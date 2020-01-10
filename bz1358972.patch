@@ -1,0 +1,71 @@
+diff -Naurp pcp-3.10.9-orig/qa/366 pcp-3.10.9/qa/366
+--- pcp-3.10.9-orig/qa/366	2015-11-09 10:34:06.000000000 +1100
++++ pcp-3.10.9/qa/366	2016-10-27 11:40:25.777674919 +1100
+@@ -58,6 +58,8 @@ $sudo rm -rf $tmp.* $seq.full
+ trap "rm -f $tmp.*; exit \$status" 0 1 2 3 15
+ 
+ cat <<End-of-File >$tmp.cull-list
++filesystem/xfs-io-linux
++filesystem/xfs-io-irix
+ networking/nfs2-client
+ networking/nfs2-server
+ networking/nfs3-client
+diff -Naurp pcp-3.10.9-orig/qa/366.out pcp-3.10.9/qa/366.out
+--- pcp-3.10.9-orig/qa/366.out	2015-11-09 10:34:06.000000000 +1100
++++ pcp-3.10.9/qa/366.out	2016-10-27 11:40:25.778674907 +1100
+@@ -217,13 +217,12 @@ QA output created by 366
+ > ## RPC stats
+ < #+ F0:n:default:
+ < ## Filesystem fullness [pmchart:FileSystem, pmie:filesys]
+----
+-> #+ filesystem/all:n:default:
+-> ## generic filesystem size, fullness and mount information
++< #----
+ < #+ F1:n:default:
+ < ## XFS data and log traffic
+ ---
+-> #+ filesystem/xfs-io-irix:x::
++> #+ filesystem/all:n:default:
++> ## generic filesystem size, fullness and mount information
+ < #+ F2:n:default:
+ < ## all available XFS data
+ ---
+@@ -273,9 +272,6 @@ QA output created by 366
+ > #+ filesystem/summary:n:default:
+ > ## filesystem size and fullness
+ > #----
+-> #+ filesystem/xfs-io-linux:n:default:
+-> ## XFS data and log I/O traffic [Linux]
+-> #----
+ > #+ kernel/load:n:default:
+ > ## load average
+ > #----
+diff -Naurp pcp-3.10.9-orig/src/pmlogconf/filesystem/localdefs pcp-3.10.9/src/pmlogconf/filesystem/localdefs
+--- pcp-3.10.9-orig/src/pmlogconf/filesystem/localdefs	2014-10-08 16:23:49.000000000 +1100
++++ pcp-3.10.9/src/pmlogconf/filesystem/localdefs	2016-10-27 11:40:25.778674907 +1100
+@@ -1 +1 @@
+-FILES = all xfs-io-irix xfs-io-linux xfs-all summary
++FILES = all xfs-io-linux xfs-all summary
+diff -Naurp pcp-3.10.9-orig/src/pmlogconf/filesystem/xfs-io-irix pcp-3.10.9/src/pmlogconf/filesystem/xfs-io-irix
+--- pcp-3.10.9-orig/src/pmlogconf/filesystem/xfs-io-irix	2014-10-08 16:23:49.000000000 +1100
++++ pcp-3.10.9/src/pmlogconf/filesystem/xfs-io-irix	1970-01-01 10:00:00.000000000 +1000
+@@ -1,8 +0,0 @@
+-#pmlogconf-setup 2.0
+-ident	XFS data and log I/O traffic [Irix]
+-probe	xfs.log_writes exists ? include : exclude
+-	xfs.log_writes
+-	xfs.log_blocks
+-	xfs.log_noiclogs
+-	xfs.read_bytes
+-	xfs.write_bytes
+diff -Naurp pcp-3.10.9-orig/src/pmlogconf/filesystem/xfs-io-linux pcp-3.10.9/src/pmlogconf/filesystem/xfs-io-linux
+--- pcp-3.10.9-orig/src/pmlogconf/filesystem/xfs-io-linux	2014-10-08 16:23:49.000000000 +1100
++++ pcp-3.10.9/src/pmlogconf/filesystem/xfs-io-linux	2016-10-27 11:40:25.778674907 +1100
+@@ -1,6 +1,6 @@
+ #pmlogconf-setup 2.0
+ ident	XFS data and log I/O traffic [Linux]
+-probe	xfs.log.writes
++probe	xfs.log.writes exists ? include : exclude
+ 	xfs.log.writes
+ 	xfs.log.blocks
+ 	xfs.log.noiclogs

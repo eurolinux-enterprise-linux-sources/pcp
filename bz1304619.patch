@@ -1,0 +1,26 @@
+diff -Naurp pcp-3.10.9-orig/qa/778 pcp-3.10.9/qa/778
+--- pcp-3.10.9-orig/qa/778	2015-11-23 13:07:53.000000000 +1100
++++ pcp-3.10.9/qa/778	2016-10-27 12:09:43.369735218 +1100
+@@ -189,7 +189,7 @@ NR == 2	{ # PCP values
+ 	echo "$1: match"
+     else
+ 	echo "$1: no match" | tee -a $here/$seq.full
+-	cat $tmp.nomatch >>$here/$seq.full
++	[ -f $tmp.nomatch ] && cat $tmp.nomatch >>$here/$seq.full
+     fi
+    
+ }
+diff -Naurp pcp-3.10.9-orig/src/pmdas/postgresql/pmdapostgresql.pl pcp-3.10.9/src/pmdas/postgresql/pmdapostgresql.pl
+--- pcp-3.10.9-orig/src/pmdas/postgresql/pmdapostgresql.pl	2015-09-04 09:46:51.000000000 +1000
++++ pcp-3.10.9/src/pmdas/postgresql/pmdapostgresql.pl	2016-10-27 12:09:43.369735218 +1100
+@@ -89,8 +89,8 @@ my %tables_by_name = (
+     pg_stat_xact_all_tables	=> { handle => undef, values => {}, version => 9.1 },
+     pg_stat_xact_sys_tables	=> { handle => undef, values => {}, version => 9.1 },
+     pg_stat_xact_user_tables	=> { handle => undef, values => {}, version => 9.1 },
+-    pg_active			=> { handle => undef, values => {}, version => undef, sql => 'select pg_is_in_recovery(), pg_current_xlog_location()' },
+-    pg_recovery			=> { handle => undef, values => {}, version => undef, sql => 'select pg_is_in_recovery(), pg_last_xlog_receive_location(), pg_last_xlog_replay_location()' },
++    pg_active			=> { handle => undef, values => {}, version => 9.0, sql => 'select pg_is_in_recovery(), pg_current_xlog_location()' },
++    pg_recovery			=> { handle => undef, values => {}, version => 9.0, sql => 'select pg_is_in_recovery(), pg_last_xlog_receive_location(), pg_last_xlog_replay_location()' },
+ );
+ 
+ # hash of hashes holding setup and refresh function, indexed by PMID cluster

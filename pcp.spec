@@ -1,7 +1,7 @@
 Summary: System-level performance monitoring and performance management
 Name: pcp
 Version: 3.10.9
-%global buildversion 6
+%global buildversion 9
 
 Release: %{buildversion}%{?dist}
 License: GPLv2+ and LGPLv2.1+ and CC-BY
@@ -25,6 +25,12 @@ Patch4: bz1223311.patch
 Patch5: bz1303005.patch
 Patch6: bz1305939.patch
 Patch7: bz1305940.patch
+Patch8: bz1358972.patch
+Patch9: bz1373590.patch
+Patch10: bz1293661.patch
+Patch11: bz1304619.patch
+Patch12: bz1324964.patch
+Patch13: bz1414257.patch
 
 # There are no papi/libpfm devel packages for s390 nor for some rhels, disable
 %ifarch s390 s390x
@@ -1608,6 +1614,12 @@ PCP utilities and daemons, and the PCP graphical tools.
 %patch5 -p1
 %patch6 -p1
 %patch7 -p1
+%patch8 -p1
+%patch9 -p1
+%patch10 -p1
+%patch11 -p1
+%patch12 -p1
+%patch13 -p1
 
 %clean
 rm -Rf $RPM_BUILD_ROOT
@@ -1617,7 +1629,8 @@ rm -Rf $RPM_BUILD_ROOT
 export PYTHON=python%{?default_python}
 %endif
 %configure %{?_with_initd} %{?_with_doc} %{?_with_ib} %{?_with_papi} %{?_with_perfevent} %{?_with_json}
-make %{?_smp_mflags} default_pcp
+# ditch %{?_smp_mflags} for now; seems to cause s390 build failures sometimes
+make default_pcp
 
 %install
 rm -Rf $RPM_BUILD_ROOT
@@ -2579,6 +2592,19 @@ cd
 %endif
 
 %changelog
+* Mon Jan 23 2017 Nathan Scott <nathans@redhat.com> 3.10.9-9
+- Added pcp-iostat precision reporting capability (BZ 1297498)
+- Fixed a pcp-iostat argument checking stack trace (BZ 1414257)
+
+* Wed Nov 02 2016 Frank Ch. Eigler <fche@redhat.com> 3.10.9-8
+- Fix pmwebd css content-type (BZ 1324964)
+
+* Thu Oct 27 2016 Nathan Scott <nathans@redhat.com> 3.10.9-7
+- Fix pmlogconf probing of base XFS metrics (BZ 1358972)
+- Resolve SIGFPE in pcp-atop with missing metrics (BZ 1373590)
+- Support pcp-iostat uninterpolated PCP archive replay (BZ 1293661)
+- Resolve several reporting issues in PostgreSQL PMDA (BZ 1304619)
+
 * Wed Feb 10 2016 Lukas Berk <lberk@redhat.com> 3.10.9-6
 - Update pmdanamed testcaes (BZ 1303005)
 - Fix possible fd leak in pmdanamed (BZ 1223311)

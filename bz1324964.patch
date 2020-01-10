@@ -1,0 +1,23 @@
+commit dd79509e51cca281abbec7a5a71a3549314510dd [[ css only subset ]]
+Author: Frank Ch. Eigler <fche@redhat.com>
+Date:   Thu Mar 24 13:46:02 2016 -0400
+
+    pmwebd: better support for old MSIE browsers
+    
+    Switch to "gzip" content-encoding instead of the less portable
+    "deflate".  Emit a proper mime-type for CSS.
+
+diff --git a/src/pmwebapi/pmresapi.cxx b/src/pmwebapi/pmresapi.cxx
+index f93bdb1..6daa362 100644
+--- a/src/pmwebapi/pmresapi.cxx
++++ b/src/pmwebapi/pmresapi.cxx
+@@ -40,6 +40,9 @@ guess_content_type (const char *filename)
+     if (0 == strcasecmp (extension, ".html")) {
+         return "text/html";
+     }
++    if (0 == strcasecmp (extension, ".css")) {
++        return "text/css";
++    }
+     if (0 == strcasecmp (extension, ".js")) {
+         return "text/javascript";
+     }

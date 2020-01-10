@@ -619,12 +619,7 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
-ac_subst_vars='PACKAGE_CONFIGURE
-BUILD_PMMGR
-HAVE_RPMLIB
-HAVE_LIBMICROHTTPD
-lib_for_rt
-lib_for_curses
+ac_subst_vars='lib_for_curses
 lib_for_readline
 pcp_mpi_dirs
 lib_for_atomic
@@ -647,6 +642,7 @@ pcp_sysconfig_dir
 pcp_rc_dir
 pcp_desktop_dir
 pcp_icons_dir
+pcp_html_dir
 pcp_books_dir
 pcp_inc_dir
 pcp_sbin_dir
@@ -689,18 +685,35 @@ pcp_saslconf_dir
 pcp_etc_dir
 lib_for_math
 lib_for_dlopen
+lib_for_rt
 lib_for_basename
 fmt_pthread
 lib_for_pthreads
 fmt_pid
 rdynamic_flag
-IB_LIBS
+PACKAGE_CONFIGURE
+enable_manager
+enable_webapi
+HAVE_CAIRO
+cairo_LIBS
+cairo_CFLAGS
+HAVE_LIBMICROHTTPD
+libmicrohttpd_LIBS
+libmicrohttpd_CFLAGS
+PMDA_RPM
+PMDA_PERFEVENT
+PFM_LIBS
+PMDA_PAPI
+PAPI_LIBS
+PAPI_CFLAGS
+papi_LIBS
+papi_CFLAGS
 PMDA_INFINIBAND
+IB_LIBS
 PMDA_SYSTEMD
 SYSTEMD_LIBS
 SYSTEMD_CFLAGS
 lib_for_regex
-which
 grep
 pcp_syslog_prog
 pcp_ps_all_flags
@@ -709,6 +722,8 @@ pcp_ps_prog
 echo_c
 echo_n
 sort
+which
+WHICH
 echo
 ECHO
 sed
@@ -786,6 +801,10 @@ qmake
 enable_qt
 qt_release
 QMAKE
+pcp_python_prog
+enable_python3
+enable_python
+PYTHON3
 PYTHON
 GIT
 LTLIBOBJS
@@ -797,6 +816,9 @@ PACKAGE_REVISION
 PACKAGE_MINOR
 PACKAGE_MAJOR
 pcp_platform_paths
+enable_systemd
+pcp_systemdunit_dir
+SYSTEMD_SYSTEMUNITDIR
 enable_avahi
 enable_discovery
 lib_for_avahi
@@ -884,8 +906,15 @@ with_infiniband
 with_user
 with_group
 with_discovery
+with_systemd
 with_qt
+with_python
+with_python3
 with_books
+with_papi
+with_perfevent
+with_manager
+with_webapi
 enable_ssp
 enable_pie
 enable_visibility
@@ -917,6 +946,7 @@ PKG_CONFIG_PATH
 PKG_CONFIG_LIBDIR
 avahi_CFLAGS
 avahi_LIBS
+SYSTEMD_SYSTEMUNITDIR
 CXX
 CXXFLAGS
 CCC
@@ -924,6 +954,12 @@ YACC
 YFLAGS
 SYSTEMD_CFLAGS
 SYSTEMD_LIBS
+papi_CFLAGS
+papi_LIBS
+libmicrohttpd_CFLAGS
+libmicrohttpd_LIBS
+cairo_CFLAGS
+cairo_LIBS
 XMKMF'
 
 
@@ -1560,9 +1596,21 @@ Optional Packages:
                           pcp)
   --with-group            user group under which daemons run (default is pcp)
   --with-discovery        enable support for service discovery (default is on)
+  --with-systemd          enable support for systemd services (default is on)
   --with-qt               enable support for tools requiring Qt (default is
                           on)
+  --with-python           enable support for tools requiring Python (default
+                          is on)
+  --with-python3          enable support for tools requiring Python3 (default
+                          is on)
   --with-books            enable building of the PCP books (default is off)
+  --with-papi[=DIR|=MODULE]
+                          enable performance api counter pmda (default is on)
+                          The optional argument may be a full path of a PAPI
+                          installation prefix, or a pkgconfig module name.
+  --with-perfevent        enable perfevent pmda (default is on)
+  --with-manager          enable daemon manager (default is on)
+  --with-webapi           enable REST API daemon (default is on)
   --with-configdir        configuration directory [LOCALSTATEDIR/pcp/config]
   --with-perl_installdirs perl installdirs [vendor]
   --with-perl_install_base
@@ -1594,6 +1642,8 @@ Some influential environment variables:
   avahi_CFLAGS
               C compiler flags for avahi, overriding pkg-config
   avahi_LIBS  linker flags for avahi, overriding pkg-config
+  SYSTEMD_SYSTEMUNITDIR
+              value of systemdsystemunitdir for systemd, overriding pkg-config
   CXX         C++ compiler command
   CXXFLAGS    C++ compiler flags
   YACC        The `Yet Another Compiler Compiler' implementation to use.
@@ -1606,6 +1656,15 @@ Some influential environment variables:
               C compiler flags for SYSTEMD, overriding pkg-config
   SYSTEMD_LIBS
               linker flags for SYSTEMD, overriding pkg-config
+  papi_CFLAGS C compiler flags for papi, overriding pkg-config
+  papi_LIBS   linker flags for papi, overriding pkg-config
+  libmicrohttpd_CFLAGS
+              C compiler flags for libmicrohttpd, overriding pkg-config
+  libmicrohttpd_LIBS
+              linker flags for libmicrohttpd, overriding pkg-config
+  cairo_CFLAGS
+              C compiler flags for cairo, overriding pkg-config
+  cairo_LIBS  linker flags for cairo, overriding pkg-config
   XMKMF       Path to xmkmf, Makefile generator for X Window System
 
 Use these variables to override the choices made by `configure' or to help
@@ -2555,6 +2614,15 @@ fi
 
 
 
+# Check whether --with-systemd was given.
+if test "${with_systemd+set}" = set; then :
+  withval=$with_systemd; do_systemd=$withval; PACKAGE_CONFIGURE="$PACKAGE_CONFIGURE --with-systemd=$withval"
+else
+  do_systemd=check
+fi
+
+
+
 # Check whether --with-qt was given.
 if test "${with_qt+set}" = set; then :
   withval=$with_qt; do_qt=$withval; PACKAGE_CONFIGURE="$PACKAGE_CONFIGURE --with-qt=$withval"
@@ -2564,11 +2632,65 @@ fi
 
 
 
+# Check whether --with-python was given.
+if test "${with_python+set}" = set; then :
+  withval=$with_python; do_python=$withval; PACKAGE_CONFIGURE="$PACKAGE_CONFIGURE --with-python=$withval"
+else
+  do_python=check
+fi
+
+
+
+# Check whether --with-python3 was given.
+if test "${with_python3+set}" = set; then :
+  withval=$with_python3; do_python3=$withval; PACKAGE_CONFIGURE="$PACKAGE_CONFIGURE --with-python3=$withval"
+else
+  do_python3=check
+fi
+
+
+
 # Check whether --with-books was given.
 if test "${with_books+set}" = set; then :
   withval=$with_books; do_books=$withval; PACKAGE_CONFIGURE="$PACKAGE_CONFIGURE --with-books=$withval"
 else
-  do_books=off
+  do_books=no
+fi
+
+
+
+# Check whether --with-papi was given.
+if test "${with_papi+set}" = set; then :
+  withval=$with_papi; do_papi=$withval; PACKAGE_CONFIGURE="$PACKAGE_CONFIGURE --with-papi=$withval"
+else
+  do_papi=check
+fi
+
+
+
+# Check whether --with-perfevent was given.
+if test "${with_perfevent+set}" = set; then :
+  withval=$with_perfevent; do_perfevent=$withval; PACKAGE_CONFIGURE="$PACKAGE_CONFIGURE --with-perfevent=$withval"
+else
+  do_perfevent=check
+fi
+
+
+
+# Check whether --with-manager was given.
+if test "${with_manager+set}" = set; then :
+  withval=$with_manager; do_manager=$withval; PACKAGE_CONFIGURE="$PACKAGE_CONFIGURE --with-manager=$withval"
+else
+  do_manager=check
+fi
+
+
+
+# Check whether --with-webapi was given.
+if test "${with_webapi+set}" = set; then :
+  withval=$with_webapi; do_webapi=$withval; PACKAGE_CONFIGURE="$PACKAGE_CONFIGURE --with-webapi=$withval"
+else
+  do_webapi=check
 fi
 
 
@@ -2721,7 +2843,6 @@ test -n "$target_alias" &&
 
 if test -z "$target"
 then
-    echo
     echo '
 FATAL ERROR: Cannot guess your target, try explicit specification
              using --target or ask pcp@mail.performancecopilot.org'
@@ -2740,6 +2861,19 @@ fi
 echo Building on $build for $target
 echo "Build: os=$build_os cpu=$build_cpu"
 echo "Target: os=$target_os cpu=$target_cpu"
+
+if test "$cross_compiling" = "yes"; then
+    if test -f ./config.$target_os; then
+	. ./config.$target_os
+    else
+	echo
+	echo "
+FATAL ERROR: Cannot perform cross-compilation without a file to source
+             configuration information from (config.$target_os is missing)"
+	rm -rf conftest conftest.*
+	exit 1
+    fi
+fi
 
 target_distro=$target_os
 if test $target_os = linux
@@ -2772,10 +2906,6 @@ then
     $as_echo "#define IS_MINGW 1" >>confdefs.h
 
     CFLAGS="-fno-strict-aliasing"
-    export CPPFLAGS="$CPPFLAGS -I$PCP_DIR/include -I$PCP_DIR/local/include"
-    export CFLAGS="$CFLAGS -I$PCP_DIR/include -I$PCP_DIR/local/include"
-    export LDFLAGS="$LDFLAGS -L$PCP_DIR/lib -L$PCP_DIR/local/lib"
-    export PATH="$PATH:$PCP_DIR/bin:$PCP_DIR/local/bin"
 elif test $target_os = solaris
 then
     $as_echo "#define IS_SOLARIS 1" >>confdefs.h
@@ -2791,6 +2921,12 @@ then
 elif test $target_os = freebsd || test $target_os = kfreebsd
 then
     $as_echo "#define IS_FREEBSD 1" >>confdefs.h
+
+    test -f /etc/debian_version && target_distro=debian
+    export CFLAGS="-fPIC -fno-strict-aliasing -D_GNU_SOURCE"
+elif test $target_os = gnu
+then
+    $as_echo "#define IS_GNU 1" >>confdefs.h
 
     test -f /etc/debian_version && target_distro=debian
     export CFLAGS="-fPIC -fno-strict-aliasing -D_GNU_SOURCE"
@@ -4510,6 +4646,49 @@ fi
 
 
 
+enable_systemd=false
+if test "x$do_systemd" != "xno"; then :
+
+    enable_systemd=true
+
+
+if test -n "$SYSTEMD_SYSTEMUNITDIR"; then
+    pkg_cv_SYSTEMD_SYSTEMUNITDIR="$SYSTEMD_SYSTEMUNITDIR"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"systemd\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "systemd") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_SYSTEMD_SYSTEMUNITDIR=`$PKG_CONFIG --variable="systemdsystemunitdir" "systemd" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+SYSTEMD_SYSTEMUNITDIR=$pkg_cv_SYSTEMD_SYSTEMUNITDIR
+
+if test "x$SYSTEMD_SYSTEMUNITDIR" = x""; then :
+  enable_systemd=false
+else
+  pcp_systemdunit_dir=$SYSTEMD_SYSTEMUNITDIR
+fi
+
+    if test -z "$pcp_systemdunit_dir"
+    then
+	if test "$do_systemd" = "yes"
+	then
+	    as_fn_error $? "cannot enable systemd support - no systemunitdir path" "$LINENO" 5
+	fi
+	enable_systemd=false
+    fi
+
+fi
+
+
 # setup additional platform-specific binary search PATH components
 pcp_platform_paths=""
 case $target_os
@@ -4529,21 +4708,7 @@ esac
 # targets a build for non-system directories such as /usr/local.
 # AC_PREFIX_DEFAULT([])
 
-if test -f VERSION.pcp
-then
-    . ./VERSION.pcp
-fi
-
-if test -z "$PACKAGE_MAJOR" ; then
-    PACKAGE_MAJOR=1
-fi
-
-for V in MINOR REVISION BUILD; do
-	P=`eval echo \\$PACKAGE_$i`
-	if test -z "$P"; then
-		eval PACKAGE_${i}=0
-	fi
-done
+. ./VERSION.pcp
 PACKAGE_VERSION=${PACKAGE_MAJOR}.${PACKAGE_MINOR}.${PACKAGE_REVISION}
 
 
@@ -5927,6 +6092,162 @@ done
 
 
 
+for ac_prog in python3
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_PYTHON3+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$PYTHON3"; then
+  ac_cv_prog_PYTHON3="$PYTHON3" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_PYTHON3="$ac_prog"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+PYTHON3=$ac_cv_prog_PYTHON3
+if test -n "$PYTHON3"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $PYTHON3" >&5
+$as_echo "$PYTHON3" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$PYTHON3" && break
+done
+
+
+
+enable_python=false
+if test "x$do_python" != "xno"; then :
+
+    enable_python=true
+    if test -z "$PYTHON"
+    then
+	enable_python=false
+    else
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking Python version" >&5
+$as_echo_n "checking Python version... " >&6; }
+	eval `$PYTHON -V 2>&1 | awk '/^Python/ { ver=2; print $ver }' | awk -F. '{ major=1; minor=2; point=3; printf "export PY_MAJOR=%d PY_MINOR=%d PY_POINT=%d\n",$major,$minor,$point }'`
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $PY_MAJOR.$PY_MINOR.$PY_POINT" >&5
+$as_echo "$PY_MAJOR.$PY_MINOR.$PY_POINT" >&6; }
+	if test "$PY_MAJOR" -lt 2; then
+	    echo WARNING: Python version 2.6 or later does not seem to be installed.
+	    echo Cannot proceed with the Python $PY_MAJOR installation found.
+	    enable_python=false
+	fi
+	if test "$PY_MAJOR" -eq 2 -a "$PY_MINOR" -lt 6 ; then
+	    echo WARNING: Python version 2.$PY_MINOR is too old.
+	    echo Python version 2.6 or later is required for Python builds.
+	    enable_python=false
+	fi
+	for ac_header in python${PY_MAJOR}.${PY_MINOR}/Python.h
+do :
+  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
+ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
+if eval test \"x\$"$as_ac_Header"\" = x"yes"; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
+_ACEOF
+
+else
+
+	    echo WARNING: Python version $PY_MAJOR.$PY_MINOR header file missing.
+	    echo Cannot proceed with the Python $PY_MAJOR installation found.
+	    enable_python=false
+
+fi
+
+done
+
+    fi
+
+    if test "$do_python" != "check" -a "$enable_python" != "true"
+    then
+	as_fn_error $? "cannot enable Python - no supported version found" "$LINENO" 5
+    fi
+
+fi
+
+
+enable_python3=false
+if test "x$do_python3" != "xno"; then :
+
+    enable_python3=true
+    if test -z "$PYTHON3"
+    then
+	enable_python3=false
+    else
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking Python3 version" >&5
+$as_echo_n "checking Python3 version... " >&6; }
+	eval `$PYTHON3 -V 2>&1 | awk '/^Python/ { ver=2; print $ver }' | awk -F. '{ major=1; minor=2; point=3; printf "export PY_MAJOR=%d PY_MINOR=%d PY_POINT=%d\n",$major,$minor,$point }'`
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $PY_MAJOR.$PY_MINOR.$PY_POINT" >&5
+$as_echo "$PY_MAJOR.$PY_MINOR.$PY_POINT" >&6; }
+	if test "$PY_MAJOR" -lt 3; then
+	    echo WARNING: Python version 3.3 or later does not seem to be installed.
+	    echo Cannot proceed with the Python $PY_MAJOR installation found.
+	    enable_python3=false
+	fi
+	if test "$PY_MAJOR" -eq 3 -a "$PY_MINOR" -lt 3 ; then
+	    echo WARNING: Python version 3.$PY_MINOR is too old.
+	    echo Python version 3.3 or later is required for Python builds.
+	    enable_python3=false
+	fi
+	for ac_header in python${PY_MAJOR}.${PY_MINOR}m/Python.h
+do :
+  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
+ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
+if eval test \"x\$"$as_ac_Header"\" = x"yes"; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
+_ACEOF
+
+else
+
+	    echo WARNING: Python version $PY_MAJOR.$PY_MINOR header file missing.
+	    echo Cannot proceed with the Python $PY_MAJOR installation found.
+	    enable_python3=false
+
+fi
+
+done
+
+    fi
+
+    if test "$do_python3" != "check" -a "$enable_python3" != "true"
+    then
+	as_fn_error $? "cannot enable Python3 - no supported version found" "$LINENO" 5
+    fi
+
+fi
+
+
+if test "$enable_python3" = "true"
+then
+    pcp_python_prog=$PYTHON3
+else
+    pcp_python_prog=$PYTHON
+fi
+
+
 qmake=$QMAKE
 enable_qt=false
 qt_release=release
@@ -5991,20 +6312,18 @@ done
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking Qt version" >&5
 $as_echo_n "checking Qt version... " >&6; }
 	eval `$qmake --version | awk '/Using Qt version/ { ver=4; print $ver }' | awk -F. '{ major=1; minor=2; point=3; printf "export QT_MAJOR=%d QT_MINOR=%d QT_POINT=%d\n",$major,$minor,$point }'`
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $QT_MAJOR.$QT_MINOR.$QT_POINT" >&5
+$as_echo "$QT_MAJOR.$QT_MINOR.$QT_POINT" >&6; }
 	if test "$QT_MAJOR" -lt 4; then
-	    echo
 	    echo WARNING: Qt version 4.4 or later does not seem to be installed.
 	    echo Cannot proceed with the Qt $QT_MAJOR installation found.
 	    enable_qt=false
 	fi
 	if test "$QT_MAJOR" -eq 4 -a "$QT_MINOR" -lt 4 ; then
-	    echo
 	    echo WARNING: Qt version 4.$QT_MINOR is too old.
 	    echo Qt version 4.4 or later is required for Qt builds.
 	    enable_qt=false
 	fi
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $QT_MAJOR.$QT_MINOR.$QT_POINT" >&5
-$as_echo "$QT_MAJOR.$QT_MINOR.$QT_POINT" >&6; }
     fi
 
     if test "$do_qt" != "check" -a "$enable_qt" != "true"
@@ -8408,6 +8727,51 @@ fi
 fi
 echo=$ECHO
 
+if test -z "$WHICH"; then
+    # Extract the first word of "which", so it can be a program name with args.
+set dummy which; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_WHICH+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $WHICH in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_WHICH="$WHICH" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_WHICH="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  test -z "$ac_cv_path_WHICH" && ac_cv_path_WHICH="/usr/bin/which"
+  ;;
+esac
+fi
+WHICH=$ac_cv_path_WHICH
+if test -n "$WHICH"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $WHICH" >&5
+$as_echo "$WHICH" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+fi
+which=$WHICH
+
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking where unix-like sort(1) lives" >&5
 $as_echo_n "checking where unix-like sort(1) lives... " >&6; }
@@ -8469,12 +8833,13 @@ else
 fi
 
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for ps style" >&5
+if test "$cross_compiling" != "yes"; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for ps style" >&5
 $as_echo_n "checking for ps style... " >&6; }
-pcp_ps_all_flags=''
-if $pcp_ps_prog -ef >conftest.out 2>/dev/null
-then
-    ans=`$awk <conftest.out '
+    pcp_ps_all_flags=''
+    if $pcp_ps_prog -ef >conftest.out 2>/dev/null
+    then
+	ans=`$awk <conftest.out '
 NR == 1			{ if ($1 != "UID" && $1 != "USER") exit
 			  if ($2 != "PID") exit
 			}
@@ -8486,18 +8851,21 @@ $2 == 1 && / \/sbin\/init/ { print "OK"; exit }
 # Fedora 15
 $2 == 1 && / \/bin\/systemd/ { print "OK"; exit }
 # Fedora 17
-$2 == 1 && / \/usr\/lib\/systemd\/systemd/ { print "OK"; exit }'`
-    if test "$ans" = OK
-    then
-	pcp_ps_have_bsd=false
-	pcp_ps_all_flags=-ef
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: SysV" >&5
+$2 == 1 && / \/usr\/lib\/systemd\/systemd/ { print "OK"; exit }
+# Debian sid
+$2 == 1 && / \/lib\/systemd\/systemd/ { print "OK"; exit }'`
+	if test "$ans" = OK
+	then
+	    pcp_ps_have_bsd=false
+	    pcp_ps_all_flags=-ef
+	    { $as_echo "$as_me:${as_lineno-$LINENO}: result: SysV" >&5
 $as_echo "SysV" >&6; }
+	fi
     fi
-fi
-if test -z "$pcp_ps_all_flags" && $pcp_ps_prog auxww >conftest.out 2>/dev/null
-then
-    ans=`$awk <conftest.out '
+
+    if test -z "$pcp_ps_all_flags" && $pcp_ps_prog auxww >conftest.out 2>/dev/null
+    then
+	ans=`$awk <conftest.out '
 NR == 1			{ if ($1 != "UID" && $1 != "USER") exit
 			  if ($2 != "PID") exit
 			}
@@ -8505,24 +8873,24 @@ $2 == 1 && / init/	{ print "OK"; exit }
 $2 == 1 && / \/sbin\/init/ { print "OK"; exit }
 $2 == 1 && / \/sbin\/launchd/ { print "OK"; exit }
 $2 == 1 && / \/init/	{ print "OK"; exit }'`
-    if test "$ans" = OK
-    then
-	pcp_ps_have_bsd=true
-	pcp_ps_all_flags=auxww
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: BSD" >&5
+	if test "$ans" = OK
+	then
+	    pcp_ps_have_bsd=true
+	    pcp_ps_all_flags=auxww
+	    { $as_echo "$as_me:${as_lineno-$LINENO}: result: BSD" >&5
 $as_echo "BSD" >&6; }
+	fi
     fi
-fi
-if test -z "$pcp_ps_all_flags" && $pcp_ps_prog -eflW >conftest.out 2>/dev/null
-then
-    if test $target_os = mingw
+
+        if $pcp_ps_prog ${pcp_ps_all_flags}w >/dev/null 2>&1
     then
-	pcp_ps_have_bsd=false
-	pcp_ps_all_flags=-eflW
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: MinGW" >&5
-$as_echo "MinGW" >&6; }
+	if test $target_os != solaris
+	then
+	    pcp_ps_all_flags=${pcp_ps_all_flags}w
+	fi
     fi
 fi
+
 if test -z "$pcp_ps_all_flags"
 then
         { $as_echo "$as_me:${as_lineno-$LINENO}: result: unknown" >&5
@@ -8531,13 +8899,6 @@ $as_echo "unknown" >&6; }
     echo "format output from your ps(1)."
     rm -rf conftest conftest.*
     exit 1
-fi
-if $pcp_ps_prog ${pcp_ps_all_flags}w >/dev/null 2>&1
-then
-    if test $target_os != solaris
-    then
-	pcp_ps_all_flags=${pcp_ps_all_flags}w
-    fi
 fi
 
 
@@ -8557,25 +8918,23 @@ then
 fi
 
 
-if test -n "$WHICH"
-then
-    which=$WHICH
-elif sh -c 'type -p sh' >/dev/null 2>&1
-then
-    which=type
-else
-    which=which
-fi
-
-
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for /proc " >&5
 $as_echo_n "checking for /proc ... " >&6; }
-if test -d /proc
+if test "$cross_compiling" = "yes"; then
+    ans=$have_procfs
+    echo "cross-compile -> \"$ans\"" >&5
+elif test -d /proc
 then
-    $as_echo "#define HAVE_PROCFS 1" >>confdefs.h
-
+    have_procfs=true
+else
+    have_procfs=false
+fi
+if $have_procfs
+then
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
+    $as_echo "#define HAVE_PROCFS 1" >>confdefs.h
+
 else
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
@@ -8918,7 +9277,7 @@ fi
 
 done
 
-for ac_header in sys/time.h sys/timeb.h sys/times.h
+for ac_header in sys/time.h sys/times.h
 do :
   as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
 ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
@@ -9068,6 +9427,18 @@ do :
 if test "x$ac_cv_header_iptypes_h" = xyes; then :
   cat >>confdefs.h <<_ACEOF
 #define HAVE_IPTYPES_H 1
+_ACEOF
+
+fi
+
+done
+
+for ac_header in fts.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "fts.h" "ac_cv_header_fts_h" "$ac_includes_default"
+if test "x$ac_cv_header_fts_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_FTS_H 1
 _ACEOF
 
 fi
@@ -9492,24 +9863,24 @@ fi
 	# Put the nasty error message in config.log where it belongs
 	echo "$SYSTEMD_PKG_ERRORS" >&5
 
-	 pmda_systemd=
+	pmda_systemd=false
 elif test $pkg_failed = untried; then
      	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
-	 pmda_systemd=
+	pmda_systemd=false
 else
 	SYSTEMD_CFLAGS=$pkg_cv_SYSTEMD_CFLAGS
 	SYSTEMD_LIBS=$pkg_cv_SYSTEMD_LIBS
         { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
-	 pmda_systemd=systemd
+	pmda_systemd=true
 fi
 PMDA_SYSTEMD=$pmda_systemd
 
 
-pmda_infiniband=
-if test "$do_infiniband" = "check" -o "$do_infiniband" = "yes"
-then
+pmda_infiniband=false
+if test "x$do_infiniband" != "xno"; then :
+
     for ac_header in infiniband/umad.h
 do :
   ac_fn_c_check_header_mongrel "$LINENO" "infiniband/umad.h" "ac_cv_header_infiniband_umad_h" "$ac_includes_default"
@@ -9525,7 +9896,7 @@ if test "x$ac_cv_header_infiniband_mad_h" = xyes; then :
   cat >>confdefs.h <<_ACEOF
 #define HAVE_INFINIBAND_MAD_H 1
 _ACEOF
- pmda_infiniband=infiniband
+ pmda_infiniband=true
 fi
 
 done
@@ -9535,6 +9906,7 @@ fi
 
 done
 
+    savedLIBS=$LIBS
     IB_LIBS=""
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for madrpc_init in -libmad" >&5
 $as_echo_n "checking for madrpc_init in -libmad... " >&6; }
@@ -9629,7 +10001,6 @@ fi
     if test $ac_cv_lib_ibmad_madrpc_init = yes -a $ac_cv_lib_ibumad_umad_init = yes
     then
 	IB_LIBS="-libmad -libumad"
-	savedLIBS=$LIBS
 	LIBS="$IB_LIBS"
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for port_performance_query_via" >&5
 $as_echo_n "checking for port_performance_query_via... " >&6; }
@@ -9702,15 +10073,514 @@ rm -f core conftest.err conftest.$ac_objext \
 	then
 	    :
 	else
-	    pmda_infiniband=
+	    pmda_infiniband=false
 	fi
     else
-	pmda_infiniband=
+	pmda_infiniband=false
     fi
-    PMDA_INFINIBAND=$pmda_infiniband
+    LIBS=$savedLIBS
 
 
 fi
+PMDA_INFINIBAND=$pmda_infiniband
+
+
+pmda_papi=false
+if test "x$do_papi" != "xno"; then :
+
+    enable_papi=true
+
+    saved_LDFLAGS="$LDFLAGS"
+    saved_CFLAGS="$CFLAGS"
+    savedLIBS=$LIBS
+
+    case "$do_papi" in
+      yes|no|check) ;;
+	 */*) PAPI_ROOTDIR=$do_papi;
+	      CFLAGS="-I$PAPI_ROOTDIR/include"
+	      LDFLAGS="-L$PAPI_ROOTDIR/lib" ;;
+	 *)
+pkg_failed=no
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for papi" >&5
+$as_echo_n "checking for papi... " >&6; }
+
+if test -n "$papi_CFLAGS"; then
+    pkg_cv_papi_CFLAGS="$papi_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"\$do_papi\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "$do_papi") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_papi_CFLAGS=`$PKG_CONFIG --cflags "$do_papi" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$papi_LIBS"; then
+    pkg_cv_papi_LIBS="$papi_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"\$do_papi\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "$do_papi") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_papi_LIBS=`$PKG_CONFIG --libs "$do_papi" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+	        papi_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "$do_papi" 2>&1`
+        else
+	        papi_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "$do_papi" 2>&1`
+        fi
+	# Put the nasty error message in config.log where it belongs
+	echo "$papi_PKG_ERRORS" >&5
+
+	as_fn_error $? "Package requirements ($do_papi) were not met:
+
+$papi_PKG_ERRORS
+
+Consider adjusting the PKG_CONFIG_PATH environment variable if you
+installed software in a non-standard prefix.
+
+Alternatively, you may set the environment variables papi_CFLAGS
+and papi_LIBS to avoid the need to call pkg-config.
+See the pkg-config man page for more details." "$LINENO" 5
+elif test $pkg_failed = untried; then
+     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+	{ { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "The pkg-config script could not be found or is too old.  Make sure it
+is in your PATH or set the PKG_CONFIG environment variable to the full
+path to pkg-config.
+
+Alternatively, you may set the environment variables papi_CFLAGS
+and papi_LIBS to avoid the need to call pkg-config.
+See the pkg-config man page for more details.
+
+To get pkg-config, see <http://pkg-config.freedesktop.org/>.
+See \`config.log' for more details" "$LINENO" 5; }
+else
+	papi_CFLAGS=$pkg_cv_papi_CFLAGS
+	papi_LIBS=$pkg_cv_papi_LIBS
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+		CFLAGS="$papi_CFLAGS"
+		LDFLAGS="$papi_LIBS"
+fi ;;
+                # $papi_LIBS will include -lpapi harmlessly redudantly with AC_CHECK_LIB
+    esac
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for PAPI_library_init in -lpapi" >&5
+$as_echo_n "checking for PAPI_library_init in -lpapi... " >&6; }
+if ${ac_cv_lib_papi_PAPI_library_init+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lpapi  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char PAPI_library_init ();
+int
+main ()
+{
+return PAPI_library_init ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_papi_PAPI_library_init=yes
+else
+  ac_cv_lib_papi_PAPI_library_init=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_papi_PAPI_library_init" >&5
+$as_echo "$ac_cv_lib_papi_PAPI_library_init" >&6; }
+if test "x$ac_cv_lib_papi_PAPI_library_init" = xyes; then :
+  papi_libs="$LDFLAGS -lpapi"
+else
+  enable_papi=false
+fi
+
+    for ac_header in papi.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "papi.h" "ac_cv_header_papi_h" "$ac_includes_default"
+if test "x$ac_cv_header_papi_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_PAPI_H 1
+_ACEOF
+ papi_cflags="$CFLAGS"
+else
+  enable_papi=false
+fi
+
+done
+
+    if test "$do_papi" != "check" -a "$enable_papi" != "true"
+    then
+	as_fn_error cannot enable the PAPI PMDA "PAPI is not installed" "$LINENO" 5
+    else
+	pmda_papi=$enable_papi
+    fi
+    LIBS=$savedLIBS
+    CFLAGS="$saved_CFLAGS"
+    LDFLAGS="$saved_LDFLAGS"
+    PAPI_CFLAGS=$papi_cflags
+
+    PAPI_LIBS=$papi_libs
+
+
+fi
+PMDA_PAPI=$pmda_papi
+
+
+if test "x$pmda_papi" = "xtrue"; then :
+
+    		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether struct PAPI_component_info_t has a disabled field" >&5
+$as_echo_n "checking whether struct PAPI_component_info_t has a disabled field... " >&6; }
+cat <<End-of-File >conftest.c
+#include <papi.h>
+int main() { PAPI_component_info_t *c; c->disabled = 0; }
+End-of-File
+	(eval $ac_compile) 2>conftest.out
+	cat conftest.out >&5
+    	if test -s conftest.out
+    	then
+	   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+    	else
+    	   $as_echo "#define HAVE_PAPI_DISABLED_COMP 1" >>confdefs.h
+
+    	   { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+    	fi
+    	rm -f conftest.*
+
+fi
+
+pmda_perfevent=false
+if test "x$do_perfevent" != "xno" ; then :
+
+    enable_perfevent=true
+
+    savedLIBS=$LIBS
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for pfm_get_os_event_encoding in -lpfm" >&5
+$as_echo_n "checking for pfm_get_os_event_encoding in -lpfm... " >&6; }
+if ${ac_cv_lib_pfm_pfm_get_os_event_encoding+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lpfm  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char pfm_get_os_event_encoding ();
+int
+main ()
+{
+return pfm_get_os_event_encoding ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_pfm_pfm_get_os_event_encoding=yes
+else
+  ac_cv_lib_pfm_pfm_get_os_event_encoding=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_pfm_pfm_get_os_event_encoding" >&5
+$as_echo "$ac_cv_lib_pfm_pfm_get_os_event_encoding" >&6; }
+if test "x$ac_cv_lib_pfm_pfm_get_os_event_encoding" = xyes; then :
+  pfm_libs="-lpfm"
+else
+  enable_perfevent=false
+fi
+
+    for ac_header in perfmon/pfmlib_perf_event.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "perfmon/pfmlib_perf_event.h" "ac_cv_header_perfmon_pfmlib_perf_event_h" "$ac_includes_default"
+if test "x$ac_cv_header_perfmon_pfmlib_perf_event_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_PERFMON_PFMLIB_PERF_EVENT_H 1
+_ACEOF
+
+else
+  enable_perfevent=false
+fi
+
+done
+
+    if test "$do_perfevent" != "check" -a "$enable_papi" != "true"
+    then
+	as_fn_error cannot enable the perfevent PMDA "libpfm is not installed" "$LINENO" 5
+    else
+	pmda_perfevent=$enable_perfevent
+    fi
+    LIBS=$savedLIBS
+    PFM_LIBS=$pfm_libs
+
+
+fi
+PMDA_PERFEVENT=$pmda_perfevent
+
+
+pmda_rpm=false
+savedLIBS=$LIBS
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for rpmlib > 4.4.2" >&5
+$as_echo_n "checking for rpmlib > 4.4.2... " >&6; }
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <rpm/header.h>
+int
+main ()
+{
+(void)HEADERGET_EXT;
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+    pmda_rpm=true
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+PMDA_RPM=$pmda_rpm
+
+LIBS=$savedLIBS
+
+
+pkg_failed=no
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for libmicrohttpd" >&5
+$as_echo_n "checking for libmicrohttpd... " >&6; }
+
+if test -n "$libmicrohttpd_CFLAGS"; then
+    pkg_cv_libmicrohttpd_CFLAGS="$libmicrohttpd_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libmicrohttpd > 0.9.9\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libmicrohttpd > 0.9.9") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_libmicrohttpd_CFLAGS=`$PKG_CONFIG --cflags "libmicrohttpd > 0.9.9" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$libmicrohttpd_LIBS"; then
+    pkg_cv_libmicrohttpd_LIBS="$libmicrohttpd_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libmicrohttpd > 0.9.9\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libmicrohttpd > 0.9.9") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_libmicrohttpd_LIBS=`$PKG_CONFIG --libs "libmicrohttpd > 0.9.9" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+	        libmicrohttpd_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "libmicrohttpd > 0.9.9" 2>&1`
+        else
+	        libmicrohttpd_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "libmicrohttpd > 0.9.9" 2>&1`
+        fi
+	# Put the nasty error message in config.log where it belongs
+	echo "$libmicrohttpd_PKG_ERRORS" >&5
+
+	have_libmicrohttpd=false
+elif test $pkg_failed = untried; then
+     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+	have_libmicrohttpd=false
+else
+	libmicrohttpd_CFLAGS=$pkg_cv_libmicrohttpd_CFLAGS
+	libmicrohttpd_LIBS=$pkg_cv_libmicrohttpd_LIBS
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+	have_libmicrohttpd=true
+fi
+HAVE_LIBMICROHTTPD=$have_libmicrohttpd
+
+
+
+pkg_failed=no
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for cairo" >&5
+$as_echo_n "checking for cairo... " >&6; }
+
+if test -n "$cairo_CFLAGS"; then
+    pkg_cv_cairo_CFLAGS="$cairo_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"cairo >= 1.2, cairo-ft >= 1.2, cairo-png >= 1.2\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "cairo >= 1.2, cairo-ft >= 1.2, cairo-png >= 1.2") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_cairo_CFLAGS=`$PKG_CONFIG --cflags "cairo >= 1.2, cairo-ft >= 1.2, cairo-png >= 1.2" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$cairo_LIBS"; then
+    pkg_cv_cairo_LIBS="$cairo_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"cairo >= 1.2, cairo-ft >= 1.2, cairo-png >= 1.2\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "cairo >= 1.2, cairo-ft >= 1.2, cairo-png >= 1.2") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_cairo_LIBS=`$PKG_CONFIG --libs "cairo >= 1.2, cairo-ft >= 1.2, cairo-png >= 1.2" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+   	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+	        cairo_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "cairo >= 1.2, cairo-ft >= 1.2, cairo-png >= 1.2" 2>&1`
+        else
+	        cairo_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "cairo >= 1.2, cairo-ft >= 1.2, cairo-png >= 1.2" 2>&1`
+        fi
+	# Put the nasty error message in config.log where it belongs
+	echo "$cairo_PKG_ERRORS" >&5
+
+	have_cairo=false
+elif test $pkg_failed = untried; then
+     	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+	have_cairo=false
+else
+	cairo_CFLAGS=$pkg_cv_cairo_CFLAGS
+	cairo_LIBS=$pkg_cv_cairo_LIBS
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+	have_cairo=true
+fi
+HAVE_CAIRO=$have_cairo
+
+
+enable_webapi=false
+if test "x$do_webapi" != "xno"; then :
+
+    enable_webapi=true
+
+    if test "$do_webapi" != "check" -a "$have_libmicrohttpd" != "true"
+    then
+	as_fn_error cannot enable the web API "libmicrohttpd is not installed" "$LINENO" 5
+    elif test "$do_webapi" != "check" -a "x$cxx" = "x"
+    then
+	as_fn_error cannot enable the web API "C++ compiler unavailable" "$LINENO" 5
+    else
+	enable_webapi=$have_libmicrohttpd
+    fi
+
+fi
+
+
+enable_manager=false
+if test "x$do_manager" != "xno"; then :
+
+    enable_manager=true
+
+    if test "$do_manager" != "check" -a $target_os = mingw
+    then
+	as_fn_error cannot enable daemon manager "Target platform is MinGW" "$LINENO" 5
+    elif test "$do_manager" != "check" -a "x$cxx" = "x"
+    then
+	as_fn_error cannot enable daemon manager "C++ compiler unavailable" "$LINENO" 5
+    fi
+
+fi
+
+
+
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking return type of signal handlers" >&5
 $as_echo_n "checking return type of signal handlers... " >&6; }
@@ -9828,7 +10698,7 @@ fi
 done
 
 
-for ac_func in mktime nanosleep unsetenv
+for ac_func in mktime nanosleep usleep unsetenv
 do :
   as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
 ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
@@ -9924,7 +10794,19 @@ _ACEOF
 fi
 done
 
-for ac_func in strtod strtol strtoll strtoull strndup
+for ac_func in strtod strtol strtoll strtoull strndup strchrnul
+do :
+  as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
+ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
+if eval test \"x\$"$as_ac_var"\" = x"yes"; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_func" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+done
+
+for ac_func in getuid getgid
 do :
   as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
 ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
@@ -9961,6 +10843,18 @@ fi
 done
 
 for ac_func in sysinfo trace_back_stack backtrace
+do :
+  as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
+ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
+if eval test \"x\$"$as_ac_var"\" = x"yes"; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_func" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+done
+
+for ac_func in sendmsg recvmsg setns
 do :
   as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
 ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
@@ -10423,23 +11317,33 @@ fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking if linker supports -rdynamic" >&5
 $as_echo_n "checking if linker supports -rdynamic... " >&6; }
-cat <<End-of-File >conftest.c
-main() {;}
-End-of-File
-rdynamic_flag=
-$CC -o conftest -rdynamic conftest.c 2>conftest.out
-test -s conftest.out || rdynamic_flag=-rdynamic
+save_CFLAGS="$CFLAGS"
+CFLAGS="-rdynamic"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
 
-if test -z "$rdynamic_flag"
-then
-   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-else
-   { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
+     rdynamic_flag=-rdynamic
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+     rdynamic_flag=
+
 fi
-rm -f conftest.c conftest.o conftest
-rm -rf conftest.dSYM
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+CFLAGS="$save_CFLAGS"
+
+
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether const arg for scandir() select method" >&5
 $as_echo_n "checking whether const arg for scandir() select method... " >&6; }
@@ -10471,7 +11375,7 @@ cat <<End-of-File >conftest.c
 #include <stdlib.h>
 #include <unistd.h>
 #include <dirent.h>
-int main() { struct dirent.d; d.d_off = 0; }
+int main() { struct dirent d; d.d_off = 0; }
 End-of-File
 (eval $ac_compile) 2>conftest.out
 cat conftest.out >&5
@@ -10489,14 +11393,19 @@ rm -f conftest.*
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking if printf %p produces 0x prefix" >&5
 $as_echo_n "checking if printf %p produces 0x prefix... " >&6; }
-cat <<End-of-File >conftest.c
+if test "$cross_compiling" = "yes"; then
+    ans=$printf_p_prefix
+    echo "cross-compile -> \"$ans\"" >&5
+else
+    cat <<End-of-File >conftest.c
 #include <stdio.h>
 main(int argc,  char **argv) { printf("%p", argv); exit(0); }
 End-of-File
-(eval $ac_compile) 2>&5
-(eval $ac_link) 2>&5
-ans=`./conftest`
-echo "./conftest -> \"$ans\"" >&5
+    (eval $ac_compile) 2>&5
+    (eval $ac_link) 2>&5
+    ans=`./conftest`
+    echo "./conftest -> \"$ans\"" >&5
+fi
 case "$ans"
 in
     0x*)
@@ -10591,6 +11500,9 @@ $2 == "bozo"	{ t = $1
 	;;
     long|'long int')
 	_fmt='"ld"'
+	;;
+    'long long'|'long long int')
+	_fmt='"lld"'
 	;;
     'unsigned long'|'unsigned long int'|'long unsigned int')
 	_fmt='"lu"'
@@ -10814,14 +11726,19 @@ fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking sizeof long" >&5
 $as_echo_n "checking sizeof long... " >&6; }
-cat <<End-of-File >conftest.c
+if test "$cross_compiling" = "yes"; then
+    ans=$sizeof_long
+    echo "cross-compile -> \"$ans\"" >&5
+else
+    cat <<End-of-File >conftest.c
 #include <stdio.h>
 main() { printf("%d", (int)sizeof(long)); }
 End-of-File
-(eval $ac_compile) 2>&5
-(eval $ac_link) 2>&5
-ans=`./conftest`
-echo "./conftest -> \"$ans\"" >&5
+    (eval $ac_compile) 2>&5
+    (eval $ac_link) 2>&5
+    ans=`./conftest`
+    echo "./conftest -> \"$ans\"" >&5
+fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ans" >&5
 $as_echo "$ans" >&6; }
 if test "$ans" = 4; then
@@ -10841,14 +11758,19 @@ rm -rf conftest conftest.*
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking sizeof pointer" >&5
 $as_echo_n "checking sizeof pointer... " >&6; }
-cat <<End-of-File >conftest.c
+if test "$cross_compiling" = "yes"; then
+    ans=$sizeof_pointer
+    echo "cross-compile -> \"$ans\"" >&5
+else
+    cat <<End-of-File >conftest.c
 #include <stdio.h>
 main() { printf("%d", (int)sizeof(char *)); }
 End-of-File
-(eval $ac_compile) 2>&5
-(eval $ac_link) 2>&5
-ans=`./conftest`
-echo "./conftest -> \"$ans\"" >&5
+    (eval $ac_compile) 2>&5
+    (eval $ac_link) 2>&5
+    ans=`./conftest`
+    echo "./conftest -> \"$ans\"" >&5
+fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ans" >&5
 $as_echo "$ans" >&6; }
 if test "$ans" = 4; then
@@ -10870,14 +11792,19 @@ rm -rf conftest conftest.*
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking sizeof int" >&5
 $as_echo_n "checking sizeof int... " >&6; }
-cat <<End-of-File >conftest.c
+if test "$cross_compiling" = "yes"; then
+    ans=$sizeof_int
+    echo "cross-compile -> \"$ans\"" >&5
+else
+    cat <<End-of-File >conftest.c
 #include <stdio.h>
 main() { printf("%d", (int)sizeof(int)); }
 End-of-File
-(eval $ac_compile) 2>&5
-(eval $ac_link) 2>&5
-ans=`./conftest`
-echo "./conftest -> \"$ans\"" >&5
+    (eval $ac_compile) 2>&5
+    (eval $ac_link) 2>&5
+    ans=`./conftest`
+    echo "./conftest -> \"$ans\"" >&5
+fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ans" >&5
 $as_echo "$ans" >&6; }
 if test "$ans" != 4
@@ -10893,14 +11820,19 @@ rm -rf conftest conftest.*
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking if bit fields allocated left-to-right" >&5
 $as_echo_n "checking if bit fields allocated left-to-right... " >&6; }
-cat <<End-of-File >conftest.c
+if test "$cross_compiling" = "yes"; then
+    ans=$bit_field_scheme
+    echo "cross-compile -> \"$ans\"" >&5
+else
+    cat <<End-of-File >conftest.c
 union { struct { unsigned int b:4; unsigned int c:4; } a; int p; } u;
 main() { u.a.b = 1; u.a.c = 2; printf("%0*x", 2*sizeof(int), u.p); }
 End-of-File
-(eval $ac_compile) 2>&5
-(eval $ac_link) 2>&5
-ans=`./conftest`
-echo "./conftest -> \"$ans\"" >&5
+    (eval $ac_compile) 2>&5
+    (eval $ac_link) 2>&5
+    ans=`./conftest`
+    echo "./conftest -> \"$ans\"" >&5
+fi
 case "$ans"
 in
     1200*|*0012)
@@ -11024,6 +11956,74 @@ fi
 	lib_for_basename="-lgen"
     else
 	lib_for_basename="-lpcp"
+    fi
+fi
+
+
+lib_for_clock_gettime=
+for ac_func in clock_gettime
+do :
+  ac_fn_c_check_func "$LINENO" "clock_gettime" "ac_cv_func_clock_gettime"
+if test "x$ac_cv_func_clock_gettime" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_CLOCK_GETTIME 1
+_ACEOF
+
+fi
+done
+
+if test $ac_cv_func_clock_gettime = no
+then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for clock_gettime in -lrt" >&5
+$as_echo_n "checking for clock_gettime in -lrt... " >&6; }
+if ${ac_cv_lib_rt_clock_gettime+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lrt  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char clock_gettime ();
+int
+main ()
+{
+return clock_gettime ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_rt_clock_gettime=yes
+else
+  ac_cv_lib_rt_clock_gettime=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_rt_clock_gettime" >&5
+$as_echo "$ac_cv_lib_rt_clock_gettime" >&6; }
+if test "x$ac_cv_lib_rt_clock_gettime" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBRT 1
+_ACEOF
+
+  LIBS="-lrt $LIBS"
+
+fi
+
+    if test $ac_cv_lib_rt_clock_gettime = yes
+    then
+	$as_echo "#define HAVE_CLOCK_GETTIME 1" >>confdefs.h
+
+	lib_for_rt=-lrt
     fi
 fi
 
@@ -12491,6 +13491,8 @@ pcp_inc_dir=`eval echo $pcp_inc_dir`
 
 pcp_books_dir=`eval echo $datarootdir/doc/pcp-doc`
 pcp_books_dir=`eval echo $pcp_books_dir`
+pcp_html_dir=`eval echo $pcp_books_dir/html`
+
 
 
 pcp_icons_dir=`eval echo $datarootdir/pcp-gui/pixmaps`
@@ -12506,7 +13508,13 @@ pcp_desktop_dir=`eval echo $pcp_desktop_dir`
 if test "${with_rcdir+set}" = set; then :
   withval=$with_rcdir; pcp_rc_dir=$withval
 else
-  pcp_rc_dir=$pcp_etc_dir/rc.d
+
+if $enable_systemd
+then
+    pcp_rc_dir="$pcp_share_dir/lib"
+else
+    pcp_rc_dir="$pcp_etc_dir/init.d"
+fi
 fi
 
 
@@ -13272,7 +14280,8 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking if strftime knows about %z" >&5
 $as_echo_n "checking if strftime knows about %z... " >&6; }
 if test "$cross_compiling" = yes; then :
-  0
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
 else
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
@@ -13478,136 +14487,10 @@ $as_echo "no" >&6; }
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
-savedLIBS=$LIBS
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for timer_gettime in -lrt" >&5
-$as_echo_n "checking for timer_gettime in -lrt... " >&6; }
-if ${ac_cv_lib_rt_timer_gettime+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lrt  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char timer_gettime ();
-int
-main ()
-{
-return timer_gettime ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_rt_timer_gettime=yes
-else
-  ac_cv_lib_rt_timer_gettime=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_rt_timer_gettime" >&5
-$as_echo "$ac_cv_lib_rt_timer_gettime" >&6; }
-if test "x$ac_cv_lib_rt_timer_gettime" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBRT 1
-_ACEOF
-
-  LIBS="-lrt $LIBS"
-
-fi
-
-lib_for_rt=""
-if test $ac_cv_lib_rt_timer_gettime = yes
-then
-    lib_for_rt="-lrt"
-fi
-
-LIBS=$savedLIBS
-
-savedLIBS=$LIBS
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for libmicrohttpd > 0.9.9" >&5
-$as_echo_n "checking for libmicrohttpd > 0.9.9... " >&6; }
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-#include <microhttpd.h>
-int
-main ()
-{
-(void)MHD_RESPMEM_PERSISTENT;
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-    have_libmicrohttpd=1
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-    have_libmicrohttpd=0
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-HAVE_LIBMICROHTTPD=$have_libmicrohttpd
-
-LIBS=$savedLIBS
-
-savedLIBS=$LIBS
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for rpmlib > 4.4.2" >&5
-$as_echo_n "checking for rpmlib > 4.4.2... " >&6; }
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-#include <rpm/header.h>
-int
-main ()
-{
-(void)HEADERGET_EXT;
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-    have_rpmlib=1
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-    have_rpmlib=0
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-HAVE_RPMLIB=$have_rpmlib
-
-LIBS=$savedLIBS
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for pmmgr prerequisites" >&5
-$as_echo_n "checking for pmmgr prerequisites... " >&6; }
-if test $target_os != mingw -a "$cxx" != ""
-then
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-        build_pmmgr=yes
-else
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-        build_pmmgr=no
-fi
-BUILD_PMMGR=$build_pmmgr
 
 
 
-
-
-
-ac_config_files="$ac_config_files src/include/builddefs src/include/pcp.conf pcp.lsm debian/pcp.preinst.head debian/pcp.postinst.head build/tar/preinstall.head build/tar/postinstall.head build/GNUlocaldefs"
+ac_config_files="$ac_config_files src/include/builddefs src/include/pcp.conf pcp.lsm debian/pcp.preinst.head debian/pcp.postinst.head build/tar/preinstall.head build/tar/postinstall.head build/GNUlocaldefs build/mac/uninstall-pcp"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -14309,6 +15192,7 @@ do
     "build/tar/preinstall.head") CONFIG_FILES="$CONFIG_FILES build/tar/preinstall.head" ;;
     "build/tar/postinstall.head") CONFIG_FILES="$CONFIG_FILES build/tar/postinstall.head" ;;
     "build/GNUlocaldefs") CONFIG_FILES="$CONFIG_FILES build/GNUlocaldefs" ;;
+    "build/mac/uninstall-pcp") CONFIG_FILES="$CONFIG_FILES build/mac/uninstall-pcp" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

@@ -1,0 +1,1034 @@
+diff -Naurp pcp-3.10.3.orig/qa/079 pcp-3.10.3/qa/079
+--- pcp-3.10.3.orig/qa/079	2015-01-21 02:18:01.000000000 +1100
++++ pcp-3.10.3/qa/079	2015-03-19 16:22:17.593828105 +1100
+@@ -30,11 +30,8 @@ _filter()
+ # od(1) differs ... we don't really care too much about the first few
+ # bytes, so the tr(1) mapping is OK ...
+ #
+-echo "Dump first 128 bytes ..."
+-dd bs=128 count=1 if=$ARCH.0 2>/dev/null \
+-| tr '\204\375\272' '\004\175\072' \
+-| od -c \
+-| sed -e 's/^\([0-7][0-7]*\)  */\1 /'
++echo "Dump first 128 bytes ..." > $seq.full
++dd bs=128 count=1 if=$ARCH.0 2>/dev/null | od -c >> $seq.full
+ 
+ echo ""
+ TZ=EST-10
+diff -Naurp pcp-3.10.3.orig/qa/079.out pcp-3.10.3/qa/079.out
+--- pcp-3.10.3.orig/qa/079.out	2015-01-21 02:18:01.000000000 +1100
++++ pcp-3.10.3/qa/079.out	2015-03-19 16:22:17.593828105 +1100
+@@ -1,13 +1,4 @@
+ QA output created by 079
+-Dump first 128 bytes ...
+-0000000 \0  \0  \0 004   P 005   & 002  \0  \0   ]   |   7   }   q   #
+-0000020 \0  \f 022   :  \0  \0  \0  \0   m   o   o   m   b   a  \0  \0
+-0000040 \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0
+-*
+-0000120 \0  \0  \0  \0  \0  \0  \0  \0   E   S   T   -   1   1   E   S
+-0000140 T   -   1   0   ,   8   7   /   2   :   0   0   ,   3   0   4
+-0000160 /   3   :   0   0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0
+-0000200
+ 
+ Local time, TZ=EST-10
+ pmclient: pmFetch: End of PCP archive log
+diff -Naurp pcp-3.10.3.orig/qa/145 pcp-3.10.3/qa/145
+--- pcp-3.10.3.orig/qa/145	2015-03-03 07:07:15.000000000 +1100
++++ pcp-3.10.3/qa/145	2015-03-19 16:22:17.605828096 +1100
+@@ -13,14 +13,6 @@ echo "QA output created by $seq"
+ . ./common.filter
+ . ./common.check
+ 
+-rm -f $seq.out
+-_get_libpcp_config
+-if $secure_sockets ; then
+-    ln $seq.out.sec $seq.out || exit 1
+-else
+-    ln $seq.out.nonsec $seq.out || exit 1
+-fi
+-
+ trap "rm -f $tmp $tmp.*; exit" 0 1 2 3 15
+ 
+ _filter_load()
+@@ -32,9 +24,12 @@ _filter()
+ {
+     # initial ones are regular stuff ...
+     # later ones are for systems that are not network byte ordered
+-    # also, deal with optional pmcd features (16 bits, error PDU).
++    # also, deal with optional pmcd features (16 bits, error PDU);
++    # squash them all into one common pattern, and when diagnosing
++    # new failures, refer to seq.full
+     #
+-    sed \
++    tee -a $seq.full \
++    | sed \
+ 	-e 's/ fd=[0-9][0-9]*/ fd=<n>/' \
+ 	-e 's/dump from.*/dump from .../' \
+ 	-e 's/^\[[0-9][0-9]*]/[PID]/' \
+@@ -49,9 +44,13 @@ s/\(000:..............7001......... \)..
+ 	-e 's/ffffffff  a000000/ffffffff        a/' \
+ 	-e 's/ffffffff  3000000/ffffffff        3/' \
+ 	-e 's/  b004007/  740000b/' \
+-	-e 's/  2010040/ 40000102/' \
+-	-e 's/  2010057/ 57000102/' \
+-	-e 's/ 17000102/ 57000102/' \
++	-e '/ 7000 /{
++s/  2010040/  2010000/
++s/  2010057/  2010000/
++s/      102/  2010000/
++s/ 17000102/  2010000/
++s/ 57000102/  2010000/
++}' \
+ 	-e 's/  201[0-9][0-9][0-9][0-9]/  2010000/' \
+ 	-e 's/  [0-9][0-9][0-9][0-9]102/  2010000/' \
+ 	-e 's/      201/  1020000/' \
+diff -Naurp pcp-3.10.3.orig/qa/145.out pcp-3.10.3/qa/145.out
+--- pcp-3.10.3.orig/qa/145.out	1970-01-01 10:00:00.000000000 +1000
++++ pcp-3.10.3/qa/145.out	2015-03-19 16:22:17.606828095 +1100
+@@ -0,0 +1,78 @@
++QA output created by 145
++Error Parsing ASCII PMNS: Duplicate metric id (29.0.11) in name space for metrics "another_ten" and "ten"
++
++pminfo: Cannot load namespace from "TMP": Problems parsing PMNS definitions
++[PID]pmGetPDU: ERROR fd=<n> len=20 from=PMCD
++000:       14     7000     FROM        0  2010000 
++[PID]pmXmitPDU: CREDS fd=<n> len=20
++000:       14     700c     FROM        1  1020000 
++[PID]pmXmitPDU: PROFILE fd=<n> len=28
++000:       1c     7002     FROM        0        0        0        0 
++[PID]pmXmitPDU: FETCH fd=<n> len=32
++000:       20     7003     FROM        0        0        0        1  740000b 
++[PID]pmGetPDU: RESULT fd=<n> len=44 from=PMCD
++000:       2c     7001     FROM     DATE    STAMP        1  740000b        1 
++008:        0 ffffffff        a 
++pmResult dump from ...
++  29.0.11 (yet.again, yet.another.ten, another_ten, ten): numval: 1 valfmt: 0 vlist[]:
++   value 10
++[PID]pmXmitPDU: DESC_REQ fd=<n> len=16
++000:       10     7004     FROM  740000b 
++[PID]pmGetPDU: DESC fd=<n> len=32 from=PMCD
++000:       20     7005     FROM  740000b        0 ffffffff        3        0 
++[PID]pmXmitPDU: FETCH fd=<n> len=32
++000:       20     7003     FROM        0        0        0        1  740000b 
++[PID]pmGetPDU: RESULT fd=<n> len=44 from=PMCD
++000:       2c     7001     FROM     DATE    STAMP        1  740000b        1 
++008:        0 ffffffff        a 
++pmResult dump from ...
++  29.0.11 (yet.again, yet.another.ten, another_ten, ten): numval: 1 valfmt: 0 vlist[]:
++   value 10
++[PID]pmXmitPDU: DESC_REQ fd=<n> len=16
++000:       10     7004     FROM  740000b 
++[PID]pmGetPDU: DESC fd=<n> len=32 from=PMCD
++000:       20     7005     FROM  740000b        0 ffffffff        3        0 
++[PID]pmXmitPDU: FETCH fd=<n> len=32
++000:       20     7003     FROM        0        0        0        1  740000b 
++[PID]pmGetPDU: RESULT fd=<n> len=44 from=PMCD
++000:       2c     7001     FROM     DATE    STAMP        1  740000b        1 
++008:        0 ffffffff        a 
++pmResult dump from ...
++  29.0.11 (yet.again, yet.another.ten, another_ten, ten): numval: 1 valfmt: 0 vlist[]:
++   value 10
++[PID]pmXmitPDU: DESC_REQ fd=<n> len=16
++000:       10     7004     FROM  740000b 
++[PID]pmGetPDU: DESC fd=<n> len=32 from=PMCD
++000:       20     7005     FROM  740000b        0 ffffffff        3        0 
++[PID]pmXmitPDU: FETCH fd=<n> len=32
++000:       20     7003     FROM        0        0        0        1  740000b 
++[PID]pmGetPDU: RESULT fd=<n> len=44 from=PMCD
++000:       2c     7001     FROM     DATE    STAMP        1  740000b        1 
++008:        0 ffffffff        a 
++pmResult dump from ...
++  29.0.11 (yet.again, yet.another.ten, another_ten, ten): numval: 1 valfmt: 0 vlist[]:
++   value 10
++[PID]pmXmitPDU: DESC_REQ fd=<n> len=16
++000:       10     7004     FROM  740000b 
++[PID]pmGetPDU: DESC fd=<n> len=32 from=PMCD
++000:       20     7005     FROM  740000b        0 ffffffff        3        0 
++
++ten PMID: 29.0.11
++    Data Type: 32-bit int  InDom: PM_INDOM_NULL 0xffffffff
++    Semantics: instant  Units: none
++    value 10
++
++another_ten PMID: 29.0.11
++    Data Type: 32-bit int  InDom: PM_INDOM_NULL 0xffffffff
++    Semantics: instant  Units: none
++    value 10
++
++yet.another.ten PMID: 29.0.11
++    Data Type: 32-bit int  InDom: PM_INDOM_NULL 0xffffffff
++    Semantics: instant  Units: none
++    value 10
++
++yet.again PMID: 29.0.11
++    Data Type: 32-bit int  InDom: PM_INDOM_NULL 0xffffffff
++    Semantics: instant  Units: none
++    value 10
+diff -Naurp pcp-3.10.3.orig/qa/145.out.nonsec pcp-3.10.3/qa/145.out.nonsec
+--- pcp-3.10.3.orig/qa/145.out.nonsec	2015-03-03 07:07:15.000000000 +1100
++++ pcp-3.10.3/qa/145.out.nonsec	1970-01-01 10:00:00.000000000 +1000
+@@ -1,78 +0,0 @@
+-QA output created by 145
+-Error Parsing ASCII PMNS: Duplicate metric id (29.0.11) in name space for metrics "another_ten" and "ten"
+-
+-pminfo: Cannot load namespace from "TMP": Problems parsing PMNS definitions
+-[PID]pmGetPDU: ERROR fd=<n> len=20 from=PMCD
+-000:       14     7000     FROM        0 40000102 
+-[PID]pmXmitPDU: CREDS fd=<n> len=20
+-000:       14     700c     FROM        1  1020000 
+-[PID]pmXmitPDU: PROFILE fd=<n> len=28
+-000:       1c     7002     FROM        0        0        0        0 
+-[PID]pmXmitPDU: FETCH fd=<n> len=32
+-000:       20     7003     FROM        0        0        0        1  740000b 
+-[PID]pmGetPDU: RESULT fd=<n> len=44 from=PMCD
+-000:       2c     7001     FROM     DATE    STAMP        1  740000b        1 
+-008:        0 ffffffff        a 
+-pmResult dump from ...
+-  29.0.11 (yet.again, yet.another.ten, another_ten, ten): numval: 1 valfmt: 0 vlist[]:
+-   value 10
+-[PID]pmXmitPDU: DESC_REQ fd=<n> len=16
+-000:       10     7004     FROM  740000b 
+-[PID]pmGetPDU: DESC fd=<n> len=32 from=PMCD
+-000:       20     7005     FROM  740000b        0 ffffffff        3        0 
+-[PID]pmXmitPDU: FETCH fd=<n> len=32
+-000:       20     7003     FROM        0        0        0        1  740000b 
+-[PID]pmGetPDU: RESULT fd=<n> len=44 from=PMCD
+-000:       2c     7001     FROM     DATE    STAMP        1  740000b        1 
+-008:        0 ffffffff        a 
+-pmResult dump from ...
+-  29.0.11 (yet.again, yet.another.ten, another_ten, ten): numval: 1 valfmt: 0 vlist[]:
+-   value 10
+-[PID]pmXmitPDU: DESC_REQ fd=<n> len=16
+-000:       10     7004     FROM  740000b 
+-[PID]pmGetPDU: DESC fd=<n> len=32 from=PMCD
+-000:       20     7005     FROM  740000b        0 ffffffff        3        0 
+-[PID]pmXmitPDU: FETCH fd=<n> len=32
+-000:       20     7003     FROM        0        0        0        1  740000b 
+-[PID]pmGetPDU: RESULT fd=<n> len=44 from=PMCD
+-000:       2c     7001     FROM     DATE    STAMP        1  740000b        1 
+-008:        0 ffffffff        a 
+-pmResult dump from ...
+-  29.0.11 (yet.again, yet.another.ten, another_ten, ten): numval: 1 valfmt: 0 vlist[]:
+-   value 10
+-[PID]pmXmitPDU: DESC_REQ fd=<n> len=16
+-000:       10     7004     FROM  740000b 
+-[PID]pmGetPDU: DESC fd=<n> len=32 from=PMCD
+-000:       20     7005     FROM  740000b        0 ffffffff        3        0 
+-[PID]pmXmitPDU: FETCH fd=<n> len=32
+-000:       20     7003     FROM        0        0        0        1  740000b 
+-[PID]pmGetPDU: RESULT fd=<n> len=44 from=PMCD
+-000:       2c     7001     FROM     DATE    STAMP        1  740000b        1 
+-008:        0 ffffffff        a 
+-pmResult dump from ...
+-  29.0.11 (yet.again, yet.another.ten, another_ten, ten): numval: 1 valfmt: 0 vlist[]:
+-   value 10
+-[PID]pmXmitPDU: DESC_REQ fd=<n> len=16
+-000:       10     7004     FROM  740000b 
+-[PID]pmGetPDU: DESC fd=<n> len=32 from=PMCD
+-000:       20     7005     FROM  740000b        0 ffffffff        3        0 
+-
+-ten PMID: 29.0.11
+-    Data Type: 32-bit int  InDom: PM_INDOM_NULL 0xffffffff
+-    Semantics: instant  Units: none
+-    value 10
+-
+-another_ten PMID: 29.0.11
+-    Data Type: 32-bit int  InDom: PM_INDOM_NULL 0xffffffff
+-    Semantics: instant  Units: none
+-    value 10
+-
+-yet.another.ten PMID: 29.0.11
+-    Data Type: 32-bit int  InDom: PM_INDOM_NULL 0xffffffff
+-    Semantics: instant  Units: none
+-    value 10
+-
+-yet.again PMID: 29.0.11
+-    Data Type: 32-bit int  InDom: PM_INDOM_NULL 0xffffffff
+-    Semantics: instant  Units: none
+-    value 10
+diff -Naurp pcp-3.10.3.orig/qa/145.out.sec pcp-3.10.3/qa/145.out.sec
+--- pcp-3.10.3.orig/qa/145.out.sec	2015-03-03 07:07:15.000000000 +1100
++++ pcp-3.10.3/qa/145.out.sec	1970-01-01 10:00:00.000000000 +1000
+@@ -1,78 +0,0 @@
+-QA output created by 145
+-Error Parsing ASCII PMNS: Duplicate metric id (29.0.11) in name space for metrics "another_ten" and "ten"
+-
+-pminfo: Cannot load namespace from "TMP": Problems parsing PMNS definitions
+-[PID]pmGetPDU: ERROR fd=<n> len=20 from=PMCD
+-000:       14     7000     FROM        0 57000102 
+-[PID]pmXmitPDU: CREDS fd=<n> len=20
+-000:       14     700c     FROM        1  1020000 
+-[PID]pmXmitPDU: PROFILE fd=<n> len=28
+-000:       1c     7002     FROM        0        0        0        0 
+-[PID]pmXmitPDU: FETCH fd=<n> len=32
+-000:       20     7003     FROM        0        0        0        1  740000b 
+-[PID]pmGetPDU: RESULT fd=<n> len=44 from=PMCD
+-000:       2c     7001     FROM     DATE    STAMP        1  740000b        1 
+-008:        0 ffffffff        a 
+-pmResult dump from ...
+-  29.0.11 (yet.again, yet.another.ten, another_ten, ten): numval: 1 valfmt: 0 vlist[]:
+-   value 10
+-[PID]pmXmitPDU: DESC_REQ fd=<n> len=16
+-000:       10     7004     FROM  740000b 
+-[PID]pmGetPDU: DESC fd=<n> len=32 from=PMCD
+-000:       20     7005     FROM  740000b        0 ffffffff        3        0 
+-[PID]pmXmitPDU: FETCH fd=<n> len=32
+-000:       20     7003     FROM        0        0        0        1  740000b 
+-[PID]pmGetPDU: RESULT fd=<n> len=44 from=PMCD
+-000:       2c     7001     FROM     DATE    STAMP        1  740000b        1 
+-008:        0 ffffffff        a 
+-pmResult dump from ...
+-  29.0.11 (yet.again, yet.another.ten, another_ten, ten): numval: 1 valfmt: 0 vlist[]:
+-   value 10
+-[PID]pmXmitPDU: DESC_REQ fd=<n> len=16
+-000:       10     7004     FROM  740000b 
+-[PID]pmGetPDU: DESC fd=<n> len=32 from=PMCD
+-000:       20     7005     FROM  740000b        0 ffffffff        3        0 
+-[PID]pmXmitPDU: FETCH fd=<n> len=32
+-000:       20     7003     FROM        0        0        0        1  740000b 
+-[PID]pmGetPDU: RESULT fd=<n> len=44 from=PMCD
+-000:       2c     7001     FROM     DATE    STAMP        1  740000b        1 
+-008:        0 ffffffff        a 
+-pmResult dump from ...
+-  29.0.11 (yet.again, yet.another.ten, another_ten, ten): numval: 1 valfmt: 0 vlist[]:
+-   value 10
+-[PID]pmXmitPDU: DESC_REQ fd=<n> len=16
+-000:       10     7004     FROM  740000b 
+-[PID]pmGetPDU: DESC fd=<n> len=32 from=PMCD
+-000:       20     7005     FROM  740000b        0 ffffffff        3        0 
+-[PID]pmXmitPDU: FETCH fd=<n> len=32
+-000:       20     7003     FROM        0        0        0        1  740000b 
+-[PID]pmGetPDU: RESULT fd=<n> len=44 from=PMCD
+-000:       2c     7001     FROM     DATE    STAMP        1  740000b        1 
+-008:        0 ffffffff        a 
+-pmResult dump from ...
+-  29.0.11 (yet.again, yet.another.ten, another_ten, ten): numval: 1 valfmt: 0 vlist[]:
+-   value 10
+-[PID]pmXmitPDU: DESC_REQ fd=<n> len=16
+-000:       10     7004     FROM  740000b 
+-[PID]pmGetPDU: DESC fd=<n> len=32 from=PMCD
+-000:       20     7005     FROM  740000b        0 ffffffff        3        0 
+-
+-ten PMID: 29.0.11
+-    Data Type: 32-bit int  InDom: PM_INDOM_NULL 0xffffffff
+-    Semantics: instant  Units: none
+-    value 10
+-
+-another_ten PMID: 29.0.11
+-    Data Type: 32-bit int  InDom: PM_INDOM_NULL 0xffffffff
+-    Semantics: instant  Units: none
+-    value 10
+-
+-yet.another.ten PMID: 29.0.11
+-    Data Type: 32-bit int  InDom: PM_INDOM_NULL 0xffffffff
+-    Semantics: instant  Units: none
+-    value 10
+-
+-yet.again PMID: 29.0.11
+-    Data Type: 32-bit int  InDom: PM_INDOM_NULL 0xffffffff
+-    Semantics: instant  Units: none
+-    value 10
+diff -Naurp pcp-3.10.3.orig/qa/661 pcp-3.10.3/qa/661
+--- pcp-3.10.3.orig/qa/661	2015-01-21 02:18:01.000000000 +1100
++++ pcp-3.10.3/qa/661	2015-03-19 16:22:17.592828105 +1100
+@@ -8,6 +8,7 @@ seq=`basename $0`
+ echo "QA output created by $seq"
+ 
+ . ./common.webapi
++. ./common.python
+ 
+ test -d "$PCP_SHARE_DIR/webapps/graphite" || \
+ 	_notrun "graphite webapp is not installed"
+diff -Naurp pcp-3.10.3.orig/qa/789 pcp-3.10.3/qa/789
+--- pcp-3.10.3.orig/qa/789	2015-01-24 07:23:07.000000000 +1100
++++ pcp-3.10.3/qa/789	2015-03-19 16:22:17.603828097 +1100
+@@ -16,7 +16,7 @@ echo "QA output created by $seq"
+ [ -d $PCP_PMDAS_DIR/papi ] || _notrun "PAPI PMDA is not installed"
+ 
+ $sudo rm -rf $tmp.* $seq.full
+-trap "cd $here; rm -rf $tmp.*; exit \$status" 0 1 2 3 15
++trap "cd $here; $sudo rm -rf $tmp.*; exit \$status" 0 1 2 3 15
+ 
+ _filter_papi_errors()
+ {
+@@ -36,33 +36,21 @@ _filter()
+ 	-e 's/0x[0-9a-f]*/ADDR/g' \
+ 	-e 's/[0-2][0-9]:00:00.000/TIME/' \
+ 	-e 's/126.0.[0-9][0-9]*/126.0.NUMBER/' \
++	-e "s,$tmp,TMP," \
+     | _filter_papi_errors
+ }
+ 
+-_pmu_present()
+-{
+-    grep "Error*" $@; if [ $? -eq 0 ]; then _notrun "PAPI native metrics not found on hardware"; fi
+-}
+-
+ # vars and checks
+ papirootpmns=$PCP_PMDAS_DIR/papi/root
+ pipepmda=$PCP_PMDAS_DIR/papi/pmdapapi
+-[ ! -f $papirootpmns ] && echo "FATAL ERROR Could not find \"$papirootpmns\"" && exit 1
+-[ ! -f $pipepmda ] && echo "FATAL ERROR Could not find \"$pipepmda\"" && exit 1
+-
+-# Check if native pmu's are present, else, _notrun the test
+-$sudo dbpmda -n $papirootpmns -ie <<EOF 2>&1 | _pmu_present
+-open pipe $pipepmda -d 126
+-getdesc on
+-attr "username" "root"
+-attr 11 "0"
+-traverse papi.system.perf
+-EOF
+ 
++# check if papi PMDA is going to work on this platform
++_check_papi
++_check_papi_native
+ 
+ echo "=== Daemon PMDA papi native events test ==="
+ $sudo dbpmda -n $papirootpmns -ie <<EOF | _filter
+-open pipe $pipepmda -d 126
++open pipe $pipepmda -d 126 -l $tmp.log
+ getdesc on
+ attr "username" "root"
+ attr 11 "0"
+diff -Naurp pcp-3.10.3.orig/qa/789.out pcp-3.10.3/qa/789.out
+--- pcp-3.10.3.orig/qa/789.out	2015-01-24 07:23:07.000000000 +1100
++++ pcp-3.10.3/qa/789.out	2015-03-19 16:22:17.599828100 +1100
+@@ -1,7 +1,7 @@
+ QA output created by 789
+ === Daemon PMDA papi native events test ===
+-dbpmda> open pipe PCP_PMDAS_DIR/papi/pmdapapi -d 126
+-Start pmdapapi PMDA: PCP_PMDAS_DIR/papi/pmdapapi -d 126
++dbpmda> open pipe PCP_PMDAS_DIR/papi/pmdapapi -d 126 -l TMP.log
++Start pmdapapi PMDA: PCP_PMDAS_DIR/papi/pmdapapi -d 126 -l TMP.log
+ dbpmda> getdesc on
+ dbpmda> attr "username" "root"
+ Attribute: username=root
+diff -Naurp pcp-3.10.3.orig/qa/813 pcp-3.10.3/qa/813
+--- pcp-3.10.3.orig/qa/813	2015-01-21 02:18:01.000000000 +1100
++++ pcp-3.10.3/qa/813	2015-03-19 16:22:17.600828099 +1100
+@@ -16,7 +16,7 @@ echo "QA output created by $seq"
+ [ -d $PCP_PMDAS_DIR/papi ] || _notrun "PAPI PMDA is not installed"
+ 
+ $sudo rm -rf $tmp.* $seq.full
+-trap "cd $here; rm -rf $tmp.*; exit \$status" 0 1 2 3 15
++trap "cd $here; $sudo rm -rf $tmp.*; exit \$status" 0 1 2 3 15
+ 
+ _filter_papi_errors()
+ {
+@@ -35,33 +35,21 @@ _filter()
+ 	-e 's/0x[0-9a-f]*/ADDR/g' \
+ 	-e 's/[0-2][0-9]:00:00.000/TIME/' \
+ 	-e 's/126.0.[0-9][0-9]*/126.0.NUMBER/' \
++	-e "s,$tmp,TMP," \
+     | _filter_papi_errors
+ }
+ 
+-_pmu_present()
+-{
+-    grep "Error*" $@; if [ $? -eq 0 ]; then _notrun "PAPI metrics not found on hardware"; fi
+-}
+-
+ # vars and checks
+ papirootpmns=$PCP_PMDAS_DIR/papi/root
+ pipepmda=$PCP_PMDAS_DIR/papi/pmdapapi
+-[ ! -f $papirootpmns ] && echo "FATAL ERROR Could not find \"$papirootpmns\"" && exit 1
+-[ ! -f $pipepmda ] && echo "FATAL ERROR Could not find \"$pipepmda\"" && exit 1
+ 
+-# Check if pmu's are present, else, _notrun the test
+-$sudo dbpmda -n $papirootpmns -ie <<EOF 2>&1 | _pmu_present
+-open pipe $pipepmda -d 126
+-getdesc on
+-attr "username" "root"
+-attr 11 "0"
+-children papi.system
+-EOF
++# check if papi PMDA is going to work on this platform
++_check_papi
+ 
+ # real QA test starts here
+ echo "=== Daemon PMDA papi test ==="
+ $sudo dbpmda -n $papirootpmns -ie <<EOF 2>&1 | _filter
+-open pipe $pipepmda -d 126
++open pipe $pipepmda -d 126 -l $tmp.log
+ getdesc on
+ attr "username" "root"
+ attr 11 "0"
+diff -Naurp pcp-3.10.3.orig/qa/813.out pcp-3.10.3/qa/813.out
+--- pcp-3.10.3.orig/qa/813.out	2015-01-21 02:18:01.000000000 +1100
++++ pcp-3.10.3/qa/813.out	2015-03-19 16:22:17.600828099 +1100
+@@ -1,7 +1,7 @@
+ QA output created by 813
+ === Daemon PMDA papi test ===
+-dbpmda> open pipe PCP_PMDAS_DIR/papi/pmdapapi -d 126
+-Start pmdapapi PMDA: PCP_PMDAS_DIR/papi/pmdapapi -d 126
++dbpmda> open pipe PCP_PMDAS_DIR/papi/pmdapapi -d 126 -l TMP.log
++Start pmdapapi PMDA: PCP_PMDAS_DIR/papi/pmdapapi -d 126 -l TMP.log
+ dbpmda> getdesc on
+ dbpmda> attr "username" "root"
+ Attribute: username=root
+diff -Naurp pcp-3.10.3.orig/qa/914 pcp-3.10.3/qa/914
+--- pcp-3.10.3.orig/qa/914	2015-01-21 02:18:01.000000000 +1100
++++ pcp-3.10.3/qa/914	2015-03-19 16:22:17.596828102 +1100
+@@ -38,17 +38,13 @@ _filter()
+     | _filter_papi_errors
+ }
+ 
+-_pmu_present()
+-{
+-    grep "Error: papi.system.TOT_INS: Unknown metric name" $@; if [ $? -eq 0 ]; then _notrun "PAPI metrics not found on hardware"; fi
+-}
+-
+ # real QA test starts here
+ pmns=$PCP_PMDAS_DIR/papi/root
+ pmda=$PCP_PMDAS_DIR/papi/pmda_papi.$DSO_SUFFIX,papi_init
+ 
+-#test PAPI availability
+-pminfo -L -K clear -K add,126,$pmda -f -n $pmns papi.system.TOT_INS papi.system.TOT_CYC 2>&1 | _pmu_present
++# check if papi PMDA is going to work on this platform
++_check_papi
++
+ echo
+ echo "== PAPI library behaviour, total instructions/cycles, non-root"
+ pminfo -L -K clear -K add,126,$pmda -f -n $pmns papi.system.TOT_INS papi.system.TOT_CYC 2>&1 | _filter
+diff -Naurp pcp-3.10.3.orig/qa/926 pcp-3.10.3/qa/926
+--- pcp-3.10.3.orig/qa/926	2015-03-03 07:07:15.000000000 +1100
++++ pcp-3.10.3/qa/926	2015-03-19 16:22:17.593828105 +1100
+@@ -26,8 +26,19 @@ perl -e "use RRDs" >/dev/null 2>&1
+ [ $? -eq 0 ] || _notrun "perl RRDs module not installed"
+ 
+ rm -f $seq.out
+-size=`_get_word_size`
+-ln $seq.out.$size $seq.out || exit 1
++machine=`uname -m`
++case "$machine"
++in
++i?86|athlon)
++    machine=32
++    ;;
++amd64|x86_64)
++    machine=64
++    ;;
++esac
++[ -f $seq.out.$machine ] || \
++	_notrun No qualified output for `uname -m` architecture
++ln $seq.out.$machine $seq.out || exit 1
+ 
+ status=0        # success is the default!
+ $sudo rm -rf $tmp.* $seq.full
+@@ -37,7 +48,7 @@ trap "rm -f $tmp.*; exit \$status" 0 1 2
+ # only one dir for now, add more if we get more sample data
+ # rrdtool can't read data from different architectures
+ 
+-indir=./ganglia/gangliatest.$size
++indir=./ganglia/gangliatest.$machine
+ 
+ echo
+ echo "=== $indir ==="
+diff -Naurp pcp-3.10.3.orig/qa/956 pcp-3.10.3/qa/956
+--- pcp-3.10.3.orig/qa/956	1970-01-01 10:00:00.000000000 +1000
++++ pcp-3.10.3/qa/956	2015-03-19 16:22:17.586828110 +1100
+@@ -0,0 +1,55 @@
++#!/bin/sh
++# PCP QA Test No. 956
++# Exercise pmcd attribute PDU handling after agent failure.
++#
++# Copyright (c) 2015 Red Hat.
++#
++
++seq=`basename $0`
++echo "QA output created by $seq"
++
++# get standard environment, filters and checks
++. ./common.product
++. ./common.filter
++. ./common.check
++
++_get_libpcp_config
++$unix_domain_sockets || _notrun "No unix domain socket support available"
++
++_cleanup()
++{
++    if pmprobe -I pmcd.agent.status | grep '"dynamic"' >/dev/null
++    then
++        cd $here/pmdas/dynamic
++        $sudo ./Remove >>$here/$seq.full 2>&1
++        cd $here
++    fi
++}
++
++status=1	# failure is the default!
++$sudo rm -rf $tmp.* $seq.full
++signal=$PCP_BINADM_DIR/pmsignal
++trap "_cleanup; exit \$status" 0 1 2 3 15
++
++cd $here/pmdas/dynamic
++make clean >>$here/$seq.full 2>&1
++$sudo ./Install < /dev/null >$tmp.out 2>&1
++cat $tmp.out | _filter_pmda_install
++cd $here
++
++# real QA test starts here
++echo "Initial check of some metric access"
++pmprobe -h unix: -i hinv.ncpu
++
++echo "Terminate a PMDA needing attributes"
++$sudo $signal -a pmdadynamic >> $seq.full 2>&1
++
++echo "Tickle access to the failed PMDA, must see 'Try Again'"
++pmprobe -h unix: -i hinv.ncpu
++
++echo "Verify subsequent return to healthy state"
++pmprobe -h unix: -i hinv.ncpu
++
++# success, all done
++status=0
++exit
+diff -Naurp pcp-3.10.3.orig/qa/956.out pcp-3.10.3/qa/956.out
+--- pcp-3.10.3.orig/qa/956.out	1970-01-01 10:00:00.000000000 +1000
++++ pcp-3.10.3/qa/956.out	2015-03-19 16:22:17.586828110 +1100
+@@ -0,0 +1,25 @@
++QA output created by 956
++You will need to choose an appropriate configuration for installation of
++the "dynamic" Performance Metrics Domain Agent (PMDA).
++
++  collector	collect performance statistics on this system
++  monitor	allow this system to monitor local and/or remote systems
++  both		collector and monitor configuration for this system
++
++Installing files ...
++[...install files, make output...]
++Updating the Performance Metrics Name Space (PMNS) ...
++Terminate PMDA if already installed ...
++[...install files, make output...]
++Updating the PMCD control file, and notifying PMCD ...
++Waiting for pmcd to terminate ...
++Starting pmcd ... 
++Starting pmlogger ... 
++Check dynamic metrics have appeared ... 6 metrics and 3 values
++Initial check of some metric access
++hinv.ncpu 1 PM_IN_NULL
++Terminate a PMDA needing attributes
++Tickle access to the failed PMDA, must see 'Try Again'
++hinv.ncpu -12389 Try again. Information not currently available
++Verify subsequent return to healthy state
++hinv.ncpu 1 PM_IN_NULL
+diff -Naurp pcp-3.10.3.orig/qa/967 pcp-3.10.3/qa/967
+--- pcp-3.10.3.orig/qa/967	2015-03-03 07:07:15.000000000 +1100
++++ pcp-3.10.3/qa/967	2015-03-19 16:22:17.601828099 +1100
+@@ -16,7 +16,7 @@ echo "QA output created by $seq"
+ [ -d $PCP_PMDAS_DIR/papi ] || _notrun "PAPI PMDA is not installed"
+ 
+ $sudo rm -rf $tmp.* $seq.full
+-trap "cd $here; rm -rf $tmp.*; exit \$status" 0 1 2 3 15
++trap "cd $here; $sudo rm -rf $tmp.*; exit \$status" 0 1 2 3 15
+ 
+ _filter_papi_errors()
+ {
+@@ -36,28 +36,16 @@ _filter()
+ 	-e 's/0x[0-9a-f]*/ADDR/g' \
+ 	-e 's/[0-2][0-9]:00:00.000/TIME/' \
+ 	-e 's/126.0.[0-9][0-9]*/126.0.NUMBER/' \
++	-e "s,$tmp,TMP," \
+     | _filter_papi_errors
+ }
+ 
+-_pmu_present()
+-{
+-    grep "Error*" $@; if [ $? -eq 0 ]; then _notrun "PAPI metrics not found on hardware"; fi
+-}
+-
+ # vars and checks
+ papirootpmns=$PCP_PMDAS_DIR/papi/root
+ pipepmda=$PCP_PMDAS_DIR/papi/pmdapapi
+-[ ! -f $papirootpmns ] && echo "FATAL ERROR Could not find \"$papirootpmns\"" && exit 1
+-[ ! -f $pipepmda ] && echo "FATAL ERROR Could not find \"$pipepmda\"" && exit 1
+ 
+-# Check if pmu's are present, else, _notrun the test
+-$sudo dbpmda -n $papirootpmns -ie <<EOF 2>&1 | _pmu_present
+-open pipe $pipepmda -d 126
+-getdesc on
+-attr "username" "root"
+-attr 11 "0"
+-children papi.system
+-EOF
++# check if papi PMDA is going to work on this platform
++_check_papi
+ 
+ # real QA test starts here
+ 
+@@ -67,7 +55,7 @@ EOF
+ 
+ echo "=== Daemon PMDA papi auto_enable disabled test ==="
+ $sudo dbpmda -n $papirootpmns -ie <<EOF 2>&1 | _filter
+-open pipe $pipepmda -d 126
++open pipe $pipepmda -d 126 -l $tmp.log
+ getdesc on
+ attr 'username' 'root'
+ attr 11 '0'
+@@ -86,7 +74,7 @@ EOF
+ # the timeout of auto_enable, lets set to 5 seconds and test
+ echo "=== Daemon PMDA papi auto_enable test ==="
+ $sudo dbpmda -n $papirootpmns -ie <<EOF 2>&1 | _filter
+-open pipe $pipepmda -d 126
++open pipe $pipepmda -d 126 -l $tmp.log
+ getdesc on
+ attr "username" "root"
+ attr 11 "0"
+@@ -104,7 +92,7 @@ EOF
+ 
+ echo "=== Daemon PMDA papi auto_enable with papi.control.enable test ==="
+ $sudo dbpmda -n $papirootpmns -ie <<EOF 2>&1 | _filter
+-open pipe $pipepmda -d 126
++open pipe $pipepmda -d 126 -l $tmp.log
+ getdesc on
+ attr "username" "root"
+ attr 11 "0"
+@@ -124,7 +112,7 @@ EOF
+ 
+ echo "=== Daemon PMDA papi auto_enable with multiplexing disabled test ==="
+ $sudo dbpmda -n $papirootpmns -ie <<EOF 2>&1 | _filter
+-open pipe $pipepmda -d 126
++open pipe $pipepmda -d 126 -l $tmp.log
+ getdesc on
+ attr "username" "root"
+ attr 11 "0"
+diff -Naurp pcp-3.10.3.orig/qa/967.out pcp-3.10.3/qa/967.out
+--- pcp-3.10.3.orig/qa/967.out	2015-03-03 07:07:15.000000000 +1100
++++ pcp-3.10.3/qa/967.out	2015-03-19 16:22:17.601828099 +1100
+@@ -1,7 +1,7 @@
+ QA output created by 967
+ === Daemon PMDA papi auto_enable disabled test ===
+-dbpmda> open pipe PCP_PMDAS_DIR/papi/pmdapapi -d 126
+-Start pmdapapi PMDA: PCP_PMDAS_DIR/papi/pmdapapi -d 126
++dbpmda> open pipe PCP_PMDAS_DIR/papi/pmdapapi -d 126 -l TMP.log
++Start pmdapapi PMDA: PCP_PMDAS_DIR/papi/pmdapapi -d 126 -l TMP.log
+ dbpmda> getdesc on
+ dbpmda> attr 'username' 'root'
+ Attribute: username=root
+@@ -55,8 +55,8 @@ pmResult dump from ADDR timestamp: 0.000
+   126.0.NUMBER (<noname>): No values returned!
+ dbpmda> 
+ === Daemon PMDA papi auto_enable test ===
+-dbpmda> open pipe PCP_PMDAS_DIR/papi/pmdapapi -d 126
+-Start pmdapapi PMDA: PCP_PMDAS_DIR/papi/pmdapapi -d 126
++dbpmda> open pipe PCP_PMDAS_DIR/papi/pmdapapi -d 126 -l TMP.log
++Start pmdapapi PMDA: PCP_PMDAS_DIR/papi/pmdapapi -d 126 -l TMP.log
+ dbpmda> getdesc on
+ dbpmda> attr "username" "root"
+ Attribute: username=root
+@@ -93,8 +93,8 @@ pmResult dump from ADDR timestamp: 0.000
+    value "Papi is stopped, has multiplexing enabled, "
+ dbpmda> 
+ === Daemon PMDA papi auto_enable with papi.control.enable test ===
+-dbpmda> open pipe PCP_PMDAS_DIR/papi/pmdapapi -d 126
+-Start pmdapapi PMDA: PCP_PMDAS_DIR/papi/pmdapapi -d 126
++dbpmda> open pipe PCP_PMDAS_DIR/papi/pmdapapi -d 126 -l TMP.log
++Start pmdapapi PMDA: PCP_PMDAS_DIR/papi/pmdapapi -d 126 -l TMP.log
+ dbpmda> getdesc on
+ dbpmda> attr "username" "root"
+ Attribute: username=root
+@@ -148,8 +148,8 @@ pmResult dump from ADDR timestamp: 0.000
+    value "Papi is stopped, has multiplexing enabled, "
+ dbpmda> 
+ === Daemon PMDA papi auto_enable with multiplexing disabled test ===
+-dbpmda> open pipe PCP_PMDAS_DIR/papi/pmdapapi -d 126
+-Start pmdapapi PMDA: PCP_PMDAS_DIR/papi/pmdapapi -d 126
++dbpmda> open pipe PCP_PMDAS_DIR/papi/pmdapapi -d 126 -l TMP.log
++Start pmdapapi PMDA: PCP_PMDAS_DIR/papi/pmdapapi -d 126 -l TMP.log
+ dbpmda> getdesc on
+ dbpmda> attr "username" "root"
+ Attribute: username=root
+diff -Naurp pcp-3.10.3.orig/qa/common.check pcp-3.10.3/qa/common.check
+--- pcp-3.10.3.orig/qa/common.check	2015-03-03 07:07:15.000000000 +1100
++++ pcp-3.10.3/qa/common.check	2015-03-19 16:22:17.604828096 +1100
+@@ -260,7 +260,7 @@ _host_to_fqdn()
+     then
+ 	if which domainname >/dev/null 2>&1
+ 	then
+-	    ans=`domainname`
++	    ans=`domainname | fgrep -v '(none)'`
+ 	    [ -z "$ans" ] || ans="$1.$ans"
+ 	fi
+     fi
+@@ -776,6 +776,55 @@ _check_containers()
+     [ $_contain = 1 ] || _notrun "Running kernel does not support containers"
+ }
+ 
++# good output from dbpmda looks like ...
++# dbpmda> open pipe /var/lib/pcp/pmdas/papi/pmdapapi -d 126
++# ...
++# dbpmda> fetch papi.system.TOT_INS
++# PMID(s): 126.0.14
++# pmResult dump from 0x25c6e00 timestamp: 0.000000 10:00:00.000 numpmid: 1
++#   126.0.14 (<noname>): numval: 1 valfmt: 1 vlist[]:
++#      value 2616
++#
++_check_papi()
++{
++    [ -f $PCP_PMDAS_DIR/papi/pmdapapi ] || _notrun "no executable for the papi PMDA"
++    [ -f $PCP_PMDAS_DIR/papi/root ] || _notrun "no PMNS for the papi PMDA"
++
++    $sudo dbpmda -n $PCP_PMDAS_DIR/papi/root -ie <<EOF >$tmp.papi.check
++open pipe $PCP_PMDAS_DIR/papi/pmdapapi -d 126 -l $tmp.papi.log
++attr "username" "root"
++attr 11 "0"
++fetch papi.system.TOT_INS
++EOF
++    echo "papi.log ..." >>$here/$seq.full
++    cat $tmp.papi.log >>$here/$seq.full
++    $sudo rm $tmp.papi.log
++    echo "_check_papi ..." >>$here/$seq.full
++    cat $tmp.papi.check >>$here/$seq.full
++    if grep ' value [0-9][0-9]*$' <$tmp.papi.check >/dev/null
++    then
++	:
++    else
++	_notrun "PAPI counters not available on this platform"
++    fi
++}
++
++_check_papi_native()
++{
++    $sudo dbpmda -n $PCP_PMDAS_DIR/papi/root -ie <<EOF >$tmp.papi.check
++open pipe $PCP_PMDAS_DIR/papi/pmdapapi -d 126
++attr "username" "root"
++attr 11 "0"
++traverse papi.system.perf
++EOF
++    echo "_check_papi_native ..." >>$here/$seq.full
++    cat $tmp.papi.check >>$here/$seq.full
++    if grep "Error PDU: Unknown metric name" <$tmp.papi.check >/dev/null
++    then
++	_notrun "PAPI native metrics not available on this platform"
++    fi
++}
++
+ # valgrind support
+ #
+ # typical usage:
+diff -Naurp pcp-3.10.3.orig/qa/.gitignore pcp-3.10.3/qa/.gitignore
+--- pcp-3.10.3.orig/qa/.gitignore	2015-03-03 07:07:15.000000000 +1100
++++ pcp-3.10.3/qa/.gitignore	2015-03-19 16:22:17.605828096 +1100
+@@ -51,7 +51,6 @@ sudo
+ 119.out
+ 126.out
+ 130.out
+-145.out
+ 149.out
+ 154.out
+ 158.out
+diff -Naurp pcp-3.10.3.orig/qa/group pcp-3.10.3/qa/group
+--- pcp-3.10.3.orig/qa/group	2015-03-03 07:07:15.000000000 +1100
++++ pcp-3.10.3/qa/group	2015-03-19 16:22:17.592828105 +1100
+@@ -970,7 +970,7 @@ cgroups
+ 782 pmwebapi local
+ 783 pmda.rpm local valgrind
+ 786 context context_local libpcp local
+-787 archive local pmie pmlogrewrite pmdumplog pmval
++787 archive local pmie pmlogrewrite pmdumplog pmval flakey
+ 789 pmda.papi local
+ 798 pmda.nfsclient local
+ 799:retired pmda.papi local
+@@ -1027,6 +1027,7 @@ cgroups
+ 947 pmlogger local
+ 950 avahi local
+ 955 pmda.linux local
++956 pmcd local
+ 957 pmda.linux local valgrind
+ 958 archive local
+ 959 pmda.sample pmstore local
+diff -Naurp pcp-3.10.3.orig/qa/pmdas/dynamic/dynamic.c pcp-3.10.3/qa/pmdas/dynamic/dynamic.c
+--- pcp-3.10.3.orig/qa/pmdas/dynamic/dynamic.c	2015-01-21 02:18:01.000000000 +1100
++++ pcp-3.10.3/qa/pmdas/dynamic/dynamic.c	2015-03-19 16:22:17.588828109 +1100
+@@ -361,6 +361,7 @@ dynamic_init(pmdaInterface *dp)
+ {
+     if (dp->status != 0)
+ 	return;
++    dp->comm.flags |= PDU_FLAG_AUTH;
+ 
+     dp->version.two.fetch = dynamic_fetch;
+     dp->version.two.store = dynamic_store;
+diff -Naurp pcp-3.10.3.orig/qa/pmdas/dynamic/.gitignore pcp-3.10.3/qa/pmdas/dynamic/.gitignore
+--- pcp-3.10.3.orig/qa/pmdas/dynamic/.gitignore	2015-01-21 02:18:01.000000000 +1100
++++ pcp-3.10.3/qa/pmdas/dynamic/.gitignore	2015-03-19 16:22:17.587828109 +1100
+@@ -1 +1,3 @@
+ pmdadynamic
++help.dir
++help.pag
+diff -Naurp pcp-3.10.3.orig/qa/pmdas/dynamic/GNUmakefile pcp-3.10.3/qa/pmdas/dynamic/GNUmakefile
+--- pcp-3.10.3.orig/qa/pmdas/dynamic/GNUmakefile	2015-01-21 02:18:01.000000000 +1100
++++ pcp-3.10.3/qa/pmdas/dynamic/GNUmakefile	2015-03-19 16:22:17.588828109 +1100
+@@ -20,7 +20,7 @@ LLDLIBS = $(PCP_PMDALIB)
+ 
+ default default_pcp setup: $(TARGETS)
+ 
+-install install_pcp:
++install install_pcp: default
+ 	$(INSTALL) -m 755 -d $(TESTDIR)
+ 	$(INSTALL) -m 644 $(CFILES) $(MYFILES) $(TESTDIR)
+ 	$(INSTALL) -m 755 $(MYSCRIPTS) $(TARGETS) $(TESTDIR)
+diff -Naurp pcp-3.10.3.orig/qa/pmdas/dynamic/GNUmakefile.install pcp-3.10.3/qa/pmdas/dynamic/GNUmakefile.install
+--- pcp-3.10.3.orig/qa/pmdas/dynamic/GNUmakefile.install	2015-01-21 02:18:01.000000000 +1100
++++ pcp-3.10.3/qa/pmdas/dynamic/GNUmakefile.install	2015-03-19 16:22:17.588828109 +1100
+@@ -34,6 +34,6 @@ LLDLIBS = -lpcp_pmda -lpcp $(LIB_FOR_MAT
+ 
+ default default_pcp setup:: $(TARGETS)
+ 
+-install install_pcp:
++install install_pcp: default
+ 
+ include $(PCP_INC_DIR)/buildrules
+diff -Naurp pcp-3.10.3.orig/qa/src/GNUlocaldefs pcp-3.10.3/qa/src/GNUlocaldefs
+--- pcp-3.10.3.orig/qa/src/GNUlocaldefs	2015-03-03 07:07:15.000000000 +1100
++++ pcp-3.10.3/qa/src/GNUlocaldefs	2015-03-19 16:22:17.590828107 +1100
+@@ -196,6 +196,7 @@ MYFILES += $(SRCARCH) \
+ 	pthread_barrier.h pv.c qa_test.c qa_timezone.c \
+ 	sa-sysstat-9.0.4 sa-sysstat-9.0.6 sa-sysstat-9.0.6.1 \
+ 	sa-sysstat-10.0.1 sa-sysstat-10.0.5 sa-sysstat-10.2.0 \
++	sa-sysstat-9.0.4_rh6.5 \
+ 	permslist
+ 
+ MYSCRIPTS = grind-tools ipcs_clear make.dodgey mkarch-all mkbadlen \
+diff -Naurp pcp-3.10.3.orig/qa/src/rtimetest.c pcp-3.10.3/qa/src/rtimetest.c
+--- pcp-3.10.3.orig/qa/src/rtimetest.c	2015-03-03 07:07:15.000000000 +1100
++++ pcp-3.10.3/qa/src/rtimetest.c	2015-03-19 16:22:17.608828093 +1100
+@@ -64,7 +64,7 @@ main(int argc, char *argv[])
+     char *tmtmp_str;
+     char *tz;
+     int errflag = 0;
+-    char c;
++    int c;
+     int sts;
+ 
+     __pmSetProgname(argv[0]);
+diff -Naurp pcp-3.10.3.orig/src/libpcp/src/avahi.c pcp-3.10.3/src/libpcp/src/avahi.c
+--- pcp-3.10.3.orig/src/libpcp/src/avahi.c	2015-01-21 02:18:01.000000000 +1100
++++ pcp-3.10.3/src/libpcp/src/avahi.c	2015-03-19 16:22:17.608828093 +1100
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2013-2014 Red Hat.
++ * Copyright (c) 2013-2015 Red Hat.
+  * 
+  * This program is free software; you can redistribute it and/or modify it
+  * under the terms of the GNU General Public License as published by the
+@@ -307,7 +307,7 @@ cleanup(__pmServerAvahiPresence *s)
+     }
+ }
+ 
+-/* Publish a new service. */
++/* Add a new serice to the active services list. */
+ static void
+ addService(__pmServerPresence *s)
+ {
+@@ -336,7 +336,7 @@ addService(__pmServerPresence *s)
+     ++nActiveServices;
+ }
+ 
+-/* Publish a new service. */
++/* Remove a service from the active services list. */
+ static void
+ removeService(__pmServerPresence *s)
+ {
+@@ -406,8 +406,10 @@ publishService(__pmServerPresence *s)
+     return;
+ 
+  fail:
++    removeService(s);
+     cleanup(s->avahi);
+     free(s->avahi);
++    s->avahi = NULL;
+ }
+ 
+ void
+diff -Naurp pcp-3.10.3.orig/src/pcp2graphite/pcp2graphite.py pcp-3.10.3/src/pcp2graphite/pcp2graphite.py
+--- pcp-3.10.3.orig/src/pcp2graphite/pcp2graphite.py	2015-03-03 07:07:15.000000000 +1100
++++ pcp-3.10.3/src/pcp2graphite/pcp2graphite.py	2015-03-19 16:22:17.607828094 +1100
+@@ -92,7 +92,8 @@ Options""")
+                 self.prefix,
+                 "pickled" if self.pickle else "text",
+                 self.graphite_host, self.graphite_port,
+-                self.interval), flush=True)
++                self.interval))
++        sys.stdout.flush()
+ 
+     def option_override(self, opt):
+         if (opt == 'p') or (opt == 'g'):
+diff -Naurp pcp-3.10.3.orig/src/pmcd/src/config.c pcp-3.10.3/src/pmcd/src/config.c
+--- pcp-3.10.3.orig/src/pmcd/src/config.c	2015-01-24 07:23:07.000000000 +1100
++++ pcp-3.10.3/src/pmcd/src/config.c	2015-03-19 16:22:17.590828107 +1100
+@@ -1394,6 +1394,15 @@ DoAttributes(AgentInfo *ap, int clientID
+ 		break;
+ 	}
+     }
++    if (sts < 0) {
++#ifdef PCP_DEBUG
++	if (pmDebug & DBG_TRACE_APPL0)
++	    fprintf(stderr, "ATTR error: \"%s\" agent : %s\n",
++		    ap->pmDomainLabel, pmErrStr(sts));
++#endif
++	CleanupAgent(ap, AT_COMM, ap->inFd);
++	return PM_ERR_AGAIN;
++    }
+     return sts;
+ }
+ 
+diff -Naurp pcp-3.10.3.orig/src/pmdas/sample/src/sample.c pcp-3.10.3/src/pmdas/sample/src/sample.c
+--- pcp-3.10.3.orig/src/pmdas/sample/src/sample.c	2015-03-03 07:07:15.000000000 +1100
++++ pcp-3.10.3/src/pmdas/sample/src/sample.c	2015-03-19 16:22:17.609828093 +1100
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2014 Red Hat.
++ * Copyright (c) 2014-2015 Red Hat.
+  * Copyright (c) 1995-2003 Silicon Graphics, Inc.  All Rights Reserved.
+  * 
+  * This program is free software; you can redistribute it and/or modify it
+@@ -42,6 +42,9 @@ static struct sysinfo {
+ 'W', 'X', 'Y', 'Z', '0', '1', '2', '3', '4', '5', '6', '7', '9', '[', ']', '.' 
+ } };
+ #endif
++#ifndef roundup
++#define roundup(x,y) ((((x) + ((y) - 1)) / (y)) * (y))
++#endif
+ 
+ static int need_mirage;	/* only do mirage glop is someone asks for it */
+ static int need_dynamic;/* only do dynamic glop is someone asks for it */
+@@ -1042,11 +1045,11 @@ nextinst(int *inst)
+ static void
+ init_tables(int dom)
+ {
+-    int		i;
++    int			i, allocsz;
+     __pmInDom_int	b_indom;
+     __pmInDom_int	*indomp;
+-    __pmID_int	*pmidp;
+-    pmDesc	*dp;
++    __pmID_int		*pmidp;
++    pmDesc		*dp;
+ 
+     /* serial numbering is arbitrary, but must be unique in this PMD */
+     b_indom.flag = 0;
+@@ -1159,16 +1162,20 @@ init_tables(int dom)
+     pmidp->domain = dom;
+ 
+     /* local hacks */
+-    _string = (char *)calloc(1, 8);
++    allocsz = roundup(sizeof("13"), 8);
++    _string = (char *)calloc(1, allocsz);
+     strncpy(_string, "13", sizeof("13"));
+-    _aggr33 = (pmValueBlock *)malloc(PM_VAL_HDR_SIZE);
++    allocsz = roundup(PM_VAL_HDR_SIZE, 8);
++    _aggr33 = (pmValueBlock *)malloc(allocsz);
+     _aggr33->vlen = PM_VAL_HDR_SIZE + 0;
+     _aggr33->vtype = PM_TYPE_AGGREGATE;
+-    _aggr34 = (pmValueBlock *)malloc(PM_VAL_HDR_SIZE+strlen("hullo world!"));
++    allocsz = roundup(PM_VAL_HDR_SIZE + strlen("hullo world!"), 8);
++    _aggr34 = (pmValueBlock *)malloc(allocsz);
+     _aggr34->vlen = PM_VAL_HDR_SIZE + strlen("hullo world!");
+     _aggr34->vtype = PM_TYPE_AGGREGATE;
+     memcpy(_aggr34->vbuf, "hullo world!", strlen("hullo world!"));
+-    _aggr35 = (pmValueBlock *)malloc(PM_VAL_HDR_SIZE+strlen("13"));
++    allocsz = roundup(PM_VAL_HDR_SIZE + strlen("13"), 8);
++    _aggr35 = (pmValueBlock *)malloc(allocsz);
+     _aggr35->vlen = PM_VAL_HDR_SIZE + strlen("13");
+     _aggr35->vtype = PM_TYPE_AGGREGATE;
+     memcpy(_aggr35->vbuf, "13", strlen("13"));

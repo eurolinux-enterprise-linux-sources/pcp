@@ -1,6 +1,7 @@
 /*
- * Linux /proc/net_rpc metrics cluster
+ * Linux /proc/net/rpc metrics cluster
  *
+ * Copyright (c) 2014 Red Hat.
  * Copyright (c) 2000,2004 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -15,6 +16,8 @@
  */
 
 #include "pmapi.h"
+#include "pmda.h"
+#include "indom.h"
 #include "proc_net_rpc.h"
 
 int
@@ -30,7 +33,7 @@ refresh_proc_net_rpc(proc_net_rpc_t *proc_net_rpc)
     /*
      * client stats
      */
-    if ((fp = fopen("/proc/net/rpc/nfs", "r")) == (FILE *)NULL) {
+    if ((fp = linux_statsfile("/proc/net/rpc/nfs", buf, sizeof(buf))) == NULL) {
     	proc_net_rpc->client.errcode = -oserror();
     }
     else {
@@ -86,7 +89,7 @@ refresh_proc_net_rpc(proc_net_rpc_t *proc_net_rpc)
     /*
      * server stats
      */
-    if ((fp = fopen("/proc/net/rpc/nfsd", "r")) == (FILE *)NULL) {
+    if ((fp = linux_statsfile("/proc/net/rpc/nfsd", buf, sizeof(buf))) == NULL) {
     	proc_net_rpc->server.errcode = -oserror();
     }
     else {
@@ -122,6 +125,18 @@ refresh_proc_net_rpc(proc_net_rpc_t *proc_net_rpc)
 		    &proc_net_rpc->server.th_cnt,
 		    &proc_net_rpc->server.th_fullcnt);
 	    else
+	    if (strncmp(buf, "ra", 2) == 0) {
+		unsigned int ra_depth[10];
+		sscanf(buf, "ra %u %u %u %u %u %u %u %u %u %u %u %u",
+		    &proc_net_rpc->server.ra_size, &ra_depth[0],
+		    &ra_depth[1], &ra_depth[2], &ra_depth[3],
+		    &ra_depth[4], &ra_depth[5], &ra_depth[6],
+		    &ra_depth[7], &ra_depth[8], &ra_depth[9],
+		    &proc_net_rpc->server.ra_misses);
+		for (i = 0; i < 10; i++)
+		    proc_net_rpc->server.ra_hits += ra_depth[i];
+	    }
+	    else
 	    if (strncmp(buf, "net", 3) == 0)
 		sscanf(buf, "net %u %u %u %u", 
 		    &proc_net_rpc->server.netcnt,
@@ -130,10 +145,12 @@ refresh_proc_net_rpc(proc_net_rpc_t *proc_net_rpc)
 		    &proc_net_rpc->server.nettcpconn);
 	    else
 	    if (strncmp(buf, "rpc", 3) == 0)
-		sscanf(buf, "rpc %u %u %u", 
+                sscanf(buf, "rpc %u %u %u %u %u",
 		    &proc_net_rpc->server.rpccnt,
 		    &proc_net_rpc->server.rpcerr, /* always the sum of the following three fields */
-		    &proc_net_rpc->server.rpcbadfmt);
+                    &proc_net_rpc->server.rpcbadfmt,
+                    &proc_net_rpc->server.rpcbadauth,
+                    &proc_net_rpc->server.rpcbadclnt);
 	    else
 	    if (strncmp(buf, "proc2", 5) == 0) {
 		if ((p = strtok(buf, " ")) != NULL)
@@ -159,8 +176,8 @@ refresh_proc_net_rpc(proc_net_rpc_t *proc_net_rpc)
 		if ((p = strtok(buf, " ")) != NULL)
 		    p = strtok(NULL, " ");
 
-		/* Inst 0 is NULL count (below) */
-		for (i=1; p && i < NR_RPC4_SVR_COUNTERS; i++) {
+		/* Inst 0 is a NULL count (below) - not from the kernel! */
+		for (i=1; p && i <= NR_RPC4_SVR_COUNTERS; i++) {
 		    if ((p = strtok(NULL, " ")) == NULL)
 			break;
 		    proc_net_rpc->server.reqcounts4[i] = strtoul(p, (char **)NULL, 10);

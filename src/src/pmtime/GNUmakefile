@@ -16,21 +16,14 @@ SOURCES = aboutdialog.cpp console.cpp pmtime.cpp pmtimearch.cpp pmtimelive.cpp \
 	  seealsodialog.cpp showboundsdialog.cpp timelord.cpp main.cpp
 LSRCFILES = $(PROJECT) $(QRCFILE) $(RCFILE) $(UIFILES) $(HEADERS) \
 	   $(SOURCES) $(WRAPPER).in $(XMLFILE).in
-LDIRT = $(COMMAND) $(ICONLINKS) $(WRAPPER) $(XMLFILE)
-
-ICONLINKS = play_off.png play_on.png fastfwd_off.png fastfwd_on.png \
-	fastback_off.png fastback_on.png back_off.png back_on.png \
-	stepfwd_off.png stepfwd_on.png stepback_off.png stepback_on.png \
-	stop_off.png stop_on.png aboutpcp.png aboutpmtime.png \
-	whatsthis.png edit-clear.png internet-web-browser.png pmtime.png \
-	$(ICNFILE) $(ICOFILE)
+LDIRT = $(COMMAND) $(WRAPPER) $(XMLFILE) images
 
 default: build-me
 
 include $(BUILDRULES)
 
 ifeq "$(ENABLE_QT)" "true"
-build-me: iconlinks wrappers
+build-me: images wrappers
 	$(QTMAKE)
 	$(LNMAKE)
 
@@ -70,3 +63,9 @@ endif
 default_pcp:	default
 
 install_pcp:	install
+
+images: $(ICNFILE)
+	$(LN_S) $(TOPDIR)/images images
+
+$(ICNFILE):
+	$(LN_S) $(TOPDIR)/images/$(ICNFILE) $(ICNFILE)

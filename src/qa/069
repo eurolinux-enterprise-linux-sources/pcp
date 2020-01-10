@@ -85,7 +85,20 @@ skip == 1			{ next }
     | _filter_pmcd_log | \
     sed \
 	-e '/UNIX_DOMAIN_SOCKET/d' \
-	-e '/unix:/d'
+	-e '/unix:/d' \
+    | $PCP_AWK_PROG '
+BEGIN					{ seen_my_access = 0 }
+/access violation from host MY_IP/	{ seen_my_access++
+					  if (seen_my_access > 1) skip=2
+					}
+skip > 0				{ skip--; next }
+					{ print }'
+    # Note on last awk component ...
+    # depending on the IPv6 support status, can see multiple lines for
+    # 127.0.0.1 _and_ ::1 ... only need to report one occurrence of
+    # the filtered lines
+    #
+
 }
 
 if [ -d $PCP_LOG_DIR/pmlogger ]
@@ -150,6 +163,19 @@ _get_hex_addr()
     fi
 }
 
+# Number of clients is platform/config dependent ...
+# 1. pmie
+# 2. primary pmlogger
+# 3. pmie (maybe)
+# 4. pmlogger for pmmgr (maybe)
+#
+_filter_numclients()
+{
+    $PCP_AWK_PROG '
+$1 == "value"	{ if ($2 == 2 || $2 == 3 || $2 == 4) $2 = "2..4" }
+		{ print }'
+}
+
 pmafm $LOGGING_DIR/$LOCALHOST/Latest remove >$tmp.cmd 2>&1 \
 && $sudo sh $tmp.cmd
 
@@ -198,7 +224,7 @@ _wait_for_pmcd
 _wait_for_pmlogger
 
 echo "should be OK"
-pminfo -f pmcd.numclients # should be controlled now - determinate
+pminfo -f pmcd.numclients | _filter_numclients
 
 cat <<End-of-File >>$nconfig
 
@@ -248,7 +274,7 @@ echo >$tmp.pminfo
 for i in 1 2 3 4 5 6 7 8 9 10
 do
     ssh -q pcpqa@$other1 $cmd2 >$tmp.tmp 2>&1
-    echo "--- attempt $i ---" >>$tmp.pminfo
+    echo "--- attempt $i from $other1 ---" >>$tmp.pminfo
     cat $tmp.tmp >>$tmp.pminfo
     if grep 'connection limit' $tmp.tmp >/dev/null
     then
@@ -282,7 +308,7 @@ echo >$tmp.pminfo
 for i in 1 2 3 4 5 6 7 8 9 10
 do
     ssh -q pcpqa@$other2 $cmd2 >$tmp.tmp 2>&1
-    echo "--- attempt $i ---" >>$tmp.pminfo
+    echo "--- attempt $i from $other2 ---" >>$tmp.pminfo
     cat $tmp.tmp >>$tmp.pminfo
     if grep 'connection limit' $tmp.tmp >/dev/null
     then
@@ -309,7 +335,7 @@ echo >$tmp.pmstore
 for i in 1 2 3 4 5 6 7 8 9 10
 do
     ssh -q pcpqa@$other2 $cmd3 >$tmp.tmp 2>&1
-    echo "--- attempt $i ---" >>$tmp.pminfo
+    echo "--- attempt $i from $other2 ---" >>$tmp.pminfo
     cat $tmp.tmp >>$tmp.pmstore
     if grep 'connection limit' $tmp.tmp >/dev/null
     then

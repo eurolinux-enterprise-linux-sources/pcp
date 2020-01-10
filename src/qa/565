@@ -21,7 +21,7 @@ in
 	;;
     linux|darwin|solaris)
 	# same output for Linux, Mac OS X and OpenSolaris
-	if [ $PCP_VER -lt 3600 ]
+	if [ $PCP_VER -lt 30600 ]
 	then
 	    ln $seq.linux $seq.out || exit 1
 	else
@@ -42,7 +42,11 @@ _cleanup()
     then
 	:
     else
-	[ -f $tmp.pmcd.conf ] && $sudo mv $tmp.pmcd.conf $PCP_PMCDCONF_PATH
+	if [ -f $tmp.pmcd.conf ]
+	then
+	    $sudo cp $tmp.pmcd.conf $PCP_PMCDCONF_PATH
+	    rm -f $tmp.pmcd.conf
+	fi
 	rm -f $tmp.*
 	$sudo $PCP_RC_DIR/pcp restart | _filter_pcp_start
 	_wait_for_pmcd

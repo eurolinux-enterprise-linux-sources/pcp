@@ -2,7 +2,7 @@
 %{
 /* Parse a string into an internal time stamp.
  *
- * Copyright (C) 1999, 2000, 2002, 2003, 2004, 2005, 2006, 2007 Free Software
+ * Copyright (C) 1999, 2000, 2002, 2003, 2004, 2005, 2006, 2007, 2015 Free Software
  * Foundation, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -314,12 +314,12 @@ zone:
 day:
     tDAY
       {
-	pc->day_ordinal = 1;
+	pc->day_ordinal = 0;
 	pc->day_number = $1;
       }
   | tDAY ','
       {
-	pc->day_ordinal = 1;
+	pc->day_ordinal = 0;
 	pc->day_number = $1;
       }
   | tORDINAL tDAY
@@ -1093,10 +1093,7 @@ __pmGlibGetDate(struct timespec *result, char const *p,
     int ok = 0;
 
     if (!now) {
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	gettime_buffer.tv_sec = tv.tv_sec;
-	gettime_buffer.tv_nsec = tv.tv_usec * 1000;
+	__pmGetTimespec(&gettime_buffer);
 	now = &gettime_buffer;
     }
 
@@ -1189,7 +1186,9 @@ __pmGlibGetDate(struct timespec *result, char const *p,
 
 	if (pc.days_seen && !pc.dates_seen) {
 	    tm.tm_mday += ((pc.day_number - tm.tm_wday + 7) % 7
-			   + 7 * (pc.day_ordinal - (0 < pc.day_ordinal)));
+			   + 7 * (pc.day_ordinal 
+				  - (0 < pc.day_ordinal 
+				     && tm.tm_wday != pc.day_number)));
 	    tm.tm_isdst = -1;
 	    Start = __pmMktime(&tm);
 	    if (Start == (time_t) - 1)

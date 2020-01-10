@@ -141,6 +141,7 @@ extern "C" {
 #undef HAVE_NETINET_IN_H
 #undef HAVE_NETINET_TCP_H
 #undef HAVE_ARPA_INET_H
+#undef HAVE_FTS_H
 
 #undef HAVE_SYS_ENDIAN_H
 #undef HAVE_SYS_MACHINE_H
@@ -157,17 +158,14 @@ extern "C" {
 #if defined(HAVE_SYSLOG_H)
 #include <syslog.h>
 #endif
-#if defined(HAVE_WINDOWS_H)
-#include <windows.h>
-#endif
 #if defined(HAVE_WINSOCK2_H)
 #include <winsock2.h>
 #endif
+#if defined(HAVE_WINDOWS_H)
+#include <windows.h>
+#endif
 #if defined(HAVE_WS2TCPIP_H)
 #include <ws2tcpip.h>
-#endif
-#if defined(HAVE_SYS_TIMEB_H)
-#include <sys/timeb.h>
 #endif
 
 /* HAVE_NETWORK_BYTEORDER for big endian systems (not Intel) */
@@ -210,6 +208,9 @@ extern "C" {
 #undef HAVE_WAIT3
 
 #undef HAVE_MKTIME
+#undef HAVE_CLOCK_GETTIME
+#undef HAVE_NANOSLEEP
+#undef HAVE_USLEEP
 #undef HAVE_UNSETENV
 
 #undef HAVE_SELECT
@@ -235,6 +236,8 @@ extern "C" {
 #undef HAVE_SCANDIR
 #undef HAVE_MKSTEMP
 
+#undef HAVE_GETUID
+#undef HAVE_GETGID
 #undef HAVE_GETGRENT
 #undef HAVE_GETGRENT_R
 #undef HAVE_GETGRNAM
@@ -254,9 +257,6 @@ extern "C" {
 #undef HAVE_MEMALIGN
 #undef HAVE_VALLOC
 
-#undef HAVE_NANOSLEEP
-#undef HAVE_USLEEP
-
 #undef HAVE_SIGNAL
 #undef HAVE_SIGHOLD
 #undef HAVE_SIGRELSE
@@ -273,6 +273,7 @@ extern "C" {
 #undef HAVE_STRTOLL
 #undef HAVE_STRTOULL
 #undef HAVE_STRNDUP
+#undef HAVE_STRCHRNUL
 
 #undef HAVE_DLOPEN
 #undef HAVE_FPCLASSIFY
@@ -287,6 +288,14 @@ extern "C" {
 #undef HAVE_BACKTRACE
 #undef HAVE_READDIR64
 
+/* interfaces used for Linux container support (namespaces) */
+#undef HAVE_SENDMSG
+#undef HAVE_RECVMSG
+#undef HAVE_SETNS
+
+/* if the PAPI_component_info_t struct has a 'disabled' variable */
+#undef HAVE_PAPI_DISABLED_COMP
+
 /* if termio signals are supported */
 #ifdef HAVE_TERMIOS_H
 #ifdef HAVE_TCGETATTR
@@ -299,6 +308,7 @@ extern "C" {
 
 /* Infiniband API version information */
 #undef HAVE_PORT_PERFORMANCE_QUERY_VIA
+#undef HAVE_PMA_QUERY_VIA
 
 #ifndef ULONGLONG_MAX 
 #define ULONGLONG_MAX (__uint64_t)18446744073709551615ULL
@@ -400,7 +410,9 @@ bozo! need to find where MAXNAMELEN is defined for this platform
 #endif
 #endif
 #ifndef MAXPATHLEN
-bozo! need to find where MAXPATHLEN is defined for this platform
+/* bozo! need to find where MAXPATHLEN is defined for this platform */
+#define PATH_MAX 4096
+#define MAXPATHLEN PATH_MAX
 #endif
 
 /*
@@ -428,7 +440,8 @@ bozo! need to find where MAXPATHLEN is defined for this platform
 #endif
 #endif
 #ifndef MAXHOSTNAMELEN
-bozo! need to find where MAXHOSTNAMELEN is defined for this platform
+/* bozo! need to find where MAXHOSTNAMELEN is defined for this platform*/
+#define MAXHOSTNAMELEN 4096
 #endif
 
 #ifndef HAVE_FLOG10
@@ -505,6 +518,9 @@ typedef void (*SIG_PF) (int);
 /* Determine if we are on a FreeBSD box */
 #undef IS_FREEBSD
 
+/* Determine if we are on a GNU box */
+#undef IS_GNU
+
 /* Determine if we are on a NetBSD box */
 #undef IS_NETBSD
 
@@ -522,18 +538,7 @@ typedef void (*SIG_PF) (int);
 #ifdef IS_MINGW
 
 #ifdef PCP_VERSION		/* used to reduce namespace pollution */
-#define EINPROGRESS	WSAEINPROGRESS
-#define ENETDOWN	WSAENETDOWN
-#define ENETUNREACH	WSAENETUNREACH
-#define ECONNRESET	WSAECONNRESET
-#define ETIMEDOUT	WSAETIMEDOUT
-#define ECONNREFUSED	WSAECONNREFUSED
 #define EHOSTDOWN	WSAEHOSTDOWN
-#define EHOSTUNREACH	WSAEHOSTUNREACH
-#define EOPNOTSUPP	WSAEOPNOTSUPP
-#define EADDRINUSE	WSAEADDRINUSE
-#define EPROTO		WSAEPROTONOSUPPORT
-#define EMSGSIZE	WSAEMSGSIZE
 #define ENODATA		WSANO_DATA
 extern const char *wsastrerror(int);
 
@@ -549,7 +554,9 @@ extern const char *wsastrerror(int);
 #define SIGUSR1		(NSIG+2)
 #define SIGBUS		(NSIG+3)
 #define S_IRGRP		0
+#define S_IWGRP		0
 #define S_IROTH		0
+#define S_IWOTH		0
 #define S_IRWXG		0
 #define S_IRWXO		0
 #define S_ISVTX		0
@@ -563,6 +570,7 @@ extern const char *wsastrerror(int);
 extern void setlinebuf(FILE *);
 extern char *index(const char *, int);
 extern char *rindex(const char *, int);
+extern char *strcasestr(const char *, const char *);
 extern long int lrand48(void);
 extern void srand48(long int);
 
@@ -644,7 +652,13 @@ extern char *dirname(char *);
 extern char *basename(char *);
 #endif
 #ifndef HAVE_STRNDUP
-extern char *strndup(const char *, size_t n);
+extern char *strndup(const char *, size_t);
+#endif
+#ifndef HAVE_STRCHRNUL
+extern char *strchrnul(const char *, int);
+#endif
+#ifndef HAVE_STRCHRNUL
+extern char *strchrnul(const char *, int c);
 #endif
 
 #ifdef HAVE_CONST_DIRENT

@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2015, Red Hat.
  * Copyright (c) 2006, Ken McDonell.  All Rights Reserved.
  * Copyright (c) 2007, Aconex.  All Rights Reserved.
  * 
@@ -64,17 +65,17 @@ NameSpace::NameSpace(QTreeWidget *list, const QmcContext *context)
     switch (my.context->source().type()) {
     case PM_CONTEXT_ARCHIVE:
 	my.basename = context->source().source();
-	my.icon = QIcon(":/archive.png");
+	my.icon = QIcon(":/images/archive.png");
 	my.type = ArchiveRoot;
 	break;
     case PM_CONTEXT_LOCAL:
 	my.basename = QString("Local context");
-	my.icon = QIcon(":/emblem-system.png");
+	my.icon = QIcon(":/images/emblem-system.png");
 	my.type = LocalRoot;
 	break;
     default:
 	my.basename = context->source().source();
-	my.icon = QIcon(":/computer.png");
+	my.icon = QIcon(":/images/computer.png");
 	my.type = HostRoot;
 	break;
     }
@@ -94,12 +95,16 @@ QString NameSpace::sourceTip()
     tooltip = "Performance metrics from host ";
     tooltip.append(source.host());
 
-    if (my.context->source().type() == PM_CONTEXT_ARCHIVE) {
+    if (source.type() == PM_CONTEXT_ARCHIVE) {
 	tooltip.append("\n  commencing ");
 	tooltip.append(source.startTime());
 	tooltip.append("\n  ending            ");
 	tooltip.append(source.endTime());
+    } else if (source.attributes() != QString::null) {
+	tooltip.append("\nAttributes: ");
+	tooltip.append(source.attributes());
     }
+
     tooltip.append("\nTimezone: ");
     tooltip.append(source.timezone());
     return tooltip;

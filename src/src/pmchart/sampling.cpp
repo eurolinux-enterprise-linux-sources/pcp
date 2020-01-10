@@ -506,7 +506,7 @@ SamplingEngine::isCompatible(pmDesc &desc)
     console->post("SamplingEngine::isCompatible"
 		  " type=%d, units=%s", desc.type, pmUnitsStr(&desc.units));
 
-    if (desc.type == PM_TYPE_EVENT)
+    if (desc.type == PM_TYPE_EVENT || desc.type == PM_TYPE_HIGHRES_EVENT)
 	return false;
     normaliseUnits(desc);
     if (my.units.dimSpace != desc.units.dimSpace ||
@@ -566,7 +566,6 @@ void
 SamplingEngine::redoScale(void)
 {
     bool	rescale = false;
-    pmUnits	oldunits = my.units;
 
     // The 1,000 and 0.1 thresholds are just a heuristic guess.
     //

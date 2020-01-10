@@ -434,7 +434,6 @@ PCP_3.4 {
   global:
     __pmConnectCheckError;
     __pmConnectRestoreFlags;
-    __pmFdOpen;
     __pmGetFileStatusFlags;
     __pmSetFileStatusFlags;
     __pmGetFileDescriptorFlags;
@@ -442,3 +441,50 @@ PCP_3.4 {
     __pmSocketClosed;
     __pmLogPutResult2;
 } PCP_3.3;
+
+PCP_3.5 {
+  global:
+    __pmDumpStack;
+    __pmServerCreatePIDFile;
+} PCP_3.4;
+
+PCP_3.6 {
+  global:
+    __pmDiscoverServicesWithOptions;
+    __pmDumpNameNode;
+    __pmFreeInterpData;
+    __pmAddOptArchiveFolio;
+} PCP_3.5;
+
+PCP_3.7 {
+  global:
+    pmFreeHighResResult;
+    pmFreeHighResEventResult;
+    pmUnpackHighResEventRecords;
+
+    __pmCheckHighResEventRecords;
+    __pmDumpHighResEventRecords;
+    __pmDumpHighResResult;
+    __pmPrintHighResStamp;
+    __pmPrintTimespec;
+    __pmGetTimespec;
+} PCP_3.6;
+
+PCP_3.8 {
+  global:
+    __pmtimevalInc;
+    __pmtimevalDec;
+} PCP_3.7;
+
+PCP_3.9 {
+  global:
+    __pmSendAttr;
+    __pmDecodeAttr;
+    __pmIgnoreSignalPIPE;
+    pmParseUnitsStr;
+} PCP_3.8;
+
+PCP_3.10 {
+  global:
+    __pmPrintMetricNames;
+} PCP_3.9;

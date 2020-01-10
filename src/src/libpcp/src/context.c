@@ -142,27 +142,40 @@ char *
 pmGetContextHostName_r(int ctxid, char *buf, int buflen)
 {
     __pmContext *ctxp;
-    const char	*sts;
     char	*name;
     pmID	pmid;
     pmResult	*resp;
-    int		rc;
+    int		original;
+    int		sts;
 
-    buf[0]='\0';
+    buf[0] = '\0';
 
     if ((ctxp = __pmHandleToPtr(ctxid)) != NULL) {
 	switch (ctxp->c_type) {
 	case PM_CONTEXT_HOST:
 	    /*
-	     * Try and establish the hostname from the remote PMCD.
+	     * Try and establish the hostname from PMCD (possibly remote).
 	     * Do not nest the successive actions. That way, if any one of
 	     * them fails, we take the default.
+	     * Note: we must *temporarily* switch context (see pmUseContext)
+	     * in the host case, then switch back afterward. We already hold
+	     * locks and have validated the context pointer, so we do a mini
+	     * context switch, then switch back.
 	     */
+	    if (pmDebug & DBG_TRACE_CONTEXT)
+		fprintf(stderr, "pmGetContextHostName_r context(%d) -> 0\n", ctxid);
+	    original = PM_TPD(curcontext);
+	    PM_TPD(curcontext) = ctxid;
+
 	    name = "pmcd.hostname";
-	    rc = pmLookupName(1, &name, &pmid);
-	    if (rc >= 0)
-		rc = pmFetch(1, &pmid, &resp);
-	    if (rc >= 0) {
+	    sts = pmLookupName(1, &name, &pmid);
+	    if (sts >= 0)
+		sts = pmFetch(1, &pmid, &resp);
+	    if (pmDebug & DBG_TRACE_CONTEXT)
+		fprintf(stderr, "pmGetContextHostName_r reset(%d) -> 0\n", original);
+
+	    PM_TPD(curcontext) = original;
+	    if (sts >= 0) {
 		if (resp->vset[0]->numval > 0) { /* pmcd.hostname present */
 		    strncpy(buf, resp->vset[0]->vlist[0].value.pval->vbuf, buflen);
 		    pmFreeResult(resp);
@@ -172,18 +185,18 @@ pmGetContextHostName_r(int ctxid, char *buf, int buflen)
 		/* FALLTHROUGH */
 	    }
 
-	    /* We could not get the hostname from the remote PMCD. If the
-	     * name in the context is a filesystem path (AF_UNIX address)
-	     * or is 'localhost', then use gethostname(). Otherwise, use the
-	     * name from the context.
+	    /*
+	     * We could not get the hostname from PMCD.  If the name in the
+	     * context structure is a filesystem path (AF_UNIX address) or
+	     * 'localhost', then use gethostname(). Otherwise, use the name
+	     * from the context structure.
 	     */
-	    sts = ctxp->c_pmcd->pc_hosts[0].name;
-	    if (sts == NULL ||			 /* no name ?! */
-		*sts == __pmPathSeparator() ||	 /* AF_UNIX /path */
-		(strcmp(sts, "localhost") == 0)) /* localhost XXX: localhost6 etc.? */
+	    name = ctxp->c_pmcd->pc_hosts[0].name;
+	    if (!name || name[0] == __pmPathSeparator() || /* AF_UNIX */
+		(strncmp(name, "localhost", 9) == 0)) /* localhost[46] */
 		gethostname(buf, buflen);
 	    else
-		strncpy(buf, sts, buflen-1);
+		strncpy(buf, name, buflen-1);
 	    break;
 
 	case PM_CONTEXT_LOCAL:
@@ -321,10 +334,30 @@ __pmInitChannelLock(pthread_mutex_t *lock)
 #endif
 
 static int
-ctxflags(__pmHashCtl *attrs)
+ctxlocal(__pmHashCtl *attrs)
 {
-    int flags = 0;
+    int sts;
+    char *name = NULL;
+    char *container = NULL;
+
+    if ((container = getenv("PCP_CONTAINER")) != NULL) {
+	if ((name = strdup(container)) == NULL)
+	    return -ENOMEM;
+	if ((sts = __pmHashAdd(PCP_ATTR_CONTAINER, (void *)name, attrs)) < 0) {
+	    free(name);
+	    return sts;
+	}
+    }
+    return 0;
+}
+
+static int
+ctxflags(__pmHashCtl *attrs, int *flags)
+{
+    int sts;
+    char *name = NULL;
     char *secure = NULL;
+    char *container = NULL;
     __pmHashNode *node;
 
     if ((node = __pmHashSearch(PCP_ATTR_PROTOCOL, attrs)) != NULL) {
@@ -340,26 +373,38 @@ ctxflags(__pmHashCtl *attrs)
 	secure = getenv("PCP_SECURE_SOCKETS");
 
     if (secure) {
-        if (secure[0] == '\0' ||
+	if (secure[0] == '\0' ||
 	   (strcmp(secure, "1")) == 0 ||
 	   (strcmp(secure, "enforce")) == 0) {
-	    flags |= PM_CTXFLAG_SECURE;
+	    *flags |= PM_CTXFLAG_SECURE;
 	} else if (strcmp(secure, "relaxed") == 0) {
-	    flags |= PM_CTXFLAG_RELAXED;
+	    *flags |= PM_CTXFLAG_RELAXED;
 	}
     }
 
     if (__pmHashSearch(PCP_ATTR_COMPRESS, attrs) != NULL)
-	flags |= PM_CTXFLAG_COMPRESS;
+	*flags |= PM_CTXFLAG_COMPRESS;
 
     if (__pmHashSearch(PCP_ATTR_USERAUTH, attrs) != NULL ||
 	__pmHashSearch(PCP_ATTR_USERNAME, attrs) != NULL ||
 	__pmHashSearch(PCP_ATTR_PASSWORD, attrs) != NULL ||
 	__pmHashSearch(PCP_ATTR_METHOD, attrs) != NULL ||
 	__pmHashSearch(PCP_ATTR_REALM, attrs) != NULL)
-	flags |= PM_CTXFLAG_AUTH;
+	*flags |= PM_CTXFLAG_AUTH;
 
-    return flags;
+    if (__pmHashSearch(PCP_ATTR_CONTAINER, attrs) != NULL)
+	*flags |= PM_CTXFLAG_CONTAINER;
+    else if ((container = getenv("PCP_CONTAINER")) != NULL) {
+	if ((name = strdup(container)) == NULL)
+	    return -ENOMEM;
+	if ((sts = __pmHashAdd(PCP_ATTR_CONTAINER, (void *)name, attrs)) < 0) {
+	    free(name);
+	    return sts;
+	}
+	*flags |= PM_CTXFLAG_CONTAINER;
+    }
+
+    return 0;
 }
 
 int
@@ -447,8 +492,8 @@ INIT_CONTEXT:
 	} else if (nhosts == 0) {
 	    sts = PM_ERR_NOTHOST;
 	    goto FAILED;
-	} else {
-	    new->c_flags |= ctxflags(attrs);
+	} else if ((sts = ctxflags(attrs, &new->c_flags)) < 0) {
+	    goto FAILED;
 	}
 
         /* As an optimization, if there is already a connection to the same PMCD,
@@ -506,6 +551,8 @@ INIT_CONTEXT:
 	new->c_pmcd->pc_refcnt++;
     }
     else if (new->c_type == PM_CONTEXT_LOCAL) {
+	if ((sts = ctxlocal(&new->c_attrs)) != 0)
+	    goto FAILED;
 	if ((sts = __pmConnectLocal(&new->c_attrs)) != 0)
 	    goto FAILED;
     }
@@ -551,6 +598,7 @@ INIT_CONTEXT:
 	new->c_archctl->ac_end = 0.0;
 	new->c_archctl->ac_want = NULL;
 	new->c_archctl->ac_unbound = NULL;
+	new->c_archctl->ac_cache = NULL;
 	new->c_archctl->ac_log->l_refcnt++;
     }
     else {
@@ -778,6 +826,15 @@ pmDupContext(void)
 	    goto done;
 	}
 	*newcon->c_archctl = *oldcon->c_archctl;	/* struct assignment */
+	/*
+	 * Need to make hash list and read cache independent in case oldcon
+	 * is subsequently closed via pmDestroyContext() and don't want
+	 * __pmFreeInterpData() to trash our hash list and read cache.
+	 * Start with an empty hash list and read cache for the dup'd context.
+	 */
+	newcon->c_archctl->ac_pmid_hc.nodes = 0;
+	newcon->c_archctl->ac_pmid_hc.hsize = 0;
+	newcon->c_archctl->ac_cache = NULL;
     }
 
     sts = new;
@@ -860,12 +917,17 @@ pmDestroyContext(int handle)
 	}
     }
     if (ctxp->c_archctl != NULL) {
+	__pmFreeInterpData(ctxp);
 	if (--ctxp->c_archctl->ac_log->l_refcnt == 0) {
 	    __pmLogClose(ctxp->c_archctl->ac_log);
 	    free(ctxp->c_archctl->ac_log);
 	}
+	if (ctxp->c_archctl->ac_cache != NULL)
+	    free(ctxp->c_archctl->ac_cache);
 	free(ctxp->c_archctl);
     }
+    __pmFreeAttrsSpec(&ctxp->c_attrs);
+    __pmHashClear(&ctxp->c_attrs);
     ctxp->c_type = PM_CONTEXT_FREE;
 
     if (handle == PM_TPD(curcontext))
@@ -885,8 +947,19 @@ pmDestroyContext(int handle)
 #ifdef PM_MULTI_THREAD
     if ((psts = pthread_mutex_destroy(&ctxp->c_lock)) != 0) {
 	pmErrStr_r(-psts, errmsg, sizeof(errmsg));
-	fprintf(stderr, "pmDestroyContext: context=%d pthread_mutex_destroy failed: %s", handle, errmsg);
-	exit(4);
+	fprintf(stderr, "pmDestroyContext(context=%d): pthread_mutex_destroy failed: %s\n", handle, errmsg);
+	/*
+	 * Most likely cause is the mutex still being locked ... this is a
+	 * a library bug, but potentially recoverable ...
+	 */
+	while (PM_UNLOCK(ctxp->c_lock) >= 0) {
+	    fprintf(stderr, "pmDestroyContext(context=%d): extra unlock?\n", handle);
+	}
+	if ((psts = pthread_mutex_destroy(&ctxp->c_lock)) != 0) {
+	    pmErrStr_r(-psts, errmsg, sizeof(errmsg));
+	    fprintf(stderr, "pmDestroyContext(context=%d): pthread_mutex_destroy failed second try: %s\n", handle, errmsg);
+	}
+	/* keep going, rather than exit ... */
     }
 #endif
 

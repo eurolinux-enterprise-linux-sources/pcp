@@ -42,6 +42,7 @@ static pmLongOptions longopts[] = {
     PMOPT_NAMESPACE,
     PMOPT_START,
     PMOPT_FINISH,
+    { "verbose", 0, 'l', 0, "verbose output" },
     PMOPT_TIMEZONE,
     PMOPT_HOSTZONE,
     PMOPT_HELP,
@@ -50,7 +51,7 @@ static pmLongOptions longopts[] = {
 
 static pmOptions opts = {
     .flags = PM_OPTFLAG_DONE | PM_OPTFLAG_BOUNDARIES | PM_OPTFLAG_STDOUT_TZ,
-    .short_options = "D:ln:S:T:zZ:?",
+    .short_options = "D:ln:S:T:zvZ:?",
     .long_options = longopts,
     .short_usage = "[options] archive",
 };
@@ -61,19 +62,8 @@ tsub(struct timeval *a, struct timeval *b)
 {
     if ((a == NULL) || (b == NULL))
 	return -1;
-    a->tv_usec -= b->tv_usec;
-    if (a->tv_usec < 0) {
-	a->tv_usec += 1000000;
-	a->tv_sec--;
-    }
-    a->tv_sec -= b->tv_sec;
+    __pmtimevalDec(a, b);
     return 0;
-}
-
-static double
-tosec(struct timeval t)
-{
-    return t.tv_sec + (t.tv_usec / 1000000.0);
 }
 
 static char *
@@ -95,13 +85,14 @@ typeStr(int pmtype)
 static void
 print_metric(FILE *f, pmID pmid)
 {
-    char	*name = NULL;
+    int		numnames;
+    char	**names;
 
-    if (pmNameID(pmid, &name) < 0)
+    if ((numnames = pmNameAll(pmid, &names)) < 1)
 	fprintf(f, "%s", pmIDStr(pmid));
     else {
-	fprintf(f, "%s", name);
-	free(name);
+	__pmPrintMetricNames(f, numnames, names, " or ");
+	free(names);
     }
 }
 
@@ -131,7 +122,8 @@ unwrap(double current, struct timeval *curtime, checkData *checkdata, int index)
     int		wrapflag = 0;
     char	*str = NULL;
 
-    if ((current - checkdata->instlist[index]->lastval) < 0.0) {
+    if ((current - checkdata->instlist[index]->lastval) < 0.0 &&
+        checkdata->instlist[index]->lasttime.tv_sec > 0) {
 	switch (checkdata->desc.type) {
 	    case PM_TYPE_32:
 	    case PM_TYPE_U32:
@@ -294,6 +286,8 @@ docheck(pmResult *result)
 	    }
 	}
 #endif
+	if (vsp->numval <= 0)
+	    continue;
 
 	/* check if pmid already in hash list */
 	if ((hptr = __pmHashSearch(vsp->pmid, &hashlist)) == NULL) {
@@ -355,6 +349,11 @@ docheck(pmResult *result)
 			continue;
 		    }
 		}
+		if (k >= checkdata->listsize) {	/* only error values observed so far */
+		    k = checkdata->listsize;
+		    newHashInst(vp, checkdata, vsp->valfmt, &result->timestamp, k);
+		    continue;
+		}
 
 		timediff = result->timestamp;
 		tsub(&timediff, &(checkdata->instlist[k]->lasttime));
@@ -363,7 +362,7 @@ docheck(pmResult *result)
 		    timediff.tv_sec = 0;
 		    timediff.tv_usec = 0;
 		}
-		diff = tosec(timediff);
+		diff = __pmtimevalToReal(&timediff);
 		if ((sts = pmExtractValue(vsp->valfmt, vp, checkdata->desc.type, &av, PM_TYPE_DOUBLE)) < 0) {
 		    printf("[");
 		    print_stamp(stdout, &result->timestamp);
@@ -436,6 +435,9 @@ main(int argc, char *argv[])
 {
     int			c, sts, ctx;
     int			lflag = 0;	/* no label by default */
+    int			vflag = 0;	/* verbose off by default */
+    int			mark_count = 0;
+    int			result_count = 0;
     pmResult		*result;
     struct timeval	timespan;
     struct timeval	last_stamp;
@@ -446,10 +448,13 @@ main(int argc, char *argv[])
 	case 'l':	/* display the archive label */
 	    lflag = 1;
 	    break;
+	case 'v':	/* bump verbosity */
+	    vflag++;
+	    break;
 	}
     }
 
-    if (opts.optind >= argc) {
+    if (!opts.errors && opts.optind >= argc) {
 	pmprintf("Error: no archive specified\n\n");
 	opts.errors++;
     }
@@ -493,6 +498,7 @@ main(int argc, char *argv[])
     for ( ; ; ) {
 	if ((sts = pmFetchArchive(&result)) < 0)
 	    break;
+	result_count++;
 	delta_stamp = result->timestamp;
 	tsub(&delta_stamp, &last_stamp);
 #ifdef PCP_DEBUG
@@ -514,8 +520,7 @@ main(int argc, char *argv[])
 		else
 		    cnt_err++;
 	    }
-	    printf("] delta(stamp)=%d.%03fsec",
-		(int)delta_stamp.tv_sec, (double)(delta_stamp.tv_usec)/1000000);
+	    printf("] delta(stamp)=%.3fsec", __pmtimevalToReal(&delta_stamp));
 	    printf(" numpmid=%d sum(numval)=%d", result->numpmid, sum_val);
 	    if (cnt_noval > 0)
 		printf(" count(numval=0)=%d", cnt_noval);
@@ -537,7 +542,27 @@ main(int argc, char *argv[])
 	if ((opts.finish.tv_sec > result->timestamp.tv_sec) ||
 	    ((opts.finish.tv_sec == result->timestamp.tv_sec) &&
 	     (opts.finish.tv_usec >= result->timestamp.tv_usec))) {
-	    docheck(result);
+	    if (result->numpmid == 0) {
+		/*
+		 * MARK record ... make sure wrap check is not done
+		 * at next fetch (mimic interp.c from libpcp)
+		 */
+		__pmHashNode	*hptr;
+		checkData	*checkdata;
+		int		k;
+		for (hptr = __pmHashWalk(&hashlist, PM_HASH_WALK_START);
+		     hptr != NULL;
+		     hptr = __pmHashWalk(&hashlist, PM_HASH_WALK_NEXT)) {
+		    checkdata = (checkData *)hptr->data;
+		    for (k = 0; k < checkdata->listsize; k++) {
+			checkdata->instlist[k]->lasttime.tv_sec = 0;
+		    }
+		}
+
+		mark_count++;
+	    }
+	    else
+		docheck(result);
 	    pmFreeResult(result);
 	}
 	else {
@@ -551,6 +576,11 @@ main(int argc, char *argv[])
 	print_stamp(stdout, &last_stamp);
 	printf("]: pmFetch: Error: %s\n", pmErrStr(sts));
 	exit(1);
+    }
+
+    if (vflag) {
+	printf("Processed %d pmResult records\n", result_count);
+	printf("Processed %d <mark> records\n", mark_count);
     }
 
     return 0;

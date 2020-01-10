@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Red Hat.
+ * Copyright (c) 2012-2015 Red Hat.
  * Copyright (c) 1995-2005 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This library is free software; you can redistribute it and/or modify it
@@ -74,11 +74,7 @@ __pmDefaultRequestTimeout(void)
 			      timeout_str);
 	    }
 	    else {
-		def_wait.tv_sec = (int)def_timeout;		/* truncate -> secs */
-		if (def_timeout > (double)def_wait.tv_sec)
-		    def_wait.tv_usec = (long)((def_timeout - (double)def_wait.tv_sec) * 1000000);
-		else
-		    def_wait.tv_usec = 0;
+		__pmtimevalFromReal(def_timeout, &def_wait);
 	    }
 	}
 	done_default = 1;
@@ -97,7 +93,7 @@ pduread(int fd, char *buf, int len, int part, int timeout)
     struct timeval	dead_hand;
     struct timeval	now;
 
-    if (timeout == TIMEOUT_ASYNC)
+    if (timeout == -2 /*TIMEOUT_ASYNC*/)
 	return -EOPNOTSUPP;
 
     /*
@@ -249,7 +245,7 @@ __pmPDUTypeStr_r(int type, char *buf, int buflen)
     else if (type == PDU_LOG_CONTROL) res = "LOG_CONTROL";
     else if (type == PDU_LOG_STATUS) res = "LOG_STATUS";
     else if (type == PDU_LOG_REQUEST) res = "LOG_REQUEST";
-    else if (type == PDU_AUTH) res = "AUTH";
+    else if (type == PDU_ATTR) res = "ATTR";
     if (res == NULL)
 	snprintf(buf, buflen, "TYPE-%d?", type);
     else
@@ -279,7 +275,8 @@ __pmPDUTypeStr(int type)
  */
 static int sigpipe_done = 0;		/* First time check for installation of
 					   non-default SIGPIPE handler */
-static void setup_sigpipe()
+void
+__pmIgnoreSignalPIPE(void)
 {
     if (!sigpipe_done) {       /* Make sure SIGPIPE is handled */
 	SIG_PF  user_onpipe;
@@ -290,7 +287,7 @@ static void setup_sigpipe()
     }
 }
 #else
-static void setup_sigpipe() { }
+void __pmIgnoreSignalPIPE(void) {}
 #endif
 
 int
@@ -301,7 +298,7 @@ __pmXmitPDU(int fd, __pmPDU *pdubuf)
     int		len;
     __pmPDUHdr	*php = (__pmPDUHdr *)pdubuf;
 
-    setup_sigpipe();
+    __pmIgnoreSignalPIPE();
 
 #ifdef PCP_DEBUG
     if (pmDebug & DBG_TRACE_PDU) {

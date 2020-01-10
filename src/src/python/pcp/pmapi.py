@@ -1,7 +1,7 @@
 # pylint: disable=C0103
-""" Wrapper module for LIBPCP - the core Performace Co-Pilot API
+""" Wrapper module for LIBPCP - the core Performace Co-Pilot API """
 #
-# Copyright (C) 2012-2014 Red Hat
+# Copyright (C) 2012-2015 Red Hat
 # Copyright (C) 2009-2012 Michael T. Werner
 #
 # This file is part of the "pcp" module, the python interfaces for the
@@ -27,7 +27,7 @@
 # cf. Chapter 3. PMAPI - The Performance Metrics API
 #
 # EXAMPLE
-
+"""
     from pcp import pmapi
     import cpmapi as c_api
 
@@ -52,12 +52,12 @@
     inst5 = context.pmLookupInDom(descs[1], "5 minute")
 
     # Loop through the metric ids
-    for i in xrange(results.contents.numpmid):
+    for i in range(results.contents.numpmid):
         # Is this the kernel.all.load id?
         if (results.contents.get_pmid(i) != metric_ids[1]):
             continue
         # Extract the kernel.all.load instance
-        for j in xrange(results.contents.get_numval(i) - 1):
+        for j in range(results.contents.get_numval(i) - 1):
             atom = context.pmExtractValue(results.contents.get_valfmt(i),
                                           results.contents.get_vlist(i, j),
                                           descs[i].contents.type,
@@ -84,6 +84,7 @@ from ctypes import addressof, pointer, sizeof, cast, byref
 from ctypes import create_string_buffer, memmove
 from ctypes.util import find_library
 
+
 ##############################################################################
 #
 # dynamic library loads
@@ -91,6 +92,30 @@ from ctypes.util import find_library
 
 LIBPCP = CDLL(find_library("pcp"))
 LIBC = CDLL(find_library("c"))
+
+
+##############################################################################
+#
+# python version information and compatibility
+#
+import sys
+
+if sys.version >= '3':
+    integer_types = (int,)
+    long = int
+else:
+    integer_types = (int, long,)
+
+def pyFileToCFile(fileObj):
+    if sys.version >= '3':
+        from os import fdopen
+        ctypes.pythonapi.PyObject_AsFileDescriptor.restype = ctypes.c_int
+        ctypes.pythonapi.PyObject_AsFileDescriptor.argtypes = [ctypes.py_object]
+        return fdopen(ctypes.pythonapi.PyObject_AsFileDescriptor(fileObj), "r", closefd=False)
+    else:
+        ctypes.pythonapi.PyFile_AsFile.restype = ctypes.c_void_p
+        ctypes.pythonapi.PyFile_AsFile.argtypes = [ctypes.py_object]
+        return ctypes.pythonapi.PyFile_AsFile(fileObj)
 
 
 ##############################################################################
@@ -113,8 +138,11 @@ class pmErr(Exception):
         errStr = create_string_buffer(c_api.PM_MAXERRMSGLEN)
         errStr = LIBPCP.pmErrStr_r(self.args[0], errStr, c_api.PM_MAXERRMSGLEN)
         for index in range(1, len(self.args)):
-            errStr += " " + str(self.args[index])
-        return errStr
+            errStr += b" " + str(self.args[index]).encode('utf-8')
+        return str(errStr.decode())
+
+    def progname(self):
+        return c_char_p.in_dll(LIBPCP, "pmProgname").value
 
 class pmUsageErr(Exception):
     def message(self):
@@ -144,8 +172,34 @@ class timeval(Structure):
         self.tv_sec = sec
         self.tv_usec = usec
 
+    @classmethod
+    def fromInterval(builder, interval):
+        """ Construct timeval from a string using pmParseInterval """
+        tvp = builder()
+        errmsg = c_char_p()
+        if type(interval) != type(b''):
+            interval = interval.encode('utf-8')
+        status = LIBPCP.pmParseInterval(interval, byref(tvp), byref(errmsg))
+        if status < 0:
+            raise pmErr(status, errmsg)
+        return tvp
+
     def __str__(self):
         return "%.3f" % c_api.pmtimevalToReal(self.tv_sec, self.tv_usec)
+
+    def __float__(self):
+        return float(c_api.pmtimevalToReal(self.tv_sec, self.tv_usec))
+
+    def __long__(self):
+        return long(self.tv_sec)
+
+    def __int__(self):
+        return int(self.tv_sec)
+
+    def sleep(self):
+        """ Delay for the amount of time specified by this timeval. """
+        c_api.pmtimevalSleep(self.tv_sec, self.tv_usec)
+        return None
 
 class tm(Structure):
     _fields_ = [("tm_sec", c_int),
@@ -235,8 +289,9 @@ class pmUnits(Structure):
         self.pad = 0
 
     def __str__(self):
-        return LIBPCP.pmUnitsStr(self)
-
+        unitstr = ctypes.create_string_buffer(64)
+        result = LIBPCP.pmUnitsStr_r(self, unitstr, 64)
+        return str(result.decode())
 
 class pmValueBlock(Structure):
     """Value block bitfields for different compilers
@@ -289,7 +344,7 @@ class pmValueSet(Structure):
 
     def __str__(self):
         if self.valfmt == 0:
-            vals =  xrange(self.numval)
+            vals = range(self.numval)
             vstr = str([" %s" % str(self.vlist[i]) for i in vals])
             vset = (addressof(self), self.pmid, self.numval, self.valfmt)
             return "pmValueSet@%#lx id=%#lx numval=%d valfmt=%d" % vset + vstr
@@ -324,7 +379,7 @@ class pmResult(Structure):
         self.numpmid = 0
 
     def __str__(self):
-        vals = xrange(self.numpmid)
+        vals = range(self.numpmid)
         vstr = str([" %s" % str(self.vset[i].contents) for i in vals])
         return "pmResult@%#lx id#=%d " % (addressof(self), self.numpmid) + vstr
 
@@ -377,7 +432,7 @@ pmDescPtr.sem = property(lambda x: x.contents.sem, None, None, None)
 pmDescPtr.type = property(lambda x: x.contents.type, None, None, None)
 
 
-def get_indom( pmdesc ):
+def get_indom(pmdesc):
     """Internal function to extract an indom from a pmdesc
 
        Allow functions requiring an indom to be passed a pmDesc* instead
@@ -398,12 +453,30 @@ class pmMetricSpec(Structure):
     """
     _fields_ = [ ("isarch", c_int),
                  ("source", c_char_p),
-                 ("metric", c_int),
-                 ("ninst", c_char_p),
+                 ("metric", c_char_p),
+                 ("ninst", c_int),
                  ("inst",  POINTER(c_char_p)) ]
+    def __str__(self):
+        insts = list(map(lambda x: str(self.inst[x]), range(self.ninst)))
+        fields = (addressof(self), self.isarch, self.source, insts)
+        return "pmMetricSpec@%#lx src=%s metric=%s insts=" % fields
+
+    @classmethod
+    def fromString(builder, string, isarch = 0, source = ''):
+        result = POINTER(builder)()
+        errmsg = c_char_p()
+        if type(source) != type(b''):
+            source = source.encode('utf-8')
+        if type(string) != type(b''):
+            string = string.encode('utf-8')
+        status = LIBPCP.pmParseMetricSpec(string, isarch, source,
+                                        byref(result), byref(errmsg))
+        if status < 0:
+            raise pmErr(status, errmsg)
+        return result
 
 class pmLogLabel(Structure):
-    """Label Record at the start of every log file - as exported above the PMAPI
+    """Label record at the start of every log file
     """
     _fields_ = [ ("magic", c_int),
                  ("pid_t", c_int),
@@ -600,6 +673,9 @@ LIBPCP.pmConvScale.argtypes = [
 LIBPCP.pmUnitsStr_r.restype = c_char_p
 LIBPCP.pmUnitsStr_r.argtypes = [POINTER(pmUnits), c_char_p, c_int]
 
+LIBPCP.pmNumberStr_r.restype = c_char_p
+LIBPCP.pmNumberStr_r.argtypes = [c_double, c_char_p, c_int]
+
 LIBPCP.pmIDStr_r.restype = c_char_p
 LIBPCP.pmIDStr_r.argtypes = [c_uint, c_char_p, c_int]
 
@@ -631,9 +707,6 @@ LIBPCP.pmprintf.argtypes = [c_char_p]
 
 LIBPCP.pmSortInstances.restype = None
 LIBPCP.pmSortInstances.argtypes = [POINTER(pmResult)]
-
-ctypes.pythonapi.PyFile_AsFile.restype = ctypes.c_void_p
-ctypes.pythonapi.PyFile_AsFile.argtypes = [ctypes.py_object]
 
 
 ##############################################################################
@@ -834,6 +907,18 @@ class pmOptions(object):
         """ Add support for -?/--help into PMAPI monitor tool """
         return c_api.pmSetLongOptionHelp()
 
+    def pmSetLongOptionArchiveList(self):
+        """ Add support for --archive-list into PMAPI monitor tool """
+        return c_api.pmSetLongOptionArchiveList()
+
+    def pmSetLongOptionArchiveFolio(self):
+        """ Add support for --archive-folio into PMAPI monitor tool """
+        return c_api.pmSetLongOptionArchiveFolio()
+
+    def pmSetLongOptionHostList(self):
+        """ Add support for --host-list into PMAPI monitor tool """
+        return c_api.pmSetLongOptionHostList()
+
     def pmGetOptionContext(self):	# int (typed)
         return c_api.pmGetOptionContext()
 
@@ -844,7 +929,7 @@ class pmOptions(object):
         return c_api.pmGetOptionArchives()
 
     def pmGetOptionAlignment(self):		# timeval
-	sec = c_api.pmGetOptionAlignment_sec()
+        sec = c_api.pmGetOptionAlignment_sec()
         if sec == None:
             return None
         return timeval(sec, c_api.pmGetOptionAlignment_sec())
@@ -854,6 +939,9 @@ class pmOptions(object):
         if sec == None:
             return None
         return timeval(sec, c_api.pmGetOptionStart_usec())
+
+    def pmGetOptionFinishOptarg(self):	# string
+        return c_api.pmGetOptionFinish_optarg()
 
     def pmGetOptionFinish(self):	# timeval
         sec = c_api.pmGetOptionFinish_sec()
@@ -878,6 +966,15 @@ class pmOptions(object):
 
     def pmGetOptionTimezone(self):	# str
         return c_api.pmGetOptionTimezone()
+
+    def pmSetOptionArchiveList(self, archives):	# str
+        return c_api.pmSetOptionArchiveList(archives)
+
+    def pmSetOptionArchiveFolio(self, folio):	# str
+        return c_api.pmSetOptionArchiveFolio(folio)
+
+    def pmSetOptionHostList(self, hosts):	# str
+        return c_api.pmSetOptionHostList(hosts)
 
 
 ##############################################################################
@@ -935,9 +1032,13 @@ class pmContext(object):
         self._type = typed                              # the context type
         self._target = target                            # the context target
         self._ctx = c_api.PM_ERR_NOCONTEXT                # init'd pre-connect
-        self._ctx = LIBPCP.pmNewContext(typed, target)     # the context handle
+        if type(target) != type(b''):
+            source = target.encode('utf-8')
+        else:
+            source = target
+        self._ctx = LIBPCP.pmNewContext(typed, source)     # the context handle
         if self._ctx < 0:
-            raise pmErr, (self._ctx, [target])
+            raise pmErr(self._ctx, [target])
 
     def __del__(self):
         if LIBPCP and self._ctx != c_api.PM_ERR_NOCONTEXT:
@@ -997,12 +1098,14 @@ class pmContext(object):
         offspring = POINTER(c_char_p)()
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
+        if type(name) != type(b''):
+            name = name.encode('utf-8')
         status = LIBPCP.pmGetChildren(name, byref(offspring))
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         if status > 0:
-            childL = map(lambda x: str(offspring[x]), range(status))
+            childL = list(map(lambda x: str(offspring[x].decode()), range(status)))
             LIBC.free(offspring)
         else:
             return None
@@ -1016,14 +1119,16 @@ class pmContext(object):
         childstat = POINTER(c_int)()
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
+        if type(name) != type(b''):
+            name = name.encode('utf-8')
         status = LIBPCP.pmGetChildrenStatus(name,
                         byref(offspring), byref(childstat))
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         if status > 0:
-            childL = map(lambda x: str(offspring[x]), range(status))
-            statL = map(lambda x: int(childstat[x]), range(status))
+            childL = list(map(lambda x: str(offspring[x].decode()), range(status)))
+            statL = list(map(lambda x: int(childstat[x]), range(status)))
             LIBC.free(offspring)
             LIBC.free(childstat)
         else:
@@ -1036,10 +1141,10 @@ class pmContext(object):
         """
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         status = LIBPCP.pmGetPMNSLocation()
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return status
 
     def pmLoadNameSpace(self, filename):
@@ -1048,10 +1153,12 @@ class pmContext(object):
         """
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
+        if type(filename) != type(b''):
+            filename = filename.encode('utf-8')
         status = LIBPCP.pmLoadNameSpace(filename)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return status
 
     def pmLookupName(self, nameA, relaxed = 0):
@@ -1060,60 +1167,64 @@ class pmContext(object):
         c_uint pmid [] = pmLookupName("MetricName")
         c_uint pmid [] = pmLookupName(("MetricName1", "MetricName2", ...))
         """
-        if type(nameA) == type(""):
+        status = LIBPCP.pmUseContext(self.ctx)
+        if status < 0:
+            raise pmErr(status)
+        if type(nameA) == type('') or type(nameA) == type(b''):
             n = 1
         else:
             n = len(nameA)
         names = (c_char_p * n)()
-        if type(nameA) == type(""):
+        if type(nameA) == type(''):
+            names[0] = c_char_p(nameA.encode('utf-8'))
+        elif type(nameA) == type(b''):
             names[0] = c_char_p(nameA)
         else:
-            for i in xrange(len(nameA)):
-                names[i] = c_char_p(nameA[i])
-
+            for i in range(len(nameA)):
+                if type(nameA[i]) == type(b''):
+                    names[i] = c_char_p(nameA[i])
+                else:
+                    names[i] = c_char_p(nameA[i].encode('utf-8'))
         pmidA = (c_uint * n)()
-        status = LIBPCP.pmUseContext(self.ctx)
-        if status < 0:
-            raise pmErr, status
         LIBPCP.pmLookupName.argtypes = [c_int, (c_char_p * n), POINTER(c_uint)]
         status = LIBPCP.pmLookupName(n, names, pmidA)
         if status < 0:
-            raise pmErr, (status, pmidA)
+            raise pmErr(status, pmidA)
         elif relaxed == 0 and status != n:
             badL = [name for (name, pmid) in zip(nameA, pmidA) \
                                                 if pmid == c_api.PM_ID_NULL]
-            raise pmErr, (c_api.PM_ERR_NAME, badL)
+            raise pmErr(c_api.PM_ERR_NAME, badL)
         return pmidA
 
     def pmNameAll(self, pmid):
         """PMAPI - Return list of all metric names having this identical PMID
         tuple names = pmNameAll(metric_id)
         """
-        nameA_p = POINTER(c_char_p)()
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
+        nameA_p = POINTER(c_char_p)()
         status = LIBPCP.pmNameAll(pmid, byref(nameA_p))
         if status < 0:
-            raise pmErr, status
-        nameL = map(lambda x: str(nameA_p[x]), range(status))
-        LIBC.free( nameA_p )
+            raise pmErr(status)
+        nameL = list(map(lambda x: str(nameA_p[x].decode()), range(status)))
+        LIBC.free(nameA_p)
         return nameL
 
     def pmNameID(self, pmid):
         """PMAPI - Return a metric name from a PMID
         name = pmNameID(self.metric_id)
         """
-        k = c_char_p()
+        name = c_char_p()
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
-        status = LIBPCP.pmNameID(pmid, byref(k))
+            raise pmErr(status)
+        status = LIBPCP.pmNameID(pmid, byref(name))
         if status < 0:
-            raise pmErr, status
-        name = k.value
-        LIBC.free( k )
-        return name
+            raise pmErr(status)
+        result = name.value
+        LIBC.free(name)
+        return str(result.decode())
 
     def pmTraversePMNS(self, name, callback):
         """PMAPI - Scan namespace, depth first, run CALLBACK at each node
@@ -1121,11 +1232,10 @@ class pmContext(object):
         """
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
-        cb = traverseCB_type(callback)
-        status = LIBPCP.pmTraversePMNS(name, cb)
+            raise pmErr(status)
+        status = c_api.pmnsTraverse(name, callback)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
 
     def pmUnLoadNameSpace(self):
         """PMAPI - Unloads a local PMNS, if one was previously loaded
@@ -1133,41 +1243,47 @@ class pmContext(object):
         """
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         status = LIBPCP.pmUnloadNameSpace()
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
 
     def pmRegisterDerived(self, name, expr):
         """PMAPI - Register a derived metric name and definition
         pm.pmRegisterDerived("MetricName", "MetricName Expression")
         """
+        if type(name) != type(b''):
+            name = name.encode('utf-8')
+        if type(expr) != type(b''):
+            expr = expr.encode('utf-8')
         status = LIBPCP.pmRegisterDerived(name, expr)
         if status != 0:
-            raise pmErr, status
+            raise pmErr(status)
         status = LIBPCP.pmReconnectContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         
-    def pmLoadDerivedConfig(self, f):
+    def pmLoadDerivedConfig(self, fname):
         """PMAPI - Register derived metric names and definitions from a file
         pm.pmLoadDerivedConfig("FileName")
         """
-        status = LIBPCP.pmLoadDerivedConfig(f)
+        if type(fname) != type(b''):
+            fname = fname.encode('utf-8')
+        status = LIBPCP.pmLoadDerivedConfig(fname)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         status = LIBPCP.pmReconnectContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
 
-    def pmDerivedErrStr(self):
+    @staticmethod
+    def pmDerivedErrStr():
         """PMAPI - Return an error message if the pmRegisterDerived metric
         definition cannot be parsed
         pm.pmRegisterDerived()
         """
-        errstr = ctypes.create_string_buffer(c_api.PM_MAXERRMSGLEN)
-        errstr = LIBPCP.pmDerivedErrStr()
-        return str(errstr)
+        result = LIBPCP.pmDerivedErrStr()
+        return str(result.decode())
 
     ##
     # PMAPI Metrics Description Services
@@ -1180,14 +1296,14 @@ class pmContext(object):
         """
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
 
         descbuf = create_string_buffer(sizeof(pmDesc))
         desc = cast(descbuf, POINTER(pmDesc))
         pmid = c_uint(pmid_p)
         status = LIBPCP.pmLookupDesc(pmid, desc)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return desc
 
     def pmLookupDescs(self, pmids_p):
@@ -1197,28 +1313,28 @@ class pmContext(object):
         (pmDesc* pmdesc)[] = pmLookupDesc(c_uint pmid[N])
         (pmDesc* pmdesc)[] = pmLookupDesc(c_uint pmid)
         """
-        if type(pmids_p) == type(int(0)) or type(pmids_p) == type(long(0)):
+        if isinstance(pmids_p, integer_types):
             n = 1
         else:
             n = len(pmids_p)
 
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
 
         desc = (POINTER(pmDesc) * n)()
 
-        for i in xrange(n):
+        for i in range(n):
             descbuf = create_string_buffer(sizeof(pmDesc))
             desc[i] = cast(descbuf, POINTER(pmDesc))
-            if type(pmids_p) == type(int()) or type(pmids_p) == type(long()):
+            if isinstance(pmids_p, integer_types):
                 pmids = c_uint(pmids_p)
             else:
                 pmids = c_uint(pmids_p[i])
 
             status = LIBPCP.pmLookupDesc(pmids, desc[i])
             if status < 0:
-                raise pmErr, status
+                raise pmErr(status)
         return desc
 
     def pmLookupInDomText(self, pmdesc, kind = c_api.PM_TEXT_ONELINE):
@@ -1229,14 +1345,14 @@ class pmContext(object):
         buf = c_char_p()
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
 
         status = LIBPCP.pmLookupInDomText(get_indom(pmdesc), kind, byref(buf))
         if status < 0:
-            raise pmErr, status
-        text = str(buf.value)
+            raise pmErr(status)
+        result = buf.value
         LIBC.free(buf)
-        return text
+        return str(result.decode())
 
     def pmLookupText(self, pmid, kind = c_api.PM_TEXT_ONELINE):
         """PMAPI - Lookup the description of a metric from its pmID
@@ -1245,10 +1361,10 @@ class pmContext(object):
         buf = c_char_p()
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         status = LIBPCP.pmLookupText(pmid, kind, byref(buf))
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         text = buf.value
         LIBC.free(buf)
         return text
@@ -1265,14 +1381,14 @@ class pmContext(object):
         nameA_p = POINTER(c_char_p)()
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         status = LIBPCP.pmGetInDom(get_indom(pmdescp),
                                     byref(instA_p), byref(nameA_p))
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         if status > 0:
-            nameL = map(lambda x: str(nameA_p[x]), range(status))
-            instL = map(lambda x: int(instA_p[x]), range(status))
+            nameL = list(map(lambda x: str(nameA_p[x].decode()), range(status)))
+            instL = list(map(lambda x: int(instA_p[x]), range(status)))
             LIBC.free(instA_p)
             LIBC.free(nameA_p)
         else:
@@ -1287,10 +1403,12 @@ class pmContext(object):
         """
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
+        if type(name) != type(b''):
+            name = name.encode('utf-8')
         status = LIBPCP.pmLookupInDom(get_indom(pmdesc), name)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return status
 
     def pmNameInDom(self, pmdesc, instval):
@@ -1303,13 +1421,13 @@ class pmContext(object):
         name_p = c_char_p()
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         status = LIBPCP.pmNameInDom(get_indom(pmdesc), instval, byref(name_p))
         if status < 0:
-            raise pmErr, status
-        outName = str(name_p.value)
+            raise pmErr(status)
+        result = name_p.value
         LIBC.free(name_p)
-        return outName
+        return str(result.decode())
 
     ##
     # PMAPI Context Services
@@ -1337,10 +1455,10 @@ class pmContext(object):
         """
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         status = LIBPCP.pmDupContext()
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return status
 
     def pmUseContext(self, handle):
@@ -1358,7 +1476,7 @@ class pmContext(object):
         """
         status = LIBPCP.pmWhichContext()
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return status
 
     def pmAddProfile(self, pmdesc, instL):
@@ -1380,10 +1498,10 @@ class pmContext(object):
                 instA[index] = value
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         status = LIBPCP.pmAddProfile(get_indom(pmdesc), numinst, instA)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return status
 
     def pmDelProfile(self, pmdesc, instL):
@@ -1402,10 +1520,10 @@ class pmContext(object):
                 instA[index] = value
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         status = LIBPCP.pmDelProfile(get_indom(pmdesc), numinst, instA)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return status
 
     def pmSetMode(self, mode, timeVal, delta):
@@ -1414,10 +1532,10 @@ class pmContext(object):
         """
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         status = LIBPCP.pmSetMode(mode, pointer(timeVal), delta)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return status
 
     def pmReconnectContext(self):
@@ -1429,7 +1547,7 @@ class pmContext(object):
         """
         status = LIBPCP.pmReconnectContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return status
 
     def pmGetContextHostName(self):
@@ -1442,7 +1560,8 @@ class pmContext(object):
         """
         buflen = c_api.PM_LOG_MAXHOSTLEN
         buffer = ctypes.create_string_buffer(buflen)
-        return str(LIBPCP.pmGetContextHostName_r(self.ctx, buffer, buflen))
+        result = LIBPCP.pmGetContextHostName_r(self.ctx, buffer, buflen)
+        return str(result.decode())
 
     ##
     # PMAPI Timezone Services
@@ -1451,18 +1570,20 @@ class pmContext(object):
         """PMAPI - Query and set the current reporting timezone """
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         status = LIBPCP.pmNewContextZone()
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return status
 
     @staticmethod
     def pmNewZone(tz):
         """PMAPI - Create new zone handle and set reporting timezone """
+        if type(tz) != type(b''):
+            tz = tz.encode('utf-8')
         status = LIBPCP.pmNewZone(tz)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return status
 
     @staticmethod
@@ -1470,7 +1591,7 @@ class pmContext(object):
         """PMAPI - Sets the current reporting timezone """
         status = LIBPCP.pmUseZone(tz_handle)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return status
 
     @staticmethod
@@ -1479,30 +1600,30 @@ class pmContext(object):
         tz_p = c_char_p()
         status = LIBPCP.pmWhichZone(byref(tz_p))
         if status < 0:
-            raise pmErr, status
-        tz = str(tz_p.value)
+            raise pmErr(status)
+        tz = tz_p.value
         LIBC.free(tz_p)
-        return tz
+        return str(tz.decode())
 
     def pmLocaltime(self, seconds):
         """PMAPI - convert the date and time for a reporting timezone """
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         result = (tm)()
-        timetp = c_long(int(seconds))
+        timetp = c_long(long(seconds))
         LIBPCP.pmLocaltime(byref(timetp), byref(result))
-	return result
+        return result
 
     def pmCtime(self, seconds):
         """PMAPI - format the date and time for a reporting timezone """
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         result = ctypes.create_string_buffer(32)
-        timetp = c_long(int(seconds))
+        timetp = c_long(long(seconds))
         LIBPCP.pmCtime(byref(timetp), result)
-	return str(result.value)
+        return str(result.value.decode())
 
     ##
     # PMAPI Metrics Services
@@ -1515,10 +1636,10 @@ class pmContext(object):
         result_p = POINTER(pmResult)()
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         status = LIBPCP.pmFetch(len(pmidA), pmidA, byref(result_p))
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return result_p
 
     @staticmethod
@@ -1535,10 +1656,10 @@ class pmContext(object):
         LIBPCP.pmStore.argtypes = [(type(result))]
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         status = LIBPCP.pmStore(result)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return result
 
 
@@ -1552,10 +1673,10 @@ class pmContext(object):
         loglabel = pmLogLabel()
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         status = LIBPCP.pmGetArchiveLabel(byref(loglabel))
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return loglabel
 
     def pmGetArchiveEnd(self):
@@ -1564,10 +1685,10 @@ class pmContext(object):
         tvp = timeval()
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         status = LIBPCP.pmGetArchiveEnd(byref(tvp))
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return tvp
 
     def pmGetInDomArchive(self, pmdescp):
@@ -1579,14 +1700,14 @@ class pmContext(object):
         nameA_p = POINTER(c_char_p)()
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         indom = get_indom(pmdescp)
         status = LIBPCP.pmGetInDomArchive(indom, byref(instA_p), byref(nameA_p))
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         if status > 0:
-            nameL = map(lambda x: str(nameA_p[x]), range(status))
-            instL = map(lambda x: int(instA_p[x]), range(status))
+            nameL = list(map(lambda x: str(nameA_p[x].decode()), range(status)))
+            instL = list(map(lambda x: int(instA_p[x]), range(status)))
             LIBC.free(instA_p)
             LIBC.free(nameA_p)
         else:
@@ -1601,10 +1722,12 @@ class pmContext(object):
         """
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
+        if type(name) != type(b''):
+            name = name.encode('utf-8')
         status = LIBPCP.pmLookupInDomArchive(get_indom(pmdesc), name)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return status
 
     def pmNameInDomArchive(self, pmdesc, inst):
@@ -1615,14 +1738,14 @@ class pmContext(object):
         name_p = c_char_p()
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         indom = get_indom(pmdesc)
         status = LIBPCP.pmNameInDomArchive(indom, inst, byref(name_p))
         if status < 0:
-            raise pmErr, status
-        outName = str(name_p.value)
+            raise pmErr(status)
+        result = name_p.value
         LIBC.free(name_p)
-        return outName
+        return str(result.decode())
 
     def pmFetchArchive(self):
         """PMAPI - Fetch measurements from the target source
@@ -1632,10 +1755,10 @@ class pmContext(object):
         result_p = POINTER(pmResult)()
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         status = LIBPCP.pmFetchArchive(byref(result_p))
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return result_p
 
 
@@ -1645,13 +1768,17 @@ class pmContext(object):
     @staticmethod
     def pmGetConfig(variable):
         """PMAPI - Return value from environment or pcp config file """
-        return str(LIBPCP.pmGetConfig(variable))
+        if type(variable) != type(b''):
+            variable = variable.encode('utf-8')
+        result = LIBPCP.pmGetConfig(variable)
+        return str(result.decode())
 
     @staticmethod
     def pmErrStr(code):
         """PMAPI - Return value from environment or pcp config file """
         errstr = ctypes.create_string_buffer(c_api.PM_MAXERRMSGLEN)
-        return str(LIBPCP.pmErrStr_r(code, errstr, c_api.PM_MAXERRMSGLEN))
+        result = LIBPCP.pmErrStr_r(code, errstr, c_api.PM_MAXERRMSGLEN)
+        return str(result.decode())
 
     @staticmethod
     def pmExtractValue(valfmt, vlist, intype, outtype):
@@ -1666,7 +1793,7 @@ class pmContext(object):
         status = LIBPCP.pmExtractValue(valfmt, vlist, intype,
                                         byref(outAtom), outtype)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
 
         if outtype == c_api.PM_TYPE_STRING:
             # Get pointer to C string
@@ -1697,20 +1824,29 @@ class pmContext(object):
                                     byref(desc[metric_idx].contents.units),
                                     byref(outAtom), byref(pmunits))
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return outAtom
 
     @staticmethod
     def pmUnitsStr(units):
         """PMAPI - Convert units struct to a readable string """
         unitstr = ctypes.create_string_buffer(64)
-        return str(LIBPCP.pmUnitsStr_r(units, unitstr, 64))
+        result = LIBPCP.pmUnitsStr_r(units, unitstr, 64)
+        return str(result.decode())
+
+    @staticmethod
+    def pmNumberStr(value):
+        """PMAPI - Convert double value to fixed-width string """
+        numstr = ctypes.create_string_buffer(8)
+        result = LIBPCP.pmNumberStr_r(value, numstr, 8)
+        return str(result.decode())
 
     @staticmethod
     def pmIDStr(pmid):
         """PMAPI - Convert a pmID to a readable string """
         pmidstr = ctypes.create_string_buffer(32)
-        return str(LIBPCP.pmIDStr_r(pmid, pmidstr, 32))
+        result = LIBPCP.pmIDStr_r(pmid, pmidstr, 32)
+        return str(result.decode())
 
     @staticmethod
     def pmInDomStr(pmdescp):
@@ -1718,7 +1854,8 @@ class pmContext(object):
         "indom" = pmGetInDom(pmDesc pmdesc)
         """
         indomstr = ctypes.create_string_buffer(32)
-        return str(LIBPCP.pmInDomStr_r(get_indom(pmdescp), indomstr, 32))
+        result = LIBPCP.pmInDomStr_r(get_indom(pmdescp), indomstr, 32)
+        return str(result.decode())
 
     @staticmethod
     def pmTypeStr(typed):
@@ -1726,7 +1863,8 @@ class pmContext(object):
         "type" = pmTypeStr(c_api.PM_TYPE_FLOAT)
         """
         typestr = ctypes.create_string_buffer(32)
-        return str(LIBPCP.pmTypeStr_r(typed, typestr, 32))
+        result = LIBPCP.pmTypeStr_r(typed, typestr, 32)
+        return str(result.decode())
 
     @staticmethod
     def pmAtomStr(atom, typed):
@@ -1734,14 +1872,15 @@ class pmContext(object):
         "value" = pmAtomStr(atom, c_api.PM_TYPE_U32)
         """
         atomstr = ctypes.create_string_buffer(96)
-        return str(LIBPCP.pmAtomStr(byref(atom), typed, atomstr, 96))
+        result = LIBPCP.pmAtomStr_r(byref(atom), typed, atomstr, 96)
+        return str(result.decode())
 
     @staticmethod
     def pmPrintValue(fileObj, result, ptype, vset_idx, vlist_idx, min_width):
         """PMAPI - Print the value of a metric
         pmPrintValue(file, value, pmdesc, vset_index, vlist_index, min_width)
         """
-        LIBPCP.pmPrintValue(ctypes.pythonapi.PyFile_AsFile(fileObj),
+        LIBPCP.pmPrintValue(pyFileToCFile(fileObj),
                 c_int(result.contents.vset[vset_idx].contents.valfmt),
                 c_int(ptype.contents.type),
                 byref(result.contents.vset[vset_idx].contents.vlist[vlist_idx]),
@@ -1752,7 +1891,7 @@ class pmContext(object):
         """PMAPI - flush the internal buffer shared with pmprintf """
         status = LIBPCP.pmflush()
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
         return status
 
     @staticmethod
@@ -1760,7 +1899,7 @@ class pmContext(object):
         """PMAPI - append message to internal buffer for later printing """
         status = LIBPCP.pmprintf(fmt, *args)
         if status < 0:
-            raise pmErr, status
+            raise pmErr(status)
 
     @staticmethod
     def pmSortInstances(result_p):
@@ -1771,27 +1910,32 @@ class pmContext(object):
     @staticmethod
     def pmParseInterval(interval):
         """PMAPI - parse a textual time interval into a timeval struct
-        (timeval_ctype, "error message") = pmParseInterval("time string")
+        (timeval_ctype, '') = pmParseInterval("time string")
         """
-        tvp = timeval()
-        errmsg = POINTER(c_char_p)()
-        status = LIBPCP.pmParseInterval(interval, byref(tvp), errmsg)
-        if status < 0:
-            raise pmErr, status
-        return tvp, errmsg
+        return (timeval.fromInterval(interval), '')
 
     @staticmethod
-    def pmParseMetricSpec(string, isarch, source):
+    def pmParseMetricSpec(string, isarch = 0, source = ''):
         """PMAPI - parse a textual metric specification into a struct
-        (result,errormsg) = pmParseMetricSpec("hinv.ncpu", 0, "localhost")
+        (result, '') = pmParseMetricSpec("hinv.ncpu", 0, "localhost")
         """
-        rsltp = POINTER(pmMetricSpec)()
+        return (pmMetricSpec.fromString(string, isarch, source), '')
+
+    @staticmethod
+    def pmParseUnitsStr(string):
+        if type(string) != type('') and type(string) != type(b''):
+            raise pmErr(c_api.PM_ERR_CONV, str(string))
+        if type(string) != type(b''):
+            string = string.encode('utf-8')
+        result = pmUnits()
         errmsg = c_char_p()
-        status = LIBPCP.pmParseMetricSpec(string, isarch, source,
-                                        byref(rsltp), byref(errmsg))
+        multiplier = c_double()
+        status = LIBPCP.pmParseUnitsStr(string, byref(result), byref(multiplier), byref(errmsg))
         if status < 0:
-            raise pmErr, status
-        return rsltp, errmsg
+            text = str(errmsg.value.decode())
+            LIBC.free(errmsg)
+            raise pmErr(status, text)
+        return (result, multiplier.value)
 
     @staticmethod
     def pmtimevalSleep(tvp):
@@ -1799,6 +1943,5 @@ class pmContext(object):
             Useful for implementing tools that do metric sampling.
             Single arg is timeval in tuple returned from pmParseInterval().
         """
-        c_api.pmtimevalSleep(tvp.tv_sec, tvp.tv_usec)
-        return None
+        return tvp.sleep()
 

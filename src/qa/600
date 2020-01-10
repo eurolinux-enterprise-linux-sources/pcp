@@ -2,6 +2,12 @@
 # PCP QA Test No. 600
 # Test __pmTimezone
 #
+# Bizarre Note:
+#
+# Looks like this test starts to fail towards the end of the last
+# week of December, but starts passing again on 1 Jan.
+# Observed 2014/2015.
+#
 # This test looks like its tripping genuine bugs in Linux:
 # 1. for glibc-2.2.4 or earlier, Linux seems to invert the sense of the
 #    daylight savings ranges (- is valid output, + is broken linux version):
@@ -40,8 +46,8 @@ echo "QA output created by $seq"
 . ./common.check
 
 . ./localconfig
-if [ $PCP_EOE_VER -le 2100 \
-    -o \( $PCP_EOE_VER -ge 6500 -a $PCP_EOE_VER -le 6508 \) ]
+if [ $PCP_EOE_VER -le 20100 \
+    -o \( $PCP_EOE_VER -ge 60500 -a $PCP_EOE_VER -le 60508 \) ]
 then
     echo "needs libpcp.so with TZ changes" >$seq.notrun
     echo "$seq: [not run] `cat $seq.notrun`"

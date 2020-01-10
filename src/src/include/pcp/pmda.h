@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014 Red Hat.
+ * Copyright (c) 2013-2015 Red Hat.
  * Copyright (c) 1995,2005 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -107,6 +107,7 @@ typedef struct __pmnsTree  pmdaNameSpace;
 typedef struct __pmHashCtl pmdaHashTable;
 typedef struct __pmProfile pmdaInProfile;
 typedef struct __pmInResult pmdaInResult;
+typedef struct __pmnsNode pmnsNode;
 
 /*
  * libpcp_pmda extension structure.
@@ -528,7 +529,7 @@ extern void pmdaDynamicPMNS(const char *, int *, int,
                             pmdaUpdatePMNS, pmdaUpdateText,
                             pmdaUpdateMetric, pmdaCountMetrics,
                             pmdaMetric *, int);
-
+extern int pmdaDynamicSetClusterMask(const char *, unsigned int);
 extern pmdaNameSpace *pmdaDynamicLookupName(pmdaExt *, const char *);
 extern pmdaNameSpace *pmdaDynamicLookupPMID(pmdaExt *, pmID);
 extern int pmdaDynamicLookupText(pmID, int, char **, pmdaExt *);
@@ -563,6 +564,7 @@ extern int pmdaTreeName(pmdaNameSpace *, pmID, char ***);
 extern int pmdaTreeChildren(pmdaNameSpace *, const char *, int, char ***, int **);
 extern void pmdaTreeRebuildHash(pmdaNameSpace *, int);
 extern int pmdaTreeSize(pmdaNameSpace *);
+extern pmnsNode * pmdaNodeLookup(pmnsNode *, const char *);
 
 /*
  * PMDA instance domain cache support
@@ -679,6 +681,17 @@ extern int pmdaEventAddParam(int, pmID, int, pmAtomValue *);
 extern pmEventArray *pmdaEventGetAddr(int);
 
 /*
+ * High Resolution Timer Event Record support
+ */
+extern int pmdaEventNewHighResArray(void);
+extern int pmdaEventResetHighResArray(int);
+extern int pmdaEventReleaseHighResArray(int);
+extern int pmdaEventAddHighResRecord(int, struct timespec *, int);
+extern int pmdaEventAddHighResMissedRecord(int, struct timespec *, int);
+extern int pmdaEventHighResAddParam(int, pmID, int, pmAtomValue *);
+extern pmHighResEventArray *pmdaEventHighResGetAddr(int);
+
+/*
  * Event Queue support
  */
 extern int pmdaEventNewQueue(const char *, size_t);
@@ -706,6 +719,55 @@ extern int pmdaEventSetFilter(int, int, void *,
 extern int pmdaEventSetAccess(int, int, int);
 
 extern char *__pmdaEventPrint(const char *, int, char *, int);
+
+extern void pmdaInterfaceMoved(pmdaInterface *);
+
+/*
+ * Privileged PMDA services, as offered by pmdaroot(1).
+ */
+extern int pmdaRootConnect(const char *);
+extern void pmdaRootShutdown(int);
+extern int pmdaRootContainerHostName(int, const char *, int, char *, int);
+extern int pmdaRootContainerProcessID(int, const char *, int);
+extern int pmdaRootContainerCGroupName(int, const char *, int, char *, int);
+
+/*
+ * Local PDU exchange details for elevated privilege operations.
+ * Only the PMDAs and pmcd need to know about this.
+ */
+#define ROOT_PDU_VERSION1	1
+#define ROOT_PDU_VERSION	ROOT_PDU_VERSION1
+
+#define PDUROOT_INFO		0x9000
+#define PDUROOT_HOSTNAME_REQ	0x9001
+#define PDUROOT_HOSTNAME	0x9002
+#define PDUROOT_PROCESSID_REQ	0x9003
+#define PDUROOT_PROCESSID	0x9004
+#define PDUROOT_CGROUPNAME_REQ	0x9005
+#define PDUROOT_CGROUPNAME	0x9006
+/*#define PDUROOT_STARTPMDA_REQ	0x9007*/
+/*#define PDUROOT_STARTPMDA	0x9008*/
+/*#define PDUROOT_SASLAUTH_REQ	0x9009*/
+/*#define PDUROOT_SASLAUTH	0x900a*/
+
+typedef enum {
+    PDUROOT_FLAG_HOSTNAME	= (1<<0),
+    PDUROOT_FLAG_PROCESSID	= (1<<1),
+    PDUROOT_FLAG_CGROUPNAME	= (1<<2),
+} __pmdaRootServerFeature;
+
+typedef struct {
+    int		type;
+    int		length;
+    int		status;
+    int		version;
+} __pmdaRootPDUHdr;
+
+extern int __pmdaSendRootPDUInfo(int, int, int);
+extern int __pmdaRecvRootPDUInfo(int, int *, int *);
+extern int __pmdaSendRootPDUContainer(int, int, int, const char *, int, int);
+extern int __pmdaRecvRootPDUContainer(int, int, void *, int);
+extern int __pmdaDecodeRootPDUContainer(void *, int, int *, char *, int);
 
 #ifdef __cplusplus
 }

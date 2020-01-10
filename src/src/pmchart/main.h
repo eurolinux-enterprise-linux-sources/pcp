@@ -21,10 +21,10 @@
 #include <pcp/impl.h>
 
 #include "tab.h"
-#include "console.h"
 #include "colorscheme.h"
+#include "qed_console.h"
 #include "timecontrol.h"
-#include "fileiconprovider.h"
+#include "qed_fileiconprovider.h"
 #include "pmchart.h"
 
 typedef struct {
@@ -75,7 +75,6 @@ typedef struct {
 } Settings;
 
 extern Settings globalSettings;
-extern void readSettings();
 extern void writeSettings();
 extern QColor nextColor(QString, int *);
 
@@ -97,9 +96,7 @@ extern PmChart *pmchart;
 class TimeControl;
 extern TimeControl *pmtime;
 
-extern double tosec(struct timeval);
 extern double torange(struct timeval, int);
-extern void fromsec(double, struct timeval *);
 extern char *timeString(double);
 extern char *timeHiResString(double);
 extern void nomem(void);

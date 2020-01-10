@@ -1,4 +1,3 @@
-#!gmake
 #
 # Copyright (c) 2013-2014 Red Hat.
 # 
@@ -13,12 +12,11 @@
 # for more details.
 # 
 
-LLDIRT =
-
 TOPDIR = ../../..
 include $(TOPDIR)/src/include/builddefs
 
-LSRCFILES = pmie pmieconf pmlogconf pmlogger pmlogmerge pmlogmerge-rewrite pmlogmerge-granular \
+CONFIGS = pmie pmieconf pmlogconf pmlogger \
+	pmlogmerge pmlogmerge-rewrite pmlogmerge-granular \
 	README target-discovery.example-avahi 
 
 PMMGR_SYSCONF_DIR=$(PCP_SYSCONF_DIR)/pmmgr
@@ -31,7 +29,7 @@ include $(BUILDRULES)
 
 install:
 	$(INSTALL) -m 755 -d $(PMMGR_SYSCONF_DIR)
-	for file in $(LSRCFILES); do \
+	for file in $(CONFIGS); do \
 		$(INSTALL) -m 644 $$file $(PMMGR_SYSCONF_DIR)/$$file; \
 	done
 

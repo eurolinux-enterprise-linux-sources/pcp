@@ -13,6 +13,22 @@ fi
 
 . /etc/pcp.env
 
+# set up $PATH to include all the optional and bizarre places that
+# useful executables might be hiding
+#
+for xtra in /usr/sbin /sbin /usr/local/bin $PCP_BINADM_DIR \
+	    /usr/local/git/bin /usr/perl5/bin /usr/gnu/bin
+do
+    [ -d "$xtra" ] || continue
+    if echo ":${PATH}:" | grep ":$xtra:" >/dev/null 2>&1
+    then
+	:
+    else
+	PATH="$PATH:$xtra"
+    fi
+done
+export PATH
+
 # no need to touch $PCP_VAR_DIR/pmns/.NeedRebuild as this file
 # is included in the tarball
 #
@@ -150,20 +166,68 @@ fi
 
 # permissions ...
 #
-[ -d $PCP_LOG_DIR/pmcd ] || mkdir -m 775 $PCP_LOG_DIR/pmcd
-chown -R pcp:pcp $PCP_LOG_DIR/pmcd
-[ -d $PCP_LOG_DIR/pmie ] || mkdir -m 775 $PCP_LOG_DIR/pmie
-chown -R pcp:pcp $PCP_LOG_DIR/pmie
-[ -d $PCP_LOG_DIR/pmwebd ] || mkdir -m 775 $PCP_LOG_DIR/pmwebd
-chown -R pcp:pcp $PCP_LOG_DIR/pmwebd
-[ -d $PCP_LOG_DIR/pmproxy ] || mkdir -m 775 $PCP_LOG_DIR/pmproxy
-chown -R pcp:pcp $PCP_LOG_DIR/pmproxy
-[ -d $PCP_LOG_DIR/pmlogger ] || mkdir -m 775 $PCP_LOG_DIR/pmlogger
-chown -R pcp:pcp $PCP_LOG_DIR/pmlogger
-[ -d $PCP_VAR_DIR/testsuite ] || mkdir -m 755 $PCP_VAR_DIR/testsuite
+
+# fix up some ones that used to be pcp:pcp and/or in a different place
+#
+grp=root
+case $PCP_PLATFORM
+in
+    freebsd|netbsd)
+	    grp=wheel
+	    ;;
+esac
+for daemon in pmlogger pmie
+do
+    chown root:$grp $PCP_SYSCONF_DIR/$daemon
+    chmod 755 $PCP_SYSCONF_DIR/$daemon
+    if [ -f $PCP_SYSCONF_DIR/$daemon/config.default ]
+    then
+	if [ -f $PCP_VAR_DIR/config/$daemon/config.default
+	then
+	    mv $PCP_SYSCONF_DIR/$daemon/config.default $PCP_VAR_DIR/config/$daemon/config.default.old
+	else
+	    mv $PCP_SYSCONF_DIR/$daemon/config.default $PCP_VAR_DIR/config/$daemon/config.default
+	fi
+    fi
+done
+chown root:$grp $PCP_SYSCONF_DIR/pmcd/pmcd.conf
+chmod 644 $PCP_SYSCONF_DIR/pmcd/pmcd.conf
+
+# Expect only root owned things below $PCP_SYSCONF_DIR
+#
+find $PCP_SYSCONF_DIR ! -user root | xargs chown root:$grp
+
+# pcp:pcp and mode 775 directories
+#
+for dir in $PCP_LOG_DIR \
+	   $PCP_LOG_DIR/pmcd $PCP_LOG_DIR/pmie $PCP_LOG_DIR/pmwebd \
+	   $PCP_LOG_DIR/pmproxy $PCP_LOG_DIR/pmlogger $PCP_LOG_DIR/pmmgr \
+	   $PCP_RUN_DIR \
+	   $PCP_VAR_DIR/tmp $PCP_VAR_DIR/tmp/pmie $PCP_VAR_DIR/tmp/pmlogger \
+	   $PCP_VAR_DIR/config/pmda \
+	   $PCP_VAR_DIR/config/pmie $PCP_VAR_DIR/config/pmlogger
+do
+    [ -d $dir ] || mkdir $dir
+    chmod 775 $dir
+    chown pcp:pcp $dir
+done
+
+# pcp:pcp and mode 644 files
+#
+for file in $PCP_VAR_DIR/config/pmie/config.default $PCP_VAR_DIR/config/pmlogger/config.default
+do
+    [ -f $file ] || continue
+    chmod 644 $file
+    chown pcp:pcp $file
+done
+
+# pcpqa:pcpqa and mode 755 dir and all below there
+#
+[ -d $PCP_VAR_DIR/testsuite ] || mkdir $PCP_VAR_DIR/testsuite
+chmod 775 $PCP_VAR_DIR/testsuite
 chown -R pcpqa:pcpqa $PCP_VAR_DIR/testsuite
 
-# Note: do not start pcp, pmwebd, pmproxy nor pmmgr by default
+# Note: do not start daemons other than: pmcd, pmlogger, pmie and pmproxy
 #
 if which svcs >/dev/null 2>&1
 then
@@ -176,8 +240,9 @@ then
 	svccfg import ../sun/pcp.xml
     fi
 else
-    for svc in pcp pmcd pmlogger pmproxy pmwebd pmmgr
+    for svc in pcp pmcd pmie pmlogger pmproxy pmmgr pmwebd
     do
+	[ -f /etc/init.d/$svc ] || continue
 	if which rc-update >/dev/null 2>&1
 	then
 	    if rc-update show | grep " $svc " >/dev/null 2>&1
@@ -192,7 +257,7 @@ else
 	# disable or enable and start as required by default policy
 	case $svc
 	in
-	    pmcd|pmlogger|pmie)
+	    pmcd|pmlogger|pmproxy|pmie|pmmgr|pmwebd)
 		if which rc-update >/dev/null 2>&1
 		then
 		    : TODO?

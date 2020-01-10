@@ -25,6 +25,7 @@
 [\f3\-L\f1]
 [\f3\-m\f1 \f2note\f1]
 [\f3\-n\f1 \f2pmnsfile\f1]
+[\f3\-p\f1 \f2pid\f1]
 [\f3\-P\f1]
 [\f3\-r\f1]
 [\f3\-s\f1 \f2endsize\f1]
@@ -129,9 +130,9 @@ this
 instance is launched by 
 .BR $PCP_RC_DIR/pcp ,
 and is affected by the files
-.I $PCP_SYSCONF_DIR/pmlogger
+.I $PCP_SYSCONF_DIR/pmlogger/control
 (use
-.BR chkconfig (1M)
+.BR chkconfig (8)
 to activate or disable the primary
 .B pmlogger 
 instance),
@@ -139,7 +140,7 @@ instance),
 (command line options passed to the primary
 .BR pmlogger )
 and
-.I $PCP_SYSCONF_DIR/pmlogger/config.default
+.I $PCP_VAR_LIB/config/pmlogger/config.default
 (the default initial configuration file for the primary
 .BR pmlogger ).
 .PP
@@ -346,7 +347,18 @@ From this it can be seen that
 .B \-T 10mins
 and
 .B \-s 10mins
-perform identical actions. 
+perform identical actions.
+.PP
+Alternatively,
+.B pmlogger
+runtime may be limited to the lifetime of another process by using the
+.B \-p
+or
+.B \-\-PID
+option to nominate the PID of the process of interest.
+In this case the
+.B pmlogger
+will exit when the other process no longer exists.
 .PP
 When
 .B pmlogger
@@ -421,17 +433,17 @@ input.
 If
 .I configfile
 does not exist, then a search is made in the directory
-.I $PCP_SYSCONF_DIR/pmlogger
+.I $PCP_VAR_LIB/config/pmlogger
 for a file of the same name, and if found that file is used,
 e.g. if 
 .I config.mumble
 does not exist in the current directory and
 the file
-.I $PCP_SYSCONF_DIR/pmlogger/config.mumble
+.I $PCP_VAR_LIB/config/pmlogger/config.mumble
 does exist, then
 .B "\-c config.mumble"
 and
-.B "\-c $PCP_SYSCONF_DIR/pmlogger/config.mumble"
+.B "\-c $PCP_VAR_LIB/config/pmlogger/config.mumble"
 are equivalent.
 .PP
 The syntax for the configuration file is as follows.
@@ -608,7 +620,7 @@ metrics used by the tool).
 For a tool named
 .I foo
 this configuration file is located in
-.IR $PCP_SYSCONF_DIR/pmlogger/config.foo .
+.IR $PCP_VAR_LIB/config/pmlogger/config.foo .
 .PP
 The following is a simple default configuration file for a primary
 .B pmlogger
@@ -667,12 +679,12 @@ each
 instance (as used by
 .BR pmlc (1))
 .TP
-.B $PCP_SYSCONF_DIR/pmlogger/config.default
+.B $PCP_VAR_LIB/config/pmlogger/config.default
 default configuration file for the primary logger instance
 launched from
 .B $PCP_RC_DIR/pcp
 .TP
-.BR $PCP_SYSCONF_DIR/pmlogger/config. *
+.BR $PCP_VAR_LIB/config/pmlogger/config. *
 assorted configuration files suitable for creating logs that may
 be subsequently replayed with the PCP visualization and monitoring
 tools
@@ -727,9 +739,10 @@ as described in
 .BR pmlc (1),
 .BR pmlogger_check (1),
 .BR pcp.conf (5),
-.BR pcp.env (5)
+.BR pcp.env (5),
+.BR pmns (5)
 and
-.BR pmns (5).
+.BR chkconfig (8).
 .SH DIAGNOSTICS
 The archive logs are sufficiently precious that
 .B pmlogger

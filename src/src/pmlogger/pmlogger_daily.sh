@@ -25,11 +25,18 @@ unset PCP_STDERR
 
 # constant setup
 #
+prog=`basename $0`
 tmp=`mktemp -d /tmp/pcp.XXXXXXXXX` || exit 1
 status=0
+
+_cleanup()
+{
+    lockfile=`cat $tmp/lock 2>/dev/null`
+    rm -f "$PCP_RUN_DIR/pmlogger_daily.pid" "$lockfile"
+    rm -rf $tmp
+}
+trap "_cleanup; exit \$status" 0 1 2 3 15
 echo >$tmp/lock
-trap "rm -rf \`[ -f $tmp/lock ] && cat $tmp/lock\` $PCP_RUN_DIR/pmlogger_daily.pid $tmp; exit \$status" 0 1 2 3 15
-prog=`basename $0`
 
 if is_chkconfig_on pmlogger
 then
@@ -47,11 +54,11 @@ CONTROL=$PCP_PMLOGGERCONTROL_PATH
 #
 CULLAFTER=14
 
-# default compression program
+# default compression program and days until starting compression
 # 
-COMPRESS=bzip2
+COMPRESS=xz
 COMPRESSAFTER=""
-COMPRESSREGEX=".meta$|.index$|.Z$|.gz$|.bz2$|.zip$"
+COMPRESSREGEX="\.(meta|index|Z|gz|bz2|zip|xz|lzma|lzo|lz4)$"
 
 # threshold size to roll $PCP_LOG_DIR/NOTICES
 #
@@ -96,6 +103,7 @@ then
 fi
 eval $PWDCMND -P >/dev/null 2>&1
 [ $? -eq 0 ] && PWDCMND="$PWDCMND -P"
+here=`$PWDCMND`
 
 echo > $tmp/usage
 cat >> $tmp/usage <<EOF
@@ -377,7 +385,7 @@ fi
 # $PCP_RUN_DIR creation is also done in pmcd startup, but pmcd may
 # not be running on this system
 #
-if [ -d "$PCP_RUN_DIR" ]
+if [ ! -d "$PCP_RUN_DIR" ]
 then
     mkdir -p -m 775 "$PCP_RUN_DIR"
     chown $PCP_USER:$PCP_GROUP "$PCP_RUN_DIR"
@@ -398,16 +406,18 @@ cat $CONTROL \
 | sed -e "s;PCP_LOG_DIR;$PCP_LOG_DIR;g" \
 | while read host primary socks dir args
 do
+    # start in one place for each iteration (beware relative paths)
+    cd "$here"
+    line=`expr $line + 1`
+
     # NB: FQDN cleanup: substitute the LOCALHOSTNAME marker in the config line
     # differently for the directory and the pcp -h HOST arguments.
     dir_hostname=`hostname || echo localhost`
     dir=`echo $dir | sed -e "s;LOCALHOSTNAME;$dir_hostname;"`
-    if [ "x$host" = "xLOCALHOSTNAME" ]
-    then
-        host=local:
-    fi
-    line=`expr $line + 1`
+    [ "x$host" = "xLOCALHOSTNAME" ] && host=local:
+
     $VERY_VERBOSE && echo "[control:$line] host=\"$host\" primary=\"$primary\" socks=\"$socks\" dir=\"$dir\" args=\"$args\""
+
     case "$host"
     in
 	\#*|'')	# comment or empty
@@ -832,7 +842,20 @@ END	{ if (inlist != "") print lastdate,inlist }' >$tmp/list
     #
     if [ X"$CULLAFTER" != X"forever" ]
     then
-	find . -type f -mtime +$CULLAFTER \
+	if [ "$PCP_PLATFORM" = freebsd ]
+	then
+	    # FreeBSD semantics for find(1) -mtime +N are "rounded up to
+	    # the next full 24-hour period", compared to GNU/Linux semantics
+	    # "any fractional part is ignored".  So, these are almost always
+	    # off by one day in terms of the files selected.
+	    # For consistency, try to match the GNU/Linux semantics by using
+	    # one MORE day.
+	    #
+	    mtime=`expr $CULLAFTER + 1`
+	else
+	    mtime=$CULLAFTER
+	fi
+	find . -type f -mtime +$mtime \
 	| _filter_filename \
 	| sort >$tmp/list
 	if [ -s $tmp/list ]
@@ -858,7 +881,15 @@ END	{ if (inlist != "") print lastdate,inlist }' >$tmp/list
     #
     if [ ! -z "$COMPRESSAFTER" ]
     then
-	find . -type f -mtime +$COMPRESSAFTER \
+	if [ "$PCP_PLATFORM" = freebsd ]
+	then
+	    # See note above re. find(1) on FreeBSD
+	    #
+	    mtime=`expr $COMPRESSAFTER - 1`
+	else
+	    mtime=$COMPRESSAFTER
+	fi
+	find . -type f -mtime +$mtime \
 	| _filter_filename \
 	| egrep -v "$COMPRESSREGEX" \
 	| sort >$tmp/list
@@ -884,7 +915,15 @@ END	{ if (inlist != "") print lastdate,inlist }' >$tmp/list
     #
     if [ "$TRACE" -gt 0 ]
     then
-	find $PCP_LOG_DIR/pmlogger -type f -mtime +$TRACE \
+	if [ "$PCP_PLATFORM" = freebsd ]
+	then
+	    # See note above re. find(1) on FreeBSD
+	    #
+	    mtime=`expr $TRACE - 1`
+	else
+	    mtime=$TRACE
+	fi
+	find $PCP_LOG_DIR/pmlogger -type f -mtime +$mtime \
 	| sed -n -e '/pmlogger\/daily\..*\.trace/p' \
 	| sort >$tmp/list
 	if [ -s $tmp/list ]

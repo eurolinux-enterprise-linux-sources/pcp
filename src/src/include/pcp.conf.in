@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013 Red Hat.
+# Copyright (c) 2013-2015 Red Hat.
 # Copyright (c) 2000-2001,2003 Silicon Graphics, Inc.  All Rights Reserved.
 # 
 # This program is free software; you can redistribute it and/or modify it
@@ -144,12 +144,11 @@ PCP_TMPFILE_DIR=@pcp_tmpfile_dir@
 
 # directory for PCP documentation
 # Standard path: /usr/share/doc/pcp
-# Subdirectories: Tutorial pcpweb ...
 PCP_DOC_DIR=@pcp_doc_dir@
+PCP_HTML_DIR=@pcp_html_dir@
 
 # directory for PCP demos and examples
 # Standard path: /usr/share/pcp/demos
-# Subdirectories: assorted
 PCP_DEMOS_DIR=@pcp_demos_dir@
 
 # awk
@@ -177,6 +176,9 @@ PCP_PS_PROG=@pcp_ps_prog@
 PCP_PS_HAVE_BSD=@pcp_ps_have_bsd@
 PCP_PS_ALL_FLAGS=@pcp_ps_all_flags@
 
+# preferred python executable
+PCP_PYTHON_PROG=@pcp_python_prog@
+
 # locate executables
 PCP_WHICH_PROG=@which@
 
@@ -202,3 +204,6 @@ PCP_GROUP=@pcp_group@
 # Standard path: /etc/sasl2
 PCP_SASLCONF_DIR=@pcp_saslconf_dir@
 
+# directory for systemd unit files
+# Standard path: /usr/lib/systemd/systemd
+PCP_SYSTEMDUNIT_DIR=@pcp_systemdunit_dir@

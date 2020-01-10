@@ -34,14 +34,20 @@ LDIRT		= $(HELPTARGETS) domain.h $(VERSION_SCRIPT)
 LLDLIBS		= $(PCP_PMDALIB)
 LCFLAGS		= $(INVISIBILITY)
 
+MAN_SECTION	= 1
+MAN_PAGES	= pmda$(IAM).$(MAN_SECTION)
+MAN_DEST	= $(PCP_MAN_DIR)/man$(MAN_SECTION)
+
 default:	build-me
 
 include $(BUILDRULES)
 
 ifeq "$(TARGET_OS)" "linux"
 build-me: domain.h $(LIBTARGET) $(CMDTARGET) $(HELPTARGETS)
-	@if [ `grep -c $(CONF_LINE) ../pmcd.conf` -eq 0 ]; then \
+	@if [ -f ../pmcd.conf ]; then \
+	    if [ `grep -c $(CONF_LINE) ../pmcd.conf` -eq 0 ]; then \
 		echo $(CONF_LINE) >> ../pmcd.conf ; \
+	    fi; \
 	fi
 
 install: default
@@ -49,6 +55,7 @@ install: default
 	$(INSTALL) -m 644 domain.h help $(HELPTARGETS) root root_jbd2 $(PMDADIR)
 	$(INSTALL) -m 755 $(LIBTARGET) $(CMDTARGET) $(SCRIPTS) $(PMDADIR)
 	$(INSTALL) -m 644 root_jbd2 $(PCP_VAR_DIR)/pmns/root_jbd2
+	@$(INSTALL_MAN)
 else
 build-me:
 install:

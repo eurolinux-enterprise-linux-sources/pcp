@@ -102,6 +102,7 @@ sampledso.hordes.one [500 instances]
 sampledso.hordes.two [500 instances]
 sampledso.bad.unknown [Not known to the PMDA]
 sampledso.bad.nosupport [Not supported in this version of the PMDA]
+sampledso.bad.novalues [Scalar with no values, ever]
 sampledso.wrap.long [long counter that wraps]
 sampledso.wrap.ulong [unsigned long counter that wraps]
 sampledso.wrap.longlong [long long counter that wraps]
@@ -137,8 +138,10 @@ sampledso.percontext.control.active [Number of active PMAPI contexts]
 sampledso.percontext.control.start [Number of new PMAPI contexts seen]
 sampledso.percontext.control.end [Number of PMAPI contexts closed]
 sampledso.event.records [Dummy event records]
+sampledso.event.highres_records [Dummy highres timestamp event records]
 sampledso.event.no_indom_records [More dummy event records]
 sampledso.event.reset [reset event record state]
+sampledso.event.reset_highres [reset highres event record state]
 sampledso.event.type [event type parameter for event records]
 sampledso.event.param_32 [32 parameter for event records]
 sampledso.event.param_u32 [U32 parameter for event records]
@@ -148,6 +151,16 @@ sampledso.event.param_float [FLOAT parameter for event records]
 sampledso.event.param_double [DOUBLE parameter for event records]
 sampledso.event.param_string [STRING parameter for event records]
 sampledso.event.param_aggregate [AGGREGATE parameter for event records]
+sampledso.dupnames.daemon_pid [Process id of PMDA daemon]
+sampledso.dupnames.pid_daemon [Process id of PMDA daemon]
+sampledso.dupnames.two.seconds [Elapsed time (seconds)]
+sampledso.dupnames.two.bin [Several constant instances]
+sampledso.dupnames.two.write_me [Modifiable, but otherwise constant.]
+sampledso.dupnames.two.lights [Traffic lights.]
+sampledso.dupnames.two.float.ten [10 as a 32-bit floating point value]
+sampledso.dupnames.two.double.ten [10 as a 64-bit floating point value]
+sampledso.dupnames.three.bin [Several constant instances]
+sampledso.dupnames.three.write_me [Modifiable, but otherwise constant.]
 
 sampledso.control
 Help:
@@ -181,13 +194,20 @@ Help:
 This metric has 3 instances, designated "red", "green" and "blue".
 
 The value of the metric is monotonic increasing in the range N to
-N+100, then back to N.  The different instances have different N values,
-namely 100 (red), 200 (green) and 300 (blue).
+N+100, then back to N.  The different instances have different N
+values, namely 100 (red), 200 (green) and 300 (blue).
+
+The underlying counter starts at 0 and is incremented once
+for each pmFetch() to this metric and/or sampledso.mirage and/or
+sampledso.mirage_longlong.
+
+Use pmStore() to modify the underlying counter (independent of which
+instance or instances are used).
 
 sampledso.darkness
 Help:
-Defined over the same instance domain as sampledso.colour, but this metric
-returns the "No values available" error for every fetch.
+Defined over the same instance domain as sampledso.colour, but this
+metric returns the "No values available" error for every fetch.
 
 sampledso.bin
 Help:
@@ -219,7 +239,7 @@ This metric returns a random value (expected mean is approximately 200),
 subject to a trending pattern such that the sequence is mainly monotonic,
 with a change in direction after on average 4 consecutive sampledsos.
 
-Use pmStore() to modifiy the instantaneous value, which becomes the new
+Use pmStore() to modify the instantaneous value, which becomes the new
 expected mean.
 
 sampledso.step
@@ -252,17 +272,30 @@ present, but the other instances 1 thru 49 come and go in a cyclic
 pattern with a large random component influencing when each instance
 appears and disappears.
 
+The underlying counter starts at 0 and is incremented once
+for each pmFetch() to this metric and/or sampledso.colour and/or
+sampledso.mirage_longlong.
+
+Use pmStore() to modify the underlying counter (independent of which
+instance or instances are used).
+
 sampledso.mirage_longlong
 Help:
 The metric is a rate (bytes/msec) that varies in a saw-tooth distribution
 over time.  Different instances of the metric have different baselines
 for the saw-tooth, but all have an max-to-min range of 100,000,000.
 
-What makes this metric interesting is that instances come and go (not
-more often than once every 10 seconds however).  Instance 0 is always
-present, but the other instances 1 thru 49 come and go in a cyclic
-pattern with a large random component influencing when each instance
-appears and disappears.
+What makes this metric interesting is that instances come and go (not more
+often than once every 10 seconds however).  Instance 0 is always present,
+but the other instances 1 thru 49 come and go in a cyclic pattern with
+a large random component influencing when each instance appears and
+disappears.
+
+The underlying counter starts at 0 and is incremented once for each
+pmFetch() to this metric and/or sampledso.mirage and/or sample.colour.
+
+Use pmStore() to modify the underlying counter (independent of which
+instance or instances are used).
 
 sampledso.write_me
 Help:
@@ -369,23 +402,23 @@ a metric with item number bigger then 2^9
 
 sampledso.byte_ctr
 Help:
-counter byte counter
+value increments randomly in the range (0,1023) bytes per fetch
 
 sampledso.byte_rate
 Help:
-avg rate is 512 bytes per fetch
+random value in the range (0,1023), so avg value is 512 bytes/second
 
 sampledso.kbyte_ctr
 Help:
-counter Kbytes/second
+value increments randomly in the range (0,1023) Kbytes per fetch
 
 sampledso.kbyte_rate
 Help:
-instantaneous Kbytes/second
+random value in the range (0,1023), so avg value is 512 Kbytes/second
 
 sampledso.byte_rate_perhour
 Help:
-instantaneous bytes/hour
+random value in the range (0,1023), so avg value is 512 bytes/hour
 
 sampledso.datasize
 Help:
@@ -657,6 +690,10 @@ sampledso.bad.nosupport
 Help:
 Type is PM_NOSUPPORT, fetch returns PM_ERR_APPVERSION
 
+sampledso.bad.novalues
+Help:
+Scalar with no values, ever
+
 sampledso.wrap.long
 Help:
 The metric value increments by INT_MAX / 2 - 1 (from <limits.h>) every
@@ -908,6 +945,15 @@ Once all setups have been returned, the cycle is repeated.
 See event.reset to exert explicit control over the next batch of event
 records to be returned.
 
+sampledso.event.highres_records
+Help:
+Dummy high resolution event records generated in a fixed pattern to help QA.
+
+Once all setups have been returned, the cycle is repeated.
+
+See event.reset_highres to exert explicit control over the next batch of event
+records to be returned.
+
 sampledso.event.no_indom_records
 Help:
 Like sampledso.event.records but without the instance domain.
@@ -917,6 +963,12 @@ Help:
 Used for QA, should take one of the values 0, 1, 2 or 3
 to determine which of the dummy event record setups will
 be returned for the next fetch of event.records.
+
+sampledso.event.reset_highres
+Help:
+Used for QA, should take one of the values 0, 1, 2 or 3
+to determine which of the dummy event record setups will
+be returned for the next fetch of event.highres_records.
 
 sampledso.event.type
 Help:
@@ -954,6 +1006,54 @@ sampledso.event.param_aggregate
 Help:
 AGGREGATE parameter for event records
 
+sampledso.dupnames.daemon_pid
+Help:
+The process id of PMDA daemon, -1 if the daemon is a DSO.
+
+sampledso.dupnames.pid_daemon
+Help:
+The process id of PMDA daemon, -1 if the daemon is a DSO.
+
+sampledso.dupnames.two.seconds
+Help:
+The elapsed time since the PMDA started, in seconds, i.e. as returned
+by time(2).
+
+sampledso.dupnames.two.bin
+Help:
+9 instances labelled "bin-100" thru "bin-900", each with a constant
+value of 100 thru 900.
+
+sampledso.dupnames.two.write_me
+Help:
+This metric has a 32-bit integer value of 2, unless changed via pmStore.
+The metric has semantics of rate, and units of events per second.
+
+sampledso.dupnames.two.lights
+Help:
+A singular metric that has a discrete string value, namely "red",
+"yellow" or "green".  There is some persistance in the value, so
+consecutive fetches are likely to return the same value, however over a
+long period of time all values are equally probable.
+
+sampledso.dupnames.two.float.ten
+Help:
+10 as a 32-bit floating point value
+
+sampledso.dupnames.two.double.ten
+Help:
+10 as a 64-bit floating point value
+
+sampledso.dupnames.three.bin
+Help:
+9 instances labelled "bin-100" thru "bin-900", each with a constant
+value of 100 thru 900.
+
+sampledso.dupnames.three.write_me
+Help:
+This metric has a 32-bit integer value of 2, unless changed via pmStore.
+The metric has semantics of rate, and units of events per second.
+
 sample.seconds
 Full Help: Error: Operation requires context with host source of metrics
 
@@ -967,6 +1067,18 @@ sample.drift
 Full Help: Error: Operation requires context with host source of metrics
 
 sample.lights
+Full Help: Error: Operation requires context with host source of metrics
+
+sample.dupnames.three.bin
+Full Help: Error: Operation requires context with host source of metrics
+
+sample.dupnames.two.seconds
+Full Help: Error: Operation requires context with host source of metrics
+
+sample.dupnames.two.bin
+Full Help: Error: Operation requires context with host source of metrics
+
+sample.dupnames.two.lights
 Full Help: Error: Operation requires context with host source of metrics
 
 simple.now
@@ -996,7 +1108,7 @@ __pmFetchLocal: calling ???_profile(domain: 30), context: 0
 __pmFetchLocal: [0] PMID=30.0.6 nval=9
 pmFetch returns ...
 pmResult ... numpmid: 1
-  30.0.6 (sampledso.bin): numval: 9 valfmt: 0 vlist[]:
+  30.0.6 (sampledso.dupnames.three.bin, sampledso.dupnames.two.bin, sampledso.bin): numval: 9 valfmt: 0 vlist[]:
     inst [100 or "bin-100"] value NUMBER
     inst [200 or "bin-200"] value NUMBER
     inst [300 or "bin-300"] value NUMBER
@@ -1297,6 +1409,7 @@ pmExtractValue:  1073741823 [32] -> 1.073742e+09 [DOUBLE]
 pmExtractValue:  1073741823 [32] -> Error: Impossible value or scale conversion [STRING]
 pmExtractValue:  1073741823 [32] -> Error: Impossible value or scale conversion [AGGREGATE]
 pmExtractValue:  1073741823 [32] -> Error: Impossible value or scale conversion [EVENT]
+pmExtractValue:  1073741823 [32] -> Error: Impossible value or scale conversion [HIGHRES_EVENT]
 pmExtractValue:  1073741823 [U32] -> 1073741823 [32]
 pmExtractValue:  1073741823 [U32] -> 1073741823 [U32]
 pmExtractValue:  1073741823 [U32] -> 1073741823 [64]
@@ -1306,6 +1419,7 @@ pmExtractValue:  1073741823 [U32] -> 1.073742e+09 [DOUBLE]
 pmExtractValue:  1073741823 [U32] -> Error: Impossible value or scale conversion [STRING]
 pmExtractValue:  1073741823 [U32] -> Error: Impossible value or scale conversion [AGGREGATE]
 pmExtractValue:  1073741823 [U32] -> Error: Impossible value or scale conversion [EVENT]
+pmExtractValue:  1073741823 [U32] -> Error: Impossible value or scale conversion [HIGHRES_EVENT]
 pmExtractValue:  1073741823 [64] -> 1073741823 [32]
 pmExtractValue:  1073741823 [64] -> 1073741823 [U32]
 pmExtractValue:  1073741823 [64] -> 1073741823 [64]
@@ -1315,6 +1429,7 @@ pmExtractValue:  1073741823 [64] -> 1.073742e+09 [DOUBLE]
 pmExtractValue:  1073741823 [64] -> Error: Impossible value or scale conversion [STRING]
 pmExtractValue:  1073741823 [64] -> Error: Impossible value or scale conversion [AGGREGATE]
 pmExtractValue:  1073741823 [64] -> Error: Impossible value or scale conversion [EVENT]
+pmExtractValue:  1073741823 [64] -> Error: Impossible value or scale conversion [HIGHRES_EVENT]
 pmExtractValue:  1073741823 [U64] -> 1073741823 [32]
 pmExtractValue:  1073741823 [U64] -> 1073741823 [U32]
 pmExtractValue:  1073741823 [U64] -> 1073741823 [64]
@@ -1324,6 +1439,7 @@ pmExtractValue:  1073741823 [U64] -> 1.073742e+09 [DOUBLE]
 pmExtractValue:  1073741823 [U64] -> Error: Impossible value or scale conversion [STRING]
 pmExtractValue:  1073741823 [U64] -> Error: Impossible value or scale conversion [AGGREGATE]
 pmExtractValue:  1073741823 [U64] -> Error: Impossible value or scale conversion [EVENT]
+pmExtractValue:  1073741823 [U64] -> Error: Impossible value or scale conversion [HIGHRES_EVENT]
 pmExtractValue:  1.073742e+09 [FLOAT] -> 1073741824 [32]
 pmExtractValue:  1.073742e+09 [FLOAT] -> 1073741824 [U32]
 pmExtractValue:  1.073742e+09 [FLOAT] -> 1073741824 [64]
@@ -1333,6 +1449,7 @@ pmExtractValue:  1.073742e+09 [FLOAT] -> 1.073742e+09 [DOUBLE]
 pmExtractValue:  1.073742e+09 [FLOAT] -> Error: Impossible value or scale conversion [STRING]
 pmExtractValue:  1.073742e+09 [FLOAT] -> Error: Impossible value or scale conversion [AGGREGATE]
 pmExtractValue:  1.073742e+09 [FLOAT] -> Error: Impossible value or scale conversion [EVENT]
+pmExtractValue:  1.073742e+09 [FLOAT] -> Error: Impossible value or scale conversion [HIGHRES_EVENT]
 pmExtractValue:  1.073742e+09 [DOUBLE] -> 1073741823 [32]
 pmExtractValue:  1.073742e+09 [DOUBLE] -> 1073741823 [U32]
 pmExtractValue:  1.073742e+09 [DOUBLE] -> 1073741823 [64]
@@ -1342,6 +1459,7 @@ pmExtractValue:  1.073742e+09 [DOUBLE] -> 1.073742e+09 [DOUBLE]
 pmExtractValue:  1.073742e+09 [DOUBLE] -> Error: Impossible value or scale conversion [STRING]
 pmExtractValue:  1.073742e+09 [DOUBLE] -> Error: Impossible value or scale conversion [AGGREGATE]
 pmExtractValue:  1.073742e+09 [DOUBLE] -> Error: Impossible value or scale conversion [EVENT]
+pmExtractValue:  1.073742e+09 [DOUBLE] -> Error: Impossible value or scale conversion [HIGHRES_EVENT]
 pmExtractValue:  "1073741823" [STRING] -> Error: Impossible value or scale conversion [32]
 pmExtractValue:  "1073741823" [STRING] -> Error: Impossible value or scale conversion [U32]
 pmExtractValue:  "1073741823" [STRING] -> Error: Impossible value or scale conversion [64]
@@ -1351,6 +1469,7 @@ pmExtractValue:  "1073741823" [STRING] -> Error: Impossible value or scale conve
 pmExtractValue:  "1073741823" [STRING] -> "1073741823" [STRING]
 pmExtractValue:  "1073741823" [STRING] -> Error: Impossible value or scale conversion [AGGREGATE]
 pmExtractValue:  "1073741823" [STRING] -> Error: Impossible value or scale conversion [EVENT]
+pmExtractValue:  "1073741823" [STRING] -> Error: Impossible value or scale conversion [HIGHRES_EVENT]
 pmExtractValue:  [len=12] 3ffffffe 3fffffff 40000000 [AGGREGATE] -> Error: Impossible value or scale conversion [32]
 pmExtractValue:  [len=12] 3ffffffe 3fffffff 40000000 [AGGREGATE] -> Error: Impossible value or scale conversion [U32]
 pmExtractValue:  [len=12] 3ffffffe 3fffffff 40000000 [AGGREGATE] -> Error: Impossible value or scale conversion [64]
@@ -1360,6 +1479,7 @@ pmExtractValue:  [len=12] 3ffffffe 3fffffff 40000000 [AGGREGATE] -> Error: Impos
 pmExtractValue:  [len=12] 3ffffffe 3fffffff 40000000 [AGGREGATE] -> Error: Impossible value or scale conversion [STRING]
 pmExtractValue:  [len=12] 3ffffffe 3fffffff 40000000 [AGGREGATE] -> [type=AGGREGATE len=12] 3ffffffe 3fffffff 40000000 [AGGREGATE]
 pmExtractValue:  [len=12] 3ffffffe 3fffffff 40000000 [AGGREGATE] -> Error: Impossible value or scale conversion [EVENT]
+pmExtractValue:  [len=12] 3ffffffe 3fffffff 40000000 [AGGREGATE] -> Error: Impossible value or scale conversion [HIGHRES_EVENT]
 pmExtractValue:  ??? [EVENT] -> Error: Impossible value or scale conversion [32]
 pmExtractValue:  ??? [EVENT] -> Error: Impossible value or scale conversion [U32]
 pmExtractValue:  ??? [EVENT] -> Error: Impossible value or scale conversion [64]
@@ -1369,6 +1489,17 @@ pmExtractValue:  ??? [EVENT] -> Error: Impossible value or scale conversion [DOU
 pmExtractValue:  ??? [EVENT] -> Error: Impossible value or scale conversion [STRING]
 pmExtractValue:  ??? [EVENT] -> Error: Impossible value or scale conversion [AGGREGATE]
 pmExtractValue:  ??? [EVENT] -> Error: Impossible value or scale conversion [EVENT]
+pmExtractValue:  ??? [EVENT] -> Error: Impossible value or scale conversion [HIGHRES_EVENT]
+pmExtractValue:  ??? [HIGHRES_EVENT] -> Error: Impossible value or scale conversion [32]
+pmExtractValue:  ??? [HIGHRES_EVENT] -> Error: Impossible value or scale conversion [U32]
+pmExtractValue:  ??? [HIGHRES_EVENT] -> Error: Impossible value or scale conversion [64]
+pmExtractValue:  ??? [HIGHRES_EVENT] -> Error: Impossible value or scale conversion [U64]
+pmExtractValue:  ??? [HIGHRES_EVENT] -> Error: Impossible value or scale conversion [FLOAT]
+pmExtractValue:  ??? [HIGHRES_EVENT] -> Error: Impossible value or scale conversion [DOUBLE]
+pmExtractValue:  ??? [HIGHRES_EVENT] -> Error: Impossible value or scale conversion [STRING]
+pmExtractValue:  ??? [HIGHRES_EVENT] -> Error: Impossible value or scale conversion [AGGREGATE]
+pmExtractValue:  ??? [HIGHRES_EVENT] -> Error: Impossible value or scale conversion [EVENT]
+pmExtractValue:  ??? [HIGHRES_EVENT] -> Error: Impossible value or scale conversion [HIGHRES_EVENT]
 
 Value: 1073741823 0x000000003fffffff
 
@@ -1518,6 +1649,8 @@ pmResult ... numpmid: 3
 Quitting need at least 4 metrics for profile tests
 
 build_dsotab:  parsing ...
+__pmSetSocketIPC: fd=N
+IPC table fd(PDU version): ...
 pmNewContext(3, localhost) -> 0
 Dump Contexts: current context = 0
 Context[0] standalone: profile=NOT_SENT
@@ -1534,6 +1667,7 @@ __pmConnectLogger: PDU version=2 fd=N
 pmWhichContext() -> 0, cur=0
 pmWhichContext() -> 0, cur=0
 pmWhichContext() -> 0, cur=0
+NotifyEndLocalContext: ...
 NotifyEndLocalContext: ...
 pmResult ... numpmid: 3
   2.0.0 (pmcd.control.debug): No PMCD agent for domain of request

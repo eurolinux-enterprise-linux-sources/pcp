@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2012-2014 Red Hat.
+# Copyright (c) 2012-2015 Red Hat.
 # Copyright (c) 2000,2004,2012 Silicon Graphics, Inc.  All Rights Reserved.
 # 
 # This program is free software; you can redistribute it and/or modify it
@@ -28,8 +28,10 @@ LIBS_SUBDIRS = \
 	libpcp_gui \
 	libpcp_mmv \
 	libpcp_import \
+	libpcp_qed \
 	libpcp_qmc \
-	libpcp_qwt
+	libpcp_qwt \
+	#
 
 OTHER_SUBDIRS = \
 	pminfo \
@@ -62,6 +64,7 @@ OTHER_SUBDIRS = \
 	pmie \
 	pmieconf \
 	pmiestatus \
+	pmiostat \
 	pmlc \
 	pmlock \
 	pmlogextract \
@@ -84,8 +87,8 @@ OTHER_SUBDIRS = \
 	pmsnap \
 	pmtop \
 	pmtime \
-	pmwebapi \
 	pmval \
+	pmwebapi \
 	perl \
 	python \
 	procmemstat \
@@ -96,7 +99,9 @@ OTHER_SUBDIRS = \
 	mrtg2pcp \
 	sar2pcp \
 	sheet2pcp \
+	ganglia2pcp \
 	win32ctl \
+	pcp2graphite \
 	#
 
 SUBDIRS = \

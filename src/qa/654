@@ -4,7 +4,7 @@
 # Requires GFS2 support in the kernel and gfs2-utils installed,
 # else the test will not run.
 #
-# Copyright (c) 2013 Red Hat, Inc.  All Rights Reserved.
+# Copyright (c) 2013 - 2014 Red Hat, Inc.  All Rights Reserved.
 #
 seq=`basename $0`
 echo "QA output created by $seq"
@@ -41,7 +41,7 @@ pminfo -v gfs2 > /dev/null || _fail "install failed?"
 
 echo
 echo "=== Check that the number of metrics are correct ===" | tee -a $here/$seq.full
-[ `_pmcount gfs2` -ge 203 ] || _fail "Too few metrics?"
+[ `_pmcount gfs2` -ge 316 ] || _fail "Too few metrics?"
 
 echo
 echo "=== Basic glock stats from all kernels ===" | tee -a $here/$seq.full

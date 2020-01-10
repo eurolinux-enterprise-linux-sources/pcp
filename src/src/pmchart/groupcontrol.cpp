@@ -26,7 +26,7 @@ GroupControl::GroupControl()
     my.realPosition = 0;
     my.timeData = NULL;
     my.timeState = StartState;
-    my.buttonState = TimeButton::Timeless;
+    my.buttonState = QedTimeButton::Timeless;
     my.pmtimeState = QmcTime::StoppedState;
     memset(&my.delta, 0, sizeof(struct timeval));
     memset(&my.position, 0, sizeof(struct timeval));
@@ -41,16 +41,16 @@ GroupControl::init(int samples, int visible,
 
     if (isArchiveSource()) {
 	my.pmtimeState = QmcTime::StoppedState;
-	my.buttonState = TimeButton::StoppedArchive;
+	my.buttonState = QedTimeButton::StoppedArchive;
     }
     else {
 	my.pmtimeState = QmcTime::ForwardState;
-	my.buttonState = TimeButton::ForwardLive;
+	my.buttonState = QedTimeButton::ForwardLive;
     }
     my.delta = *interval;
     my.position = *position;
-    my.realDelta = tosec(*interval);
-    my.realPosition = tosec(*position);
+    my.realDelta = __pmtimevalToReal(interval);
+    my.realPosition = __pmtimevalToReal(position);
 
     my.timeData = (double *)malloc(samples * sizeof(double));
     for (int i = 0; i < samples; i++)
@@ -265,8 +265,8 @@ GroupControl::adjustWorldView(QmcTime::Packet *packet, bool vcrMode)
 {
     my.delta = packet->delta;
     my.position = packet->position;
-    my.realDelta = tosec(packet->delta);
-    my.realPosition = tosec(packet->position);
+    my.realDelta = __pmtimevalToReal(&packet->delta);
+    my.realPosition = __pmtimevalToReal(&packet->position);
 
     console->post("GroupControl::adjustWorldView: "
 		  "sh=%d vh=%d delta=%.2f position=%.2f (%s) state=%s",
@@ -412,7 +412,7 @@ GroupControl::adjustArchiveWorldViewForward(QmcTime::Packet *packet, bool setup)
 	my.timeData[i] = position;
 
 	struct timeval timeval;
-	fromsec(position, &timeval);
+	__pmtimevalFromReal(position, &timeval);
 	setArchiveMode(setmode, &timeval, delta);
 	console->post("Fetching data[%d] at %s", i, timeString(position));
 	fetch();
@@ -473,7 +473,7 @@ GroupControl::adjustArchiveWorldViewBackward(QmcTime::Packet *packet, bool setup
 	my.timeData[i] = position;
 
 	struct timeval timeval;
-	fromsec(position, &timeval);
+	__pmtimevalFromReal(position, &timeval);
 	setArchiveMode(setmode, &timeval, -delta);
 	console->post("Fetching data[%d] at %s", i, timeString(position));
 	fetch();
@@ -530,7 +530,7 @@ sideStep(double n, double o, double interval)
 void
 GroupControl::step(QmcTime::Packet *packet)
 {
-    double stepPosition = tosec(packet->position);
+    double stepPosition = __pmtimevalToReal(&packet->position);
 
     console->post(PmChart::DebugProtocol,
 	"GroupControl::step: stepping to time %.2f, delta=%.2f, state=%s",
@@ -633,7 +633,7 @@ GroupControl::timeAxisData(void)
     return my.timeData;
 }
 
-TimeButton::State
+QedTimeButton::State
 GroupControl::buttonState(void)
 {
     return my.buttonState;
@@ -645,31 +645,31 @@ GroupControl::newButtonState(QmcTime::State s, QmcTime::Mode m, bool record)
     if (isArchiveSource() == false) {
 	if (s == QmcTime::StoppedState)
 	    my.buttonState = record ?
-			TimeButton::StoppedRecord : TimeButton::StoppedLive;
+		QedTimeButton::StoppedRecord : QedTimeButton::StoppedLive;
 	else
 	    my.buttonState = record ?
-			TimeButton::ForwardRecord : TimeButton::ForwardLive;
+		QedTimeButton::ForwardRecord : QedTimeButton::ForwardLive;
     }
     else if (m == QmcTime::StepMode) {
 	if (s == QmcTime::ForwardState)
-	    my.buttonState = TimeButton::StepForwardArchive;
+	    my.buttonState = QedTimeButton::StepForwardArchive;
 	else if (s == QmcTime::BackwardState)
-	    my.buttonState = TimeButton::StepBackwardArchive;
+	    my.buttonState = QedTimeButton::StepBackwardArchive;
 	else
-	    my.buttonState = TimeButton::StoppedArchive;
+	    my.buttonState = QedTimeButton::StoppedArchive;
     }
     else if (m == QmcTime::FastMode) {
 	if (s == QmcTime::ForwardState)
-	    my.buttonState = TimeButton::FastForwardArchive;
+	    my.buttonState = QedTimeButton::FastForwardArchive;
 	else if (s == QmcTime::BackwardState)
-	    my.buttonState = TimeButton::FastBackwardArchive;
+	    my.buttonState = QedTimeButton::FastBackwardArchive;
 	else
-	    my.buttonState = TimeButton::StoppedArchive;
+	    my.buttonState = QedTimeButton::StoppedArchive;
     }
     else if (s == QmcTime::ForwardState)
-	my.buttonState = TimeButton::ForwardArchive;
+	my.buttonState = QedTimeButton::ForwardArchive;
     else if (s == QmcTime::BackwardState)
-	my.buttonState = TimeButton::BackwardArchive;
+	my.buttonState = QedTimeButton::BackwardArchive;
     else
-	my.buttonState = TimeButton::StoppedArchive;
+	my.buttonState = QedTimeButton::StoppedArchive;
 }

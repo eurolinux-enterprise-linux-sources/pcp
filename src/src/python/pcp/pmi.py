@@ -1,7 +1,7 @@
 # pylint: disable=C0103
 """Wrapper module for libpcp_import - Performace Co-Pilot Log Import API
 #
-# Copyright (C) 2012-2013 Red Hat.
+# Copyright (C) 2012-2015 Red Hat.
 #
 # This file is part of the "pcp" module, the python interfaces for the
 # Performance Co-Pilot toolkit.
@@ -168,10 +168,12 @@ class pmiLogImport(object):
     # overloads
 
     def __init__(self, path, inherit = 0):
+        if type(path) != type(b''):
+            path = path.encode('utf-8')
         self._path = path        # the archive path (file name)
         self._ctx = LIBPCP_IMPORT.pmiStart(c_char_p(path), inherit)
         if self._ctx < 0:
-            raise pmiErr, self._ctx
+            raise pmiErr(self._ctx)
 
     def __del__(self):
         if LIBPCP_IMPORT:
@@ -186,10 +188,12 @@ class pmiLogImport(object):
         """PMI - set the source host name for a Log Import archive """
         status = LIBPCP_IMPORT.pmiUseContext(self._ctx)
         if status < 0:
-            raise pmiErr, status
+            raise pmiErr(status)
+        if type(hostname) != type(b''):
+            hostname = hostname.encode('utf-8')
         status = LIBPCP_IMPORT.pmiSetHostname(c_char_p(hostname))
         if status < 0:
-            raise pmiErr, status
+            raise pmiErr(status)
         return status
 
     def pmiSetTimezone(self, timezone):
@@ -197,10 +201,12 @@ class pmiLogImport(object):
         """
         status = LIBPCP_IMPORT.pmiUseContext(self._ctx)
         if status < 0:
-            raise pmiErr, status
+            raise pmiErr(status)
+        if type(timezone) != type(b''):
+            timezone = timezone.encode('utf-8')
         status = LIBPCP_IMPORT.pmiSetTimezone(c_char_p(timezone))
         if status < 0:
-            raise pmiErr, status
+            raise pmiErr(status)
         return status
 
     @staticmethod
@@ -226,72 +232,88 @@ class pmiLogImport(object):
         """PMI - add a new metric definition to a Log Import context """
         status = LIBPCP_IMPORT.pmiUseContext(self._ctx)
         if status < 0:
-            raise pmiErr, status
+            raise pmiErr(status)
+        if type(name) != type(b''):
+            name = name.encode('utf-8')
         status = LIBPCP_IMPORT.pmiAddMetric(c_char_p(name),
                                         pmid, typed, indom, sem, units)
         if status < 0:
-            raise pmiErr, status
+            raise pmiErr(status)
         return status
 
     def pmiAddInstance(self, indom, instance, instid):
         """PMI - add element to an instance domain in a Log Import context """
         status = LIBPCP_IMPORT.pmiUseContext(self._ctx)
         if status < 0:
-            raise pmiErr, status
+            raise pmiErr(status)
+        if type(instance) != type(b''):
+            instance = instance.encode('utf-8')
         status = LIBPCP_IMPORT.pmiAddInstance(indom, c_char_p(instance), instid)
         if status < 0:
-            raise pmiErr, status
+            raise pmiErr(status)
         return status
 
     def pmiPutValue(self, name, inst, value):
         """PMI - add a value for a metric-instance pair """
         status = LIBPCP_IMPORT.pmiUseContext(self._ctx)
         if status < 0:
-            raise pmiErr, status
+            raise pmiErr(status)
+        if type(name) != type(b''):
+            name = name.encode('utf-8')
+        if type(inst) != type(b''):
+            inst = inst.encode('utf-8')
+        if type(value) != type(b''):
+            value = value.encode('utf-8')
         status = LIBPCP_IMPORT.pmiPutValue(c_char_p(name),
                                         c_char_p(inst), c_char_p(value))
         if status < 0:
-            raise pmiErr, status
+            raise pmiErr(status)
         return status
 
     def pmiGetHandle(self, name, inst):
         """PMI - define a handle for a metric-instance pair """
         status = LIBPCP_IMPORT.pmiUseContext(self._ctx)
         if status < 0:
-            raise pmiErr, status
+            raise pmiErr(status)
+        if type(name) != type(b''):
+            name = name.encode('utf-8')
+        if type(inst) != type(b''):
+            inst = inst.encode('utf-8')
         status = LIBPCP_IMPORT.pmiGetHandle(c_char_p(name), c_char_p(inst))
         if status < 0:
-            raise pmiErr, status
+            raise pmiErr(status)
         return status
 
     def pmiPutValueHandle(self, handle, value):
         """PMI - add a value for a metric-instance pair via a handle """
         status = LIBPCP_IMPORT.pmiUseContext(self._ctx)
         if status < 0:
-            raise pmiErr, status
+            raise pmiErr(status)
+        if type(value) != type(b''):
+            value = value.encode('utf-8')
         status = LIBPCP_IMPORT.pmiPutValueHandle(handle, c_char_p(value))
         if status < 0:
-            raise pmiErr, status
+            raise pmiErr(status)
         return status
 
     def pmiWrite(self, sec, usec):
         """PMI - flush data to a Log Import archive """
         status = LIBPCP_IMPORT.pmiUseContext(self._ctx)
         if status < 0:
-            raise pmiErr, status
+            raise pmiErr(status)
         status = LIBPCP_IMPORT.pmiWrite(sec, usec)
         if status < 0:
-            raise pmiErr, status
+            raise pmiErr(status)
         return status
 
     def put_result(self, result):
         """PMI - add a data record to a Log Import archive """
         status = LIBPCP_IMPORT.pmiUseContext(self._ctx)
         if status < 0:
-            raise pmiErr, status
+            raise pmiErr(status)
         status = LIBPCP_IMPORT.pmiPutResult(cast(result, POINTER(pmResult)))
         if status < 0:
-            raise pmiErr, status
+            raise pmiErr(status)
         return status
 
     @staticmethod
@@ -303,10 +325,10 @@ class pmiLogImport(object):
         """PMI - close current context and finish a Log Import archive """
         status = LIBPCP_IMPORT.pmiUseContext(self._ctx)
         if status < 0:
-            raise pmiErr, status
+            raise pmiErr(status)
         status = LIBPCP_IMPORT.pmiEnd()
         self._ctx = -1
         if status < 0:
-            raise pmiErr, status
+            raise pmiErr(status)
         return status
 

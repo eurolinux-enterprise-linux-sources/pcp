@@ -2,7 +2,7 @@
 # Copyright (c) 2000,2004-2008 Silicon Graphics, Inc.  All Rights Reserved.
 # Portions Copyright (c) International Business Machines Corp., 2002
 # Portions Copyright (c) 2007-2009 Aconex.  All Rights Reserved.
-# Portions Copyright (c) 2013 Red Hat.
+# Portions Copyright (c) 2013-2014 Red Hat.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
@@ -173,6 +173,54 @@ Count of read requests that were merged with an already queued read request.
 @ disk.dev.write_merge per-disk count of merged write requests
 Count of write requests that were merged with an already queued write request.
 
+@ disk.dm.read per-device-mapper device read operations
+
+@ disk.dm.write per-device-mapper device write operations
+
+@ disk.dm.total per-device-mapper device total (read+write) operations
+
+@ disk.dm.blkread per-device-mapper device block read operations
+
+@ disk.dm.blkwrite per-device-mapper device block write operations
+
+@ disk.dm.blktotal per-device-mapper device total (read+write) block operations
+
+@ disk.dm.read_bytes per-device-mapper device count of bytes read
+
+@ disk.dm.write_bytes per-device-mapper device count of bytes written
+
+@ disk.dm.total_bytes per-device-mapper device count of total bytes read and written
+
+@ disk.dm.read_merge per-device-mapper device count of merged read requests
+
+@ disk.dm.write_merge per-device-mapper device count of merged write requests
+
+@ disk.dm.avactive per-device-mapper device count of active time
+
+@ disk.dm.aveq per-device-mapper device time averaged count of request queue length
+
+@ disk.dm.read_rawactive per-device-mapper raw count of active read time
+When converted to a rate, this metric represents the raw utilization of
+the device during the sampling interval as a result of reads.  Accounting for
+this metric is only done on I/O completion and can thus result in more than a
+second's worth of IO being accounted for within any one second, leading to
+>100% utilisation.  It is suitable mainly for use in calculations with other
+metrics, e.g. mirroring the results from existing performance tools:
+
+ iostat.dm.r_await = delta(disk.dm.read_rawactive) / delta(disk.dm.read)
+
+@ disk.dm.write_rawactive per-device-mapper raw count of active write time
+When converted to a rate, this metric represents the raw utilization of
+the device during the sampling interval as a result of writes.  Accounting for
+this metric is only done on I/O completion and can thus result in more than a
+second's worth of IO being accounted for within any one second, leading to
+>100% utilisation.  It is suitable mainly for use in calculations with other
+metrics, e.g. mirroring the results from existing performance tools:
+
+ iostat.dm.w_await = delta(disk.dm.write_rawactive) / delta(disk.dm.write)
+
+@ hinv.map.dmname per-device-mapper device persistent name mapping to dm-[0-9]*
+
 @ disk.all.read_merge total count of merged read requests, summed for all disks
 Total count of read requests that were merged with an already queued read request.
 
@@ -310,6 +358,12 @@ certain ROMs in RAM.
 Used memory is the difference between mem.physmem and mem.freemem.
 @ mem.util.free free memory metric from /proc/meminfo
 Alias for mem.freemem.
+@ mem.util.available available memory from /proc/meminfo
+The amount of memory that is available for a new workload,
+without pushing the system into swap. Estimated from MemFree,
+Active(file), Inactive(file), and SReclaimable, as well as the "low"
+watermarks from /proc/zoneinfo.
+
 @ mem.util.shared shared memory metric from /proc/meminfo
 Shared memory metric. Currently always zero on Linux 2.4 kernels
 and has been removed from 2.6 kernels.
@@ -389,6 +443,7 @@ you will get real memory on demand, and just as much as you use.
 @ mem.util.kernelStack kbytes of memory used for kernel stacks
 @ mem.util.hugepagesTotal a count of total hugepages
 @ mem.util.hugepagesFree a count of free hugepages
+@ mem.util.hugepagesRsvd a count of reserved hugepages
 @ mem.util.hugepagesSurp a count of surplus hugepages
 @ mem.util.directMap4k amount of memory that is directly mapped in 4kB pages
 @ mem.util.directMap2M amount of memory that is directly mapped in 2MB pages
@@ -442,6 +497,8 @@ User memory (Kbytes) in pages not backed by files, e.g. from malloc()
 @ mem.numa.alloc.other_node count of times a process ran on this node and got memory from another node
 @ mem.vmstat.nr_dirty number of pages in dirty state
 Instantaneous number of pages in dirty state, from /proc/vmstat
+@ mem.vmstat.nr_dirty_background_threshold background writeback threshold
+@ mem.vmstat.nr_dirty_threshold dirty throttling threshold
 @ mem.vmstat.nr_dirtied count of pages dirtied
 Count of pages entering dirty state, from /proc/vmstat
 @ mem.vmstat.nr_writeback number of pages in writeback state
@@ -618,6 +675,7 @@ Count of huge TLB page buddy allocation successes, from /proc/vmstat
 @ swap.used swap used metric from /proc/meminfo
 @ swap.free swap free metric from /proc/meminfo
 @ kernel.all.load 1, 5 and 15 minute load average
+@ kernel.all.nusers number of user sessions on system
 @ kernel.all.cpu.user total user CPU time from /proc/stat for all CPUs, including guest CPU time
 @ kernel.all.cpu.vuser total user CPU time from /proc/stat for all CPUs, excluding guest CPU time
 @ kernel.all.cpu.intr total interrupt CPU time from /proc/stat for all CPUs
@@ -640,30 +698,82 @@ Total CPU time when a CPU had a runnable process, but the hypervisor
 (virtualisation layer) chose to run something else instead.
 @ kernel.all.cpu.guest total virtual guest CPU time for all CPUs
 Total CPU time spent running virtual guest operating systems.
-@ kernel.all.nusers number of user sessions on system
+@ kernel.pernode.cpu.user total user CPU time from /proc/stat for each node, including guest CPU time
+@ kernel.pernode.cpu.vuser total user CPU time from /proc/stat for each node, excluding guest CPU time
+@ kernel.pernode.cpu.intr total interrupt CPU time from /proc/stat for each node
+@ kernel.pernode.cpu.wait.total total wait CPU time from /proc/stat for each node
+@ kernel.pernode.cpu.nice total nice user CPU time from /proc/stat for each node
+@ kernel.pernode.cpu.sys total sys CPU time from /proc/stat for each node
+@ kernel.pernode.cpu.idle total idle CPU time from /proc/stat for each node
+@ kernel.pernode.cpu.irq.soft soft interrupt CPU time from /proc/stat for each node
+@ kernel.pernode.cpu.irq.hard hard interrupt CPU time from /proc/stat for each node
+@ kernel.pernode.cpu.steal total virtualisation CPU steal time for each node
+@ kernel.pernode.cpu.guest total virtual guest CPU time for each node
 
 @ hinv.ninterface number of active (up) network interfaces
 @ network.interface.in.bytes network recv read bytes from /proc/net/dev per network interface
+bytes column on the "Receive" side of /proc/net/dev (stats->rx_bytes counter in
+rtnl_link_stats64)
 @ network.interface.in.packets network recv read packets from /proc/net/dev per network interface
+packets column on the "Receive" side of /proc/net/dev
+(stats->rx_packets counter in rtnl_link_stats64)
 @ network.interface.in.errors network recv read errors from /proc/net/dev per network interface
+errors column on the "Receive" side of /proc/net/dev
+(stats->rx_errors counter in rtnl_link_stats64)
 @ network.interface.in.drops network recv read drops from /proc/net/dev per network interface
-@ network.interface.in.mcasts network recv compressed from /proc/net/dev per network interface
-@ network.interface.in.fifo network recv read fifos from /proc/net/dev per network interface
-@ network.interface.in.frame network recv read frames from /proc/net/dev per network interface
+drop column on the "Receive" side of /proc/net/dev
+(stats->{rx_dropped + rx_missed_errors} counters in rtnl_link_stats64)
+rx_dropped are the dropped packets due to no space in linux buffers and rx_missed
+are due to the receiver NIC missing a packet.
+Not all NICS use the rx_missed_errors counter.
+@ network.interface.in.mcasts network recv multicast packets from /proc/net/dev per network interface
+multicast column on the "Receive" side of /proc/net/dev
+(stats->multicast counter in rtnl_link_stats64)
+@ network.interface.in.fifo network recv fifo overrun errors from /proc/net/dev per network interface
+fifo column on the "Receive" side of /proc/net/dev
+(stats->rx_fifo_errors counter in rtnl_link_stats64)
+@ network.interface.in.frame network recv frames errors from /proc/net/dev per network interface
+frame column on the "Receive" side of /proc/net/dev
+(stats->{rx_length_errors + rx_over_errors + rx_crc_errors + rx_frame_errors}
+counters in rtnl_link_stats64)
 @ network.interface.in.compressed network recv compressed from /proc/net/dev per network interface
+compressed column on the "Receive" side of /proc/net/dev
+(stats->rx_compressed counter in rtnl_link_stats64).
+Almost exclusively used for CSLIP or HDLC devices
 @ network.interface.out.bytes network send bytes from /proc/net/dev per network interface
+bytes column on the "Transmit" side of /proc/net/dev
+(stats->tx_bytes counter in rtnl_link_stats64)
 @ network.interface.out.packets network send packets from /proc/net/dev per network interface
+packets column on the "Transmit" side of /proc/net/dev
+(stats->tx_packets counter in rtnl_link_stats64)
 @ network.interface.out.errors network send errors from /proc/net/dev per network interface
+errors column on the "Transmit" side of /proc/net/dev
+(stats->tx_errors counter in rtnl_link_stats64)
 @ network.interface.out.drops network send drops from /proc/net/dev per network interface
+drop column on the "Transmit" side of /proc/net/dev
+(stats->tx_dropped counter in rtnl_link_stats64)
 @ network.interface.out.fifo network send fifos from /proc/net/dev per network interface
+fifo column on the "Transmit" side of /proc/net/dev
+(stats->tx_fifo_errors counter in rtnl_link_stats64)
 @ network.interface.collisions network send collisions from /proc/net/dev per network interface
+colls column on the "Transmit" side of /proc/net/dev
+(stats->collisions counter in rtnl_link_stats64).
+Counter only valid for outgoing packets.
 @ network.interface.out.carrier network send carrier from /proc/net/dev per network interface
+carrier column on the "Transmit" side of /proc/net/dev
+(stats->{tx_carrier_errors + tx_aborted_errors + tx_window_errors +
+tx_heartbeat_errors} counters in rtnl_link_stats64).
 @ network.interface.out.compressed network send compressed from /proc/net/dev per network interface
+compressed column on the "Transmit" side of /proc/net/dev
+(stats->tx_compressed counter in rtnl_link_stats64).
+Almost exclusively used for CSLIP or HDLC devices
 @ network.interface.total.bytes network total (in+out) bytes from /proc/net/dev per network interface
 @ network.interface.total.packets network total (in+out) packets from /proc/net/dev per network interface
 @ network.interface.total.errors network total (in+out) errors from /proc/net/dev per network interface
 @ network.interface.total.drops network total (in+out) drops from /proc/net/dev per network interface
-@ network.interface.total.mcasts network total (in+out) mcasts from /proc/net/dev per network interface
+@ network.interface.total.mcasts network total (in) mcasts from /proc/net/dev per network interface
+Linux does not account for outgoing mcast packets per device, so this counter
+is identical to the incoming mcast metric.
 @ network.interface.mtu maximum transmission unit on network interface
 @ network.interface.speed interface speed in megabytes per second
 The linespeed on the network interface, as reported by the kernel,
@@ -782,6 +892,9 @@ tools running on IRIX.
 @ rpc.server.io_write cumulative count of bytes passed into write requests
 @ rpc.server.th_cnt available nfsd threads
 @ rpc.server.th_fullcnt number of times the last free nfsd thread was used
+@ rpc.server.ra_size size of read-ahead params cache
+@ rpc.server.ra_hits count of read-ahead params cache hits
+@ rpc.server.ra_misses count of read-ahead params cache misses
 
 @ network.ip.forwarding count of ip forwarding
 @ network.ip.defaultttl count of ip defaultttl
@@ -872,6 +985,136 @@ tools running on IRIX.
 @ network.udplite.sndbuferrors count of udplite send buffer errors
 @ network.udplite.incsumerrors count of udplite in checksum errors
 
+@ network.ip.innoroutes Number of IP datagrams discarded due to no routes in forwarding path
+@ network.ip.intruncatedpkts Number of IP datagrams discarded due to frame not carrying enough data
+@ network.ip.inmcastpkts Number of received IP multicast datagrams
+@ network.ip.outmcastpkts Number of sent IP multicast datagrams
+@ network.ip.inbcastpkts Number of received IP broadcast datagrams
+@ network.ip.outbcastpkts Number of sent IP bradcast datagrams
+@ network.ip.inoctets Number of received octets
+@ network.ip.outoctets Number of sent octets
+@ network.ip.inmcastoctets Number of received IP multicast octets
+@ network.ip.outmcastoctets Number of sent IP multicast octets
+@ network.ip.inbcastoctets Number of received IP broadcast octets
+@ network.ip.outbcastoctets Number of sent IP broadcast octets
+@ network.ip.csumerrors Number of IP datagrams with checksum errors
+@ network.ip.noectpkts Number of packets received with NOECT
+@ network.ip.ect1pkts Number of packets received with ECT(1)
+@ network.ip.ect0pkts Number of packets received with ECT(0)
+@ network.ip.cepkts Number of packets received with Congestion Experimented
+
+@ network.tcp.syncookiessent Number of sent SYN cookies
+@ network.tcp.syncookiesrecv Number of received SYN cookies
+@ network.tcp.syncookiesfailed Number of failed SYN cookies
+@ network.tcp.embryonicrsts Number of resets received for embryonic SYN_RECV sockets
+@ network.tcp.prunecalled Number of packets pruned from receive queue because of socket buffer overrun
+@ network.tcp.rcvpruned Number of packets pruned from receive queue
+@ network.tcp.ofopruned Number of packets dropped from out-of-order queue because of socket buffer overrun
+@ network.tcp.outofwindowicmps Number of dropped out of window ICMPs
+@ network.tcp.lockdroppedicmps Number of dropped ICMP because socket was locked
+@ network.tcp.arpfilter Number of arp packets filtered
+@ network.tcp.timewaited Number of TCP sockets finished time wait in fast timer
+@ network.tcp.timewaitrecycled Number of time wait sockets recycled by time stamp
+@ network.tcp.timewaitkilled Number of TCP sockets finished time wait in slow timer
+@ network.tcp.pawspassiverejected Number of passive connections rejected because of timestamp
+@ network.tcp.pawsactiverejected Number of active connections rejected because of timestamp
+@ network.tcp.pawsestabrejected Number of packets rejects in established connections because of timestamp
+@ network.tcp.delayedacks Number of delayed acks sent
+@ network.tcp.delayedacklocked Number of delayed acks further delayed because of locked socket
+@ network.tcp.delayedacklost Number of times quick ack mode was activated times
+@ network.tcp.listenoverflows Number of times the listen queue of a socket overflowed
+@ network.tcp.listendrops Number of SYNs to LISTEN sockets dropped
+@ network.tcp.prequeued Number of packets directly queued to recvmsg prequeue
+@ network.tcp.directcopyfrombacklog Number of bytes directly in process context from backlog
+@ network.tcp.directcopyfromprequeue Number of bytes directly received in process context from prequeue
+@ network.tcp.prequeueddropped Number of packets dropped from prequeue
+@ network.tcp.hphits Number of packet headers predicted
+@ network.tcp.hphitstouser Number of packets header predicted and directly queued to user
+@ network.tcp.pureacks Number of acknowledgments not containing data payload received
+@ network.tcp.hpacks Number of predicted acknowledgments
+@ network.tcp.renorecovery Number of times recovered from packet loss due to fast retransmit
+@ network.tcp.sackrecovery Number of times recovered from packet loss by selective acknowledgements
+@ network.tcp.sackreneging Number of bad SACK blocks received
+@ network.tcp.fackreorder Number of times detected reordering using FACK
+@ network.tcp.sackreorder Number of times detected reordering using SACK
+@ network.tcp.renoreorder Number of times detected reordering using reno fast retransmit
+@ network.tcp.tsreorder Number of times detected reordering times using time stamp
+@ network.tcp.fullundo Number of congestion windows fully recovered without slow start
+@ network.tcp.partialundo Number of congestion windows partially recovered using Hoe heuristic
+@ network.tcp.dsackundo Number of congestion windows recovered without slow start using DSACK
+@ network.tcp.lossundo Number of congestion windows recovered without slow start after partial ack
+@ network.tcp.lostretransmit Number of retransmits lost
+@ network.tcp.renofailures Number of timeouts after reno fast retransmit
+@ network.tcp.sackfailures Number of timeouts after SACK recovery
+@ network.tcp.lossfailures Number of timeouts in loss state
+@ network.tcp.fastretrans Number of fast retransmits
+@ network.tcp.forwardretrans Number of forward retransmits
+@ network.tcp.slowstartretrans Number of retransmits in slow start
+@ network.tcp.timeouts Number of other TCP timeouts
+@ network.tcp.lossprobes Number of sent TCP loss probes
+@ network.tcp.lossproberecovery Number of TCP loss probe recoveries
+@ network.tcp.renorecoveryfail Number of reno fast retransmits failed
+@ network.tcp.sackrecoveryfail Number of SACK retransmits failed
+@ network.tcp.schedulerfail Number of times receiver scheduled too late for direct processing
+@ network.tcp.rcvcollapsed Number of packets collapsed in receive queue due to low socket buffer
+@ network.tcp.dsackoldsent Number of DSACKs sent for old packets
+@ network.tcp.dsackofosent Number of DSACKs sent for out of order packets
+@ network.tcp.dsackrecv Number of DSACKs received
+@ network.tcp.dsackoforecv Number of DSACKs for out of order packets received
+@ network.tcp.abortondata Number of connections reset due to unexpected data
+@ network.tcp.abortonclose Number of connections reset due to early user close
+@ network.tcp.abortonmemory Number of connections aborted due to memory pressure
+@ network.tcp.abortontimeout Number of connections aborted due to timeout
+@ network.tcp.abortonlinger Number of connections aborted after user close in linger timeout
+@ network.tcp.abortfailed Number of times unable to send RST due to no memory
+@ network.tcp.memorypressures Numer of times TCP ran low on memory
+@ network.tcp.sackdiscard Number of SACKs discarded
+@ network.tcp.dsackignoredold Number of ignored old duplicate SACKs
+@ network.tcp.dsackignorednoundo Number of ignored duplicate SACKs with undo_marker not set
+@ network.tcp.spuriousrtos Number of FRTO's successfully detected spurious RTOs
+@ network.tcp.md5notfound Number of times MD5 hash expected but not found
+@ network.tcp.md5unexpected Number of times MD5 hash unexpected but found
+@ network.tcp.sackshifted Number of SACKs shifted
+@ network.tcp.sackmerged Number of SACKs merged
+@ network.tcp.sackshiftfallback Number of SACKs fallbacks
+@ network.tcp.backlogdrop Number of frames dropped because of full backlog queue
+@ network.tcp.minttldrop Number of frames dropped when TTL is under the minimum
+@ network.tcp.deferacceptdrop Number of dropped ACK frames when socket is in SYN-RECV state
+Due to SYNACK retrans count lower than defer_accept value
+
+@ network.tcp.iprpfilter Number of packets dropped in input path because of rp_filter settings
+@ network.tcp.timewaitoverflow Number of occurences of time wait bucket overflow
+@ network.tcp.reqqfulldocookies Number of times a SYNCOOKIE was replied to client
+@ network.tcp.reqqfulldrop Number of times a SYN request was dropped due to disabled syncookies
+@ network.tcp.retransfail Number of failed tcp_retransmit_skb() calls
+@ network.tcp.rcvcoalesce Number of times tried to coalesce the receive queue
+@ network.tcp.ofoqueue Number of packets queued in OFO queue
+@ network.tcp.ofodrop Number of packets meant to be queued in OFO but dropped due to limits hit
+Number of packets meant to be queued in OFO but dropped because socket rcvbuf
+limit reached.
+@ network.tcp.ofomerge Number of packets in OFO that were merged with other packets
+@ network.tcp.challengeack Number of challenge ACKs sent (RFC 5961 3.2)
+@ network.tcp.synchallenge Number of challenge ACKs sent in response to SYN packets
+@ network.tcp.fastopenactive Number of successful active fast opens
+@ network.tcp.fastopenactivefail Number of fast open attempts failed due to remote not accepting it or time outs
+@ network.tcp.fastopenpassive Number of successful passive fast opens
+@ network.tcp.fastopenpassivefail Number of passive fast open attempts failed
+@ network.tcp.fastopenlistenoverflow Number of times the fastopen listen queue overflowed
+@ network.tcp.fastopencookiereqd Number of fast open cookies requested
+@ network.tcp.spuriousrtxhostqueues Number of times that the fast clone is not yet freed in tcp_transmit_skb()
+@ network.tcp.busypollrxpackets Number of low latency application-fetched packets
+@ network.tcp.autocorking Number of times stack detected skb was underused and its flush was deferred
+@ network.tcp.fromzerowindowadv Number of times window went from zero to non-zero
+@ network.tcp.tozerowindowadv Number of times window went from non-zero to zero
+@ network.tcp.wantzerowindowadv Number of times zero window announced
+@ network.tcp.synretrans Number of SYN-SYN/ACK retransmits
+Number of SYN-SYN/ACK retransmits to break down retransmissions in SYN, fast/timeout
+retransmits.
+@ network.tcp.origdatasent Number of outgoing packets with original data
+Excluding retransmission but including data-in-SYN). This counter is different from
+TcpOutSegs because TcpOutSegs also tracks pure ACKs. TCPOrigDataSent is
+more useful to track the TCP retransmission rate.
+
 @ pmda.uname identity and type of current system
 Identity and type of current system.  The concatenation of the values
 returned from utsname(2), also similar to uname -a.
@@ -883,12 +1126,16 @@ See also the kernel.uname.* metrics
 @ hinv.map.cpu_node logical CPU to NUMA node mapping for each CPU
 @ hinv.machine machine name, IP35 if SGI SNIA, else simply linux
 @ hinv.cpu.clock clock rate in Mhz for each CPU as reported by /proc/cpuinfo
-@ hinv.cpu.vendor manafacturer of each CPU as reported by /proc/cpuinfo
+@ hinv.cpu.vendor manufacturer of each CPU as reported by /proc/cpuinfo
 @ hinv.cpu.model model number of each CPU as reported by /proc/cpuinfo
 @ hinv.cpu.model_name model name of each CPU as reported by /proc/cpuinfo
 @ hinv.cpu.stepping stepping of each CPU as reported by /proc/cpuinfo
 @ hinv.cpu.cache primary cache size of each CPU as reported by /proc/cpuinfo
 @ hinv.cpu.bogomips bogo mips rating for each CPU as reported by /proc/cpuinfo
+@ hinv.cpu.flags Hardware capability flags for each CPU as reported by /proc/cpuinfo
+@ hinv.cpu.cache_alignment Cache alignment for each CPU as reported by /proc/cpuinfo
+@ hinv.cpu.online CPU online state from /sys/devices/system/cpu/*/online
+@ hinv.node.online NUMA node online state from /sys/devices/system/node/*/online
 @ kernel.all.hz value of HZ (jiffies/second) for the currently running kernel
 @ kernel.all.uptime time the current kernel has been running
 @ kernel.all.idletime time the current kernel has been idle since boot

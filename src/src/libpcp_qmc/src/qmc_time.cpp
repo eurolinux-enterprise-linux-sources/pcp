@@ -14,6 +14,8 @@
  */
 #include <QtGui/QIcon>
 #include "qmc_time.h"
+#include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 //
 // Map icon type name to QIcon
@@ -25,20 +27,20 @@ extern QIcon *QmcTime::icon(QmcTime::Icon type)
 
     if (!setup) {
 	setup = 1;
-	icons[QmcTime::ForwardOn] = QIcon(":play_on.png");
-	icons[QmcTime::ForwardOff] = QIcon(":play_off.png");
-	icons[QmcTime::StoppedOn] = QIcon(":stop_on.png");
-	icons[QmcTime::StoppedOff] = QIcon(":stop_off.png");
-	icons[QmcTime::BackwardOn] = QIcon(":back_on.png");
-	icons[QmcTime::BackwardOff] = QIcon(":back_off.png");
-	icons[QmcTime::FastForwardOn] = QIcon(":fastfwd_on.png");
-	icons[QmcTime::FastForwardOff] = QIcon(":fastfwd_off.png");
-	icons[QmcTime::FastBackwardOn] = QIcon(":fastback_on.png");
-	icons[QmcTime::FastBackwardOff] = QIcon(":fastback_off.png");
-	icons[QmcTime::StepForwardOn] = QIcon(":stepfwd_on.png");
-	icons[QmcTime::StepForwardOff] = QIcon(":stepfwd_off.png");
-	icons[QmcTime::StepBackwardOn] = QIcon(":stepback_on.png");
-	icons[QmcTime::StepBackwardOff] = QIcon(":stepback_off.png");
+	icons[QmcTime::ForwardOn] = QIcon(":images/play_on.png");
+	icons[QmcTime::ForwardOff] = QIcon(":images/play_off.png");
+	icons[QmcTime::StoppedOn] = QIcon(":images/stop_on.png");
+	icons[QmcTime::StoppedOff] = QIcon(":images/stop_off.png");
+	icons[QmcTime::BackwardOn] = QIcon(":images/back_on.png");
+	icons[QmcTime::BackwardOff] = QIcon(":images/back_off.png");
+	icons[QmcTime::FastForwardOn] = QIcon(":images/fastfwd_on.png");
+	icons[QmcTime::FastForwardOff] = QIcon(":images/fastfwd_off.png");
+	icons[QmcTime::FastBackwardOn] = QIcon(":images/fastback_on.png");
+	icons[QmcTime::FastBackwardOff] = QIcon(":images/fastback_off.png");
+	icons[QmcTime::StepForwardOn] = QIcon(":images/stepfwd_on.png");
+	icons[QmcTime::StepForwardOff] = QIcon(":images/stepfwd_off.png");
+	icons[QmcTime::StepBackwardOn] = QIcon(":images/stepback_on.png");
+	icons[QmcTime::StepBackwardOff] = QIcon(":images/stepback_off.png");
     }
     return &icons[type];
 }
@@ -56,12 +58,7 @@ int QmcTime::timevalNonZero(struct timeval *a)
 //
 void QmcTime::timevalAdd(struct timeval *a, struct timeval *b)
 {
-    a->tv_usec += b->tv_usec;
-    if (a->tv_usec > 1000000) {
-	a->tv_usec -= 1000000;
-	a->tv_sec++;
-    }
-    a->tv_sec += b->tv_sec;
+    __pmtimevalInc(a, b);
 }
 
 //
@@ -69,12 +66,7 @@ void QmcTime::timevalAdd(struct timeval *a, struct timeval *b)
 //
 void QmcTime::timevalSub(struct timeval *a, struct timeval *b)
 {
-    a->tv_usec -= b->tv_usec;
-    if (a->tv_usec < 0) {
-	a->tv_usec += 1000000;
-	a->tv_sec--;
-    }
-    a->tv_sec -= b->tv_sec;
+    __pmtimevalDec(a, b);
     if (a->tv_sec < 0) {
 	/* clip negative values at zero */
 	a->tv_sec = 0;
@@ -98,8 +90,7 @@ int QmcTime::timevalCompare(struct timeval *a, struct timeval *b)
 //
 void QmcTime::secondsToTimeval(double value, struct timeval *tv)
 {
-    tv->tv_sec = (time_t)value;
-    tv->tv_usec = (long)(((value - (double)tv->tv_sec) * 1000000.0));
+    __pmtimevalFromReal(value, tv);
 }
 
 //
@@ -107,7 +98,7 @@ void QmcTime::secondsToTimeval(double value, struct timeval *tv)
 //
 double QmcTime::secondsFromTimeval(struct timeval *tv)
 {
-    return (double)tv->tv_sec + ((double)tv->tv_usec / 1000000.0);
+    return __pmtimevalToReal(tv);
 }
 
 //

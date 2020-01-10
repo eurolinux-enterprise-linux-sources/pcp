@@ -17,17 +17,17 @@ include $(TOPDIR)/src/include/builddefs
 
 LIBTARGET = pmda_pmcd.$(DSOSUFFIX)
 PMDAINIT = pmcd_init
+DOMAIN = PMCD
 
-CFILES	= pmcd.c
-LSRCFILES = objstyle
+CFILES = pmcd.c
 VERSION_SCRIPT = exports
-LDIRT = $(VERSION_SCRIPT)
+LDIRT = $(VERSION_SCRIPT) domain.h
 
 # Add to CFLAGS to find files in pmcd/src...
 LCFLAGS = -I$(TOPDIR)/src
 LCFLAGS += -I$(TOPDIR)/src/pmie/src
 
-ifneq (, $(filter linux kfreebsd, $(TARGET_OS)))
+ifneq (, $(filter linux kfreebsd gnu, $(TARGET_OS)))
 ABI = $(shell ./objstyle)
 LCFLAGS += -DSIM_ABI=\""$(ABI)"\"
 endif
@@ -50,7 +50,7 @@ LLDLIBS += -lpcp_pmcd
 PCPLIB_LDFLAGS += -L$(TOPDIR)/src/libpcp_pmcd/src
 endif
 
-default: $(LIBTARGET)
+default: $(LIBTARGET) domain.h
 
 install: default
 	$(INSTALL) -m 755 -d $(PCP_PMDAS_DIR)/pmcd
@@ -62,7 +62,10 @@ default_pcp : default
 
 install_pcp : install
 
-$(LIBTARGET): $(VERSION_SCRIPT)
+domain.h: $(TOPDIR)/src/pmns/stdpmid
+	$(DOMAIN_MAKERULE)
 
 $(VERSION_SCRIPT):
 	$(VERSION_SCRIPT_MAKERULE)
+
+$(LIBTARGET): $(VERSION_SCRIPT)

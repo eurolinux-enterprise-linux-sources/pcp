@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2014 Red Hat.
  * Copyright (c) 1995-2003 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -55,7 +56,7 @@ extern int	limbo(void);
 static pmDesc	desctab[] = {
 /* control */
     { PMDA_PMID(0,0), PM_TYPE_32, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
-/* daemon-pid */
+/* daemon_pid or sample.dupnames.daemon_pid or sample.dupnames.pid_daemon */
     { PMDA_PMID(0,1), PM_TYPE_U32, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
 /* seconds */
     { PMDA_PMID(0,2), PM_TYPE_U32, PM_INDOM_NULL, PM_SEM_COUNTER, PMDA_PMUNITS(0,1,0,0,PM_TIME_SEC,0) },
@@ -65,7 +66,7 @@ static pmDesc	desctab[] = {
     { PMDA_PMID(0,4), PM_TYPE_32, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
 /* colour */
     { PMDA_PMID(0,5), PM_TYPE_32, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
-/* bin */
+/* bin or dupnames.two.bin or dupnames.three.bin */
     { PMDA_PMID(0,6), PM_TYPE_32, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
 /* drift */
     { PMDA_PMID(0,7), PM_TYPE_32, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
@@ -85,7 +86,7 @@ static pmDesc	desctab[] = {
     { PMDA_PMID(0,14), PM_TYPE_32, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
 /* float.one */
     { PMDA_PMID(0,15), PM_TYPE_FLOAT, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
-/* float.ten */
+/* float.ten or dupnames.two.float.ten */
     { PMDA_PMID(0,16), PM_TYPE_FLOAT, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
 /* float.hundred */
     { PMDA_PMID(0,17), PM_TYPE_FLOAT, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
@@ -105,7 +106,7 @@ static pmDesc	desctab[] = {
     { PMDA_PMID(0,24), PM_TYPE_64, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
 /* double.one */
     { PMDA_PMID(0,25), PM_TYPE_DOUBLE, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
-/* double.ten */
+/* double.ten or dupnames.two.double.ten */
     { PMDA_PMID(0,26), PM_TYPE_DOUBLE, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
 /* double.hundred */
     { PMDA_PMID(0,27), PM_TYPE_DOUBLE, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
@@ -125,7 +126,7 @@ static pmDesc	desctab[] = {
     { PMDA_PMID(0,34), PM_TYPE_AGGREGATE, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
 /* aggregate.write_me */
     { PMDA_PMID(0,35), PM_TYPE_AGGREGATE, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
-/* write_me */
+/* write_me or dupnames.two.write_me or dupnames.three.write_me */
     { PMDA_PMID(0,36), PM_TYPE_32, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,-1,1,0,PM_TIME_SEC,PM_COUNT_ONE) },
 /* mirage */
     { PMDA_PMID(0,37), PM_TYPE_32, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(1,-1,0,PM_SPACE_KBYTE,PM_TIME_SEC,0) },
@@ -145,7 +146,7 @@ static pmDesc	desctab[] = {
     { PMDA_PMID(0,44), PM_TYPE_32, PM_INDOM_NULL, PM_SEM_COUNTER, PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) },
 /* percontext.xmit-pdu */
     { PMDA_PMID(0,45), PM_TYPE_32, PM_INDOM_NULL, PM_SEM_COUNTER, PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) },
-/* lights */
+/* lights or dupnames.two.lights */
     { PMDA_PMID(0,46), PM_TYPE_STRING, PM_INDOM_NULL, PM_SEM_DISCRETE, PMDA_PMUNITS(0,0,0,0,0,0) },
 /* magnitude */
     { PMDA_PMID(0,47), PM_TYPE_32, PM_INDOM_NULL, PM_SEM_DISCRETE, PMDA_PMUNITS(0,0,0,0,0,0) },
@@ -329,6 +330,12 @@ static pmDesc	desctab[] = {
     { PMDA_PMID(0,136), PM_TYPE_EVENT, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
 /* event.no_indom_records */
     { PMDA_PMID(0,137), PM_TYPE_EVENT, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
+/* bad.novalues */
+    { PMDA_PMID(0,138), PM_TYPE_32, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
+/* event.highres_records */
+    { PMDA_PMID(0,139), PM_TYPE_HIGHRES_EVENT, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
+/* event.reset */
+    { PMDA_PMID(0,140), PM_TYPE_32, PM_INDOM_NULL, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) },
 
 /*
  * dynamic PMNS ones
@@ -1082,7 +1089,7 @@ init_tables(int dom)
 	    case PMDA_PMID(0,92):	/* darkness */
 		dp->indom = indomtab[COLOUR_INDOM].it_indom;
 		break;
-	    case PMDA_PMID(0,6):	/* bin */
+	    case PMDA_PMID(0,6):	/* bin or dupnames.two.bin or dupnames.three.bin */
 	    case PMDA_PMID(0,48):	/* bucket */
 	    case PMDA_PMID(0,50):	/* part_bin */
 	    case PMDA_PMID(0,51):	/* bogus_bin */
@@ -1128,6 +1135,7 @@ init_tables(int dom)
 		dp->indom = indomtab[SCRAMBLE_INDOM].it_indom;
 		break;
 	    case PMDA_PMID(0,136):		/* event.records */
+	    case PMDA_PMID(0,139):		/* event.highres_records */
 		dp->indom = indomtab[EVENT_INDOM].it_indom;
 		break;
 	}
@@ -1151,8 +1159,8 @@ init_tables(int dom)
     pmidp->domain = dom;
 
     /* local hacks */
-    _string = (char *)malloc(3);
-    strcpy(_string, "13");
+    _string = (char *)calloc(1, 8);
+    strncpy(_string, "13", sizeof("13"));
     _aggr33 = (pmValueBlock *)malloc(PM_VAL_HDR_SIZE);
     _aggr33->vlen = PM_VAL_HDR_SIZE + 0;
     _aggr33->vtype = PM_TYPE_AGGREGATE;
@@ -1249,17 +1257,10 @@ sample_instance(pmInDom indom, int inst, char *name, __pmInResult **result, pmda
     else if (name == NULL) {
 	/* given an inst, return the name */
 	for (i = 0; i < idp->it_numinst; i++) {
-	    char	*p;
 	    if (inst == idp->it_set[i].i_inst) {
 		if ((res->namelist[0] = strdup(idp->it_set[i].i_name)) == NULL) {
 		    __pmFreeInResult(res);
 		    return -oserror();
-		}
-		for (p = res->namelist[0]; *p; p++) {
-		    if (*p == ' ') {
-			*p = '\0';
-			break;
-		    }
 		}
 		break;
 	    }
@@ -1513,17 +1514,7 @@ sample_attribute(int ctx, int attr, const char *value, int length, pmdaExt *pmda
      * going to log any connection attribute messages we happen to get
      * from pmcd (handy for demo and testing purposes).
      */
-    if (pmDebug & DBG_TRACE_AUTH) {
-	char buffer[256];
-
-	if (!__pmAttrStr_r(attr, value, buffer, sizeof(buffer))) {
-	    __pmNotifyErr(LOG_ERR, "Bad Attribute: ctx=%d, attr=%d\n", ctx, attr);
-	} else {
-	    buffer[sizeof(buffer)-1] = '\0';
-	    __pmNotifyErr(LOG_INFO, "Attribute: ctx=%d %s", ctx, buffer);
-	}
-    }
-    return 0;
+    return pmdaAttribute(ctx, attr, value, length, pmda);
 }
 
 /*
@@ -1627,6 +1618,8 @@ doit:
 	    else if (pmidp->cluster == 0 && pmidp->item == 54)
 		numval = PM_ERR_PMID;
 	    else if (pmidp->cluster == 0 && pmidp->item == 92)	/* darkness */
+		numval = 0;
+	    else if (pmidp->cluster == 0 && pmidp->item == 138)	/* bad.novalues */
 		numval = 0;
 	    else if (pmidp->cluster == 0 &&
 	             (pmidp->item == 127 ||	/* event.type */
@@ -1750,24 +1743,24 @@ doit:
 	     */
 	    if (pmidp->cluster == 0) {
 		switch (pmidp->item) {
-		    case 0:
+		    case 0:		/* control */
 			atom.l = _control;
 			break;
-		    case 1:
+		    case 1:		/* daemon_pid or sample.dupnames.daemon_pid or sample.dupnames.pid_daemon */
 			if (_mypid == 0) _mypid = (int)getpid();
 			atom.ul = _mypid;
 			break;
-		    case 2:
+		    case 2:		/* seconds or sample.dupnames.seconds */
 			atom.ul = time(NULL) - _start;
 			break;
-		    case 3:
+		    case 3:		/* milliseconds */
 			__pmtimevalNow(&now);
 			atom.d = 1000 * __pmtimevalSub(&now, &_then);
 			break;
-		    case 4:
+		    case 4:		/* load */
 			atom.l = 42;
 			break;
-		    case 5:
+		    case 5:		/* colour */
 			switch (inst) {
 			    case 0:		/* "red" */
 				_x = (_x + 1) % 100;
@@ -1783,7 +1776,7 @@ doit:
 				break;
 			}
 			break;
-		    case 6:
+		    case 6:		/* bin or dupnames.two.bin or dupnames.three.bin */
 		    case 48:
 		    case 50:
 		    case 51:
@@ -1814,8 +1807,7 @@ doit:
 		    case 114:
 			atom.d = inst;
 			break;
-		    case 7:
-			/* drift */
+		    case 7:		/* drift */
 			_drift = _drift + _sign * (int)(lrand48() % 50);
 			if (_drift < 0) _drift = 0;
 			atom.l = _drift;
@@ -1826,7 +1818,7 @@ doit:
 				_sign = 1;
 			}
 			break;
-		    case 63:	/* step_counter */
+		    case 63:		/* step_counter */
 		    case 8:		/* step every 30 seconds */
 			atom.l = (1 + (time(NULL) - _start) / 30) * _step;
 			break;
@@ -1907,7 +1899,7 @@ doit:
 			 */
 			type = PM_TYPE_AGGREGATE_STATIC;
 			break;
-		    case 46:
+		    case 46:		/* lights or dupnames.two.lights */
 			if (_n46 == 0) {
 			    _col46 = lrand48() % 3;
 			    _n46 = 1 + (int)(lrand48() % 10);
@@ -2007,7 +1999,7 @@ doit:
 		    case 15:		/* float.* group */
 			atom.f = 1;
 			break;
-		    case 16:
+		    case 16:		/* float.ten or dupnames.two.float.ten */
 			atom.f = 10;
 			break;
 		    case 17:
@@ -2022,7 +2014,7 @@ doit:
 		    case 25:		/* double.* group */
 			atom.d = 1;
 			break;
-		    case 26:
+		    case 26:		/* double.ten or dupnames.two.double.ten */
 			atom.d = 10;
 			break;
 		    case 27:
@@ -2322,9 +2314,15 @@ doit:
 			break;
 		    case 136:	/* event.records */
 		    case 137:	/* event.no_indom_records */
-			sts = sample_fetch_events(&atom.vbp, inst);
-			if (sts < 0)
+			if ((sts = sample_fetch_events(&atom.vbp, inst)) < 0)
 			    return sts;
+			break;
+		    case 139:	/* event.highres_records */
+			if ((sts = sample_fetch_highres_events(&atom.vbp, inst)) < 0)
+			    return sts;
+			break;
+		    case 140:	/* event.reset_highres */
+			atom.l = event_get_highres_fetch_count();
 			break;
 		    case 1000:	/* secret.bar */
 			atom.cp = "foo";
@@ -2486,9 +2484,36 @@ sample_store(pmResult *result, pmdaExt *ep)
 	/*
 	 * for this PMD, the metrics that support modification
 	 * via pmStore() mostly demand a single value, encoded in
-	 * the result structure as PM_VAL_INSITU format
+	 * the result structure as PM_VAL_INSITU format for 32-bit
+	 * ints, else a single value, encoded in the result structure
+	 * as NOT PM_VAL_INSITU for 64-bit ints.
 	 */
 	switch (pmidp->item) {
+
+	    case 0:	/* control */
+	    case 7:	/* drift */
+	    case 8:	/* step */
+	    case 14:	/* long.write_me */
+	    case 36:	/* write_me or dupnames.two.write_me or dupnames.three.write_me */
+	    case 41:	/* recv_pdu */
+	    case 42:	/* xmit_pdu */
+	    case 56:	/* not_ready */
+	    case 61:	/* dodgey.control */
+	    case 72:    /* const_rate.value */
+	    case 73:    /* const_rate.gradient */
+	    case 74:    /* error_code */
+	    case 79:    /* many.count */
+	    case 87:	/* dynamic.meta.pmdesc.type */
+	    case 88:	/* dynamic.meta.pmdesc.indom */
+	    case 89:	/* dynamic.meta.pmdesc.sem */
+	    case 90:	/* dynamic.meta.pmdesc.units */
+	    case 97:	/* ulong.write_me */
+	    case 126:	/* event.reset */
+	    case 140:	/* event.reset_highres */
+		if (vsp->numval != 1 || vsp->valfmt != PM_VAL_INSITU)
+		    sts = PM_ERR_CONV;
+		break;
+
 	    case 24:	/* longlong.write_me */
 	    case 29:	/* double.write_me */
 	    case 32:	/* string.write_me */
@@ -2499,25 +2524,21 @@ sample_store(pmResult *result, pmdaExt *ep)
 		    sts = PM_ERR_CONV;
 		break;
 
-	    case 74:    /* error_code */
-	    case 73:    /* const_rate.gradient */
-	    case 61:	/* dodgey.control */
-	    case 56:	/* not_ready */
-	    case 36:
-	    case 42:
-	    case 41:
-	    case 14:	/* long.write_me */
-	    case 8:	/* step */
-	    case 7:	/* drift */
-	    case 0:	/* control */
-	    case 79:    /* many.count */
-	    case 87:	/* dynamic.meta.pmdesc.type */
-	    case 88:	/* dynamic.meta.pmdesc.indom */
-	    case 89:	/* dynamic.meta.pmdesc.sem */
-	    case 90:	/* dynamic.meta.pmdesc.units */
-	    case 97:	/* ulong.write_me */
-	    case 126:	/* event.reset */
-		if (vsp->numval != 1 || vsp->valfmt != PM_VAL_INSITU)
+	    case 5:	/* colour */
+	    case 37:	/* mirage */
+		/*
+		 * number of values/instances does not matter ... reset
+		 * counter _x for a pmStore on _any_ instance
+		 */
+		if (vsp->valfmt != PM_VAL_INSITU)
+		    sts = PM_ERR_CONV;
+		break;
+	    case 38:	/* mirage_longlong */
+		/*
+		 * number of values/instances does not matter ... reset
+		 * counter _x for a pmStore on _any_ instance
+		 */
+		if (vsp->valfmt == PM_VAL_INSITU)
 		    sts = PM_ERR_CONV;
 		break;
 
@@ -2560,6 +2581,17 @@ sample_store(pmResult *result, pmdaExt *ep)
 			pmDebug = _control;
 			break;
 		}
+		break;
+	    /*
+	     * note: all 3 metrics below share the same underlying
+	     * global counter, _x
+	     */
+	    case 5:	/* colour */
+	    case 37:	/* mirage */
+		_x = av.l;
+		break;
+	    case 38:	/* mirage_longlong */
+		_x = av.ll;
 		break;
 	    case 7:	/* drift */
 		_drift = av.l;
@@ -2611,6 +2643,9 @@ sample_store(pmResult *result, pmdaExt *ep)
 		dodgey = av.l;
 		redo_dodgey();
 		break;
+	    case 72:	/* const_rate.value */
+		const_rate_value = av.ul;
+		break;
 	    case 73:	/* const_rate.gradient */
 		const_rate_gradient = av.ul;
 		break;
@@ -2651,6 +2686,9 @@ sample_store(pmResult *result, pmdaExt *ep)
 		break;
 	    case 126:	/* event.reset */
 		event_set_fetch_count(av.l);
+		break;
+	    case 140:	/* event.reset_highres */
+		event_set_highres_fetch_count(av.l);
 		break;
 	    default:
 		sts = PM_ERR_PERMISSION;

@@ -30,7 +30,7 @@ static pmLongOptions longopts[] = {
     { "header", 0, 'H', 0, "print one-line header at start showing each column" },
     { "mintime", 0, 'i', 0, "also print timestamp for minimum value" },
     { "maxtime", 0, 'I', 0, "also print timestamp for maximum value" },
-    { "label", 0, 'l', 0, "also print the archive label" },
+    { "label", 0, 'l', 0, "also print the archive label and time window" },
     { "minimum", 0, 'm', 0, "also print minimum value" },
     { "maximum", 0, 'M', 0, "also print maximum value" },
     PMOPT_NAMESPACE,
@@ -118,12 +118,7 @@ tsub(struct timeval *a, struct timeval *b)
 {
     if ((a == NULL) || (b == NULL))
 	return -1;
-    a->tv_usec -= b->tv_usec;
-    if (a->tv_usec < 0) {
-	a->tv_usec += 1000000;
-	a->tv_sec--;
-    }
-    a->tv_sec -= b->tv_sec;
+    __pmtimevalDec(a, b);
     if (a->tv_sec < 0) {
 	/* clip negative values at zero */
 	a->tv_sec = 0;
@@ -137,19 +132,8 @@ tadd(struct timeval *a, struct timeval *b)
 {
     if ((a == NULL) || (b == NULL))
 	return -1;
-    a->tv_usec += b->tv_usec;
-    if (a->tv_usec > 1000000) {
-	a->tv_usec -= 1000000;
-	a->tv_sec++;
-    }
-    a->tv_sec += b->tv_sec;
+    __pmtimevalInc(a, b);
     return 0;
-}
-
-static double
-tosec(struct timeval t)
-{
-    return t.tv_sec + (t.tv_usec / 1000000.0);
 }
 
 static void
@@ -157,17 +141,18 @@ pmiderr(pmID pmid, const char *msg, ...)
 {
     if (warnflag && __pmHashSearch(pmid, &errlist) == NULL) {
 	va_list	arg;
-	char	*mname = NULL;
-	static char *unknown = "(cannot find metric name) ";
+	int	numnames;
+	char	**names;
 
-	pmNameID(pmid, &mname);
-	if (!mname) mname = unknown;
-	fprintf(stderr, "%s: %s(%s) - ", pmProgname, mname, pmIDStr(pmid));
+	numnames = pmNameAll(pmid, &names);
+	fprintf(stderr, "%s: ", pmProgname);
+	__pmPrintMetricNames(stderr, numnames, names, " or ");
+	fprintf(stderr, "(%s) - ", pmIDStr(pmid));
 	va_start(arg, msg);
 	vfprintf(stderr, msg, arg);
 	va_end(arg);
 	__pmHashAdd(pmid, NULL, &errlist);
-	if (mname && mname != unknown) free(mname);
+	if (numnames > 0) free(names);
     }
 }
 
@@ -209,11 +194,11 @@ printlabel(void)
     printf("Log Label (Log Format Version %d)\n", label.ll_magic & 0xff);
     printf("Performance metrics from host %s\n", label.ll_hostname);
 
-    ddmm = pmCtime(&label.ll_start.tv_sec, timebuf);
+    ddmm = pmCtime(&opts.start.tv_sec, timebuf);
     ddmm[10] = '\0';
     yr = &ddmm[20];
     printf("  commencing %s ", ddmm);
-    __pmPrintStamp(stdout, &label.ll_start);
+    __pmPrintStamp(stdout, &opts.start);
     printf(" %4.4s\n", yr);
 
     if (opts.finish.tv_sec == INT_MAX) {
@@ -292,13 +277,13 @@ printsummary(const char *name)
 		tsub(&timediff, &instdata->lasttime);
 		val = instdata->lastval;
 		instdata->stocave += val;
-		instdata->timeave += val*tosec(timediff);
+		instdata->timeave += val*__pmtimevalToReal(&timediff);
 		instdata->lasttime = opts.finish;
 		instdata->count++;
 	    }
 	    metrictimespan = instdata->lasttime;
 	    tsub(&metrictimespan, &instdata->firsttime);
-	    metricspan = tosec(metrictimespan);
+	    metricspan = __pmtimevalToReal(&metrictimespan);
 	    /* counter metric doesn't cover 90% of log */
 	    star = (avedata->desc.sem == PM_SEM_COUNTER && metricspan / logspan <= 0.1);
 
@@ -478,11 +463,13 @@ newHashInst(pmValue *vp,
     avedata->listsize++;
 #ifdef PCP_DEBUG
     if (pmDebug & DBG_TRACE_APPL0) {
-	char	*name = NULL;
-	pmNameID(avedata->desc.pmid, &name);
-	fprintf(stderr, "%s Initially - min/max=%f/%f\n", name,
+	int	numnames;
+	char	**names;
+	numnames = pmNameAll(avedata->desc.pmid, &names);
+	__pmPrintMetricNames(stderr, numnames, names, " or ");
+	fprintf(stderr, " Initially - min/max=%f/%f\n",
 		instdata->min, instdata->max);
-	if (name) free(name);
+	if (numnames > 0) free(names);
     }
 #endif
 }
@@ -542,12 +529,14 @@ findbin(pmID pmid, double val, double min, double max)
 
 #ifdef PCP_DEBUG
     if (pmDebug & DBG_TRACE_APPL0) {
-	char *mname = NULL;
-	pmNameID(pmid, &mname);
-	fprintf(stderr, "%s selected bin %u/%u (val=%.*f, min=%.*f, max=%.*f)\n",
-		mname, index, nbins, (int)precision, val, (int)precision,
+	int	numnames;
+	char	**names;
+	numnames = pmNameAll(pmid, &names);
+	__pmPrintMetricNames(stderr, numnames, names, " or ");
+	fprintf(stderr, " selected bin %u/%u (val=%.*f, min=%.*f, max=%.*f)\n",
+		index, nbins, (int)precision, val, (int)precision,
 		min, (int)precision, max);
-	if (mname) free(mname);
+	if (numnames > 0) free(names);
 	if (index >= nbins) exit(1);
     }
 #endif
@@ -585,7 +574,7 @@ markrecord(pmResult *result)
 		    tsub(&timediff, &instdata->lasttime);
 		    val = instdata->lastval;
 		    instdata->stocave += val;
-		    instdata->timeave += val*tosec(timediff);
+		    instdata->timeave += val*__pmtimevalToReal(&timediff);
 		    instdata->lasttime = result->timestamp;
 		    instdata->count++;
 		}
@@ -683,7 +672,7 @@ calcbinning(pmResult *result)
 
 		timediff = result->timestamp;
 		tsub(&timediff, &instdata->lasttime);
-		diff = tosec(timediff);
+		diff = __pmtimevalToReal(&timediff);
 		wrap = 0;
 		if (avedata->desc.sem == PM_SEM_COUNTER) {
 		    diff *= avedata->scale;
@@ -820,7 +809,7 @@ calcaverage(pmResult *result)
 		    continue;
 		timediff = result->timestamp;
 		tsub(&timediff, &instdata->lasttime);
-		diff = tosec(timediff);
+		diff = __pmtimevalToReal(&timediff);
 		wrap = 0;
 		if (avedata->desc.sem == PM_SEM_COUNTER) {
 		    diff *= avedata->scale;
@@ -831,11 +820,13 @@ calcaverage(pmResult *result)
 			val = unwrap(av.d, instdata->lastval, avedata->desc.type);
 #ifdef PCP_DEBUG
 		    if (pmDebug & DBG_TRACE_APPL0) {
-			char	*name = NULL;
-			pmNameID(avedata->desc.pmid, &name);
-			fprintf(stderr, "%s base value is %f, count %d\n",
-				name, val, instdata->count+1);
-			if (name) free(name);
+			int	numnames;
+			char	**names;
+			numnames = pmNameAll(avedata->desc.pmid, &names);
+			__pmPrintMetricNames(stderr, numnames, names, " or ");
+			fprintf(stderr, " base value is %f, count %d\n",
+				val, instdata->count+1);
+			if (numnames > 0) free(names);
 		    }
 #endif
 		    if (instdata->marked || val < instdata->lastval) {
@@ -843,10 +834,12 @@ calcaverage(pmResult *result)
 			/* the first one, and counter not monotonic increasing */
 #ifdef PCP_DEBUG
 			if (pmDebug & DBG_TRACE_APPL1) {
-			    char	*name = NULL;
-			    pmNameID(avedata->desc.pmid, &name);
-			    fprintf(stderr, "%s counter wrapped or <mark>\n", name);
-			    if (name) free(name);
+			    int	numnames;
+			    char	**names;
+			    numnames = pmNameAll(avedata->desc.pmid, &names);
+			    __pmPrintMetricNames(stderr, numnames, names, " or ");
+			    fprintf(stderr, " counter wrapped or <mark>\n");
+			    if (numnames > 0) free(names);
 			}
 #endif
 			wrap = 1;
@@ -872,28 +865,31 @@ calcaverage(pmResult *result)
 			else {
 #ifdef PCP_DEBUG
 			    if (pmDebug & DBG_TRACE_APPL2) {
-				char	*name = NULL;
+				int	numnames;
+				char	**names;
 				char	*istr = NULL;
 
-				pmNameID(avedata->desc.pmid, &name);
+				numnames = pmNameAll(avedata->desc.pmid, &names);
 				if (pmNameInDom(avedata->desc.indom,
 				    instdata->inst, &istr) < 0)
 				    istr = NULL;
 				if (rate < instdata->min) {
-				    fprintf(stderr, "new min value for %s "
-						    "(inst[%s]: %f) at ",
-					name, (istr == NULL ? "":istr), rate);
+				    fprintf(stderr, "new min value for ");
+				    __pmPrintMetricNames(stderr, numnames, names, " or ");
+				    fprintf(stderr, " (inst[%s]: %f) at ",
+					(istr == NULL ? "":istr), rate);
 				    __pmPrintStamp(stderr, &result->timestamp);
 				    fprintf(stderr, "\n");
 				}
 				if (rate > instdata->max) {
-				    fprintf(stderr, "new max value for %s "
-						    "(inst[%s]: %f) at ",
-					name, (istr == NULL ? "":istr), rate);
+				    fprintf(stderr, "new max value for ");
+				    __pmPrintMetricNames(stderr, numnames, names, " or ");
+				    fprintf(stderr, " (inst[%s]: %f) at ",
+					(istr == NULL ? "":istr), rate);
 				    __pmPrintStamp(stderr, &result->timestamp);
 				    fprintf(stderr, "\n");
 				}
-				if (name) free(name);
+				if (numnames > 0) free(names);
 				if (istr) free(istr);
 			    }
 #endif
@@ -935,37 +931,39 @@ calcaverage(pmResult *result)
 #ifdef PCP_DEBUG
 		    if ((pmDebug & DBG_TRACE_APPL1) &&
 			(avedata->desc.sem != PM_SEM_COUNTER || instdata->count > 0)) {
-			char	*name = NULL;
+			int	numnames;
+			char	**names;
 			double	metricspan = 0.0;
 			struct timeval	metrictimespan;
 
 			metrictimespan = result->timestamp;
 			tsub(&metrictimespan, &instdata->firsttime);
-			metricspan = tosec(metrictimespan);
-			pmNameID(avedata->desc.pmid, &name);
+			metricspan = __pmtimevalToReal(&metrictimespan);
+			numnames = pmNameAll(avedata->desc.pmid, &names);
+			fprintf(stderr, "++ ");
+			__pmPrintMetricNames(stderr, numnames, names, " or ");
 
 			if (avedata->desc.sem == PM_SEM_COUNTER) {
-			    fprintf(stderr, "++ %s timedelta=%f count=%d\n"
+			    fprintf(stderr, " timedelta=%f count=%d\n"
 					    "sum=%f min=%f max=%f stocsum=%f\n"
 					    "rate=%f timesum=%f (+%f) timespan=%f\n",
-				    name, diff, instdata->count, instdata->sum,
+				    diff, instdata->count, instdata->sum,
 				    instdata->min, instdata->max,
 				    instdata->stocave, rate, instdata->timeave,
 				    diff * (val - instdata->lastval) / 2,
 				    metricspan);
 			}
 			else {	/* non-counters */
-			    fprintf(stderr, "++ %s timedelta=%f count=%d\n"
+			    fprintf(stderr, " timedelta=%f count=%d\n"
 					    "sum=%f min=%f max=%f stocsum=%f\n"
 					    "lastval=%f timesum=%f (+%f) timespan=%f\n",
-				    name, diff, instdata->count, instdata->sum,
+				    diff, instdata->count, instdata->sum,
 				    instdata->min, instdata->max,
 				    instdata->stocave, instdata->lastval,
 				    instdata->timeave, instdata->lastval*diff,
 				    metricspan);
 			}
-			if (name)
-			    free(name);
+			if (numnames > 0) free(names);
 		    }
 #endif
 		}
@@ -1085,7 +1083,7 @@ main(int argc, char *argv[])
 	}
     }
 
-    if (opts.optind >= argc) {
+    if (!opts.errors && opts.optind >= argc) {
 	pmprintf("Error: no archive specified\n\n");
 	opts.errors++;
     }
@@ -1119,7 +1117,7 @@ main(int argc, char *argv[])
     if (lflag)
 	printlabel();
 
-    logspan = tosec(opts.finish) - tosec(opts.start);
+    logspan = __pmtimevalToReal(&opts.finish) - __pmtimevalToReal(&opts.start);
 
     /* check which timestamp print format we should be using */
     timespan = opts.finish;

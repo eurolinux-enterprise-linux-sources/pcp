@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2012 Red Hat.
+# Copyright (c) 2012,2014 Red Hat.
 # Copyright (c) 2009-2010 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
 #
 # This program is free software; you can redistribute it and/or modify it
@@ -211,56 +211,5 @@ $pmda->add_indom($postfix_sent_indom, \@postfix_sent_dom, '', '');
 $pmda->add_indom($postfix_received_indom, \@postfix_received_dom, '', '');
 $pmda->add_tail($logfile, \&postfix_log_parser, 0);
 $pmda->set_fetch_callback(\&postfix_fetch_callback);
-$pmda->set_user('pcp');
+$pmda->set_user('postfix');
 $pmda->run;
-
-=pod
-
-=head1 NAME
-
-pmdapostfix - Postfix performance metrics domain agent (PMDA)
-
-=head1 DESCRIPTION
-
-B<pmdapostfix> is a Performance Metrics Domain Agent (PMDA) which exports
-mail queue sizes as reported by qshape(1), as well as aggregate statistics
-collected from mail.log.
-
-=head1 INSTALLATION
-
-If you want access to the names and values for the Postfix performance
-metrics, do the following as root:
-
-    # cd $PCP_PMDAS_DIR/postfix
-    # ./Install
-
-If you want to undo the installation, do the following as root:
-
-    # cd $PCP_PMDAS_DIR/postfix
-    # ./Remove
-
-B<pmdapostfix> is launched by pmcd(1) and should never be executed
-directly.  The Install and Remove scripts notify pmcd(1) when
-the agent is installed or removed.
-
-=head1 FILES
-
-=over
-
-=item $PCP_PMDAS_DIR/postfix/Install
-
-installation script for the B<pmdapostfix> agent
-
-=item $PCP_PMDAS_DIR/postfix/Remove
-
-undo installation script for the B<pmdapostfix> agent
-
-=item $PCP_LOG_DIR/pmcd/postfix.log
-
-default log file for error messages from B<pmdapostfix>
-
-=back
-
-=head1 SEE ALSO
-
-pmcd(1) and qshape(1).

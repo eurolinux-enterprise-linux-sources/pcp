@@ -3,13 +3,6 @@
 # Run test builds on one or more PCP machines
 #
 
-tmp=/var/tmp/$$
-sts=0
-trap "rm -f $tmp.*; exit \$sts" 0 1 2 3 15
-
-list_1="vm03 vm01 vm04 vm07 vm12 vm14 vm16 vm18 vm20 vm22 vm24"
-list_2="fuji grundy vm02 vm00 vm05 vm11 vm15 vm19 vm21 vm23"
-
 _usage()
 {
     echo >&2 "Usage: `basename $0` [options] vm ..."
@@ -17,6 +10,7 @@ _usage()
     echo >&2 "  -a          all except shutdown VM [implies -pmiqh]"
     echo >&2 "  -b branch   pcp branch to checkout [default $pcp_branch]"
     echo >&2 "  -c          check git repositories"
+    echo >&2 "  -d          output debugging diagnostics"
     echo >&2 "  -e file     prerun script"
     echo >&2 "  -f          force shutdown"
     echo >&2 "  -g what     QA tests or groups to run, e.g. -g \"123 -g sanity -x remote\""
@@ -41,268 +35,21 @@ _usage()
     echo >&2 "[both vmlists run in parallel for the default case without -S]"
 }
 
-args="$*"
-pcp_branch=dev
-pcp_tree=pcp
-cflag=false
-fflag=false
-hflag=false
-iflag=false
-mflag=false
-pflag=false
-qflag=false
-rflag=false
-what="-g sanity -g libpcp -g pdu -g pmda -g valgrind -g pmie"
-what=all
-sflag=false
-Sflag=false
-options=false
-work=false
-efile=''
-while getopts "ab:B:ce:fg:himpqrsSt:T:?" c
-do
-    case $c
-    in
-	a)
-	    options=true
-	    work=true
-	    pflag=true
-	    mflag=true
-	    iflag=true
-	    qflag=true
-	    hflag=true
-	    ;;
-	b)
-	    pcp_branch="$OPTARG"
-	    ;;
-	c)
-	    options=true
-	    work=true
-	    cflag=true
-	    ;;
-	e)
-	    efile="$OPTARG"
-	    if [ -f "$efile" ]
-	    then
-		:
-	    else
-		echo "Error: $efile: cannot be found"
-		sts=1
-		exit
-	    fi
-	    ;;
-	f)
-	    fflag=true
-	    ;;
-	g)
-	    what="$OPTARG"
-	    ;;
-	h)
-	    options=true
-	    work=true
-	    hflag=true
-	    ;;
-	i)
-	    options=true
-	    work=true
-	    iflag=true
-	    ;;
-	m)
-	    options=true
-	    work=true
-	    mflag=true
-	    ;;
-	p)
-	    options=true
-	    work=true
-	    pflag=true
-	    ;;
-	q)
-	    options=true
-	    work=true
-	    qflag=true
-	    ;;
-	r)
-	    options=true
-	    work=true
-	    rflag=true
-	    ;;
-	s)
-	    options=true
-	    sflag=true
-	    ;;
-	S)
-	    Sflag=true
-	    ;;
-	t)
-	    pcp_tree="$OPTARG"
-	    ;;
-	?)
-	    _usage
-	    sts=1
-	    exit
-	    ;;
-    esac
-done
-shift `expr $OPTIND - 1`
-
-if [ $# -eq 0 ]
-then
-    if $Sflag
-    then
-	# serial run
-	set -- $list_1 $list_2
-    else
-	# run in parallel
-	set -- $list_1
-	pcp-daily $args $list_2 &
-    fi
-fi
-
-if $options
-then
-    :
-else
-    # defaults
-    #
-    work=true
-    pflag=true
-    mflag=true
-    iflag=true
-    qflag=true
-    hflag=true
-    sflag=true
-fi
-
-today=`date +%Y-%m-%d`
-mkdir -p $HOME/Logs/by-date/$today
-
-rm -f $tmp.domains
-echo "bozo" >>$tmp.domains
-echo "bozo-vm" >>$tmp.domains
-echo "bozo-laptop" >>$tmp.domains
-echo "fuji" >>$tmp.domains
-echo "grundy.sgi.com" >>$tmp.domains
-if which virsh >/dev/null 2>&1
-then
-    virsh list --all \
-    | sed >>$tmp.domains \
-        -e 1d \
-        -e '/-----/d' \
-        -e 's/^  *//' \
-        -e 's/^[0-9][0-9]*[ 	]*//' \
-        -e 's/^-[ 	]*//' \
-	-e 's/[    ].*//' \
-        -e '/^$/d'
-fi
-
-for target
-do
-    grep "^$target" <$tmp.domains >$tmp.domain
-    if [ ! -s $tmp.domain ]
-    then
-	echo "No domain matches \"$target\" ... the domains I have are ..."
-	cat $tmp.domains
-	continue
-    fi
-    count=`wc -l <$tmp.domain | sed -e 's/ //g'`
-    if [ $count != 1 ]
-    then
-	echo "More than one domain matches \"$target\" ... the matches I have are ..."
-	cat $tmp.domain
-	continue
-    fi
-    domain=`cat $tmp.domain`
-    host=`echo $domain | sed -e '/^vm/s/-.*//'`
-    echo "::: $domain :::"
-    # per-host settings
-    # MAKE=gmake for *BSD hosts
-    #
-    MAKE=make
-    case "$domain"
-    in
-	*freebsd*|*netbsd*)
-	    MAKE=gmake
-	    ;;
-    esac
-
-    if which virsh >/dev/null 2>&1
-    then
-	state=`virsh list --all | grep "$domain" | awk '{print $3}'`
-	case "$state"
-	in
-	    shut)
-		if $work
-		then
-		    sudo virsh start $domain
-		    state=running
-		fi
-		;;
-	    running)
-		;;
-	    paused)
-		if $work
-		then
-		    sudo virsh resume $domain
-		    state=running
-		fi
-		;;
-	    '')
-		# probably not a VM, like "fuji"
-		;;
-	    *)
-		echo "No clue what do with virsh state \"$state\""
-		continue
-		;;
-	esac
-    fi
-
-    if $work
-    then
-	log=$HOME/Logs/by-date/$today/$domain
-	touch $log
-	mkdir -p $HOME/Logs/by-vm/$domain
-	if [ ! -L $HOME/Logs/by-vm/$domain/$today ]
-	then
-	    ( cd $HOME/Logs/by-vm/$domain; ln -s ../../by-date/$today/$domain $today )
-	fi
-
-	rm -f $tmp.up
-	wait=0
-	delta=5
-	max_wait=300
-	while [ $wait -lt $max_wait ]
-	do
-	    # if ping -c 1 $host >/dev/null 2>&1
-	    # then
-		if ssh $host true
-		then
-		    #debug# echo host up
-		    touch $tmp.up
-		    break
-		fi
-	    # else
-		#debug# echo host down
-		# :
-	    # fi
-	    sleep $delta
-	    wait=`expr $wait + $delta`
-	done
-	if [ ! -f $tmp.up ]
-	then
-	    echo "Failed to start VM domain $domain after $max_wait secs ... giving up"
-	    continue
-	fi
-
-	cat >$tmp.script <<End-of-File
+_script_header()
+{
+    cat <<End-of-File
 #!/bin/sh
 #
 # PCP Build Script from pcp-daily on `date`
 #
 
 [ -f \$HOME/.dailyrc ] && . \$HOME/.dailyrc
-#debug# echo PATH=\$PATH
-#debug# which ${MAKE:-make}
+if [ $debug = true ]
+then
+    echo PATH=\$PATH
+    echo MAKE=\$MAKE
+    which ${MAKE:-make}
+fi
 
 tmp=/var/tmp/\$\$
 trap "rm -f \$tmp.*; exit 0" 0 1 2 3 15
@@ -318,22 +65,22 @@ in
 	    echo "Info: clone $pcp_tree git tree" | tee -a \$HOME/daily.log
 	fi
 	;;
-    secure-pcp)
-	if [ ! -d src/secure-pcp ]
+    *)
+	if [ ! -d src/$pcp_tree ]
 	then
-	    git clone ssh://bozo/home/kenj/git/${pcp_tree}.git src/secure-pcp
-	    echo "Info: clone $pcp_tree-pcp git tree" | tee -a \$HOME/daily.log
+	    git clone ssh://bozo/home/kenj/src/${pcp_tree} src/$pcp_tree
+	    echo "Info: clone $pcp_tree git tree" | tee -a \$HOME/daily.log
 	fi
 	;;
 esac
 
 cd src/$pcp_tree
 End-of-File
-	if [ -n "$efile" ]
-	then
-	    cat $efile >>$tmp.script
-	fi
-	cat >>$tmp.script <<End-of-File
+}
+
+_script_git()
+{
+    cat <<End-of-File
 git branch -a >\$tmp.branch
 if grep " $pcp_branch\$" <\$tmp.branch >/dev/null
 then
@@ -349,8 +96,11 @@ else
     fi
 fi
 End-of-File
+}
 
-	$cflag && cat >>$tmp.script <<End-of-File
+_script_git_check()
+{
+    cat <<End-of-File
 git status -s | grep 'M ' >\$tmp.status
 if [ -s \$tmp.status ]
 then
@@ -360,14 +110,18 @@ else
     echo "Info: No modified pcp files" | tee -a \$HOME/daily.log
 fi
 End-of-File
+}
 
-	$pflag && cat >>$tmp.script <<End-of-File
+_script_git_pull()
+{
+    cat <<End-of-File
 # need to clean before pulling in case unwanted files no longer removed,
 # e.g. in PCP 3.x -> PCP 4.0 migration of source base
 # not needed any longer - 26 Mar 2013
 #${MAKE:-make} clean >>\$HOME/daily.log 2>&1
 # only VERSION.pcp is expected to be modified, sometimes!
-git checkout -f VERSION.pcp
+rm -f VERSION.pcp
+git checkout -- VERSION.pcp
 if git checkout $pcp_branch >>\$HOME/daily.log 2>&1
 then
     echo "Info: pcp git checkout $pcp_branch" | tee -a \$HOME/daily.log
@@ -383,11 +137,13 @@ else
     exit 1
 fi
 End-of-File
+}
 
-	if $mflag
-	then
-	    echo "${MAKE:-make} clean >>\$HOME/daily.log 2>&1" >>$tmp.script
-	    cat >>$tmp.script <<'End-of-File'
+_script_make()
+{
+    # not needed - 4 Oct 2014
+    # echo "${MAKE:-make} clean >>\$HOME/daily.log 2>&1"
+    cat <<'End-of-File'
 ok=false
 # if needed, bump build number for pcp-daily
 if [ ! -f VERSION.pcp.daily ]
@@ -416,8 +172,8 @@ sudo rm -f /usr/lib*/libpcp[_.]*
 # clean up any build turds
 rm -f qa/qa_outfiles
 End-of-File
-	    echo "if MAKE=$MAKE ./Makepkgs --clean >>\$HOME/daily.log 2>&1" >>$tmp.script
-	    cat >>$tmp.script <<'End-of-File'
+    echo "if MAKE=$MAKE ./Makepkgs --clean >>\$HOME/daily.log 2>&1"
+    cat <<'End-of-File'
 then
     ok=true
 else
@@ -430,12 +186,14 @@ else
     else
 	echo "Error: Makepkgs failed!" | tee -a $HOME/daily.log
 	# restore build number
-	git checkout -f VERSION.pcp
+	rm -f VERSION.pcp
+	git checkout -- VERSION.pcp
 	exit 1
     fi
 fi
 # restore build number
-git checkout -f VERSION.pcp
+rm -f VERSION.pcp
+git checkout -- VERSION.pcp
 # Look for errors/warnings in the build logs ...
 #
 for log in Logs/*
@@ -459,9 +217,11 @@ then
 fi
 $ok && echo "Info: Makepkgs" | tee -a $HOME/daily.log
 End-of-File
-	fi
+}
 
-	$iflag && cat >>$tmp.script <<'End-of-File'
+_script_install()
+{
+    cat <<'End-of-File'
 # extract buildversion
 . ./VERSION.pcp
 if [ -z "$PACKAGE_MAJOR" -o -z "$PACKAGE_MINOR" -o -z "$PACKAGE_REVISION" ]
@@ -472,10 +232,11 @@ then
     exit 1
 fi
 buildversion=$PACKAGE_MAJOR.$PACKAGE_MINOR.$PACKAGE_REVISION
-# find lsm ... in pcp-$buildversion for most build types, but in . for debian
+# find lsm ... in pcp-$buildversion for most build types, but in 
+# build/deb/pcp-$buildversion for debian
 lsm=''
-[ -f pcp.lsm ] && lsm=pcp.lsm
 [ -f pcp-$buildversion/pcp.lsm ] && lsm=pcp-$buildversion/pcp.lsm
+[ -f build/deb/pcp-$buildversion/pcp.lsm ] && lsm=build/deb/pcp-$buildversion/pcp.lsm
 if [ -z "$lsm" ]
 then
     ls -l pcp.lsm* pcp-$buildversion/pcp.lsm* | tee -a $HOME/daily.log
@@ -603,10 +364,12 @@ then
     : pmcd started above
 else
     . /etc/pcp.env
-    if sudo $PCP_RC_DIR/pcp start >>$HOME/daily.log 2>&1
+    if sudo $PCP_RC_DIR/pcp start >$tmp.out 2>&1
     then
+	cat $tmp.out >>$HOME/daily.log
 	echo "Info: pmcd started" | tee -a $HOME/daily.log
     else
+	cat $tmp.out >>$HOME/daily.log
 	echo "Error: pmcd start failed" | tee -a $HOME/daily.log
 	exit 1
     fi
@@ -620,26 +383,14 @@ then
     echo "Error: version mismatch src=$src_version running=$running_version" | tee -a $HOME/daily.log
     exit 1
 fi
+# sample PMDA may have an updated PMNS, so re-install just in case
+( cd $PCP_VAR_DIR/pmdas/sample; sudo ./Install </dev/null ) >>$HOME/daily.log
 End-of-File
+}
 
-	cat >>$tmp.script <<End-of-File
-
-cd qa
-End-of-File
-
-	check_what="$what"
-	[ X"$what" = Xall ] && check_what=''
-	# Need to add
-	# -x remote default for grundy.sgi.com if running all tests
-	#
-	case "$domain"
-	in
-	    *grundy*)
-		[ X"$what" = Xall ] && check_what='$check_what -x remote'
-		;;
-	esac
-
-	$qflag && cat >>$tmp.script <<End-of-File
+_script_qa()
+{
+    cat <<End-of-File
 rm -f *.out.bad
 ./changeversion >/dev/null 2>&1
 if ./check -l $check_what >>\$HOME/daily.log 2>&1
@@ -656,8 +407,11 @@ NF == 0	{ txt = ""; next }
 END	{ print txt }' | tee -a \$HOME/daily.log
 fi
 End-of-File
+}
 
-	$rflag && cat >>$tmp.script <<End-of-File
+_script_qa_rerun()
+{
+    cat <<End-of-File
 if ./recheck >>\$HOME/daily.log 2>&1
 then
     echo "Info: QA recheck" | tee -a \$HOME/daily.log
@@ -665,8 +419,11 @@ else
     echo "Error: QA recheck failed!" | tee -a \$HOME/daily.log
 fi
 End-of-File
+}
 
-	$hflag && cat >>$tmp.script <<End-of-File
+_script_harvest()
+{
+    cat <<End-of-File
 rm -f \$HOME/daily.harvest
 touch \$HOME/daily.harvest
 nbad=0
@@ -687,6 +444,348 @@ done
 [ -s \$HOME/daily.harvest ] && cat \$HOME/daily.harvest >>\$HOME/daily.log
 echo "Info: harvest \$nbad *.bad files, \$nfull *.full files" | tee -a \$HOME/daily.log
 End-of-File
+}
+
+# Mainline starts here ...
+#
+
+tmp=/var/tmp/$$
+sts=0
+trap "rm -f $tmp.*; exit \$sts" 0 1 2 3 15
+
+list_1="vm03 vm01 vm04 vm07 vm12 vm14 vm16 vm18 vm20 vm22 vm24"
+list_2="fuji grundy vm02 vm00 vm05 vm11 vm15 vm19 vm21 vm23"
+
+args="$*"
+pcp_branch=dev
+pcp_tree=pcp
+cflag=false
+fflag=false
+hflag=false
+iflag=false
+mflag=false
+pflag=false
+qflag=false
+rflag=false
+what="-g sanity -g libpcp -g pdu -g pmda -g valgrind -g pmie"
+what=all
+sflag=false
+Sflag=false
+options=false
+work=false
+efile=''
+debug=false
+while getopts "ab:B:cde:fg:himpqrsSt:T:?" c
+do
+    case $c
+    in
+	a)
+	    options=true
+	    work=true
+	    pflag=true
+	    mflag=true
+	    iflag=true
+	    qflag=true
+	    hflag=true
+	    ;;
+	b)
+	    pcp_branch="$OPTARG"
+	    ;;
+	c)
+	    options=true
+	    work=true
+	    cflag=true
+	    ;;
+	d)
+	    debug=true
+	    ;;
+	e)
+	    efile="$OPTARG"
+	    if [ -f "$efile" ]
+	    then
+		:
+	    else
+		echo "Error: $efile: cannot be found"
+		sts=1
+		exit
+	    fi
+	    ;;
+	f)
+	    fflag=true
+	    ;;
+	g)
+	    what="$OPTARG"
+	    ;;
+	h)
+	    options=true
+	    work=true
+	    hflag=true
+	    ;;
+	i)
+	    options=true
+	    work=true
+	    iflag=true
+	    ;;
+	m)
+	    options=true
+	    work=true
+	    mflag=true
+	    ;;
+	p)
+	    options=true
+	    work=true
+	    pflag=true
+	    ;;
+	q)
+	    options=true
+	    work=true
+	    qflag=true
+	    ;;
+	r)
+	    options=true
+	    work=true
+	    rflag=true
+	    ;;
+	s)
+	    options=true
+	    sflag=true
+	    ;;
+	S)
+	    Sflag=true
+	    ;;
+	t)
+	    pcp_tree="$OPTARG"
+	    ;;
+	?)
+	    _usage
+	    sts=1
+	    exit
+	    ;;
+    esac
+done
+shift `expr $OPTIND - 1`
+
+if [ $# -eq 0 ]
+then
+    if $Sflag
+    then
+	# serial run
+	set -- $list_1 $list_2
+    else
+	# run in parallel
+	set -- $list_1
+	pcp-daily $args $list_2 &
+    fi
+fi
+
+if $options
+then
+    :
+else
+    # defaults
+    #
+    work=true
+    pflag=true
+    mflag=true
+    iflag=true
+    qflag=true
+    hflag=true
+    sflag=true
+fi
+
+today=`date +%Y-%m-%d`
+mkdir -p $HOME/Logs/by-date/$today
+
+rm -f $tmp.domains
+
+# some driver host specific things ...
+#
+case `hostname`
+in
+    bozo)
+	echo "bozo" >>$tmp.domains
+	echo "bozo-vm" >>$tmp.domains
+	echo "bozo-laptop" >>$tmp.domains
+	echo "fuji" >>$tmp.domains
+	echo "grundy.sgi.com" >>$tmp.domains
+	# and open up the X server
+	#
+	DISPLAY=localhost:0.0 xhost + >/dev/null
+	;;
+esac
+
+if which virsh >/dev/null 2>&1
+then
+    virsh list --all \
+    | sed >>$tmp.domains \
+        -e 1d \
+        -e '/-----/d' \
+        -e 's/^  *//' \
+        -e 's/^[0-9][0-9]*[ 	]*//' \
+        -e 's/^-[ 	]*//' \
+	-e 's/[    ].*//' \
+        -e '/^$/d'
+fi
+
+for target
+do
+    grep "^$target" <$tmp.domains >$tmp.domain
+    if [ ! -s $tmp.domain ]
+    then
+	echo "No domain matches \"$target\" ... the domains I have are ..."
+	cat $tmp.domains
+	continue
+    fi
+    count=`wc -l <$tmp.domain | sed -e 's/ //g'`
+    if [ $count != 1 ]
+    then
+	echo "Warning: More than one domain matches \"$target\" ... the matches I have are ..."
+	cat $tmp.domain
+	echo "... using the first one."
+    fi
+    domain=`sed -e 1q $tmp.domain`
+    # used to be vmNN-osname&version, but now just vmMM ...
+    # old sed now does nothing
+    #
+    host=`echo $domain | sed -e '/^vm/s/-.*//'`
+    echo "::: $domain :::"
+
+    if which virsh >/dev/null 2>&1
+    then
+	state=`virsh list --all | grep "$domain" | awk '{print $3}'`
+	case "$state"
+	in
+	    shut)
+		if $work
+		then
+		    sudo virsh start $domain
+		    state=running
+		fi
+		;;
+	    running)
+		;;
+	    paused)
+		if $work
+		then
+		    sudo virsh resume $domain
+		    state=running
+		fi
+		;;
+	    '')
+		# probably not a VM, like "fuji"
+		;;
+	    *)
+		echo "No clue what do with virsh state \"$state\""
+		continue
+		;;
+	esac
+    fi
+
+    if $work
+    then
+	log=$HOME/Logs/by-date/$today/$domain
+	touch $log
+	mkdir -p $HOME/Logs/by-vm/$domain
+	if [ ! -L $HOME/Logs/by-vm/$domain/$today ]
+	then
+	    ( cd $HOME/Logs/by-vm/$domain; ln -s ../../by-date/$today/$domain $today )
+	fi
+
+	rm -f $tmp.up
+	wait=0
+	delta=5
+	max_wait=300
+	while [ $wait -lt $max_wait ]
+	do
+	    # if ping -c 1 $host >/dev/null 2>&1
+	    # then
+		if ssh $host true
+		then
+		    $debug && echo host up
+		    touch $tmp.up
+		    break
+		fi
+	    # else
+		$debug && echo host down
+	    # fi
+	    sleep $delta
+	    wait=`expr $wait + $delta`
+	done
+	if [ ! -f $tmp.up ]
+	then
+	    echo "Failed to start VM domain $domain after $max_wait secs ... giving up"
+	    continue
+	fi
+	
+	check=`ssh -t $host uname -sr 2>/dev/null`
+	$debug && echo "check=$check"
+	case "$check"
+	in
+	    FreeBSD\ *)
+	    	osname=freebsd
+		;;
+	    NetBSD\ *)
+	    	osname=netbsd
+		;;
+	    *)
+	    	osname=unknown
+		;;
+	esac
+	$debug && echo "osname=$osname"
+
+	# per-host settings
+	# MAKE=gmake for *BSD hosts
+	#
+	MAKE=make
+	case "$osname"
+	in
+	    freebsd|netbsd)
+		MAKE=gmake
+		;;
+	esac
+	$debug && echo "MAKE=$MAKE"
+
+	_script_header >$tmp.script
+	if [ -n "$efile" ]
+	then
+	    cat $efile >>$tmp.script
+	fi
+	_script_git >>$tmp.script
+	$cflag && _script_git_check >>$tmp.script
+	$pflag && _script_git_pull >>$tmp.script
+
+	if $mflag
+	then
+	    _script_make >>$tmp.script
+	fi
+
+	$iflag && _script_install >>$tmp.script
+
+	cat >>$tmp.script <<End-of-File
+
+cd qa
+End-of-File
+
+	check_what="$what"
+	[ X"$what" = Xall ] && check_what=''
+	case "$domain"
+	in
+	    *grundy*)
+		# Need to add
+		# -x remote default for grundy.sgi.com if running all tests
+		#
+		[ X"$what" = Xall ] && check_what='$check_what -x remote'
+		;;
+	    vm06|vm10)
+		# Only -g sanity at this stage for FreeBSD
+		#
+		[ X"$what" = Xall ] && check_what='-g sanity'
+		;;
+	esac
+
+	$qflag && _script_qa >>$tmp.script
+	$rflag && _script_qa_rerun >>$tmp.script
+	$hflag && _script_harvest >>$tmp.script
 
 	chmod 755 $tmp.script
 	if scp $tmp.script $host:daily.script >$tmp.out 2>&1
@@ -697,11 +796,21 @@ End-of-File
 	    echo "Error: scp failed!"
 	    continue
 	fi
+
+	# actually do the remote work here
+	#
 	ssh -t $host sh -c ./daily.script
+
 	scp -q $host:daily.log $tmp.out
 	echo "=== `date` ===" >>$log
 	cat $tmp.out >>$log
 	echo "=== END ===" >>$log
+
+	if $iflag
+	then
+	    # run whatami on QA host
+	    ssh -t $host src/pcp/qa/admin/whatami >$HOME/Logs/by-vm/$domain/whatami
+	fi
 
 	if $hflag
 	then

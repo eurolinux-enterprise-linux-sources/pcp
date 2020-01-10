@@ -2,7 +2,7 @@
  * pragmatics.c - inference engine pragmatics analysis
  * 
  * Copyright (c) 1995-2003 Silicon Graphics, Inc.  All Rights Reserved.
- * Copyright (c) 2013 Red Hat, Inc.
+ * Copyright (c) 2013-2014 Red Hat, Inc.
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -287,8 +287,7 @@ findFetch(Host *h, Metric *m)
 	    int tmp_mode = PM_MODE_INTERP;
 	    getDoubleAsXTB(&h->task->delta, &tmp_ival, &tmp_mode);
 
-	    tv.tv_sec = (time_t)start;
-	    tv.tv_usec = (int)((start - tv.tv_sec) * 1000000.0);
+	    __pmtimevalFromReal(start, &tv);
 	    if ((sts = pmSetMode(tmp_mode, &tv, tmp_ival)) < 0) {
 		fprintf(stderr, "%s: pmSetMode failed: %s\n", pmProgname,
 			pmErrStr(sts));
@@ -458,7 +457,7 @@ sendDesc(Expr *x, pmValueSet *vset)
 
 	case SEM_NUMVAR:
 	case SEM_NUMCONST:
-	case SEM_TRUTH:
+	case SEM_BOOLEAN:
 	    /* map to a numeric value */
 	    d.type = PM_TYPE_DOUBLE;
 	    d.sem = PM_SEM_INSTANT;
@@ -522,7 +521,7 @@ initArchive(Archive *a)
 	pmDestroyContext(handle);
 	return 0;
     }
-    a->first = realize(label.ll_start);
+    a->first = __pmtimevalToReal(&label.ll_start);
     if ((sts = pmGetArchiveEnd(&tv)) < 0) {
 	fprintf(stderr, "%s: archive %s is corrupted\n"
 		"pmGetArchiveEnd failed: %s\n",
@@ -530,7 +529,7 @@ initArchive(Archive *a)
 	pmDestroyContext(handle);
 	return 0;
     }
-    a->last = realize(tv);
+    a->last = __pmtimevalToReal(&tv);
 
     /* check for duplicate host */
     b = archives;
@@ -689,6 +688,7 @@ initMetric(Metric *m)
 	m->desc.type == PM_TYPE_AGGREGATE ||
 	m->desc.type == PM_TYPE_AGGREGATE_STATIC ||
 	m->desc.type == PM_TYPE_EVENT ||
+	m->desc.type == PM_TYPE_HIGHRES_EVENT ||
 	m->desc.type == PM_TYPE_UNKNOWN) {
 	fprintf(stderr, "%s: metric %s has non-numeric type\n", pmProgname, mname);
 	ret = -1;
@@ -863,6 +863,7 @@ reinitMetric(Metric *m)
 	m->desc.type == PM_TYPE_AGGREGATE ||
 	m->desc.type == PM_TYPE_AGGREGATE_STATIC ||
 	m->desc.type == PM_TYPE_EVENT ||
+	m->desc.type == PM_TYPE_HIGHRES_EVENT ||
 	m->desc.type == PM_TYPE_UNKNOWN) {
 	fprintf(stderr, "%s: metric %s has non-numeric type\n", pmProgname, mname);
 	ret = -1;
@@ -1174,7 +1175,7 @@ taskFetch(Task *t)
 			    if (m->desc.pmid == r->vset[i]->pmid) {
 				if (r->vset[i]->numval > 0) {
 				    m->vset = r->vset[i];
-				    m->stamp = realize(r->timestamp);
+				    m->stamp = __pmtimevalToReal(&r->timestamp);
 				}
 				break;
 			    }

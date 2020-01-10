@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2014 Red Hat.
+ * Copyright (C) 2012-2015 Red Hat.
  * Copyright (C) 2009-2012 Michael T. Werner
  *
  * This file is part of the "pcp" module, the python interfaces for the
@@ -28,6 +28,22 @@
 #include <pcp/pmapi.h>
 #include <pcp/impl.h>
 
+#if PY_MAJOR_VERSION >= 3
+#define MOD_ERROR_VAL NULL
+#define MOD_SUCCESS_VAL(val) val
+#define MOD_INIT(name) PyMODINIT_FUNC PyInit_##name(void)
+#define MOD_DEF(ob, name, doc, methods) \
+        static struct PyModuleDef moduledef = { \
+          PyModuleDef_HEAD_INIT, name, doc, -1, methods, }; \
+        ob = PyModule_Create(&moduledef);
+#else
+#define MOD_ERROR_VAL
+#define MOD_SUCCESS_VAL(val)
+#define MOD_INIT(name) void init##name(void)
+#define MOD_DEF(ob, name, doc, methods) \
+        ob = Py_InitModule3(name, methods, doc);
+#endif
+
 static pmOptions options;
 static int longOptionsCount;
 static PyObject *optionCallback;
@@ -44,7 +60,11 @@ dict_add_unsigned(PyObject *dict, char *symbol, unsigned long value)
 static void
 dict_add(PyObject *dict, char *symbol, long value)
 {
+#if PY_MAJOR_VERSION >= 3
+    PyObject *pyvalue = PyLong_FromLong(value);
+#else
     PyObject *pyvalue = PyInt_FromLong(value);
+#endif
     PyDict_SetItemString(dict, symbol, pyvalue);
     Py_XDECREF(pyvalue);
 }
@@ -52,8 +72,13 @@ dict_add(PyObject *dict, char *symbol, long value)
 static void
 edict_add(PyObject *dict, PyObject *edict, char *symbol, long value)
 {
+#if PY_MAJOR_VERSION >= 3
+    PyObject *pyvalue = PyLong_FromLong(value);
+    PyObject *pysymbol = PyUnicode_FromString(symbol);
+#else
     PyObject *pyvalue = PyInt_FromLong(value);
     PyObject *pysymbol = PyString_FromString(symbol);
+#endif
 
     PyDict_SetItemString(dict, symbol, pyvalue);
     PyDict_SetItem(edict, pyvalue, pysymbol);
@@ -149,6 +174,7 @@ addLongOption(pmLongOptions *opt, int duplicate)
     bytes = (index + 2) * sizeof(pmLongOptions); /* +2 for PMAPI_OPTIONS_END */
     if ((lp = realloc(options.long_options, bytes)) == NULL)
 	return -ENOMEM;
+    options.long_options = lp;
 
     if (!duplicate)
 	goto update;
@@ -174,7 +200,6 @@ update:
     lp[index].argname = opt->argname;
     lp[index].message = opt->message;
     memset(&lp[index+1], 0, sizeof(pmLongOptions));	/* PMAPI_OPTIONS_END */
-    options.long_options = lp;
     longOptionsCount++;
     return 0;
 }
@@ -259,6 +284,27 @@ static PyObject *
 setLongOptionArchive(PyObject *self, PyObject *args)
 {
     pmLongOptions option = PMOPT_ARCHIVE;
+    return addLongOptionObject(&option);
+}
+
+static PyObject *
+setLongOptionHostList(PyObject *self, PyObject *args)
+{
+    pmLongOptions option = PMOPT_HOST_LIST;
+    return addLongOptionObject(&option);
+}
+
+static PyObject *
+setLongOptionArchiveList(PyObject *self, PyObject *args)
+{
+    pmLongOptions option = PMOPT_ARCHIVE_LIST;
+    return addLongOptionObject(&option);
+}
+
+static PyObject *
+setLongOptionArchiveFolio(PyObject *self, PyObject *args)
+{
+    pmLongOptions option = PMOPT_ARCHIVE_FOLIO;
     return addLongOptionObject(&option);
 }
 
@@ -437,6 +483,51 @@ setOptionFlags(PyObject *self, PyObject *args, PyObject *keywords)
 }
 
 static PyObject *
+setOptionArchiveFolio(PyObject *self, PyObject *args, PyObject *keywords)
+{
+    char *folio;
+    char *keyword_list[] = {PMLONGOPT_ARCHIVE_FOLIO, NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, keywords,
+			"s:pmSetOptionArchiveFolio", keyword_list, &folio))
+	return NULL;
+
+    __pmAddOptArchiveFolio(&options, folio);
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *
+setOptionArchiveList(PyObject *self, PyObject *args, PyObject *keywords)
+{
+    char *archives;
+    char *keyword_list[] = {PMLONGOPT_ARCHIVE_LIST, NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, keywords,
+			"s:pmSetOptionArchiveList", keyword_list, &archives))
+	return NULL;
+
+    __pmAddOptArchiveList(&options, archives);
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *
+setOptionHostList(PyObject *self, PyObject *args, PyObject *keywords)
+{
+    char *hosts;
+    char *keyword_list[] = {PMLONGOPT_HOST_LIST, NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, keywords,
+			"s:pmSetOptionHostList", keyword_list, &hosts))
+	return NULL;
+
+    __pmAddOptHostList(&options, hosts);
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *
 setOptionSamples(PyObject *self, PyObject *args, PyObject *keywords)
 {
     char *count, *endnum;
@@ -516,7 +607,7 @@ override_callback(int opt, pmOptions *opts)
 	PyErr_Print();
 	return -EAGAIN; /* exception thrown */
     }
-    sts = PyInt_AsLong(result);
+    sts = PyLong_AsLong(result);
     Py_DECREF(result);
     return sts;
 }
@@ -560,7 +651,6 @@ getNonOptionsFromList(PyObject *self, PyObject *args, PyObject *keywords)
 
     if (!PyList_Check(pyargv)) {
 	PyErr_SetString(PyExc_TypeError, "pmGetNonOptionsFromList uses a list");
-	Py_DECREF(pyargv);
 	return NULL;
     }
 
@@ -568,16 +658,13 @@ getNonOptionsFromList(PyObject *self, PyObject *args, PyObject *keywords)
     if ((argc = PyList_GET_SIZE(pyargv)) > 0)
 	length = argc - options.optind;
 
-    if (!length) {
-	Py_DECREF(pyargv);
+    if (length <= 0) {
 	Py_INCREF(Py_None);
 	return Py_None;
     }
 
-    if ((result = PyList_New(length)) == NULL) {
-	Py_DECREF(pyargv);
+    if ((result = PyList_New(length)) == NULL)
 	return PyErr_NoMemory();
-    }
 
     for (i = 0; i < length; i++) {
 	PyObject *pyarg = PyList_GET_ITEM(pyargv, options.optind + i);
@@ -595,6 +682,9 @@ getOptionsFromList(PyObject *self, PyObject *args, PyObject *keywords)
     PyObject *pyargv = NULL;
     char *keyword_list[] = {"argv", NULL};
 
+    // Note that PyArg_ParseTupleAndKeywords() returns a "borrowed"
+    // reference, so there is no need to decrement a reference to
+    // pyargv.
     if (!PyArg_ParseTupleAndKeywords(args, keywords,
 			"O:pmGetOptionsFromList", keyword_list, &pyargv))
 	return NULL;
@@ -604,29 +694,30 @@ getOptionsFromList(PyObject *self, PyObject *args, PyObject *keywords)
 
     if (!PyList_Check(pyargv)) {
 	PyErr_SetString(PyExc_TypeError, "pmGetOptionsFromList uses a list");
-	Py_DECREF(pyargv);
 	return NULL;
     }
 
     if ((argc = PyList_GET_SIZE(pyargv)) <= 0) {
-	Py_DECREF(pyargv);
 	return Py_BuildValue("i", 0);
     }
 
     if ((argv = malloc(argc * sizeof(char *))) == NULL) {
-	Py_DECREF(pyargv);
 	return PyErr_NoMemory();
     }
 
     for (i = 0; i < argc; i++) {
 	PyObject *pyarg = PyList_GET_ITEM(pyargv, i);
+#if PY_MAJOR_VERSION >= 3
+	char *string = PyUnicode_AsUTF8(pyarg);
+#else
 	char *string = PyString_AsString(pyarg);
+#endif
 
 	/* argv[0] parameter will be used for pmProgname, so need to
 	 * ensure the memory that backs it will be with us forever.
          */
 	if (i == 0 && (string = strdup(string)) == NULL) {
-	    Py_DECREF(pyargv);
+	    free(argv);
 	    return PyErr_NoMemory();
 	}
 	argv[i] = string;
@@ -680,6 +771,46 @@ setContextOptions(PyObject *self, PyObject *args, PyObject *keywords)
 	    options.errors++;
 	}
     }
+    return Py_BuildValue("i", sts);
+}
+
+static void
+pmnsDecodeCallback(const char *name, void *closure)
+{
+    PyObject *arglist, *result;
+
+    arglist = Py_BuildValue("(s)", name);
+    if (arglist == NULL)
+        return;
+    result = PyEval_CallObject(closure, arglist);
+    Py_DECREF(arglist);
+    if (!result)
+        PyErr_Print();
+    else
+	Py_DECREF(result);
+}
+
+/*
+ * This pmTraversePMNS_r wrapper is specifically so that python3
+ * installs can pass out correctly decoded python strings rather
+ * than byte arrays.
+ */
+static PyObject *
+pmnsTraverse(PyObject *self, PyObject *args, PyObject *keywords)
+{
+    PyObject *func;
+    char *keyword_list[] = {"name", "callback", NULL};
+    char *name;
+    int sts;
+
+    if (!PyArg_ParseTupleAndKeywords(args, keywords,
+		"sO:pmnsTraverse", keyword_list, &name, &func))
+	return NULL;
+    if (!PyCallable_Check(func)) {
+	PyErr_SetString(PyExc_TypeError, "pmnsTraverse needs a callable");
+	return NULL;
+    }
+    sts = pmTraversePMNS_r(name, pmnsDecodeCallback, func);
     return Py_BuildValue("i", sts);
 }
 
@@ -760,7 +891,11 @@ getOptionHosts(PyObject *self, PyObject *args)
 	if ((result = PyList_New(options.nhosts)) == NULL)
 	    return PyErr_NoMemory();
 	for (i = 0; i < options.nhosts; i++) {
+#if PY_MAJOR_VERSION >= 3
+	    PyObject *pyent = PyUnicode_FromString(options.hosts[i]);
+#else
 	    PyObject *pyent = PyString_FromString(options.hosts[i]);
+#endif
 	    PyList_SET_ITEM(result, i, pyent);
 	}
 	Py_INCREF(result);
@@ -780,7 +915,11 @@ getOptionArchives(PyObject *self, PyObject *args)
 	if ((result = PyList_New(options.narchives)) == NULL)
 	    return PyErr_NoMemory();
 	for (i = 0; i < options.narchives; i++) {
+#if PY_MAJOR_VERSION >= 3
+	    PyObject *pyent = PyUnicode_FromString(options.archives[i]);
+#else
 	    PyObject *pyent = PyString_FromString(options.archives[i]);
+#endif
 	    PyList_SET_ITEM(result, i, pyent);
 	}
 	Py_INCREF(result);
@@ -804,6 +943,15 @@ getOptionStart_usec(PyObject *self, PyObject *args)
 {
     if (options.start.tv_sec || options.start.tv_usec)
 	return Py_BuildValue("l", options.start.tv_usec);
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *
+getOptionFinish_optarg(PyObject *self, PyObject *args)
+{
+    if (options.finish_optarg)
+	return Py_BuildValue("s", options.finish_optarg);
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -915,6 +1063,12 @@ static PyMethodDef methods[] = {
     { .ml_name = "pmSetLongOptionArchive",
 	.ml_meth = (PyCFunction) setLongOptionArchive,
         .ml_flags = METH_NOARGS },
+    { .ml_name = "pmSetLongOptionArchiveList",
+	.ml_meth = (PyCFunction) setLongOptionArchiveList,
+        .ml_flags = METH_NOARGS },
+    { .ml_name = "pmSetLongOptionArchiveFolio",
+	.ml_meth = (PyCFunction) setLongOptionArchiveFolio,
+        .ml_flags = METH_NOARGS },
     { .ml_name = "pmSetLongOptionDebug",
 	.ml_meth = (PyCFunction) setLongOptionDebug,
         .ml_flags = METH_NOARGS },
@@ -923,6 +1077,9 @@ static PyMethodDef methods[] = {
         .ml_flags = METH_NOARGS },
     { .ml_name = "pmSetLongOptionHost",
 	.ml_meth = (PyCFunction) setLongOptionHost,
+        .ml_flags = METH_NOARGS },
+    { .ml_name = "pmSetLongOptionHostList",
+	.ml_meth = (PyCFunction) setLongOptionHostList,
         .ml_flags = METH_NOARGS },
     { .ml_name = "pmSetLongOptionHostsFile",
 	.ml_meth = (PyCFunction) setLongOptionHostsFile,
@@ -1014,6 +1171,9 @@ static PyMethodDef methods[] = {
     { .ml_name = "pmGetOptionStart_usec",
 	.ml_meth = (PyCFunction) getOptionStart_usec,
         .ml_flags = METH_NOARGS },
+    { .ml_name = "pmGetOptionFinish_optarg",
+	.ml_meth = (PyCFunction) getOptionFinish_optarg,
+        .ml_flags = METH_NOARGS },
     { .ml_name = "pmGetOptionFinish_sec",
 	.ml_meth = (PyCFunction) getOptionFinish_sec,
         .ml_flags = METH_NOARGS },
@@ -1044,16 +1204,30 @@ static PyMethodDef methods[] = {
     { .ml_name = "pmGetOptionTimezone",
 	.ml_meth = (PyCFunction) getOptionTimezone,
         .ml_flags = METH_NOARGS },
+    { .ml_name = "pmSetOptionArchiveList",
+	.ml_meth = (PyCFunction) setOptionArchiveList,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS },
+    { .ml_name = "pmSetOptionArchiveFolio",
+	.ml_meth = (PyCFunction) setOptionArchiveFolio,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS },
+    { .ml_name = "pmSetOptionHostList",
+	.ml_meth = (PyCFunction) setOptionHostList,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS },
+    { .ml_name = "pmnsTraverse",
+	.ml_meth = (PyCFunction) pmnsTraverse,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS },
     { NULL }
 };
 
 /* called when the module is initialized. */
-void
-initcpmapi(void)
+MOD_INIT(cpmapi)
 {
     PyObject *module, *dict, *edict;
 
-    module = Py_InitModule("cpmapi", methods);
+    MOD_DEF(module, "cpmapi", NULL, methods);
+    if (module == NULL)
+	return MOD_ERROR_VAL;
+
     dict = PyModule_GetDict(module);
     edict = PyDict_New();
     Py_INCREF(edict);
@@ -1103,6 +1277,7 @@ initcpmapi(void)
     dict_add(dict, "PM_TYPE_AGGREGATE", PM_TYPE_AGGREGATE);
     dict_add(dict, "PM_TYPE_AGGREGATE_STATIC", PM_TYPE_AGGREGATE_STATIC);
     dict_add(dict, "PM_TYPE_EVENT", PM_TYPE_EVENT);
+    dict_add(dict, "PM_TYPE_HIGHRES_EVENT", PM_TYPE_HIGHRES_EVENT);
     dict_add(dict, "PM_TYPE_UNKNOWN", PM_TYPE_UNKNOWN);
 
     dict_add(dict, "PM_SEM_COUNTER", PM_SEM_COUNTER);
@@ -1226,4 +1401,6 @@ initcpmapi(void)
     edict_add(dict, edict, "PM_ERR_PMDAREADY", PM_ERR_PMDAREADY);
     edict_add(dict, edict, "PM_ERR_PMDANOTREADY", PM_ERR_PMDANOTREADY);
     edict_add(dict, edict, "PM_ERR_NYI", PM_ERR_NYI);
+
+    return MOD_SUCCESS_VAL(module);
 }

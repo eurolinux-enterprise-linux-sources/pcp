@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 Red Hat.
+ * Copyright (c) 2012-2015 Red Hat.
  * Copyright (c) 1995-2001,2003 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -29,6 +29,10 @@ __int64_t	vol_switch_bytes = -1;   /* number of bytes 'til vol switch */
 struct timeval	vol_switch_time;         /* time interval 'til vol switch */
 int		vol_samples_counter;     /* Counts samples - reset for new vol*/
 int		vol_switch_afid = -1;    /* afid of event for vol switch */
+int		vol_switch_flag;         /* sighup received - switch vol now */
+int		vol_switch_alarm;	 /* vol_switch_callback() called */
+int		run_done_alarm;		 /* run_done_callback() called */
+int		log_alarm;	 	 /* log_callback() called */
 int		parse_done;
 int		primary;		/* Non-zero for primary pmlogger */
 char	    	*archBase;		/* base name for log files */
@@ -39,6 +43,7 @@ int		archive_version = PM_LOG_VERS02; /* Type of archive to create */
 int		linger;			/* linger with no tasks/events */
 int		rflag;			/* report sizes */
 struct timeval	delta = { 60, 0 };	/* default logging interval */
+int		exit_code;		/* code to pass to exit (zero/signum) */
 int		qa_case;		/* QA error injection state */
 char		*note;			/* note for port map file */
 
@@ -79,16 +84,22 @@ run_done(int sts, char *msg)
     exit(sts);
 }
 
+/*
+ * Warning: called in signal handler context ... be careful
+ */
 static void
 run_done_callback(int i, void *j)
 {
-    run_done(0, NULL);
+    run_done_alarm = 1;
 }
 
+/*
+ * Warning: called in signal handler context ... be careful
+ */
 static void
 vol_switch_callback(int i, void *j)
 {
-    newvolume(VOL_SW_TIME);
+    vol_switch_alarm = 1;
 }
 
 static int
@@ -219,12 +230,7 @@ ParseSize(char *size_arg, int *sample_counter, __int64_t *byte_size,
 static void
 tsub(struct timeval *a, struct timeval *b)
 {
-    a->tv_usec -= b->tv_usec;
-    if (a->tv_usec < 0) {
-        a->tv_usec += 1000000;
-        a->tv_sec--;
-    }
-    a->tv_sec -= b->tv_sec;
+    __pmtimevalDec(a, b);
     if (a->tv_sec < 0) {
         /* clip negative values at zero */
         a->tv_sec = 0;
@@ -438,6 +444,7 @@ failed:
 
     if (cmd == 'Q' || (cmd == 'X' && strcmp(lbuf, "Yes") == 0)) {
 	run_done(0, "Recording session terminated");
+	/*NOTREACHED*/
     }
 
     if (cmd != '?') {
@@ -457,6 +464,7 @@ static pmLongOptions longopts[] = {
     { "linger", 0, 'L', 0, "run even if not primary logger instance and nothing to log" },
     { "note", 1, 'm', "MSG", "descriptive note to be added to the port map file" },
     PMOPT_NAMESPACE,
+    { "PID", 1, 'p', "PID", "Log specified metric for the lifetime of the pid" },
     { "primary", 0, 'P', 0, "execute as primary logger instance" },
     { "report", 0, 'r', 0, "report record sizes and archive growth rate" },
     { "size", 1, 's', "SIZE", "terminate after endsize has been accumulated" },
@@ -473,7 +481,7 @@ static pmLongOptions longopts[] = {
 };
 
 static pmOptions opts = {
-    .short_options = "c:D:h:l:Lm:n:Prs:T:t:uU:v:V:x:y?",
+    .short_options = "c:D:h:l:Lm:n:p:Prs:T:t:uU:v:V:x:y?",
     .long_options = longopts,
     .short_usage = "[options] archive",
 };
@@ -499,6 +507,8 @@ main(int argc, char **argv)
     char		*runtime = NULL;
     int	    		ctx;		/* handle corresponding to ctxp below */
     __pmContext  	*ctxp;		/* pmlogger has just this one context */
+    int			niter;
+    pid_t               target_pid = 0;
 
     __pmGetUsername(&username);
 
@@ -516,13 +526,13 @@ main(int argc, char **argv)
 		configfile = opts.optarg;
 	    else {
 		/* does not exist as given, try the standard place */
-		char *sysconf = pmGetConfig("PCP_SYSCONF_DIR");
-		int sz = strlen(sysconf)+strlen("/pmlogger/")+strlen(opts.optarg)+1;
+		char *sysconf = pmGetConfig("PCP_VAR_DIR");
+		int sz = strlen(sysconf)+strlen("/config/pmlogger/")+strlen(opts.optarg)+1;
 		if ((configfile = (char *)malloc(sz)) == NULL)
 		    __pmNoMem("config file name", sz, PM_FATAL_ERR);
 		snprintf(configfile, sz,
-			"%s%c" "pmlogger" "%c%s",
-			sysconf, sep, sep, opts.optarg);
+			"%s%c" "config%c" "pmlogger%c" "%s",
+			sysconf, sep, sep, sep, opts.optarg);
 		if (access(configfile, F_OK) != 0) {
 		    /* still no good, error handling happens below */
 		    free(configfile);
@@ -562,6 +572,19 @@ main(int argc, char **argv)
 
 	case 'n':		/* alternative name space file */
 	    pmnsfile = opts.optarg;
+	    break;
+
+	case 'p':
+	    target_pid = (int)strtol(opts.optarg, &endnum, 10);
+	    if (*endnum != '\0') {
+		pmprintf("%s: invalid process identifier (%s)\n",
+			 pmProgname, opts.optarg);
+		opts.errors++;
+	    } else if (!__pmProcessExists(target_pid)) {
+		pmprintf("%s: PID error - no such process (%d)\n",
+			 pmProgname, target_pid);
+		opts.errors++;
+	    }
 	    break;
 
 	case 'P':		/* this is the primary pmlogger */
@@ -804,21 +827,20 @@ main(int argc, char **argv)
     }
     else {
 	/*
-	 * try and establish $TZ and hostname from the remote PMCD ...
+	 * try and establish $TZ from the remote PMCD ...
 	 * Note the label record has been set up, but not written yet
 	 */
-	char		*names[2] = {"pmcd.timezone", "pmcd.hostname"};
-	pmID		pmids[2];
+	char		*name = "pmcd.timezone";
+	pmID		pmid;
 	pmResult	*resp;
 
 	__pmtimevalNow(&epoch);
 	sts = pmUseContext(ctx);
 
 	if (sts >= 0)
-	    sts = pmLookupName(2, names, pmids);
-	if (sts >= 0) {
-	    sts = pmFetch(2, pmids, &resp);
-	}
+	    sts = pmLookupName(1, &name, &pmid);
+	if (sts >= 0)
+	    sts = pmFetch(1, &pmid, &resp);
 	if (sts >= 0) {
 	    if (resp->vset[0]->numval > 0) { /* pmcd.timezone present */
 		strcpy(logctl.l_label.ill_tz, resp->vset[0]->vlist[0].value.pval->vbuf);
@@ -831,18 +853,6 @@ main(int argc, char **argv)
 	    else if (pmDebug & DBG_TRACE_LOG) {
 		fprintf(stderr,
 			"main: Could not get timezone from host %s\n",
-			pmcd_host);
-	    }
-#endif
-	    if (resp->vset[1]->numval > 0) { /* pmcd.hostname present */
-		strncpy(logctl.l_label.ill_hostname,
-			resp->vset[1]->vlist[0].value.pval->vbuf, PM_LOG_MAXHOSTLEN-1);
-		logctl.l_label.ill_hostname[PM_LOG_MAXHOSTLEN-1] = '\0';
-	    }
-#ifdef PCP_DEBUG
-	    else if (pmDebug & DBG_TRACE_LOG) {
-		fprintf(stderr,
-			"main: Could not get hostname from host %s\n",
 			pmcd_host);
 	    }
 #endif
@@ -913,12 +923,61 @@ main(int argc, char **argv)
 
     for ( ; ; ) {
 	int		nready;
+
+#ifdef PCP_DEBUG
+	if ((pmDebug & DBG_TRACE_APPL2) && (pmDebug & DBG_TRACE_DESPERATE)) {
+	    fprintf(stderr, "before __pmSelectRead(%d,...): run_done_alarm=%d vol_switch_alarm=%d log_alarm=%d\n", numfds, run_done_alarm, vol_switch_alarm, log_alarm);
+	}
+#endif
+
+	niter = 0;
+	while (log_alarm && niter++ < 10) {
+	    __pmAFblock();
+	    log_alarm = 0;
+#ifdef PCP_DEBUG
+	    if (pmDebug & DBG_TRACE_APPL2)
+		fprintf(stderr, "delayed callback: log_alarm\n");
+#endif
+	    for (tp = tasklist; tp != NULL; tp = tp->t_next) {
+		if (tp->t_alarm) {
+		    tp->t_alarm = 0;
+		    do_work(tp);
+		}
+	    }
+	    __pmAFunblock();
+	}
+
+	if (vol_switch_alarm) {
+	    __pmAFblock();
+	    vol_switch_alarm = 0;
+#ifdef PCP_DEBUG
+	    if (pmDebug & DBG_TRACE_APPL2)
+		fprintf(stderr, "delayed callback: vol_switch_alarm\n");
+#endif
+	    newvolume(VOL_SW_TIME);
+	    __pmAFunblock();
+	}
+
+	if (run_done_alarm) {
+#ifdef PCP_DEBUG
+	    if (pmDebug & DBG_TRACE_APPL2)
+		fprintf(stderr, "delayed callback: run_done_alarm\n");
+#endif
+	    run_done(0, NULL);
+	    /*NOTREACHED*/
+	}
+
 	__pmFD_COPY(&readyfds, &fds);
 	nready = __pmSelectRead(numfds, &readyfds, NULL);
 
+#ifdef PCP_DEBUG
+	if ((pmDebug & DBG_TRACE_APPL2) && (pmDebug & DBG_TRACE_DESPERATE)) {
+	    fprintf(stderr, "__pmSelectRead(%d,...) done: nready=%d run_done_alarm=%d vol_switch_alarm=%d log_alarm=%d\n", numfds, nready, run_done_alarm, vol_switch_alarm, log_alarm);
+	}
+#endif
+
+	__pmAFblock();
 	if (nready > 0) {
-	    /* block signals to simplify IO handling */
-	    __pmAFblock();
 
 	    /* handle request on control port */
 	    for (i = 0; i < CFD_NUM; ++i) {
@@ -1047,15 +1106,24 @@ main(int argc, char **argv)
 		    do_dialog('X');
 		}
 	    }
-
-	    __pmAFunblock();
+	}
+	else if (vol_switch_flag) {
+	    newvolume(VOL_SW_SIGHUP);
+	    vol_switch_flag = 0;
 	}
 	else if (nready < 0 && neterror() != EINTR)
 	    fprintf(stderr, "Error: select: %s\n", netstrerror());
+
+	__pmAFunblock();
+
+	if (target_pid && !__pmProcessExists(target_pid))
+	    exit(EXIT_SUCCESS);
+
+	if (exit_code)
+	    break;
     }
-
+    exit(exit_code);
 }
-
 
 int
 newvolume(int vol_switch_type)
@@ -1125,7 +1193,6 @@ newvolume(int vol_switch_type)
 	return -oserror();
 }
 
-
 void
 disconnect(int sts)
 {
@@ -1190,5 +1257,3 @@ reconnect(void)
     return sts;
 }
 #endif
-
-

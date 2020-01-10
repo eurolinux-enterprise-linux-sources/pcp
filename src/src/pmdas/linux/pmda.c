@@ -1,7 +1,7 @@
 /*
  * Linux PMDA
  *
- * Copyright (c) 2012-2013 Red Hat.
+ * Copyright (c) 2012-2015 Red Hat.
  * Copyright (c) 2007-2011 Aconex.  All Rights Reserved.
  * Copyright (c) 2002 International Business Machines Corp.
  * Copyright (c) 2000,2004,2007-2008 Silicon Graphics, Inc.  All Rights Reserved.
@@ -48,6 +48,7 @@
 #include "proc_net_sockstat.h"
 #include "proc_net_tcp.h"
 #include "proc_partitions.h"
+#include "proc_net_netstat.h"
 #include "proc_net_snmp.h"
 #include "proc_scsi.h"
 #include "proc_slabinfo.h"
@@ -60,6 +61,7 @@
 #include "sysfs_kernel.h"
 #include "linux_table.h"
 #include "numa_meminfo.h"
+#include "namespaces.h"
 #include "interrupts.h"
 #include "devmapper.h"
 
@@ -71,7 +73,6 @@ static proc_net_tcp_t		proc_net_tcp;
 static proc_net_sockstat_t	proc_net_sockstat;
 static struct utsname		kernel_uname;
 static char 			uname_string[sizeof(kernel_uname)];
-static proc_scsi_t		proc_scsi;
 static dev_mapper_t		dev_mapper;
 static proc_cpuinfo_t		proc_cpuinfo;
 static proc_slabinfo_t		proc_slabinfo;
@@ -84,6 +85,7 @@ static sysfs_kernel_t		sysfs_kernel;
 static numa_meminfo_t		numa_meminfo;
 
 static int		_isDSO = 1;	/* =0 I am a daemon */
+static int		rootfd = -1;	/* af_unix pmdaroot */
 static char		*username;
 
 /* globals */
@@ -96,6 +98,7 @@ int _pm_idletime_size; /* size in bytes of the idle cputime metric */
 proc_vmstat_t _pm_proc_vmstat;
 proc_net_snmp_t _pm_proc_net_snmp;
 pmdaInstid _pm_proc_net_snmp_indom_id[NR_ICMPMSG_COUNTERS];
+proc_net_netstat_t _pm_proc_net_netstat;
 
 /*
  * Metric Instance Domains (statically initialized ones only)
@@ -104,7 +107,7 @@ static pmdaInstid loadavg_indom_id[] = {
     { 1, "1 minute" }, { 5, "5 minute" }, { 15, "15 minute" }
 };
 
-static pmdaInstid nfs_indom_id[] = {
+static pmdaInstid nfs_indom_id[NR_RPC_COUNTERS] = {
 	{ 0, "null" },
 	{ 1, "getattr" },
 	{ 2, "setattr" },
@@ -125,7 +128,7 @@ static pmdaInstid nfs_indom_id[] = {
 	{ 17, "statfs" }
 };
 
-static pmdaInstid nfs3_indom_id[] = {
+static pmdaInstid nfs3_indom_id[NR_RPC3_COUNTERS] = {
 	{ 0, "null" },
 	{ 1, "getattr" },
 	{ 2, "setattr" },
@@ -150,7 +153,7 @@ static pmdaInstid nfs3_indom_id[] = {
 	{ 21, "commit" }
 };
 
-static pmdaInstid nfs4_cli_indom_id[] = {
+static pmdaInstid nfs4_cli_indom_id[NR_RPC4_CLI_COUNTERS] = {
 	{ 0,  "null" },
 	{ 1,  "read" },
 	{ 2,  "write" },
@@ -185,14 +188,38 @@ static pmdaInstid nfs4_cli_indom_id[] = {
 	{ 31, "delegreturn" },
 	{ 32, "getacl" },
 	{ 33, "setacl" },
-	{ 34, "fs_locatns" },
+	{ 34, "fs_locations" },
+	{ 35, "rel_lkowner" },
+	{ 36, "secinfo" },
+	{ 37, "fsid_present" },
+	/* nfsv4.1 client ops */
+	{ 38, "exchange_id" },
+	{ 39, "create_ses" },
+	{ 40, "destroy_ses" },
+	{ 41, "sequence" },
+	{ 42, "get_lease_t" },
+	{ 43, "reclaim_comp" },
+	{ 44, "layoutget" },
+	{ 45, "getdevinfo" },
+	{ 46, "layoutcommit" },
+	{ 47, "secinfononam" },
+	{ 48, "test_stateid" },
+	{ 49, "free_stateid" },
+	{ 50, "getdevlist" },
+	{ 51, "bind_ses" },
+	{ 52, "destroy_clntid" },
 };
 
-static pmdaInstid nfs4_svr_indom_id[] = {
-	{ 0,  "null" },
+static pmdaInstid nfs4_svr_indom_id[NR_RPC4_SVR_COUNTERS] = {
+	/*
+	 * { 0,  "null" } - the kernel actually only exports from "access"
+	 * The first three values in the net/rpc/nfsd file are always zero
+	 * In particular, see the nfs_opnum4 enum in <linux/nfs4.h>, these
+	 * values are used as array indices in the kernel.
+	 */
 	{ 1,  "op0-unused" },
 	{ 2,  "op1-unused"},
-	{ 3,  "minorversion"},	/* future use */
+	{ 3,  "op2-future"}, /* name matching the nfsstat convention */
 	{ 4,  "access" },
 	{ 5,  "close" },
 	{ 6,  "commit" },
@@ -230,6 +257,26 @@ static pmdaInstid nfs4_svr_indom_id[] = {
 	{ 38, "verify" },
 	{ 39, "write" },
 	{ 40, "rellockowner" },
+	/* nfsv4.1 server ops */
+	{ 41, "bc_ctl" },
+	{ 42, "bind_conn" },
+	{ 43, "exchange_id" },
+	{ 44, "create_ses" },
+	{ 45, "destroy_ses" },
+	{ 46, "free_stateid" },
+	{ 47, "getdirdeleg" },
+	{ 48, "getdevinfo" },
+	{ 49, "getdevlist" },
+	{ 50, "layoutcommit" },
+	{ 51, "layoutget" },
+	{ 52, "layoutreturn" },
+	{ 53, "secinfononam" },
+	{ 54, "sequence" },
+	{ 55, "set_ssv" },
+	{ 56, "test_stateid" },
+	{ 57, "want_deleg" },
+	{ 58, "destroy_clid" },
+	{ 59, "reclaim_comp" },
 };
 
 static pmdaIndom indomtab[] = {
@@ -257,6 +304,7 @@ static pmdaIndom indomtab[] = {
     { PROC_CGROUP_MOUNTS_INDOM, 0, NULL },
     { LV_INDOM, 0, NULL },
     { ICMPMSG_INDOM, NR_ICMPMSG_COUNTERS, _pm_proc_net_snmp_indom_id },
+    { DM_INDOM, 0, NULL }, /* cached */
 };
 
 
@@ -888,6 +936,11 @@ static pmdaMetric metrictab[] = {
 /* mem.util.directMap1G */
     { NULL,
       { PMDA_PMID(CLUSTER_MEMINFO,57), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_INSTANT,
+      PMDA_PMUNITS(1,0,0,PM_SPACE_KBYTE,0,0) }, },
+
+/* mem.util.available */
+    { NULL,
+      { PMDA_PMID(CLUSTER_MEMINFO,58), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_INSTANT,
       PMDA_PMUNITS(1,0,0,PM_SPACE_KBYTE,0,0) }, },
 
 /* mem.numa.util.total */
@@ -1753,6 +1806,21 @@ static pmdaMetric metrictab[] = {
     { PMDA_PMID(CLUSTER_NET_NFS,57), PM_TYPE_U32, PM_INDOM_NULL, PM_SEM_COUNTER,
     PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
 
+/* rpc.server.ra_size */
+  { &proc_net_rpc.server.ra_size,
+    { PMDA_PMID(CLUSTER_NET_NFS,68), PM_TYPE_U32, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* rpc.server.ra_hits */
+  { &proc_net_rpc.server.ra_hits,
+    { PMDA_PMID(CLUSTER_NET_NFS,69), PM_TYPE_U32, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* rpc.server.ra_misses */
+  { &proc_net_rpc.server.ra_misses,
+    { PMDA_PMID(CLUSTER_NET_NFS,70), PM_TYPE_U32, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
 /*
  * /proc/partitions cluster
  */
@@ -2323,6 +2391,605 @@ static pmdaMetric metrictab[] = {
     { PMDA_PMID(CLUSTER_NET_SNMP,89), PM_TYPE_U64, ICMPMSG_INDOM, PM_SEM_COUNTER,
     PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
 
+/*
+ * network netstat cluster
+ */
+
+/* network.ip.innoroutes */
+  { &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_INNOROUTES],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,0), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.ip.intruncatedpkts */
+  { &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_INTRUNCATEDPKTS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,1), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.ip.inmcastpkts */
+  { &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_INMCASTPKTS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,2), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.ip.outmcastpkts */
+  { &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_OUTMCASTPKTS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,3), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.ip.inbcastpkts */
+  { &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_INBCASTPKTS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,4), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.ip.outbcastpkts */
+  { &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_OUTBCASTPKTS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,5), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.ip.inoctets */
+  { &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_INOCTETS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,6), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.ip.outoctets */
+  { &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_OUTOCTETS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,7), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.ip.inmcastoctets */
+  { &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_INMCASTOCTETS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,8), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.ip.outmcastoctets */
+  { &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_OUTMCASTOCTETS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,9), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.ip.inbcastoctets */
+  { &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_INBCASTOCTETS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,10), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.ip.outbcastoctets */
+  { &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_OUTBCASTOCTETS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,11), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.ip.csumerrors */
+  { &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_CSUMERRORS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,12), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.ip.noectpkts */
+  { &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_NOECTPKTS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,13), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.ip.ect1pkts */
+  { &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_ECT1PKTS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,14), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.ip.ect0pkts */
+  { &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_ECT0PKTS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,15), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.ip.cepkts */
+  { &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_CEPKTS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,16), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.syncookiessent */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_SYNCOOKIESSENT],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,17), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.syncookiesrecv */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_SYNCOOKIESRECV],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,18), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.syncookiesfailed */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_SYNCOOKIESFAILED],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,19), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.embryonicrsts */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_EMBRYONICRSTS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,20), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.prunecalled */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_PRUNECALLED],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,21), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.rcvpruned */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_RCVPRUNED],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,22), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.ofopruned */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_OFOPRUNED],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,23), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.outofwindowicmps */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_OUTOFWINDOWICMPS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,24), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.lockdroppedicmps */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_LOCKDROPPEDICMPS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,25), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.arpfilter */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_ARPFILTER],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,26), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.timewaited */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TIMEWAITED],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,27), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.timewaitrecycled */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TIMEWAITRECYCLED],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,28), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.timewaitkilled */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TIMEWAITKILLED],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,29), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.pawspassiverejected */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_PAWSPASSIVEREJECTED],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,30), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.pawsactiverejected */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_PAWSACTIVEREJECTED],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,31), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.pawsestabrejected */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_PAWSESTABREJECTED],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,32), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.delayedacks */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_DELAYEDACKS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,33), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.delayedacklocked */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_DELAYEDACKLOCKED],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,34), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.delayedacklost */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_DELAYEDACKLOST],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,35), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.listenoverflows */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_LISTENOVERFLOWS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,36), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.listendrops */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_LISTENDROPS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,37), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.prequeued */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPPREQUEUED],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,38), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.directcopyfrombacklog */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPDIRECTCOPYFROMBACKLOG],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,39), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.directcopyfromprequeue */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPDIRECTCOPYFROMPREQUEUE],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,40), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.prequeuedropped */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPPREQUEUEDROPPED],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,41), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.hphits*/
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPHPHITS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,42), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.hphitstouser */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPHPHITSTOUSER],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,43), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.pureacks */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPPUREACKS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,44), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.hpacks */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPHPACKS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,45), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.renorecovery */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPRENORECOVERY],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,46), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.sackrecovery */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPSACKRECOVERY],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,47), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.sackreneging */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPSACKRENEGING],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,48), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.fackreorder */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPFACKREORDER],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,49), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.sackreorder */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPSACKREORDER],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,50), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.renoreorder */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPRENOREORDER],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,51), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.tsreorder */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPTSREORDER],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,52), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.fullundo */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPFULLUNDO],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,53), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.partialundo */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPPARTIALUNDO],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,54), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.dsackundo */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPDSACKUNDO],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,55), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.lossundo */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPLOSSUNDO],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,56), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.lostretransmit */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPLOSTRETRANSMIT],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,57), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.renofailures */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPRENOFAILURES],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,58), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.sackfailures */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPSACKFAILURES],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,59), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.lossfailures */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPLOSSFAILURES],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,60), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.fastretrans */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPFASTRETRANS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,61), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.forwardretrans */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPFORWARDRETRANS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,62), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.slowstartretrans */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPSLOWSTARTRETRANS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,63), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.timeouts */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPTIMEOUTS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,64), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.lossprobes */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPLOSSPROBES],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,65), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.lossproberecovery */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPLOSSPROBERECOVERY],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,66), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.renorecoveryfail */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPRENORECOVERYFAIL],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,67), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.sackrecoveryfail */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPSACKRECOVERYFAIL],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,68), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.schedulerfailed */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPSCHEDULERFAILED],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,69), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.rcvcollapsed */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPRCVCOLLAPSED],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,70), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.dsackoldsent */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPDSACKOLDSENT],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,71), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.dsackofosent */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPDSACKOFOSENT],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,72), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.dsackrecv */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPDSACKRECV],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,73), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.dsackoforecv */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPDSACKOFORECV],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,74), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.abortondata */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPABORTONDATA],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,75), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.abortonclose */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPABORTONCLOSE],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,76), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.abortonmemory */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPABORTONMEMORY],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,77), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.abortontimeout */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPABORTONTIMEOUT],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,78), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.abortonlinger */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPABORTONLINGER],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,79), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.abortfailed */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPABORTFAILED],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,80), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.memorypressures */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPMEMORYPRESSURES],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,81), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.sackdiscard */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPSACKDISCARD],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,82), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.dsackignoredold */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPDSACKIGNOREDOLD],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,83), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.dsackignorednoundo */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPDSACKIGNOREDNOUNDO],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,84), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.spuriousrtos */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPSPURIOUSRTOS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,85), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.md5notfound */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPMD5NOTFOUND],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,86), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.md5unexpected */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPMD5UNEXPECTED],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,87), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.sackshifted */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_SACKSHIFTED],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,88), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.sackmerged */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_SACKMERGED],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,89), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.sackshiftfallback */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_SACKSHIFTFALLBACK],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,90), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.backlogdrop */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPBACKLOGDROP],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,91), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.minttldrop */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPMINTTLDROP],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,92), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.deferacceptdrop */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPDEFERACCEPTDROP],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,93), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.iprpfilter */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_IPRPFILTER],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,94), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.timewaitoverflow */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPTIMEWAITOVERFLOW],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,95), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.reqqfulldocookies */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPREQQFULLDOCOOKIES],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,96), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.reqqfulldrop */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPREQQFULLDROP],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,97), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.retransfail */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPRETRANSFAIL],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,98), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.rcvcoalesce */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPRCVCOALESCE],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,99), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.ofoqueue */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPOFOQUEUE],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,100), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.ofodrop */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPOFODROP],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,101), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.ofomerge */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPOFOMERGE],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,102), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.challengeack */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPCHALLENGEACK],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,103), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.synchallenge */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPSYNCHALLENGE],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,104), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.fastopenactive */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPFASTOPENACTIVE],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,105), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.fastopenactivefail */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPFASTOPENACTIVEFAIL],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,106), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.fastopenpassive */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPFASTOPENPASSIVE],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,107), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.fastopenpassivefail */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPFASTOPENPASSIVEFAIL],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,108), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.fastopenlistenoverflow */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPFASTOPENLISTENOVERFLOW],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,109), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.fastopencookiereqd */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPFASTOPENCOOKIEREQD],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,110), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.spuriousrtxhostqueues */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPSPURIOUS_RTX_HOSTQUEUES],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,111), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.busypollrxpackets */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_BUSYPOLLRXPACKETS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,112), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.autocorking */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPAUTOCORKING],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,113), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.fromzerowindowadv */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPFROMZEROWINDOWADV],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,114), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.tozerowindowadv */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPTOZEROWINDOWADV],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,115), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.wantzerowindowadv */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPWANTZEROWINDOWADV],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,116), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.synretrans */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPSYNRETRANS],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,117), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
+/* network.tcp.origdatasent */
+  { &_pm_proc_net_netstat.tcp[_PM_NETSTAT_TCPEXT_TCPORIGDATASENT],
+    { PMDA_PMID(CLUSTER_NET_NETSTAT,118), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
+    PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
+
 /* hinv.map.scsi */
     { NULL, 
       { PMDA_PMID(CLUSTER_SCSI,0), PM_TYPE_STRING, SCSI_INDOM, PM_SEM_DISCRETE, 
@@ -2401,6 +3068,20 @@ static pmdaMetric metrictab[] = {
   { NULL,
     { PMDA_PMID(CLUSTER_CPUINFO, 11), PM_TYPE_U32, CPU_INDOM, PM_SEM_DISCRETE,
     PMDA_PMUNITS(0,0,0,PM_SPACE_BYTE,0,0) } },
+
+/*
+ * sysfs device state cluster
+ */
+
+/* hinv.cpu.online */
+  { NULL,
+    { PMDA_PMID(CLUSTER_SYSFS_DEVICES, 0), PM_TYPE_U32, CPU_INDOM, PM_SEM_INSTANT,
+    PMDA_PMUNITS(0,0,0,0,0,0) } },
+
+/* hinv.node.online */
+  { NULL,
+    { PMDA_PMID(CLUSTER_SYSFS_DEVICES, 1), PM_TYPE_U32, NODE_INDOM, PM_SEM_INSTANT,
+    PMDA_PMUNITS(0,0,0,0,0,0) } },
 
 /*
  * semaphore limits cluster
@@ -3101,21 +3782,123 @@ static pmdaMetric metrictab[] = {
     { NULL, { PMDA_PMID(CLUSTER_INTERRUPT_OTHER, 0), PM_TYPE_U32,
     CPU_INDOM, PM_SEM_COUNTER, PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) }, },
 
+/*
+ * disk.dm cluster
+ */
+    /* disk.dm.read */
+    { NULL, 
+      { PMDA_PMID(CLUSTER_DM,0), KERNEL_ULONG, DM_INDOM, PM_SEM_COUNTER, 
+      PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) }, },
+
+    /* disk.dm.write */
+    { NULL, 
+      { PMDA_PMID(CLUSTER_DM,1), KERNEL_ULONG, DM_INDOM, PM_SEM_COUNTER, 
+      PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) }, },
+
+    /* disk.dm.total */
+    { NULL, 
+      { PMDA_PMID(CLUSTER_DM,2), KERNEL_ULONG, DM_INDOM, PM_SEM_COUNTER, 
+      PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) }, },
+
+    /* disk.dm.blkread */
+    { NULL, 
+      { PMDA_PMID(CLUSTER_DM,3), PM_TYPE_U64, DM_INDOM, PM_SEM_COUNTER, 
+      PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) }, },
+
+    /* disk.dm.blkwrite */
+    { NULL, 
+      { PMDA_PMID(CLUSTER_DM,4), PM_TYPE_U64, DM_INDOM, PM_SEM_COUNTER, 
+      PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) }, },
+
+    /* disk.dm.blktotal */
+    { NULL, 
+      { PMDA_PMID(CLUSTER_DM,5), PM_TYPE_U64, DM_INDOM, PM_SEM_COUNTER, 
+      PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) }, },
+
+    /* disk.dm.read_bytes */
+    { NULL, 
+      { PMDA_PMID(CLUSTER_DM,6), PM_TYPE_U32, DM_INDOM, PM_SEM_COUNTER, 
+      PMDA_PMUNITS(1,0,0,PM_SPACE_KBYTE,0,0) }, },
+
+    /* disk.dm.write_bytes */
+    { NULL, 
+      { PMDA_PMID(CLUSTER_DM,7), PM_TYPE_U32, DM_INDOM, PM_SEM_COUNTER, 
+      PMDA_PMUNITS(1,0,0,PM_SPACE_KBYTE,0,0) }, },
+
+    /* disk.dm.total_bytes */
+    { NULL, 
+      { PMDA_PMID(CLUSTER_DM,8), PM_TYPE_U32, DM_INDOM, PM_SEM_COUNTER, 
+      PMDA_PMUNITS(1,0,0,PM_SPACE_KBYTE,0,0) }, },
+
+    /* disk.dm.read_merge */
+    { NULL, 
+      { PMDA_PMID(CLUSTER_DM,9), KERNEL_ULONG, DM_INDOM, PM_SEM_COUNTER, 
+      PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) }, },
+
+    /* disk.dm.write_merge */
+    { NULL, 
+      { PMDA_PMID(CLUSTER_DM,10), KERNEL_ULONG, DM_INDOM, PM_SEM_COUNTER, 
+      PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) }, },
+
+    /* disk.dm.avactive */
+    { NULL, 
+      { PMDA_PMID(CLUSTER_DM,11), PM_TYPE_U32, DM_INDOM, PM_SEM_COUNTER, 
+      PMDA_PMUNITS(0,1,0,0,PM_TIME_MSEC,0) }, },
+
+    /* disk.dm.aveq */
+    { NULL, 
+      { PMDA_PMID(CLUSTER_DM,12), PM_TYPE_U32, DM_INDOM, PM_SEM_COUNTER, 
+      PMDA_PMUNITS(0,1,0,0,PM_TIME_MSEC,0) }, },
+
+    /* hinv.map.dmname */
+    { NULL, 
+      { PMDA_PMID(CLUSTER_DM,13), PM_TYPE_STRING, DM_INDOM, PM_SEM_DISCRETE,
+      PMDA_PMUNITS(0,0,0,0,0,0) }, },
+
+    /* disk.dm.read_rawactive */
+    { NULL, 
+      { PMDA_PMID(CLUSTER_DM,14), PM_TYPE_U32, DM_INDOM, PM_SEM_COUNTER, 
+      PMDA_PMUNITS(0,1,0,0,PM_TIME_MSEC,0) }, },
+
+    /* disk.dm.write_rawactive */
+    { NULL, 
+      { PMDA_PMID(CLUSTER_DM,15), PM_TYPE_U32, DM_INDOM, PM_SEM_COUNTER, 
+      PMDA_PMUNITS(0,1,0,0,PM_TIME_MSEC,0) }, },
 };
 
+typedef struct {
+    char        *container;
+    int		length;
+} perctx_t;
+
+static perctx_t *ctxtab;
+static int      num_ctx;
+
+char *linux_statspath = "";	/* optional path prefix for all stats files */
+
+FILE *
+linux_statsfile(const char *path, char *buffer, int size)
+{
+    snprintf(buffer, size, "%s%s", linux_statspath, path);
+    buffer[size-1] = '\0';
+    return fopen(buffer, "r");
+}
+
 static void
-linux_refresh(pmdaExt *pmda, int *need_refresh)
+linux_refresh(pmdaExt *pmda, int *need_refresh, int pid)
 {
     int need_refresh_mtab = 0;
 
     if (need_refresh[CLUSTER_PARTITIONS])
-    	refresh_proc_partitions(INDOM(DISK_INDOM), INDOM(PARTITIONS_INDOM));
+    	refresh_proc_partitions(INDOM(DISK_INDOM),
+				INDOM(PARTITIONS_INDOM),
+				INDOM(DM_INDOM));
 
     if (need_refresh[CLUSTER_STAT])
-    	refresh_proc_stat(&proc_cpuinfo, &proc_stat);
+	refresh_proc_stat(&proc_cpuinfo, &proc_stat);
 
     if (need_refresh[CLUSTER_CPUINFO])
-    	refresh_proc_cpuinfo(&proc_cpuinfo);
+	refresh_proc_cpuinfo(&proc_cpuinfo);
 
     if (need_refresh[CLUSTER_MEMINFO])
 	refresh_proc_meminfo(&proc_meminfo);
@@ -3133,7 +3916,7 @@ linux_refresh(pmdaExt *pmda, int *need_refresh)
 	refresh_net_dev_addr(INDOM(NET_ADDR_INDOM));
 
     if (need_refresh[CLUSTER_FILESYS] || need_refresh[CLUSTER_TMPFS])
-	refresh_filesys(INDOM(FILESYS_INDOM), INDOM(TMPFS_INDOM));
+	refresh_filesys(INDOM(FILESYS_INDOM), INDOM(TMPFS_INDOM), pid);
 
     if (need_refresh[CLUSTER_INTERRUPTS] ||
 	need_refresh[CLUSTER_INTERRUPT_LINES] ||
@@ -3147,16 +3930,16 @@ linux_refresh(pmdaExt *pmda, int *need_refresh)
 	refresh_proc_net_rpc(&proc_net_rpc);
 
     if (need_refresh[CLUSTER_NET_SOCKSTAT])
-    	refresh_proc_net_sockstat(&proc_net_sockstat);
+	refresh_proc_net_sockstat(&proc_net_sockstat);
 
     if (need_refresh[CLUSTER_KERNEL_UNAME])
-    	uname(&kernel_uname);
+	uname(&kernel_uname);
 
     if (need_refresh[CLUSTER_NET_SNMP])
 	refresh_proc_net_snmp(&_pm_proc_net_snmp);
 
     if (need_refresh[CLUSTER_SCSI])
-	refresh_proc_scsi(&proc_scsi);
+	refresh_proc_scsi(INDOM(SCSI_INDOM));
 
     if (need_refresh[CLUSTER_LV])
 	refresh_dev_mapper(&dev_mapper);
@@ -3164,11 +3947,14 @@ linux_refresh(pmdaExt *pmda, int *need_refresh)
     if (need_refresh[CLUSTER_NET_TCP])
 	refresh_proc_net_tcp(&proc_net_tcp);
 
+    if (need_refresh[CLUSTER_NET_NETSTAT])
+	refresh_proc_net_netstat(&_pm_proc_net_netstat);
+
     if (need_refresh[CLUSTER_SLAB])
 	refresh_proc_slabinfo(&proc_slabinfo);
 
     if (need_refresh[CLUSTER_SEM_LIMITS])
-        refresh_sem_limits(&sem_limits);
+	refresh_sem_limits(&sem_limits);
 
     if (need_refresh[CLUSTER_MSG_LIMITS])
         refresh_msg_limits(&msg_limits);
@@ -3192,62 +3978,91 @@ linux_refresh(pmdaExt *pmda, int *need_refresh)
 	pmdaDynamicMetricTable(pmda);
 }
 
+static char *
+linux_ctx_container(int ctx, int *length)
+{
+    if (ctx < num_ctx && ctx >= 0 && ctxtab[ctx].container) {
+	*length = ctxtab[ctx].length;
+	return ctxtab[ctx].container;
+    }
+    return NULL;
+}
+
 static int
 linux_instance(pmInDom indom, int inst, char *name, __pmInResult **result, pmdaExt *pmda)
 {
     __pmInDom_int	*indomp = (__pmInDom_int *)&indom;
-    int			need_refresh[NUM_CLUSTERS];
+    int			need_refresh[NUM_CLUSTERS] = {0};
+    int			sts, pid = 0, length = 0, ns_flags = 0;
+    char		*container = NULL;
 
-    memset(need_refresh, 0, sizeof(need_refresh));
     switch (indomp->serial) {
     case DISK_INDOM:
     case PARTITIONS_INDOM:
+    case DM_INDOM:
 	need_refresh[CLUSTER_PARTITIONS]++;
 	break;
     case CPU_INDOM:
-    	need_refresh[CLUSTER_STAT]++;
+	need_refresh[CLUSTER_STAT]++;
 	break;
     case NODE_INDOM:
 	need_refresh[CLUSTER_NUMA_MEMINFO]++;
 	break;
     case LOADAVG_INDOM:
-    	need_refresh[CLUSTER_LOADAVG]++;
+	need_refresh[CLUSTER_LOADAVG]++;
 	break;
     case NET_DEV_INDOM:
-    	need_refresh[CLUSTER_NET_DEV]++;
+	need_refresh[CLUSTER_NET_DEV]++;
+	ns_flags |= LINUX_NAMESPACE_NET;
+	break;
+    case NET_ADDR_INDOM:
+	need_refresh[CLUSTER_NET_ADDR]++;
+	ns_flags |= LINUX_NAMESPACE_NET;
 	break;
     case FILESYS_INDOM:
-    	need_refresh[CLUSTER_FILESYS]++;
+	need_refresh[CLUSTER_FILESYS]++;
+	ns_flags |= LINUX_NAMESPACE_MNT;
 	break;
     case TMPFS_INDOM:
-    	need_refresh[CLUSTER_TMPFS]++;
+	need_refresh[CLUSTER_TMPFS]++;
+	ns_flags |= LINUX_NAMESPACE_MNT;
 	break;
     case SWAPDEV_INDOM:
-    	need_refresh[CLUSTER_SWAPDEV]++;
+	need_refresh[CLUSTER_SWAPDEV]++;
 	break;
     case NFS_INDOM:
     case NFS3_INDOM:
     case NFS4_CLI_INDOM:
     case NFS4_SVR_INDOM:
-    	need_refresh[CLUSTER_NET_NFS]++;
+	need_refresh[CLUSTER_NET_NFS]++;
+	ns_flags |= LINUX_NAMESPACE_MNT;
 	break;
     case SCSI_INDOM:
-    	need_refresh[CLUSTER_SCSI]++;
+	need_refresh[CLUSTER_SCSI]++;
 	break;
     case LV_INDOM:
-    	need_refresh[CLUSTER_LV]++;
+	need_refresh[CLUSTER_LV]++;
 	break;
     case SLAB_INDOM:
-    	need_refresh[CLUSTER_SLAB]++;
+	need_refresh[CLUSTER_SLAB]++;
 	break;
     case ICMPMSG_INDOM:
-    	need_refresh[CLUSTER_NET_SNMP]++;
+	need_refresh[CLUSTER_NET_SNMP]++;
 	break;
     /* no default label : pmdaInstance will pick up errors */
     }
 
-    linux_refresh(pmda, need_refresh);
-    return pmdaInstance(indom, inst, name, result, pmda);
+    if ((container = linux_ctx_container(pmda->e_context, &length)) != NULL) {
+	sts = container_enter_namespaces(rootfd, container, length, ns_flags);
+	if (sts < 0)
+	    return sts;
+	pid = sts;
+    }
+    linux_refresh(pmda, need_refresh, pid);
+    sts = pmdaInstance(indom, inst, name, result, pmda);
+    if (container)
+	container_leave_namespaces(rootfd, ns_flags);
+    return sts;
 }
 
 /*
@@ -3264,6 +4079,7 @@ linux_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
     struct filesys	*fs;
     net_addr_t		*addrp;
     net_interface_t	*netip;
+    scsi_entry_t	*scsi_entry;
 
     if (mdesc->m_user != NULL) {
 	/* 
@@ -3294,6 +4110,11 @@ linux_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    if (*(__uint64_t *)mdesc->m_user == (__uint64_t)-1)
 		if (idp->item != 53)	/* tcp.maxconn is special */
 		    return 0; /* no value available on this kernel */
+	}
+	else
+	if (idp->cluster == CLUSTER_NET_NETSTAT) {
+	    if (*(__uint64_t *)mdesc->m_user == (__uint64_t)-1)
+	        return 0; /* no value available on this kernel */
 	}
 	else
 	if (idp->cluster == CLUSTER_NET_NFS) {
@@ -3438,7 +4259,7 @@ linux_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    _pm_assign_utype(_pm_cputime_size, atom,
 			1000 * (double)proc_stat.n_guest[inst] / proc_stat.hz);
 	    break;
-	case 77: /* kernel.pernode.cpu.guest */
+	case 77: /* kernel.pernode.cpu.vuser */
 	    _pm_assign_utype(_pm_cputime_size, atom,
 			1000 * ((double)proc_stat.n_user[inst] - (double)proc_stat.n_guest[inst])
 			/ proc_stat.hz);
@@ -3576,24 +4397,20 @@ linux_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	break;
 
     case CLUSTER_MEMINFO: /* mem */
-
-#define VALID_VALUE(x)		((x) != (uint64_t)-1)
-#define VALUE_OR_ZERO(x)	(((x) == (uint64_t)-1) ? 0 : (x))
-
     	switch (idp->item) {
 	case 0: /* mem.physmem (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.MemTotal))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.MemTotal))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.MemTotal >> 10;
 	    break;
 	case 1: /* mem.util.used (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.MemTotal) ||
-	        !VALID_VALUE(proc_meminfo.MemFree))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.MemTotal) ||
+	        !MEMINFO_VALID_VALUE(proc_meminfo.MemFree))
 		return 0; /* no values available */
 	    atom->ull = (proc_meminfo.MemTotal - proc_meminfo.MemFree) >> 10;
 	    break;
 	case 2: /* mem.util.free (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.MemFree))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.MemFree))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.MemFree >> 10;
 	    break;
@@ -3603,43 +4420,43 @@ linux_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	     * zero (deprecated). PCP exports it for compatibility with older
 	     * PCP monitoring tools, e.g. pmgsys running on IRIX(TM).
 	     */
-	    if (!VALID_VALUE(proc_meminfo.MemShared))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.MemShared))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.MemShared >> 10;
 	    break;
 	case 4: /* mem.util.bufmem (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.Buffers))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.Buffers))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.Buffers >> 10;
 	    break;
 	case 5: /* mem.util.cached (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.Cached))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.Cached))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.Cached >> 10;
 	    break;
 	case 6: /* swap.length (in bytes) */
-	    if (!VALID_VALUE(proc_meminfo.SwapTotal))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.SwapTotal))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.SwapTotal;
 	    break;
 	case 7: /* swap.used (in bytes) */
-	    if (!VALID_VALUE(proc_meminfo.SwapTotal) ||
-	        !VALID_VALUE(proc_meminfo.SwapFree))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.SwapTotal) ||
+	        !MEMINFO_VALID_VALUE(proc_meminfo.SwapFree))
 		return 0; /* no values available */
 	    atom->ull = proc_meminfo.SwapTotal - proc_meminfo.SwapFree;
 	    break;
 	case 8: /* swap.free (in bytes) */
-	    if (!VALID_VALUE(proc_meminfo.SwapFree))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.SwapFree))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.SwapFree;
 	    break;
 	case 9: /* hinv.physmem (in mbytes) */
-	    if (!VALID_VALUE(proc_meminfo.MemTotal))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.MemTotal))
 	    	return 0; /* no values available */
 	    atom->ul = proc_meminfo.MemTotal >> 20;
 	    break;
 	case 10: /* mem.freemem (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.MemFree))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.MemFree))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.MemFree >> 10;
 	    break;
@@ -3648,10 +4465,10 @@ linux_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    break;
 	case 12: /* mem.util.other (in kbytes) */
 	    /* other = used - (cached+buffers) */
-	    if (!VALID_VALUE(proc_meminfo.MemTotal) ||
-	        !VALID_VALUE(proc_meminfo.MemFree) ||
-	        !VALID_VALUE(proc_meminfo.Cached) ||
-	        !VALID_VALUE(proc_meminfo.Buffers))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.MemTotal) ||
+	        !MEMINFO_VALID_VALUE(proc_meminfo.MemFree) ||
+	        !MEMINFO_VALID_VALUE(proc_meminfo.Cached) ||
+	        !MEMINFO_VALID_VALUE(proc_meminfo.Buffers))
 		return 0; /* no values available */
 	    sl = (proc_meminfo.MemTotal -
 		 proc_meminfo.MemFree -
@@ -3660,90 +4477,90 @@ linux_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    atom->ull = sl >= 0 ? sl : 0;
 	    break;
 	case 13: /* mem.util.swapCached (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.SwapCached))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.SwapCached))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.SwapCached >> 10;
 	    break;
 	case 14: /* mem.util.active (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.Active))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.Active))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.Active >> 10;
 	    break;
 	case 15: /* mem.util.inactive (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.Inactive))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.Inactive))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.Inactive >> 10;
 	    break;
 	case 16: /* mem.util.highTotal (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.HighTotal))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.HighTotal))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.HighTotal >> 10;
 	    break;
 	case 17: /* mem.util.highFree (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.HighFree))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.HighFree))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.HighFree >> 10;
 	    break;
 	case 18: /* mem.util.lowTotal (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.LowTotal))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.LowTotal))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.LowTotal >> 10;
 	    break;
 	case 19: /* mem.util.lowFree (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.LowFree))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.LowFree))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.LowFree >> 10;
 	    break;
 	case 20: /* mem.util.swapTotal (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.SwapTotal))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.SwapTotal))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.SwapTotal >> 10;
 	    break;
 	case 21: /* mem.util.swapFree (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.SwapFree))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.SwapFree))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.SwapFree >> 10;
 	    break;
 	case 22: /* mem.util.dirty (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.Dirty))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.Dirty))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.Dirty >> 10;
 	    break;
 	case 23: /* mem.util.writeback (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.Writeback))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.Writeback))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.Writeback >> 10;
 	    break;
 	case 24: /* mem.util.mapped (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.Mapped))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.Mapped))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.Mapped >> 10;
 	    break;
 	case 25: /* mem.util.slab (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.Slab))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.Slab))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.Slab >> 10;
 	    break;
 	case 26: /* mem.util.committed_AS (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.Committed_AS))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.Committed_AS))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.Committed_AS >> 10;
 	    break;
 	case 27: /* mem.util.pageTables (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.PageTables))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.PageTables))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.PageTables >> 10;
 	    break;
 	case 28: /* mem.util.reverseMaps (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.ReverseMaps))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.ReverseMaps))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.ReverseMaps >> 10;
 	    break;
 	case 29: /* mem.util.clean_cache (in kbytes) */
 	    /* clean=cached-(dirty+writeback) */
-	    if (!VALID_VALUE(proc_meminfo.Cached) ||
-	        !VALID_VALUE(proc_meminfo.Dirty) ||
-	        !VALID_VALUE(proc_meminfo.Writeback))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.Cached) ||
+	        !MEMINFO_VALID_VALUE(proc_meminfo.Dirty) ||
+	        !MEMINFO_VALID_VALUE(proc_meminfo.Writeback))
 	    	return 0; /* no values available */
 	    sl = (proc_meminfo.Cached -
 	    	 proc_meminfo.Dirty -
@@ -3751,144 +4568,149 @@ linux_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    atom->ull = sl >= 0 ? sl : 0;
 	    break;
 	case 30: /* mem.util.anonpages */
-	   if (!VALID_VALUE(proc_meminfo.AnonPages))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.AnonPages))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.AnonPages >> 10;
 	   break;
 	case 31: /* mem.util.commitLimit (in kbytes) */
-	    if (!VALID_VALUE(proc_meminfo.CommitLimit))
+	    if (!MEMINFO_VALID_VALUE(proc_meminfo.CommitLimit))
 	    	return 0; /* no values available */
 	    atom->ull = proc_meminfo.CommitLimit >> 10;
 	    break;
 	case 32: /* mem.util.bounce */
-	   if (!VALID_VALUE(proc_meminfo.Bounce))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.Bounce))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.Bounce >> 10;
 	   break;
 	case 33: /* mem.util.NFS_Unstable */
-	   if (!VALID_VALUE(proc_meminfo.NFS_Unstable))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.NFS_Unstable))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.NFS_Unstable >> 10;
 	   break;
 	case 34: /* mem.util.slabReclaimable */
-	   if (!VALID_VALUE(proc_meminfo.SlabReclaimable))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.SlabReclaimable))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.SlabReclaimable >> 10;
 	   break;
 	case 35: /* mem.util.slabUnreclaimable */
-	   if (!VALID_VALUE(proc_meminfo.SlabUnreclaimable))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.SlabUnreclaimable))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.SlabUnreclaimable >> 10;
 	   break;
 	case 36: /* mem.util.active_anon */
-	   if (!VALID_VALUE(proc_meminfo.Active_anon))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.Active_anon))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.Active_anon >> 10;
 	   break;
 	case 37: /* mem.util.inactive_anon */
-	   if (!VALID_VALUE(proc_meminfo.Inactive_anon))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.Inactive_anon))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.Inactive_anon >> 10;
 	   break;
 	case 38: /* mem.util.active_file */
-	   if (!VALID_VALUE(proc_meminfo.Active_file))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.Active_file))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.Active_file >> 10;
 	   break;
 	case 39: /* mem.util.inactive_file */
-	   if (!VALID_VALUE(proc_meminfo.Inactive_file))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.Inactive_file))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.Inactive_file >> 10;
 	   break;
 	case 40: /* mem.util.unevictable */
-	   if (!VALID_VALUE(proc_meminfo.Unevictable))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.Unevictable))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.Unevictable >> 10;
 	   break;
 	case 41: /* mem.util.mlocked */
-	   if (!VALID_VALUE(proc_meminfo.Mlocked))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.Mlocked))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.Mlocked >> 10;
 	   break;
 	case 42: /* mem.util.shmem */
-	   if (!VALID_VALUE(proc_meminfo.Shmem))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.Shmem))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.Shmem >> 10;
 	   break;
 	case 43: /* mem.util.kernelStack */
-	   if (!VALID_VALUE(proc_meminfo.KernelStack))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.KernelStack))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.KernelStack >> 10;
 	   break;
 	case 44: /* mem.util.hugepagesTotal */
-	   if (!VALID_VALUE(proc_meminfo.HugepagesTotal))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.HugepagesTotal))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.HugepagesTotal;
 	   break;
 	case 45: /* mem.util.hugepagesFree */
-	   if (!VALID_VALUE(proc_meminfo.HugepagesFree))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.HugepagesFree))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.HugepagesFree;
 	   break;
 	case 46: /* mem.util.hugepagesRsvd */
-	   if (!VALID_VALUE(proc_meminfo.HugepagesRsvd))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.HugepagesRsvd))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.HugepagesRsvd;
 	   break;
 	case 47: /* mem.util.hugepagesSurp */
-	   if (!VALID_VALUE(proc_meminfo.HugepagesSurp))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.HugepagesSurp))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.HugepagesSurp;
 	   break;
 	case 48: /* mem.util.directMap4k */
-	   if (!VALID_VALUE(proc_meminfo.directMap4k))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.directMap4k))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.directMap4k >> 10;
 	   break;
 	case 49: /* mem.util.directMap2M */
-	   if (!VALID_VALUE(proc_meminfo.directMap2M))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.directMap2M))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.directMap2M >> 10;
 	   break;
 	case 50: /* mem.util.vmallocTotal */
-	   if (!VALID_VALUE(proc_meminfo.VmallocTotal))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.VmallocTotal))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.VmallocTotal >> 10;
 	   break;
 	case 51: /* mem.util.vmallocUsed */
-	   if (!VALID_VALUE(proc_meminfo.VmallocUsed))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.VmallocUsed))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.VmallocUsed >> 10;
 	   break;
 	case 52: /* mem.util.vmallocChunk */
-	   if (!VALID_VALUE(proc_meminfo.VmallocChunk))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.VmallocChunk))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.VmallocChunk >> 10;
 	   break;
 	case 53: /* mem.util.mmap_copy */
-	   if (!VALID_VALUE(proc_meminfo.MmapCopy))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.MmapCopy))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.MmapCopy >> 10;
 	   break;
 	case 54: /* mem.util.quicklists */
-	   if (!VALID_VALUE(proc_meminfo.Quicklists))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.Quicklists))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.Quicklists >> 10;
 	   break;
 	case 55: /* mem.util.corrupthardware */
-	   if (!VALID_VALUE(proc_meminfo.HardwareCorrupted))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.HardwareCorrupted))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.HardwareCorrupted >> 10;
 	   break;
 	case 56: /* mem.util.anonhugepages */
-	   if (!VALID_VALUE(proc_meminfo.AnonHugePages))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.AnonHugePages))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.AnonHugePages >> 10;
 	   break;
 	case 57: /* mem.util.directMap1G */
-	   if (!VALID_VALUE(proc_meminfo.directMap1G))
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.directMap1G))
 		return 0; /* no values available */
 	   atom->ull = proc_meminfo.directMap1G >> 10;
+	   break;
+	case 58: /* mem.util.available */
+	   if (!MEMINFO_VALID_VALUE(proc_meminfo.MemAvailable))
+		return 0; /* no values available */
+	   atom->ull = proc_meminfo.MemAvailable >> 10;
 	   break;
 	default:
 	    return PM_ERR_PMID;
@@ -4244,7 +5066,7 @@ linux_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    if (proc_net_rpc.server.errcode != 0)
 	    	return 0; /* no values available */
 	    for (atom->ul=0, i=0; i < NR_RPC4_SVR_COUNTERS; i++) {
-		atom->ul += proc_net_rpc.server.reqcounts4[i];
+		atom->ul += proc_net_rpc.server.reqcounts4[i+1];
 	    }
 	    break;
 
@@ -4260,7 +5082,7 @@ linux_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	case 67: /* nfs4.server.reqs */
 	    if (proc_net_rpc.server.errcode != 0)
 	    	return 0; /* no values available */
-	    if (inst < NR_RPC4_SVR_COUNTERS)
+	    if (inst && inst <= NR_RPC4_SVR_COUNTERS)
 		atom->ul = proc_net_rpc.server.reqcounts4[inst];
 	    else
 	    	return PM_ERR_INST;
@@ -4328,19 +5150,15 @@ linux_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	return proc_partitions_fetch(mdesc, inst, atom);
 
     case CLUSTER_SCSI:
-	if (proc_scsi.nscsi == 0)
-	    return 0; /* no values available */
-	switch(idp->item) {
+	scsi_entry = NULL;
+	sts = pmdaCacheLookup(INDOM(SCSI_INDOM), inst, NULL, (void **)&scsi_entry);
+	if (sts < 0)
+	    return sts;
+	if (sts == PMDA_CACHE_INACTIVE)
+	    return PM_ERR_INST;
+	switch (idp->item) {
 	case 0: /* hinv.map.scsi */
-	    atom->cp = (char *)NULL;
-	    for (i=0; i < proc_scsi.nscsi; i++) {
-		if (proc_scsi.scsi[i].id == inst) {
-		    atom->cp = proc_scsi.scsi[i].dev_name;
-		    break;
-		}
-	    }
-	    if (i == proc_scsi.nscsi)
-	    	return PM_ERR_INST;
+	    atom->cp = (scsi_entry && scsi_entry->dev_name) ? scsi_entry->dev_name : "";
 	    break;
 	default:
 	    return PM_ERR_PMID;
@@ -4461,6 +5279,25 @@ linux_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 		return 0;
 	    atom->ul = proc_cpuinfo.cpuinfo[inst].cache_align;
 	    break;
+
+	default:
+	    return PM_ERR_PMID;
+	}
+	break;
+
+    case CLUSTER_SYSFS_DEVICES:
+	switch (idp->item) {
+	case 0: /* hinv.cpu.online */
+	    if (inst >= proc_cpuinfo.cpuindom->it_numinst)
+		return PM_ERR_INST;
+	    atom->ul = refresh_sysfs_online(inst, "cpu");
+	    break;
+	case 1: /* hinv.node.online */
+	    if (inst >= proc_cpuinfo.node_indom->it_numinst)
+		return PM_ERR_INST;
+	    atom->ul = refresh_sysfs_online(inst, "node");
+	    break;
+
 	default:
 	    return PM_ERR_PMID;
 	}
@@ -4581,7 +5418,6 @@ linux_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    endutent();
 	}
 	break;
-
 
     case CLUSTER_IB: /* deprecated: network.ib, use infiniband PMDA */
         return PM_ERR_APPVERSION;
@@ -4802,6 +5638,9 @@ linux_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    return PM_ERR_INST;
 	return interrupts_fetch(idp->cluster, idp->item, inst, atom);
 
+    case CLUSTER_DM:
+	return proc_partitions_fetch(mdesc, inst, atom);
+
     default: /* unknown cluster */
 	return PM_ERR_PMID;
     }
@@ -4813,36 +5652,72 @@ linux_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 static int
 linux_fetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *pmda)
 {
-    int		i;
-    int		need_refresh[NUM_CLUSTERS];
+    int		need_refresh[NUM_CLUSTERS] = {0};
+    int		i, sts, pid = 0, length = 0, ns_flags = 0;
+    char	*container = NULL;
 
-    memset(need_refresh, 0, sizeof(need_refresh));
-    for (i=0; i < numpmid; i++) {
+    for (i = 0; i < numpmid; i++) {
 	__pmID_int *idp = (__pmID_int *)&(pmidlist[i]);
-	if (idp->cluster < NUM_CLUSTERS) {
-	    need_refresh[idp->cluster]++;
 
-	    if (idp->cluster == CLUSTER_STAT && 
-		need_refresh[CLUSTER_PARTITIONS] == 0 &&
+	if (idp->cluster >= NUM_CLUSTERS)
+	    continue;
+	need_refresh[idp->cluster]++;
+
+	switch (idp->cluster) {
+	case CLUSTER_STAT:
+	case CLUSTER_DM:
+	    if (need_refresh[CLUSTER_PARTITIONS] == 0 &&
 		is_partitions_metric(pmidlist[i]))
 		need_refresh[CLUSTER_PARTITIONS]++;
+	    /* In 2.6 kernels, swap.{pagesin,pagesout} are in /proc/vmstat */
+	    if (_pm_have_proc_vmstat && idp->cluster == CLUSTER_STAT) {
+		if (idp->item >= 8 && idp->item <= 11)
+		    need_refresh[CLUSTER_VMSTAT]++;
+	    }
+	    break;
 
-	    if (idp->cluster == CLUSTER_CPUINFO ||
-		idp->cluster == CLUSTER_INTERRUPT_LINES ||
-		idp->cluster == CLUSTER_INTERRUPT_OTHER ||
-		idp->cluster == CLUSTER_INTERRUPTS)
-		need_refresh[CLUSTER_STAT]++;
-	}
+	case CLUSTER_CPUINFO:
+	case CLUSTER_SYSFS_DEVICES:
+	case CLUSTER_INTERRUPT_LINES:
+	case CLUSTER_INTERRUPT_OTHER:
+	case CLUSTER_INTERRUPTS:
+	    need_refresh[CLUSTER_STAT]++;
+	    break;
 
-	/* In 2.6 kernels, swap.{pagesin,pagesout} are in /proc/vmstat */
-	if (_pm_have_proc_vmstat && idp->cluster == CLUSTER_STAT) {
-	    if (idp->item >= 8 && idp->item <= 11)
-	    	need_refresh[CLUSTER_VMSTAT]++;
+	case CLUSTER_KERNEL_UNAME:
+	    ns_flags |= LINUX_NAMESPACE_UTS;
+	    break;
+
+	case CLUSTER_NET_DEV:
+	case CLUSTER_NET_ADDR:
+	    ns_flags |= LINUX_NAMESPACE_NET;
+	    break;
+
+	case CLUSTER_NET_NFS:
+	case CLUSTER_FILESYS:
+	case CLUSTER_TMPFS:
+	    ns_flags |= LINUX_NAMESPACE_MNT;
+	    break;
+
+	case CLUSTER_SEM_LIMITS:
+	case CLUSTER_MSG_LIMITS:
+	case CLUSTER_SHM_LIMITS:
+	    ns_flags |= LINUX_NAMESPACE_IPC;
+	    break;
 	}
     }
 
-    linux_refresh(pmda, need_refresh);
-    return pmdaFetch(numpmid, pmidlist, resp, pmda);
+    if ((container = linux_ctx_container(pmda->e_context, &length)) != NULL) {
+	sts = container_enter_namespaces(rootfd, container, length, ns_flags);
+	if (sts < 0)
+	    return sts;
+	pid = sts;
+    }
+    linux_refresh(pmda, need_refresh, pid);
+    sts = pmdaFetch(numpmid, pmidlist, resp, pmda);
+    if (container)
+	container_leave_namespaces(rootfd, ns_flags);
+    return sts;
 }
 
 static int
@@ -4875,6 +5750,47 @@ linux_children(const char *name, int flag, char ***kids, int **sts, pmdaExt *pmd
 {
     pmdaNameSpace *tree = pmdaDynamicLookupName(pmda, name);
     return pmdaTreeChildren(tree, name, flag, kids, sts);
+}
+
+static void
+linux_grow_ctxtab(int ctx)
+{
+    /* expand and initialize the per client context table */
+    ctxtab = (perctx_t *)realloc(ctxtab, (ctx+1)*sizeof(ctxtab[0]));
+    if (ctxtab == NULL) {
+	__pmNoMem("grow_ctxtab", (ctx+1)*sizeof(ctxtab[0]), PM_FATAL_ERR);
+	/*NOTREACHED*/
+    }
+    while (num_ctx <= ctx) {
+	ctxtab[num_ctx].container = NULL;
+	num_ctx++;
+    }
+    ctxtab[ctx].container = NULL;
+}
+
+static void
+linux_end_context(int ctx)
+{
+    if (ctx >= 0 && ctx < num_ctx) {
+	if (ctxtab[ctx].container)
+	    free(ctxtab[ctx].container);
+	ctxtab[ctx].container = NULL;
+    }
+}
+
+static int
+linux_attribute(int ctx, int attr, const char *value, int len, pmdaExt *pmda)
+{
+    if (attr == PCP_ATTR_CONTAINER) {
+	if (ctx >= num_ctx)
+	    linux_grow_ctxtab(ctx);
+	if (ctxtab[ctx].container)
+	    free(ctxtab[ctx].container);
+	if ((ctxtab[ctx].container = strdup(value)) == NULL)
+	    return -ENOMEM;
+	ctxtab[ctx].length = len;
+    }
+    return pmdaAttribute(ctx, attr, value, len, pmda);
 }
 
 pmInDom
@@ -4921,33 +5837,40 @@ linux_init(pmdaInterface *dp)
 {
     int		i, major, minor, point;
     size_t	nmetrics, nindoms;
+    char	*envpath;
     __pmID_int	*idp;
 
     _pm_system_pagesize = getpagesize();
+    if ((envpath = getenv("LINUX_STATSPATH")) != NULL)
+	linux_statspath = envpath;
+
     if (_isDSO) {
 	char helppath[MAXPATHLEN];
 	int sep = __pmPathSeparator();
 	snprintf(helppath, sizeof(helppath), "%s%c" "linux" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-	pmdaDSO(dp, PMDA_INTERFACE_4, "linux DSO", helppath);
+	pmdaDSO(dp, PMDA_INTERFACE_6, "linux DSO", helppath);
     } else {
-	__pmSetProcessIdentity(username);
+	if (username)
+	    __pmSetProcessIdentity(username);
     }
 
     if (dp->status != 0)
 	return;
+    dp->comm.flags |= PDU_FLAG_CONTAINER;
 
-    dp->version.four.instance = linux_instance;
-    dp->version.four.fetch = linux_fetch;
-    dp->version.four.text = linux_text;
-    dp->version.four.pmid = linux_pmid;
-    dp->version.four.name = linux_name;
-    dp->version.four.children = linux_children;
+    dp->version.six.instance = linux_instance;
+    dp->version.six.fetch = linux_fetch;
+    dp->version.six.text = linux_text;
+    dp->version.six.pmid = linux_pmid;
+    dp->version.six.name = linux_name;
+    dp->version.six.children = linux_children;
+    dp->version.six.attribute = linux_attribute;
+    dp->version.six.ext->e_endCallBack = linux_end_context;
     pmdaSetFetchCallBack(dp, linux_fetchCallBack);
 
     proc_stat.cpu_indom = proc_cpuinfo.cpuindom = &indomtab[CPU_INDOM];
     numa_meminfo.node_indom = proc_cpuinfo.node_indom = &indomtab[NODE_INDOM];
-    proc_scsi.scsi_indom = &indomtab[SCSI_INDOM];
     dev_mapper.lv_indom = &indomtab[LV_INDOM];
     proc_slabinfo.indom = &indomtab[SLAB_INDOM];
 
@@ -5034,6 +5957,7 @@ linux_init(pmdaInterface *dp)
     proc_vmstat_init();
     interrupts_init(metrictab, nmetrics);
 
+    rootfd = pmdaRootConnect(NULL);
     pmdaSetFlags(dp, PMDA_EXT_FLAG_HASHED);
     pmdaInit(dp, indomtab, nindoms, metrictab, nmetrics);
 
@@ -5041,51 +5965,45 @@ linux_init(pmdaInterface *dp)
     pmdaCacheOp(INDOM(STRINGS_INDOM), PMDA_CACHE_STRINGS);
 }
 
+pmLongOptions	longopts[] = {
+    PMDA_OPTIONS_HEADER("Options"),
+    PMOPT_DEBUG,
+    PMDAOPT_DOMAIN,
+    PMDAOPT_LOGFILE,
+    PMDAOPT_USERNAME,
+    PMOPT_HELP,
+    PMDA_OPTIONS_END
+};
 
-static void
-usage(void)
-{
-    fprintf(stderr, "Usage: %s [options]\n\n", pmProgname);
-    fputs("Options:\n"
-	  "  -d domain  use domain (numeric) for metrics domain of PMDA\n"
-	  "  -l logfile write log into logfile rather than using default log name\n"
-	  "  -U username  user account to run under (default \"pcp\")\n",
-	  stderr);		
-    exit(1);
-}
+pmdaOptions	opts = {
+    .short_options = "D:d:l:U:?",
+    .long_options = longopts,
+};
 
 /*
  * Set up the agent if running as a daemon.
  */
-
 int
 main(int argc, char **argv)
 {
     int			sep = __pmPathSeparator();
-    int			err = 0;
-    int			c;
     pmdaInterface	dispatch;
     char		helppath[MAXPATHLEN];
 
     _isDSO = 0;
     __pmSetProgname(argv[0]);
-    __pmGetUsername(&username);
 
     snprintf(helppath, sizeof(helppath), "%s%c" "linux" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-    pmdaDaemon(&dispatch, PMDA_INTERFACE_4, pmProgname, LINUX, "linux.log", helppath);
+    pmdaDaemon(&dispatch, PMDA_INTERFACE_6, pmProgname, LINUX, "linux.log", helppath);
 
-    while ((c = pmdaGetOpt(argc, argv, "D:d:l:U:?", &dispatch, &err)) != EOF) {
-	switch(c) {
-	case 'U':
-	    username = optarg;
-	    break;
-	default:
-	    err++;
-	}
+    pmdaGetOptions(argc, argv, &opts, &dispatch);
+    if (opts.errors) {
+	pmdaUsageMessage(&opts);
+	exit(1);
     }
-    if (err)
-	usage();
+    if (opts.username)
+	username = opts.username;
 
     pmdaOpenLog(&dispatch);
     linux_init(&dispatch);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Red Hat.
+ * Copyright (c) 2012-2014 Red Hat.
  * Copyright (c) 1995-2002,2004 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This library is free software; you can redistribute it and/or modify it
@@ -84,6 +84,106 @@ negotiate_proxy(int fd, const char *hostname, int port)
 }
 
 /*
+ * Verify that the requested context flags (ctxflags) are
+ * viable given available functionality from pmcd at the
+ * other end of a connection (features).
+ * Returns appropriate PDU flags for the client to send to
+ * pmcd if we can go ahead with the connection, else error.
+ */
+static int
+check_feature_flags(int ctxflags, int features)
+{
+    int		pduflags = 0;
+
+    if (features & PDU_FLAG_CREDS_REQD)
+	/*
+	 * This is a mandatory connection feature - pmcd must be
+	 * sent user credential information one way or another -
+	 * i.e. via SASL2 authentication, or AF_UNIX peer creds.
+	 */
+	pduflags |= PDU_FLAG_CREDS_REQD;
+
+    if (ctxflags) {
+	/*
+	 * If an optional connection feature (e.g. encryption) is
+	 * desired, the pmcd that we're talking to must advertise
+	 * support for the feature.  And if it did, the client in
+	 * turn must request it be enabled (now, via pduflags).
+	 */
+	if (ctxflags & (PM_CTXFLAG_SECURE|PM_CTXFLAG_RELAXED)) {
+	    if (features & PDU_FLAG_SECURE) {
+		pduflags |= PDU_FLAG_SECURE;
+		/*
+		 * Determine whether the server can send an ACK for a
+		 * secure connection request. We can still connect
+		 * whether it does or not, but we need to know the
+		 * protocol.
+		 */
+		if (features & PDU_FLAG_SECURE_ACK)
+		    pduflags |= PDU_FLAG_SECURE_ACK;
+	    } else if (ctxflags & PM_CTXFLAG_SECURE) {
+		return -EOPNOTSUPP;
+	    }
+	}
+	if (ctxflags & PM_CTXFLAG_COMPRESS) {
+	    if (features & PDU_FLAG_COMPRESS)
+		pduflags |= PDU_FLAG_COMPRESS;
+	    else
+		return -EOPNOTSUPP;
+	}
+	if (ctxflags & PM_CTXFLAG_AUTH) {
+	    if (features & PDU_FLAG_AUTH)
+		pduflags |= PDU_FLAG_AUTH;
+	    else
+		return -EOPNOTSUPP;
+	}
+	if (ctxflags & PM_CTXFLAG_CONTAINER) {
+	    if (features & PDU_FLAG_CONTAINER)
+		pduflags |= PDU_FLAG_CONTAINER;
+	    else
+		return -EOPNOTSUPP;
+	}
+    }
+    return pduflags;
+}
+
+static int
+container_handshake(int fd, __pmHashCtl *attrs)
+{
+    __pmHashNode *node;
+    const char *name;
+    int length;
+
+    if ((node = __pmHashSearch(PCP_ATTR_CONTAINER, attrs)) == NULL)
+	return -ESRCH;
+    if ((name = (const char *)node->data) == NULL)
+	return -ESRCH;
+    length = strlen(name);
+
+    if (pmDebug & DBG_TRACE_CONTEXT)
+	fprintf(stderr, "%s:__pmConnectHandshake container=\"%s\" [%d]\n",
+		__FILE__, name, length);
+
+    return __pmSendAttr(fd, FROM_ANON, PCP_ATTR_CONTAINER, name, length);
+}
+
+static int
+attributes_handshake(int fd, int flags, const char *host, __pmHashCtl *attrs)
+{
+    int sts;
+
+    if ((sts = __pmSecureClientHandshake(fd, flags, host, attrs)) < 0)
+	return sts;
+
+    /* additional connection attributes, done after secure setup */
+    if (((flags & PDU_FLAG_CONTAINER) != 0) &&
+	((sts = container_handshake(fd, attrs)) < 0))
+	return sts;
+
+    return 0;
+}
+
+/*
  * client connects to pmcd handshake
  */
 static int
@@ -123,74 +223,38 @@ __pmConnectHandshake(int fd, const char *hostname, int ctxflags, __pmHashCtl *at
 	if (version == PDU_VERSION2) {
 	    __pmPDUInfo		pduinfo;
 	    __pmVersionCred	handshake;
-	    int			pduflags = 0;
+	    int			pduflags;
 
 	    pduinfo = __ntohpmPDUInfo(*(__pmPDUInfo *)&challenge);
-
-	    if (pduinfo.features & PDU_FLAG_CREDS_REQD)
-		/*
-		 * This is a mandatory connection feature - pmcd must be
-		 * sent user credential information one way or another -
-		 * i.e. via SASL2 authentication, or AF_UNIX peer creds.
-		 */
-		pduflags |= PDU_FLAG_CREDS_REQD;
-
-	    if (ctxflags) {
-		/*
-		 * If an optional connection feature (e.g. encryption) is
-		 * desired, the pmcd that we're talking to must advertise
-		 * support for the feature.  And if it did, the client in
-		 * turn must request it be enabled (now, via pduflags).
-		 */
-		if (ctxflags & (PM_CTXFLAG_SECURE|PM_CTXFLAG_RELAXED)) {
-		    if (pduinfo.features & PDU_FLAG_SECURE) {
-			pduflags |= PDU_FLAG_SECURE;
-		    } else if (ctxflags & PM_CTXFLAG_SECURE) {
-			__pmUnpinPDUBuf(pb);
-			return -EOPNOTSUPP;
-		    }
-		}
-		if (ctxflags & PM_CTXFLAG_COMPRESS) {
-		    if (pduinfo.features & PDU_FLAG_COMPRESS)
-			pduflags |= PDU_FLAG_COMPRESS;
-		    else {
-			__pmUnpinPDUBuf(pb);
-			return -EOPNOTSUPP;
-		    }
-		}
-		if (ctxflags & PM_CTXFLAG_AUTH) {
-		    if (pduinfo.features & PDU_FLAG_AUTH)
-			pduflags |= PDU_FLAG_AUTH;
-		    else {
-			__pmUnpinPDUBuf(pb);
-			return -EOPNOTSUPP;
-		    }
-		}
+	    pduflags = sts = check_feature_flags(ctxflags, pduinfo.features);
+	    if (sts < 0) {
+		__pmUnpinPDUBuf(pb);
+		return sts;
 	    }
 
-	    /*
-	     * Negotiate connection version and features (via creds PDU)
-	     */
 	    if ((ok = __pmSetVersionIPC(fd, version)) < 0) {
 		__pmUnpinPDUBuf(pb);
 		return ok;
 	    }
 
+	    /*
+	     * Negotiate connection version and features (via creds PDU)
+	     */
 	    memset(&handshake, 0, sizeof(handshake));
 	    handshake.c_type = CVERSION;
 	    handshake.c_version = PDU_VERSION;
 	    handshake.c_flags = pduflags;
-
 	    sts = __pmSendCreds(fd, (int)getpid(), 1, (__pmCred *)&handshake);
 
 	    /*
-	     * At this point we know caller wants to set channel options and
-	     * pmcd supports them so go ahead and update the socket now (this
+	     * At this point we know the caller wants to set channel options
+	     * and pmcd supports them so go ahead and update the socket (this
 	     * completes the SSL handshake in encrypting mode, authentication
-	     * via SASL, and/or enabling compression in NSS).
+	     * via SASL, enabling compression in NSS, and any other requested
+	     * connection attributes).
 	     */
 	    if (sts >= 0 && pduflags)
-		sts = __pmSecureClientHandshake(fd, pduflags, hostname, attrs);
+		sts = attributes_handshake(fd, pduflags, hostname, attrs);
 	}
 	else
 	    sts = PM_ERR_IPC;
@@ -206,59 +270,21 @@ __pmConnectHandshake(int fd, const char *hostname, int ctxflags, __pmHashCtl *at
 
 static int	global_nports;
 static int	*global_portlist;
-static int	default_portlist[] = { SERVER_PORT };
 
 static void
 load_pmcd_ports(void)
 {
-    static int	first_time = 1;
-
-    if (first_time) {
-	char	*envstr;
-	char	*endptr;
-
-	first_time = 0;
-
-	if ((envstr = getenv("PMCD_PORT")) != NULL) {
-	    char	*p = envstr;
-
-	    for ( ; ; ) {
-		int size, port = (int)strtol(p, &endptr, 0);
-		if ((*endptr != '\0' && *endptr != ',') || port < 0) {
-		    __pmNotifyErr(LOG_WARNING,
-				  "ignored bad PMCD_PORT = '%s'", p);
-		}
-		else {
-		    size = ++global_nports * sizeof(int);
-		    global_portlist = (int *)realloc(global_portlist, size);
-		    if (global_portlist == NULL) {
-			__pmNotifyErr(LOG_WARNING,
-				     "__pmConnectPMCD: portlist alloc failed (%d bytes), using default PMCD_PORT (%d)\n", size, SERVER_PORT);
-			global_nports = 0;
-			break;
-		    }
-		    global_portlist[global_nports-1] = port;
-		}
-		if (*endptr == '\0')
-		    break;
-		p = &endptr[1];
-	    }
-	}
-
-	if (global_nports == 0) {
-	    global_portlist = default_portlist;
-	    global_nports = sizeof(default_portlist) / sizeof(default_portlist[0]);
-	}
+    if (global_portlist == NULL) {
+	/* __pmPMCDAddPorts discovers at least one valid port, if it returns. */
+	global_nports = __pmPMCDAddPorts(&global_portlist, global_nports);
     }
 }
 
 static void
 load_proxy_hostspec(pmHostSpec *proxy)
 {
-    static int	proxy_port;
     char	errmsg[PM_MAXERRMSGLEN];
     char	*envstr;
-    char	*endptr;
 
     if ((envstr = getenv("PMPROXY_HOST")) != NULL) {
 	proxy->name = strdup(envstr);
@@ -268,37 +294,13 @@ load_proxy_hostspec(pmHostSpec *proxy)
 			  pmErrStr_r(-oserror(), errmsg, sizeof(errmsg)));
 	}
 	else {
-	    if ((envstr = getenv("PMPROXY_PORT")) != NULL) {
-		proxy_port = (int)strtol(envstr, &endptr, 0);
-		if (*endptr != '\0' || proxy_port < 0) {
-		    __pmNotifyErr(LOG_WARNING,
-			"__pmConnectPMCD: ignored bad PMPROXY_PORT = '%s'\n", envstr);
-		    proxy_port = PROXY_PORT;
-		}
-	    } else {
-		proxy_port = PROXY_PORT;
-	    }
-	    proxy->ports = &proxy_port;
-	    proxy->nports = 1;
+	    /*
+	     *__pmProxyAddPorts discovers at least one valid port, if it
+	     * returns.
+	     */
+	    proxy->nports = __pmProxyAddPorts(&proxy->ports, proxy->nports);
 	}
     }
-}
-
-static void
-load_secure_runtime(void)
-{
-    /* Ensure correct security lib initialisation order */
-    __pmInitAuthClients();
-    __pmInitSecureSockets();
-
-    /*
-     * If secure sockets functionality available, iterate over the set of
-     * known locations for certificate databases and attempt to initialise
-     * one of them for our use.
-     */
-    if (__pmInitCertificates() < 0)
-	__pmNotifyErr(LOG_WARNING, "__pmConnectPMCD: "
-		"certificate database exists, but failed initialization");
 }
 
 void
@@ -346,7 +348,6 @@ __pmConnectPMCD(pmHostSpec *hosts, int nhosts, int ctxflags, __pmHashCtl *attrs)
 	first_time = 0;
 	load_pmcd_ports();
 	load_proxy_hostspec(&proxy);
-	load_secure_runtime();
     }
 
     if (hosts[0].nports == 0) {
@@ -370,6 +371,11 @@ __pmConnectPMCD(pmHostSpec *hosts, int nhosts, int ctxflags, __pmHashCtl *attrs)
 	/* Try connecting via the local unix domain socket, if requested and supported. */
 	if (nports == PM_HOST_SPEC_NPORTS_LOCAL || nports == PM_HOST_SPEC_NPORTS_UNIX) {
 #if defined(HAVE_STRUCT_SOCKADDR_UN)
+#ifdef PCP_DEBUG
+	    if ((pmDebug & DBG_TRACE_CONTEXT) && (pmDebug & DBG_TRACE_DESPERATE)) {
+		fprintf(stderr, "__pmConnectPMCD: trying __pmAuxConnectPMCDUnixSocket(%s) ...\n", name);
+	    }
+#endif
 	    if ((fd = __pmAuxConnectPMCDUnixSocket(name)) >= 0) {
 		if ((sts = __pmConnectHandshake(fd, name, ctxflags, attrs)) < 0) {
 		    __pmCloseSocket(fd);
@@ -398,6 +404,11 @@ __pmConnectPMCD(pmHostSpec *hosts, int nhosts, int ctxflags, __pmHashCtl *attrs)
 	/* If still not connected, try via the given host name and ports, if requested. */
 	if (sts == -1) {
 	    for (portIx = 0; portIx < nports; portIx++) {
+#ifdef PCP_DEBUG
+		if ((pmDebug & DBG_TRACE_CONTEXT) && (pmDebug & DBG_TRACE_DESPERATE)) {
+		    fprintf(stderr, "__pmConnectPMCD: trying __pmAuxConnectPMCDPort(%s, %d) ...\n", name, ports[portIx]);
+		}
+#endif
 		if ((fd = __pmAuxConnectPMCDPort(name, ports[portIx])) >= 0) {
 		    if ((sts = __pmConnectHandshake(fd, name, ctxflags, attrs)) < 0) {
 			__pmCloseSocket(fd);
@@ -452,6 +463,11 @@ __pmConnectPMCD(pmHostSpec *hosts, int nhosts, int ctxflags, __pmHashCtl *attrs)
     proxyport = (proxyhost->nports > 0) ? proxyhost->ports[0] : PROXY_PORT;
 
     for (portIx = 0; portIx < nports; portIx++) {
+#ifdef PCP_DEBUG
+	if ((pmDebug & DBG_TRACE_CONTEXT) && (pmDebug & DBG_TRACE_DESPERATE)) {
+	    fprintf(stderr, "__pmConnectPMCD: trying __pmAuxConnectPMCDPort(%s, %d) ...\n", proxyhost->name, proxyport);
+	}
+#endif
 	fd = __pmAuxConnectPMCDPort(proxyhost->name, proxyport);
 	if (fd < 0) {
 #ifdef PCP_DEBUG

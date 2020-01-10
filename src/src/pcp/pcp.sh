@@ -26,7 +26,7 @@ trap "rm -rf $tmp; exit \$sts" 0 1 2 3 15
 errors=0
 progname=`basename $0`
 pcp_host=`hostname` # may match pmcd.hostname
-for var in unknown version build numagents numclients ncpu ndisk nnode nrouter nxbow ncell mem cputype uname timezone hostname status
+for var in unknown version build numagents numclients ncpu ndisk nnode nrouter nxbow ncell mem cputype uname timezone hostname services status
 do
     eval $var="unknown?"
 done
@@ -36,7 +36,7 @@ do
 done
 
 # metrics
-metrics="pmcd.numagents pmcd.numclients pmcd.version pmcd.build pmcd.timezone pmcd.hostname pmcd.agent.status pmcd.pmlogger.archive pmcd.pmlogger.pmcd_host hinv.ncpu hinv.ndisk hinv.nnode hinv.nrouter hinv.nxbow hinv.ncell hinv.physmem hinv.cputype pmda.uname pmcd.pmie.pmcd_host pmcd.pmie.configfile pmcd.pmie.numrules pmcd.pmie.logfile"
+metrics="pmcd.numagents pmcd.numclients pmcd.version pmcd.build pmcd.timezone pmcd.hostname pmcd.services pmcd.agent.status pmcd.pmlogger.archive pmcd.pmlogger.pmcd_host hinv.ncpu hinv.ndisk hinv.nnode hinv.nrouter hinv.nxbow hinv.ncell hinv.physmem hinv.cputype pmda.uname pmcd.pmie.pmcd_host pmcd.pmie.configfile pmcd.pmie.numrules pmcd.pmie.logfile"
 pmiemetrics="pmcd.pmie.actions pmcd.pmie.eval.true pmcd.pmie.eval.false pmcd.pmie.eval.unknown pmcd.pmie.eval.expected"
 
 # usage spec for pmgetopt, note posix flag (commands mean no reordering)
@@ -327,6 +327,7 @@ mode == 3		{ inst(); next }
 /pmcd.numclients/	{ mode = 1; quote="numclients"; next }
 /pmcd.timezone/		{ mode = 1; quote="timezone"; next }
 /pmcd.hostname/		{ mode = 1; quote="hostname"; next }
+/pmcd.services/		{ mode = 1; quote="services"; next }
 /pmcd.agent.status/	{ mode = 2; count = 0; quote="status"; next }
 /pmcd.pmlogger.archive/	{ mode = 3; count = 0; quote="log_archive"; next }
 /pmcd.pmlogger.pmcd_host/ { mode = 3; count = 0; quote="log_host"; next }
@@ -395,6 +396,7 @@ else
     uname="$uname"
 fi
 
+[ "$services" = $unknown ] && services=""
 [ "$timezone" = $unknown ] && timezone="Unknown"
 [ "$hostname" = $unknown ] || pcp_host="$hostname"
 
@@ -430,30 +432,14 @@ END		{ print count }'`
     $PCP_AWK_PROG < $tmp/log > $tmp/loggers '
 BEGIN		{ primary=0 }
 $1 == "0"	{ primary=$3; next }
-$3 == primary	{ offset = match($3, "/pmlogger/")
-		  if (offset != 0) {
-		    $3=substr($3, offset+10, length($3))
-		  } else {
-		    offset = match($3, "/pcplog/")
-		    if (offset != 0)
-		      $3=substr($3, offset+8, length($3))
-		  }
-		  printf "primary logger: %s\n\n",$3; exit }'
+$3 == primary	{ printf "primary logger: %s\n\n",$3; exit }'
 
     $PCP_AWK_PROG < $tmp/log >> $tmp/loggers '
 BEGIN		{ primary=0 }
 $1 == "0"	{ primary=$3; next }
 $1 == "1"	{ next }
 $3 == primary	{ next }
-	{ offset = match($3, "/pmlogger/")
-		  if (offset != 0) {
-		    $3=substr($3, offset+10, length($3))
-		  } else {
-		    offset = match($3, "/pcplog/")
-		    if (offset != 0)
-		      $3=substr($3, offset+8, length($3))
-		  }
-		  printf "%s: %s\n\n",$2,$3 }'
+		{ printf "%s: %s\n\n",$2,$3 }'
 else
     numloggers=0
 fi
@@ -480,6 +466,7 @@ then
 	sort $tmp/ie_false -o $tmp/ie_false
 	sort $tmp/ie_unknown -o $tmp/ie_unknown
 	sort $tmp/ie_expected -o $tmp/ie_expected
+	sort $tmp/pmie -o $tmp/pmie
 	join $tmp/pmie $tmp/ie_true | join - $tmp/ie_false \
 		| join - $tmp/ie_unknown | join - $tmp/ie_actions \
 		| join - $tmp/ie_expected > $tmp/tmp
@@ -488,9 +475,6 @@ then
 
     $PCP_AWK_PROG -v Pflag=$Pflag < $tmp/pmie '{
 	if (Pflag == "true") {
-	    offset = match($3, "/pmie/")
-	    if (offset != 0)
-		$3=substr($3, offset+6, length($3))
 	    printf "%s: %s (%u rules)\n\n",$2,$3,$4
 	    printf "evaluations true=%u false=%u unknown=%u (actions=%u)\n\n",$5,$6,$7,$8
 	    printf "expected evaluation rate=%.2f rules/sec\n\n",$9
@@ -510,6 +494,7 @@ echo
 echo " platform: ${uname}"
 echo " hardware: "`echo $hardware | _fmt`
 echo " timezone: $timezone"
+[ -n "$services" ] && echo " services: $services"
 
 echo "     pmcd: ${version},${numagents}$numclients"
 
@@ -534,3 +519,4 @@ then
 fi
 
 sts=0
+exit

@@ -28,7 +28,6 @@ static char		*fullname;	/* full PMNS pathname for newbie */
 static pmLongOptions longopts[] = {
     PMAPI_OPTIONS_HEADER("Options"),
     PMOPT_DEBUG,
-    { "duplicates", 0, 'd', 0, "duplicate PMIDs are allowed" },
     PMOPT_NAMESPACE,
     PMOPT_HELP,
     PMAPI_OPTIONS_END
@@ -106,28 +105,30 @@ main(int argc, char **argv)
     int		sep = __pmPathSeparator();
     int		sts;
     int		c;
-    int		dupok = 0;
     char	*p;
     char	pmnsfile[MAXPATHLEN];
     char	outfname[MAXPATHLEN];
     struct stat	sbuf;
 
-    if ((p = getenv("PMNS_DEFAULT")) != NULL)
-	strcpy(pmnsfile, p);
-    else
+    if ((p = getenv("PMNS_DEFAULT")) != NULL) {
+	strncpy(pmnsfile, p, MAXPATHLEN);
+        pmnsfile[MAXPATHLEN-1]= '\0';
+
+    } else {
 	snprintf(pmnsfile, sizeof(pmnsfile), "%s%c" "pmns" "%c" "root",
 		pmGetConfig("PCP_VAR_DIR"), sep, sep);
+    }
 
     while ((c = pmgetopt_r(argc, argv, &opts)) != EOF) {
 	switch (c) {
 
 	case 'd':	/* duplicate PMIDs are OK */
-	    dupok = 1;
+	    fprintf(stderr, "%s: Warning: -d deprecated, duplicate PMNS names allowed by default\n", pmProgname);
 	    break;
 
 	case 'D':	/* debug flag */
 	    if ((sts = __pmParseDebug(opts.optarg)) < 0) {
-		pmprintf("%s: unrecognized debug flag specification (%s)\n",
+		fprintf(stderr, "%s: unrecognized debug flag specification (%s)\n",
 			pmProgname, opts.optarg);
 		opts.errors++;
 	    } else {
@@ -136,7 +137,8 @@ main(int argc, char **argv)
 	    break;
 
 	case 'n':	/* alternative name space file */
-	    strcpy(pmnsfile, opts.optarg);
+	    strncpy(pmnsfile, opts.optarg, MAXPATHLEN);
+	    pmnsfile[MAXPATHLEN-1]= '\0';
 	    break;
 
 	case '?':
@@ -151,7 +153,7 @@ main(int argc, char **argv)
 	exit(1);
     }
 
-    if ((sts = pmLoadASCIINameSpace(pmnsfile, dupok)) < 0) {
+    if ((sts = pmLoadNameSpace(pmnsfile)) < 0) {
 	fprintf(stderr, "%s: Error: pmLoadNameSpace(%s): %s\n",
 		pmProgname, pmnsfile, pmErrStr(sts));
 	exit(1);

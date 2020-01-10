@@ -7,6 +7,9 @@ sample.aggregate.hullo
 sample.aggregate.null
 sample.aggregate.write_me
 sample.bin
+sample.dupnames.three.bin
+sample.dupnames.two.bin
+sample.event.highres_records
 sample.event.no_indom_records
 sample.event.param_32
 sample.event.param_64
@@ -18,6 +21,7 @@ sample.event.param_u32
 sample.event.param_u64
 sample.event.records
 sample.event.reset
+sample.event.reset_highres
 sample.event.type
 
 Reduced archive ...
@@ -31,6 +35,9 @@ pmcd.pmlogger.archive
 pmcd.pmlogger.host
 pmcd.pmlogger.port
 sample.bin
+sample.dupnames.three.bin
+sample.dupnames.two.bin
+sample.event.highres_records
 sample.event.param_32
 sample.event.param_64
 sample.event.param_double
@@ -39,4 +46,5 @@ sample.event.param_string
 sample.event.param_u32
 sample.event.param_u64
 sample.event.reset
+sample.event.reset_highres
 sample.event.type

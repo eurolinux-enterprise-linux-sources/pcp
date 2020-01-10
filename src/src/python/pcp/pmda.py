@@ -1,7 +1,7 @@
 # pylint: disable=C0103
 """Wrapper module for libpcp_pmda - Performace Co-Pilot Domain Agent API
 #
-# Copyright (C) 2013 Red Hat.
+# Copyright (C) 2013-2015 Red Hat.
 #
 # This file is part of the "pcp" module, the python interfaces for the
 # Performance Co-Pilot toolkit.
@@ -24,15 +24,15 @@ import os
 
 import cpmapi
 import cpmda
-from pmapi import pmContext as PCP
-from pmapi import pmID, pmInDom, pmDesc, pmUnits, pmResult
+from pcp.pmapi import pmContext as PCP
+from pcp.pmapi import pmInDom, pmDesc, pmUnits
 
-import ctypes
-from ctypes import c_int, c_long, c_char_p, c_void_p, cast, byref
-from ctypes import addressof, sizeof, CDLL, POINTER, Structure, create_string_buffer
+from ctypes.util import find_library
+from ctypes import CDLL, c_int, c_long, c_char_p, c_void_p, cast, byref
+from ctypes import addressof, sizeof, POINTER, Structure, create_string_buffer
 
 ## Performance Co-Pilot PMDA library (C)
-LIBPCP_PMDA = ctypes.CDLL(ctypes.util.find_library("pcp_pmda"))
+LIBPCP_PMDA = CDLL(find_library("pcp_pmda"))
 
 
 ###
@@ -86,7 +86,7 @@ class pmdaInstid(Structure):
     def __init__(self, instid, name):
         Structure.__init__(self)
         self.i_inst = instid
-        self.i_name = name
+        self.i_name = name.encode('utf-8')
 
     def __str__(self):
         return "pmdaInstid@%#lx index=%d name=%s" % (addressof(self), self.i_inst, self.i_name)
@@ -99,6 +99,8 @@ class pmdaIndom(Structure):
 
     def __init__(self, indom, insts):
         Structure.__init__(self)
+        self.it_numinst = 0
+        self.it_set = None
         self.it_indom = indom
         self.set_instances(indom, insts)
 
@@ -107,7 +109,7 @@ class pmdaIndom(Structure):
         if (instance_count == 0):
             return
         instance_array = (pmdaInstid * instance_count)()
-        for i in xrange(instance_count):
+        for i in range(instance_count):
             instance_array[i].i_inst = insts[i].i_inst
             instance_array[i].i_name = insts[i].i_name
         self.it_set = instance_array
@@ -115,7 +117,8 @@ class pmdaIndom(Structure):
     def set_dict_instances(self, indom, insts):
         LIBPCP_PMDA.pmdaCacheOp(indom, cpmda.PMDA_CACHE_INACTIVE)
         for key in insts.keys():
-            LIBPCP_PMDA.pmdaCacheStore(indom, cpmda.PMDA_CACHE_ADD, key, byref(insts[key]))
+            key8 = key.encode('utf-8')
+            LIBPCP_PMDA.pmdaCacheStore(indom, cpmda.PMDA_CACHE_ADD, key8, byref(insts[key]))
         LIBPCP_PMDA.pmdaCacheOp(indom, cpmda.PMDA_CACHE_SAVE)
 
     def set_instances(self, indom, insts):
@@ -130,6 +133,11 @@ class pmdaIndom(Structure):
 
     def __str__(self):
         return "pmdaIndom@%#lx indom=%#lx num=%d" % (addressof(self), self.it_indom, self.it_numinst)
+
+class pmdaUnits(pmUnits):
+    """ Wrapper class for PMDAs defining their metrics (avoids pmapi import) """
+    def __init__(self, dimS, dimT, dimC, scaleS, scaleT, scaleC):
+        pmUnits.__init__(self, dimS, dimT, dimC, scaleS, scaleT, scaleC)
 
 
 ###
@@ -153,25 +161,49 @@ class MetricDispatch(object):
     # overloads
 
     def __init__(self, domain, name, logfile, helpfile):
-        self.clear_indoms()
-        self.clear_metrics()
-        cpmda.init_dispatch(domain, name, logfile, helpfile)
-
-    def clear_indoms(self):
         self._indomtable = []
         self._indoms = {}
         self._indom_oneline = {}
         self._indom_helptext = {}
-
-    def clear_metrics(self):
         self._metrictable = []
         self._metrics = {}
         self._metric_names = {}
         self._metric_oneline = {}
         self._metric_helptext = {}
+        cpmda.init_dispatch(domain, name, logfile, helpfile)
+
+    def clear_indoms(self):
+        # Notice we're using the following:
+        #
+        #   del list[:]
+        #   dict.clear()
+        #
+        # instead of:
+        #
+        #   list = []
+        #   dict = {}
+        #
+        # The latter creates a new list/dictionary and assigns it to
+        # the variable. But, the stashed list/dictionary reference
+        # down in cpmda still will point to the original
+        # list/dictionary. Clearing out the existing list/dictionary
+        # keeps the stashed references working the way we'd like.
+        del self._indomtable[:]
+        self._indoms.clear()
+        self._indom_oneline.clear()
+        self._indom_helptext.clear()
+
+    def clear_metrics(self):
+        # See note above in clear_indoms() about clearing
+        # lists/dictionaries.
+        del self._metrictable[:]
+        self._metrics.clear()
+        self._metric_names.clear()
+        self._metric_oneline.clear()
+        self._metric_helptext.clear()
 
     def reset_metrics(self):
-        clear_metrics()
+        self.clear_metrics()
         cpmda.set_need_refresh()
 
     ##
@@ -181,14 +213,14 @@ class MetricDispatch(object):
         cpmda.pmns_refresh(self._metric_names)
 
     def connect_pmcd(self):
-	cpmda.connect_pmcd()
+        cpmda.connect_pmcd()
 
     def add_metric(self, name, metric, oneline = '', text = ''):
         pmid = metric.m_desc.pmid
         if (pmid in self._metric_names):
-            raise KeyError, 'attempt to add_metric with an existing name'
+            raise KeyError('attempt to add_metric with an existing name')
         if (pmid in self._metrics):
-            raise KeyError, 'attempt to add_metric with an existing PMID'
+            raise KeyError('attempt to add_metric with an existing PMID')
 
         self._metrictable.append(metric)
         self._metrics[pmid] = metric
@@ -201,7 +233,7 @@ class MetricDispatch(object):
         indomid = indom.it_indom
         for entry in self._indomtable:
             if (entry.it_indom == indomid):
-                raise KeyError, 'attempt to add_indom with an existing ID'
+                raise KeyError('attempt to add_indom with an existing ID')
         self._indomtable.append(indom)
         self._indoms[indomid] = indom
         self._indom_oneline[indomid] = oneline
@@ -240,11 +272,11 @@ class MetricDispatch(object):
             name = (c_char_p)()
             sts = LIBPCP_PMDA.pmdaCacheLookup(indom, instance, byref(name), None)
             if (sts == cpmda.PMDA_CACHE_ACTIVE):
-                return name.value
+                return str(name.value.decode())
         elif (entry.it_numinst > 0 and entry.it_indom == indom):
             for inst in entry.it_set:
                 if (inst.i_inst == instance):
-                    return inst.i_name
+                    return str(inst.i_name.decode())
         return None
 
 
@@ -289,7 +321,7 @@ class PMDA(MetricDispatch):
         """
         Write out the domain.h file (used during installation)
         """
-        print '#define %s %d' % (self._name.upper(), self._domain)
+        print('#define %s %d' % (self._name.upper(), self._domain))
 
     def pmns_write(self, root):
         """
@@ -301,11 +333,11 @@ class PMDA(MetricDispatch):
         lead = ''
         if indent:
             lead = '\t'
-            print 'root {'
+            print('root {')
         for prefix in prefixes:
-            print '%s%s\t%d:*:*' % (lead, prefix, self._domain)
+            print('%s%s\t%d:*:*' % (lead, prefix, self._domain))
         if indent:
-            print '}'
+            print('}')
 
     def run(self):
         """
@@ -326,17 +358,7 @@ class PMDA(MetricDispatch):
             cpmda.pmid_longtext_refresh(self._metric_helptext)
             cpmda.indom_oneline_refresh(self._indom_oneline)
             cpmda.indom_longtext_refresh(self._indom_helptext)
-            numindoms = len(self._indomtable)
-            ibuf = create_string_buffer(numindoms * sizeof(pmdaIndom))
-            indoms = cast(ibuf, POINTER(pmdaIndom))
-            for i in xrange(numindoms):
-                indoms[i] = self._indomtable[i]
-            nummetrics = len(self._metrictable)
-            mbuf = create_string_buffer(nummetrics * sizeof(pmdaMetric))
-            metrics = cast(mbuf, POINTER(pmdaMetric))
-            for i in xrange(nummetrics):
-                metrics[i] = self._metrictable[i]
-            cpmda.pmda_dispatch(ibuf.raw, numindoms, mbuf.raw, nummetrics)
+            cpmda.pmda_dispatch(self._indomtable, self._metrictable)
 
     @staticmethod
     def set_fetch(fetch):
@@ -357,6 +379,10 @@ class PMDA(MetricDispatch):
     @staticmethod
     def set_store_callback(store_callback):
         return cpmda.set_store_callback(store_callback)
+
+    @staticmethod
+    def set_refresh_metrics(refresh_metrics):
+        return cpmda.set_refresh_metrics(refresh_metrics)
 
     @staticmethod
     def set_user(username):

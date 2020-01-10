@@ -13,7 +13,6 @@ echo "QA output created by $seq"
 . ./common.filter
 . ./common.check
 
-[ $PCP_VER -ge 3805 ] || _notrun "PCP version is too old"
 
 status=0	# success is the default!
 $sudo rm -rf $tmp.* $seq.full
@@ -109,7 +108,7 @@ _run_sudo @:sampledso.event.records foo:bar
 
 echo
 echo "--- problems at source of metrics ---"
-_run -h no.such.host sample.event.records
+_run -h no.such.host.pcp.io sample.event.records
 _run -a /no/such/archive sample.event.records
 _run_sudo -L sample.event.records
 _run sample.event.records sample.colour
@@ -128,6 +127,9 @@ _run_arch -z src/eventrec-old/sample.event.records
 _run_arch -z -S@15:26:11.073 -s 2 -a src/eventrec-old sample.event.records
 _run_arch -z -O+2.5 -T+4.5 -a src/eventrec-old sample.event.records
 
+echo
+echo "--- highres events ---"
+_run_arch -z src/eventrec/sample.event.highres_records
 
 # success, all done
 exit

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Red Hat.
+ * Copyright (c) 2012-2015 Red Hat.
  * Copyright (c) 2010 Aconex.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -16,388 +16,224 @@
 #include "pmapi.h"
 #include "impl.h"
 #include "pmda.h"
+#include "indom.h"
 #include "cgroups.h"
-#include "filesys.h"
 #include "clusters.h"
 #include "proc_pid.h"
 #include <sys/stat.h>
-#ifdef HAVE_STRINGS_H
-#include <strings.h>
-#endif
 #include <ctype.h>
 
-/* Add namespace entries and prepare values for one cgroupfs directory entry */
-struct cgroup_subsys;
-typedef int (*cgroup_prepare_t)(__pmnsTree *, const char *,
-		struct cgroup_subsys *, const char *, int, int, int);
-static int prepare_ull(__pmnsTree *, const char *,
-		struct cgroup_subsys *, const char *, int, int, int);
-static int prepare_string(__pmnsTree *, const char *,
-		struct cgroup_subsys *, const char *, int, int, int);
-static int prepare_named_ull(__pmnsTree *, const char *,
-		struct cgroup_subsys *, const char *, int, int, int);
-
-/*
- * Critical data structures for cgroup subsystem in pmdalinux...
- * Initial comment for each struct talks about lifecycle of that
- * data, in terms of what pmdalinux must do with it (esp. memory
- * allocation related).
- */
-
-typedef struct { /* contents depends on individual kernel cgroups */
-    int			item;		/* PMID == domain:cluster:[id:item] */
-    int			dynamic;	/* do we need an extra free (string) */
-    cgroup_prepare_t	prepare;	/* setup metric name(s) and value(s) */
-    char		*suffix;	/* cpus/mems/rss/... */
-} cgroup_metrics_t;
-
-typedef struct { /* some metrics are multi-valued, but most have only one */
-    int			item;		/* PMID == domain:cluster:[id:item] */
-    int			atom_count;	
-    pmAtomValue		*atoms;
-} cgroup_values_t;
-
-typedef struct { /* contains data for each group users have created, if any */
-    int			id;		/* PMID == domain:cluster:[id:item] */
-    int			refreshed;	/* boolean: are values all uptodate */
-    proc_pid_list_t	process_list;
-    cgroup_values_t	*metric_values;
-} cgroup_group_t;
-
-typedef struct cgroup_subsys { /* contents covers the known kernel cgroups */
-    const char		*name;		/* cpuset/memory/... */
-    int			cluster;	/* PMID == domain:cluster:[id:item] */
-    int			unused;		/* unused, just padding now */
-    int			group_count;	/* number of groups (dynamic) */
-    int			metric_count;	/* number of metrics (fixed)  */
-    cgroup_group_t	*groups;	/* array of groups (dynamic)  */
-    cgroup_metrics_t	*metrics;	/* array of metrics (fixed)   */
-} cgroup_subsys_t;
-
-static cgroup_metrics_t cpusched_metrics[] = {
-    { .item = 0, .suffix = "shares", .prepare = prepare_ull },
-};
-
-static cgroup_metrics_t cpuacct_metrics[] = {
-    { .item = 0, .suffix = "stat.user", .prepare = prepare_named_ull },
-    { .item = 1, .suffix = "stat.system", .prepare = prepare_named_ull },
-    { .item = 2, .suffix = "usage", .prepare = prepare_ull },
-    { .item = 3, .suffix = "usage_percpu", .prepare = prepare_ull },
-};
-
-static cgroup_metrics_t cpuset_metrics[] = {
-    { .item = 0, .suffix = "cpus", .prepare = prepare_string, .dynamic = 1 },
-    { .item = 1, .suffix = "mems", .prepare = prepare_string, .dynamic = 1 },
-};
-
-static cgroup_metrics_t memory_metrics[] = {
-    { .item = 0, .suffix = "stat.cache", .prepare = prepare_named_ull },
-    { .item = 1, .suffix = "stat.rss", .prepare = prepare_named_ull },
-    { .item = 2, .suffix = "stat.pgin", .prepare = prepare_named_ull },
-    { .item = 3, .suffix = "stat.pgout", .prepare = prepare_named_ull },
-    { .item = 4, .suffix = "stat.swap", .prepare = prepare_named_ull },
-    { .item = 5, .suffix = "stat.active_anon", .prepare = prepare_named_ull },
-    { .item = 6, .suffix = "stat.inactive_anon", .prepare = prepare_named_ull },
-    { .item = 7, .suffix = "stat.active_file", .prepare = prepare_named_ull },
-    { .item = 8, .suffix = "stat.inactive_file", .prepare = prepare_named_ull },
-    { .item = 9, .suffix = "stat.unevictable", .prepare = prepare_named_ull },
-};
-
-static cgroup_metrics_t netclass_metrics[] = {
-    { .item = 0, .suffix = "classid", .prepare = prepare_ull },
-};
-
-static cgroup_subsys_t controllers[] = {
-    {	.name = "cpu",
-	.cluster = CLUSTER_CPUSCHED_GROUPS,
-	.metrics = cpusched_metrics,
-	.metric_count = sizeof(cpusched_metrics) / sizeof(cpusched_metrics[0]),
-    },
-    {	.name = "cpuset",
-	.cluster = CLUSTER_CPUSET_GROUPS,
-	.metrics = cpuset_metrics,
-	.metric_count = sizeof(cpuset_metrics) / sizeof(cpuset_metrics[0]),
-    },
-    {	.name = "cpuacct",
-	.cluster = CLUSTER_CPUACCT_GROUPS,
-	.metrics = cpuacct_metrics,
-	.metric_count = sizeof(cpuacct_metrics) / sizeof(cpuacct_metrics[0]),
-    },
-    {	.name = "memory",
-	.cluster = CLUSTER_MEMORY_GROUPS,
-	.metrics = memory_metrics,
-	.metric_count = sizeof(memory_metrics) / sizeof(memory_metrics[0]),
-    },
-    {	.name = "net_cls",
-	.cluster = CLUSTER_NET_CLS_GROUPS,
-	.metrics = netclass_metrics,
-	.metric_count = sizeof(netclass_metrics) / sizeof(netclass_metrics[0]),
-    },
-};
-
-static int
-read_values(char *buffer, int size, const char *path, const char *subsys,
-		const char *metric)
-{
-    int fd, count;
-
-    snprintf(buffer, size, "%s/%s.%s", path, subsys, metric);
-    if ((fd = open(buffer, O_RDONLY)) < 0)
-	return -oserror();
-    count = read(fd, buffer, size);
-    close(fd);
-    if (count < 0)
-	return -oserror();
-    buffer[count-1] = '\0';
-    return 0;
-}
-
 static void
-update_pmns(__pmnsTree *pmns, cgroup_subsys_t *subsys, const char *name,
-		cgroup_metrics_t *metrics, int group, int domain)
+refresh_cgroup_cpus(void)
 {
-    char entry[MAXPATHLEN];
-    pmID pmid;
-
-    snprintf(entry, sizeof(entry), "%s.groups.%s%s.%s",
-			CGROUP_ROOT, subsys->name, name, metrics->suffix);
-    pmid = cgroup_pmid_build(domain, subsys->cluster, group, metrics->item);
-    __pmAddPMNSNode(pmns, pmid, entry);
-}
-
-static int
-prepare_ull(__pmnsTree *pmns, const char *path, cgroup_subsys_t *subsys,
-		const char *name, int metric, int group, int domain)
-{
-    int count = 0;
-    unsigned long long value;
-    char buffer[MAXPATHLEN];
-    char *endp, *p = &buffer[0];
-    cgroup_group_t *groups = &subsys->groups[group];
-    cgroup_metrics_t *metrics = &subsys->metrics[metric];
-    pmAtomValue *atoms = groups->metric_values[metric].atoms;
-
-    if (read_values(p, sizeof(buffer), path, subsys->name, metrics->suffix) < 0)
-	return -oserror();
-
-    while (p && *p) {
-	value = strtoull(p, &endp, 0);
-	if ((atoms = realloc(atoms, (count + 1) * sizeof(pmAtomValue))) == NULL)
-	    return -oserror();
-	atoms[count++].ull = value;
-	if (endp == '\0' || endp == p)
-	    break;
-	p = endp;
-	while (p && isspace((int)*p))
-	    p++;
-    }
-
-    groups->metric_values[metric].item = metric;
-    groups->metric_values[metric].atoms = atoms;
-    groups->metric_values[metric].atom_count = count;
-    update_pmns(pmns, subsys, name, metrics, group, domain);
-    return 0;
-}
-
-static int
-prepare_named_ull(__pmnsTree *pmns, const char *path, cgroup_subsys_t *subsys,
-		const char *name, int metric, int group, int domain)
-{
-    int i, count;
-    unsigned long long value;
-    char filename[64], buffer[MAXPATHLEN];
-    char *offset, *p = &buffer[0];
-    cgroup_group_t *groups = &subsys->groups[group];
-    cgroup_metrics_t *metrics = &subsys->metrics[metric];
-
-    if (groups->refreshed)
-	return 0;
-
-    /* metric => e.g. stat.user and stat.system - split it up first */
-    offset = index(metrics->suffix, '.');
-    if (!offset)
-	return PM_ERR_CONV;
-    count = (offset - metrics->suffix);
-    strncpy(filename, metrics->suffix, count);
-    filename[count] = '\0';
-
-    if (read_values(p, sizeof(buffer), path, subsys->name, filename) < 0)
-	return -oserror();
-
-    /* buffer contains <name <value> pairs */
-    while (p && *p) {
-	char *endp, *field, *offset;
-
-	if ((field = index(p, ' ')) == NULL)
-	    return PM_ERR_CONV;
-	offset = field + 1;
-	*field = '\0';
-	field = p;		/* field now points to <name> */
-	p = offset;
-	value = strtoull(p, &endp, 0);
-	p = endp;
-	while (p && isspace((int)*p))
-	    p++;
-
-	for (i = 0; i < subsys->metric_count; i++) {
-	    pmAtomValue *atoms = groups->metric_values[i].atoms;
-	    metrics = &subsys->metrics[i];
-
-	    if (strcmp(field, metrics->suffix + count + 1) != 0)
-		continue;
-	    if ((atoms = calloc(1, sizeof(pmAtomValue))) == NULL)
-		return -oserror();
-	    atoms[0].ull = value;
-
-	    groups->metric_values[i].item = i;
-	    groups->metric_values[i].atoms = atoms;
-	    groups->metric_values[i].atom_count = 1;
-	    update_pmns(pmns, subsys, name, metrics, group, domain);
-	    break;
-	}
-    }
-    groups->refreshed = 1;
-    return 0;
-}
-
-static int
-prepare_string(__pmnsTree *pmns, const char *path, cgroup_subsys_t *subsys,
-		const char *name, int metric, int group, int domain)
-{
-    char buffer[MAXPATHLEN];
-    cgroup_group_t *groups = &subsys->groups[group];
-    cgroup_metrics_t *metrics = &subsys->metrics[metric];
-    pmAtomValue *atoms = groups->metric_values[metric].atoms;
-    char *p = &buffer[0];
-
-    if (read_values(p, sizeof(buffer), path, subsys->name, metrics->suffix) < 0)
-	return -oserror();
-
-    if ((atoms = malloc(sizeof(pmAtomValue))) == NULL)
-	return -oserror();
-    if ((atoms[0].cp = strdup(buffer)) == NULL) {
-	free(atoms);
-	return -oserror();
-    }
-    groups->metric_values[metric].item = metric;
-    groups->metric_values[metric].atoms = atoms;
-    groups->metric_values[metric].atom_count = 1;
-    update_pmns(pmns, subsys, name, metrics, group, domain);
-    return 0;
-}
-
-static void
-translate(char *dest, const char *src, size_t size)
-{
-    char *p;
-
-    if (*src != '\0')	/* non-root */
-	*dest = '.';
-    strncpy(dest, src, size);
-    for (p = dest; *p; p++) {
-	if (*p == '/')
-	    *p = '.';
-    }
-}
-
-static int
-namespace(__pmnsTree *pmns, cgroup_subsys_t *subsys,
-		const char *cgrouppath, const char *cgroupname, int domain)
-{
-    int i, id, sts;
-    cgroup_values_t *cvp;
-    char group[128];
-
-    translate(&group[0], cgroupname, sizeof(group));
-
-    /* allocate space for this group */
-    sts = (subsys->group_count + 1) * sizeof(cgroup_group_t);
-    subsys->groups = (cgroup_group_t *)realloc(subsys->groups, sts);
-    if (subsys->groups == NULL)
-	return -oserror();
-    /* allocate space for all values up-front */
-    sts = subsys->metric_count * sizeof(cgroup_values_t);
-    if ((cvp = (cgroup_values_t *)calloc(1, sts)) == NULL)
-	return -oserror();
-    id = subsys->group_count++;
-    memset(&subsys->groups[id], 0, sizeof(cgroup_group_t));
-    subsys->groups[id].id = id;
-    subsys->groups[id].metric_values = cvp;
-
-    for (i = 0; i < subsys->metric_count; i++) {
-	cgroup_metrics_t *metrics = &subsys->metrics[i];
-	metrics->prepare(pmns, cgrouppath, subsys, group, i, id, domain);
-    }
-    return 1;
-}
-
-int
-refresh_cgroup_subsys(pmInDom indom)
-{
-    char buf[4096];
-    char name[MAXPATHLEN];
-    unsigned int numcgroups, enabled;
-    int sts;
-    long *data;
-    long hierarchy;
+    pmInDom cpus = INDOM(CPU_INDOM);
+    char buf[MAXPATHLEN];
+    char *space;
     FILE *fp;
 
-    if ((fp = fopen("/proc/cgroups", "r")) == NULL)
-	return 1;
+    pmdaCacheOp(cpus, PMDA_CACHE_INACTIVE);
+    if ((fp = proc_statsfile("/proc/stat", buf, sizeof(buf))) == NULL)
+	return;
+    while (fgets(buf, sizeof(buf), fp) != NULL) {
+	if (strncmp(buf, "cpu", 3) == 0 && isdigit((int)buf[3])) {
+	    if ((space = strchr(buf, ' ')) != NULL) {
+	    	*space = '\0';
+		pmdaCacheStore(cpus, PMDA_CACHE_ADD, buf, NULL);
+	    }
+	}
+    }
+    fclose(fp);
+}
+
+static int
+_pm_isloop(char *dname)
+{
+    return strncmp(dname, "loop", 4) == 0;
+}
+
+static int
+_pm_isramdisk(char *dname)
+{
+    return strncmp(dname, "ram", 3) == 0;
+}
+
+/*
+ * For block devices we have one instance domain for dev_t
+ * based lookup, and another for (real) name lookup.
+ * The reason we need this is that the blkio cgroup stats
+ * are exported using the major:minor numbers, and not the
+ * device names - we must perform that mapping ourselves.
+ * In some places (value refresh) we need to lookup the blk
+ * name from device major/minor, in other places (instances
+ * refresh) we need the usual external instid:name lookup.
+ */
+static void
+refresh_cgroup_devices(void)
+{
+    pmInDom diskindom = INDOM(DISK_INDOM);
+    pmInDom devtindom = INDOM(DEVT_INDOM);
+    char buf[MAXPATHLEN];
+    FILE *fp;
+
+    pmdaCacheOp(devtindom, PMDA_CACHE_INACTIVE);
+    pmdaCacheOp(diskindom, PMDA_CACHE_INACTIVE);
+
+    if ((fp = proc_statsfile("/proc/diskstats", buf, sizeof(buf))) == NULL)
+	return;
 
     while (fgets(buf, sizeof(buf), fp) != NULL) {
+	unsigned int major, minor, unused;
+	device_t *dev = NULL;
+	char namebuf[1024];
+	int inst;
+
+	if (sscanf(buf, "%u %u %s %u", &major, &minor, namebuf, &unused) != 4)
+	    continue;
+	if (_pm_isloop(namebuf) || _pm_isramdisk(namebuf))
+	    continue;
+	if (pmdaCacheLookupName(diskindom, namebuf, &inst, (void **)&dev) < 0 ||
+	    dev == NULL) {
+	    if (!(dev = (device_t *)malloc(sizeof(device_t)))) {
+		__pmNoMem("device", sizeof(device_t), PM_RECOV_ERR);
+		continue;
+	    }
+	    dev->major = major;
+	    dev->minor = minor;
+	}
+	/* keeping track of all fields (major/minor/inst/name) */
+	pmdaCacheStore(diskindom, PMDA_CACHE_ADD, namebuf, dev);
+	(void)pmdaCacheLookupName(diskindom, namebuf, &dev->inst, NULL);
+	(void)pmdaCacheLookup(diskindom, dev->inst, &dev->name, NULL);
+
+	snprintf(buf, sizeof(buf), "%u:%u", major, minor);
+	pmdaCacheStore(devtindom, PMDA_CACHE_ADD, buf, (void *)dev);
+
+	if (pmDebug & DBG_TRACE_APPL0)
+	    fprintf(stderr, "refresh_devices: \"%s\" \"%d:%d\" inst=%d\n",
+			dev->name, dev->major, dev->minor, dev->inst);
+    }
+    fclose(fp);
+}
+
+void
+refresh_cgroup_subsys(void)
+{
+    pmInDom subsys = INDOM(CGROUP_SUBSYS_INDOM);
+    char buf[4096];
+    FILE *fp;
+
+    pmdaCacheOp(subsys, PMDA_CACHE_INACTIVE);
+    if ((fp = proc_statsfile("/proc/cgroups", buf, sizeof(buf))) == NULL)
+	return;
+
+    while (fgets(buf, sizeof(buf), fp) != NULL) {
+	unsigned int hierarchy, num_cgroups, enabled;
+	char name[MAXPATHLEN];
+	subsys_t *ssp;
+	int sts;
+
 	/* skip lines starting with hash (header) */
 	if (buf[0] == '#')
 	    continue;
-	if (sscanf(buf, "%s %ld %u %u", &name[0],
-			&hierarchy, &numcgroups, &enabled) != 4)
+	if (sscanf(buf, "%s %u %u %u", &name[0],
+			&hierarchy, &num_cgroups, &enabled) < 4)
 	    continue;
-	sts = pmdaCacheLookupName(indom, name, NULL, (void **)&data);
-	if (sts == PMDA_CACHE_ACTIVE) {
-	    if (*data != hierarchy) {
-		/*
-		 * odd ... instance name repeated but different
-		 * hierarchy ... we cannot support more than one hierarchy
-		 * yet
-		 */
-		fprintf(stderr, "refresh_cgroup_subsys: \"%s\": entries for hierarchy %ld ignored (hierarchy %ld seen first)\n", name, hierarchy, *data);
-	    }
-	    continue;
-	}
-	else if (sts != PMDA_CACHE_INACTIVE) {
-	    if ((data = (long *)malloc(sizeof(long))) == NULL) {
-#if PCP_DEBUG
-		if (pmDebug & DBG_TRACE_LIBPMDA)
-		    fprintf(stderr, "refresh_cgroup_subsys: \"%s\": malloc failed\n", name);
-#endif
+	sts = pmdaCacheLookupName(subsys, name, NULL, (void **)&ssp);
+	if (sts != PMDA_CACHE_INACTIVE) {
+	    if ((ssp = (subsys_t *)malloc(sizeof(subsys_t))) == NULL)
 		continue;
-	    }
-	    *data = hierarchy;
 	}
-	pmdaCacheStore(indom, PMDA_CACHE_ADD, name, (void *)data);
-#if PCP_DEBUG
-	if (pmDebug & DBG_TRACE_LIBPMDA)
-	    fprintf(stderr, "refresh_cgroup_subsys: add \"%s\" [hierarchy %ld]\n", name, hierarchy);
-#endif
+	ssp->hierarchy = hierarchy;
+	ssp->num_cgroups = num_cgroups;
+	ssp->enabled = enabled;
+	pmdaCacheStore(subsys, PMDA_CACHE_ADD, name, (void *)ssp);
+
+	if (pmDebug & DBG_TRACE_APPL0)
+	    fprintf(stderr, "refresh_subsys: \"%s\" h=%u nc=%u on=%u\n",
+			name, hierarchy, num_cgroups, enabled);
     }
     fclose(fp);
-    return 0;
 }
 
-/*
- * Parse a (comma-separated) mount option string to find one of the known
- * cgroup subsystems, and return a pointer to it or "?" if none found.
- */
+void
+refresh_cgroup_filesys(void)
+{
+    pmInDom mounts = INDOM(CGROUP_MOUNTS_INDOM);
+    char buf[MAXPATHLEN];
+    filesys_t *fs;
+    FILE *fp;
+    char *path, *device, *type, *options;
+    int sts;
+
+    pmdaCacheOp(mounts, PMDA_CACHE_INACTIVE);
+    if ((fp = proc_statsfile("/proc/mounts", buf, sizeof(buf))) == NULL)
+	return;
+
+    while (fgets(buf, sizeof(buf), fp) != NULL) {
+	device = strtok(buf, " ");
+	path = strtok(NULL, " ");
+	type = strtok(NULL, " ");
+	options = strtok(NULL, " ");
+	if (strcmp(type, "cgroup") != 0)
+	    continue;
+
+	sts = pmdaCacheLookupName(mounts, path, NULL, (void **)&fs);
+	if (sts == PMDA_CACHE_ACTIVE)	/* repeated line in /proc/mounts? */
+	    continue;
+	if (sts == PMDA_CACHE_INACTIVE) { /* re-activate an old mount */
+	    pmdaCacheStore(mounts, PMDA_CACHE_ADD, path, fs);
+	    if (strcmp(path, fs->path) != 0) {	/* old device, new path */
+		free(fs->path);
+		fs->path = strdup(path);
+	    }
+	    if (strcmp(options, fs->options) != 0) {	/* old device, new opts */
+		free(fs->options);
+		fs->options = strdup(options);
+	    }
+	}
+	else {	/* new mount */
+	    if ((fs = malloc(sizeof(filesys_t))) == NULL)
+		continue;
+	    fs->path = strdup(path);
+	    fs->options = strdup(options);
+	    if (pmDebug & DBG_TRACE_APPL0)
+		fprintf(stderr, "refresh_filesys: add \"%s\" \"%s\"\n",
+			fs->path, device);
+	    pmdaCacheStore(mounts, PMDA_CACHE_ADD, path, fs);
+	}
+    }
+    fclose(fp);
+}
+
+static char *
+scan_filesys_options(const char *options, const char *option)
+{
+    static char buffer[128];
+    char *s;
+
+    strncpy(buffer, options, sizeof(buffer));
+    buffer[sizeof(buffer)-1] = '\0';
+
+    s = strtok(buffer, ",");
+    while (s) {
+	if (strcmp(s, option) == 0)
+	    return s;
+        s = strtok(NULL, ",");
+    }
+    return NULL;
+}
+
 char *
-cgroup_find_subsys(pmInDom indom, const char *options)
+cgroup_find_subsys(pmInDom indom, filesys_t *fs)
 {
     static char dunno[] = "?";
-    static char opts[128];
-    char buffer[128];
+    static char opts[256];
+    char buffer[256];
     char *s, *out = NULL;
 
     memset(opts, 0, sizeof(opts));
-    strncpy(buffer, options, sizeof(buffer));
+    strncpy(buffer, fs->options, sizeof(buffer));
+    buffer[sizeof(buffer)-1] = '\0';
 
     s = strtok(buffer, ",");
     while (s) {
@@ -418,290 +254,672 @@ cgroup_find_subsys(pmInDom indom, const char *options)
     return dunno;
 }
 
-/* Ensure cgroup name can be used as a PCP namespace entry, ignore it if not */
-static int
-valid_pmns_name(char *name)
+int
+cgroup_mounts_subsys(const char *system, char *buffer, int length)
 {
-    if (!isalpha((int)name[0]))
-	return 0;
-    for (; *name != '\0'; name++)
-	if (!isalnum((int)*name) && *name != '_')
-	    return 0;
-    return 1;
-}
+    pmInDom mounts = INDOM(CGROUP_MOUNTS_INDOM);
+    pmInDom subsys = INDOM(CGROUP_SUBSYS_INDOM);
+    filesys_t *fs;
+    char *name;
+    int sts;
 
-static int
-cgroup_namespace(__pmnsTree *pmns, const char *options,
-		const char *cgrouppath, const char *cgroupname, int domain)
-{
-    int i, sts = 0;
-
-    /* use options to tell which cgroup controller(s) are active here */
-    for (i = 0; i < sizeof(controllers)/sizeof(controllers[0]); i++) {
-	int	lsts;
-	cgroup_subsys_t *subsys = &controllers[i];
-	if (scan_filesys_options(options, subsys->name) == NULL)
+    /* Iterate over cgroup.mounts.subsys indom, comparing the value
+     * with the given subsys - if a match is found, return the inst
+     * name, else NULL.
+     */
+    pmdaCacheOp(mounts, PMDA_CACHE_WALK_REWIND);
+    while ((sts = pmdaCacheOp(mounts, PMDA_CACHE_WALK_NEXT)) != -1) {
+	if (!pmdaCacheLookup(mounts, sts, &name, (void **)&fs))
 	    continue;
-	lsts = namespace(pmns, subsys, cgrouppath, cgroupname, domain);
-	if (lsts > 0)
-	    sts = 1;
+	if (strcmp(system, cgroup_find_subsys(subsys, fs)) != 0)
+	    continue;
+	snprintf(buffer, length, "%s%s/", proc_statspath, name);
+	buffer[length-1] = '\0';
+	return strlen(buffer);
     }
-    return sts;
+    return 0;
 }
 
-static int
-cgroup_scan(const char *mnt, const char *path, const char *options,
-		int domain, __pmnsTree *pmns, int root)
+static const char *
+cgroup_name(const char *path, int offset)
 {
-    int sts, length;
+    char *name = (char *)path + offset;
+
+    if (*name == '/') {
+	while (*name == '/')
+	    name++;
+	name--;
+    } else if (*name == '\0') {
+	name = "/";
+    }
+    return name;
+}
+
+static void
+cgroup_scan(const char *mnt, const char *path, cgroup_refresh_t refresh,
+		const char *container, int container_length)
+{
+    int length;
     DIR *dirp;
     struct stat sbuf;
     struct dirent *dp;
-    char *cgroupname;
-    char cgrouppath[MAXPATHLEN];
+    const char *cgname;
+    char cgpath[MAXPATHLEN];
 
-    if (root) {
-	strncpy(cgrouppath, mnt, sizeof(cgrouppath));
-	cgrouppath[sizeof(cgrouppath)-1] = '\0';
-	length = strlen(cgrouppath);
+    if (path[0] == '\0') {
+	snprintf(cgpath, sizeof(cgpath), "%s%s", proc_statspath, mnt);
+	length = strlen(cgpath);
     } else {
-	snprintf(cgrouppath, sizeof(cgrouppath), "%s/%s", mnt, path);
-	length = strlen(mnt) + 1;
+	snprintf(cgpath, sizeof(cgpath), "%s%s/%s", proc_statspath, mnt, path);
+	length = strlen(proc_statspath) + strlen(mnt) + 1;
     }
 
-    if ((dirp = opendir(cgrouppath)) == NULL)
-	return -oserror();
+    if ((dirp = opendir(cgpath)) == NULL)
+	return;
 
-    cgroupname = &cgrouppath[length];
+    cgname = cgroup_name(cgpath, length);
+    if (strncmp(cgpath, container, container_length) == 0)
+	refresh(cgpath, cgname);
 
-    sts = cgroup_namespace(pmns, options, cgrouppath, cgroupname, domain);
-
-    /*
-     * readdir - descend into directories to find all cgroups, then
-     * populate namespace with <controller>[.<groupname>].<metrics>
-     */
+    /* descend into subdirectories to find all cgroups */
     while ((dp = readdir(dirp)) != NULL) {
-	int	lsts;
-	if (!valid_pmns_name(dp->d_name))
+	if (dp->d_name[0] == '.')
 	    continue;
 	if (path[0] == '\0')
-	    snprintf(cgrouppath, sizeof(cgrouppath), "%s/%s",
-			mnt, dp->d_name);
+	    snprintf(cgpath, sizeof(cgpath), "%s%s/%s",
+			proc_statspath, mnt, dp->d_name);
 	else
-	    snprintf(cgrouppath, sizeof(cgrouppath), "%s/%s/%s",
-			mnt, path, dp->d_name);
-	cgroupname = &cgrouppath[length];
-	if (stat(cgrouppath, &sbuf) < 0)
+	    snprintf(cgpath, sizeof(cgpath), "%s%s/%s/%s",
+			proc_statspath, mnt, path, dp->d_name);
+	if (stat(cgpath, &sbuf) < 0)
 	    continue;
 	if (!(S_ISDIR(sbuf.st_mode)))
 	    continue;
 
-	lsts = cgroup_namespace(pmns, options, cgrouppath, cgroupname, domain);
-	if (lsts > 0)
-	    sts = 1;
-
-	/*
-	 * also scan for any child cgroups, but cgroup_scan() may return
-	 * an error
-	 */
-	lsts = cgroup_scan(mnt, cgroupname, options, domain, pmns, 0);
-	if (lsts > 0)
-	    sts = 1;
+	cgname = cgroup_name(cgpath, length);
+	if (strncmp(cgpath, container, container_length) == 0)
+	    refresh(cgpath, cgname);
+	cgroup_scan(mnt, cgname, refresh, container, container_length);
     }
     closedir(dirp);
-    return sts;
 }
 
-static void
-cgroup_regulars(__pmnsTree *pmns, int domain)
+/*
+ * Primary driver interface - finds any/all mount points for a given
+ * cgroup subsystem and iteratively expands all of the cgroups below
+ * them.  The setup callback inactivates each indoms contents, while
+ * the refresh callback is called once per cgroup (with path/name) -
+ * its role is to refresh the values for that one named cgroup.
+ */
+void
+refresh_cgroups(const char *subsys, const char *container,
+	int length, cgroup_setup_t setup, cgroup_refresh_t refresh)
 {
-    int i;
-    static struct {
-	int	item;
-	int	cluster;
-	char	*name;
-    } regulars[] = {
-	{ 0, CLUSTER_CGROUP_SUBSYS, CGROUP_ROOT ".subsys.hierarchy" },
-	{ 1, CLUSTER_CGROUP_SUBSYS, CGROUP_ROOT ".subsys.count" },
-	{ 0, CLUSTER_CGROUP_MOUNTS, CGROUP_ROOT ".mounts.subsys" },
-	{ 1, CLUSTER_CGROUP_MOUNTS, CGROUP_ROOT ".mounts.count" },
-    };
-
-    for (i = 0; i < 4; i++) {
-	pmID pmid = pmid_build(domain, regulars[i].cluster, regulars[i].item);
-	__pmAddPMNSNode(pmns, pmid, regulars[i].name);
-    }
-}
-
-int
-refresh_cgroup_groups(pmdaExt *pmda, pmInDom mounts, __pmnsTree **pmns)
-{
-    int i, j, k, a;
-    int sts, mtab = 0, domain = pmda->e_domain;
+    int sts;
     filesys_t *fs;
-    __pmnsTree *tree = pmns ? *pmns : NULL;
-
-    if (tree)
-	__pmFreePMNS(tree);
-
-    if ((sts = __pmNewPMNS(&tree)) < 0) {
-	__pmNotifyErr(LOG_ERR, "%s: failed to create new pmns: %s\n",
-			pmProgname, pmErrStr(sts));
-	if (pmns)
-	    *pmns = NULL;
-	return 0;
-    }
-
-    cgroup_regulars(tree, domain);
-
-    /* reset our view of subsystems and groups */
-    for (i = 0; i < sizeof(controllers)/sizeof(controllers[0]); i++) {
-	cgroup_subsys_t *subsys = &controllers[i];
-	for (j = 0; j < subsys->group_count; j++) {
-	    cgroup_group_t *group = &subsys->groups[j];
-	    for (k = 0; k < subsys->metric_count; k++) {
-		pmAtomValue *atoms = group->metric_values[k].atoms;
-		if (subsys->metrics[k].dynamic)
-		    for (a = 0; a < group->metric_values[k].atom_count; a++)
-			free(atoms[a].cp);
-		free(atoms);
-	    }
-	    free(group->metric_values);
-	    if (group->process_list.size)
-		free(group->process_list.pids);
-	    memset(group, 0, sizeof(cgroup_group_t));
-	}
-	controllers[i].group_count = 0;
-    }
+    pmInDom mounts = INDOM(CGROUP_MOUNTS_INDOM);
 
     pmdaCacheOp(mounts, PMDA_CACHE_WALK_REWIND);
     while ((sts = pmdaCacheOp(mounts, PMDA_CACHE_WALK_NEXT)) != -1) {
-	int	lsts;
 	if (!pmdaCacheLookup(mounts, sts, NULL, (void **)&fs))
 	    continue;
-	/* walk this cgroup mount finding groups (subdirs) */
-	lsts = cgroup_scan(fs->path, "", fs->options, domain, tree, 1);
-	if (lsts > 0)
-	    mtab = 1;
-    }
-
-    if (pmns)
-	*pmns = tree;
-    else
-	__pmFreePMNS(tree);
-
-    return mtab;
-}
-
-int
-cgroup_group_fetch(int cluster, int item, unsigned int inst, pmAtomValue *atom)
-{
-    int i, j, k, gid;
-
-    gid = cgroup_pmid_group(item);
-    item = cgroup_pmid_metric(item);
-
-    for (i = 0; i < sizeof(controllers)/sizeof(controllers[0]); i++) {
- 	cgroup_subsys_t *subsys = &controllers[i];
-
-	if (subsys->cluster != cluster)
+	if (scan_filesys_options(fs->options, subsys) == NULL)
 	    continue;
-	for (j = 0; j < subsys->group_count; j++) {
-	    cgroup_group_t *group = &subsys->groups[j];
-
-	    if (group->id != gid)
-		continue;
-	    for (k = 0; k < subsys->metric_count; k++) {
-		cgroup_values_t *cvp = &group->metric_values[k];
-
-		if (cvp->item != item)
-		    continue;
-		if (cvp->atom_count <= 0)
-		    return PM_ERR_VALUE;
-		if (inst == PM_IN_NULL)
-		    inst = 0;
-		else if (inst >= cvp->atom_count)
-		    return PM_ERR_INST;
-		*atom = cvp->atoms[inst];
-		return 1;
-	    }
-	}
+	setup();
+	cgroup_scan(fs->path, "", refresh, container, length);
     }
-    return PM_ERR_PMID;
-}
-
-/*
- * Needs to answer the question: how much extra space needs to be allocated
- * in the metric table for (dynamic) cgroup metrics"?  We have static entries
- * for group ID zero - if we have any non-zero group IDs, we need entries to
- * cover those.  Return value is the number of additional entries needed.
- */
-static void
-size_metrictable(int *total, int *trees)
-{
-    int i, j, maxid = 0, count = 0;
-
-    for (i = 0; i < sizeof(controllers)/sizeof(controllers[0]); i++) {
-	cgroup_subsys_t *subsys = &controllers[i];
-	for (j = 0; j < subsys->group_count; j++) {
-	    cgroup_group_t *group = &subsys->groups[j];
-	    if (group->id > maxid)
-		maxid = group->id;
-	}
-	count += subsys->metric_count + 0;	/* +1 for task.pid */
-    }
-
-    *total = count;
-    *trees = maxid;
-
-    if (pmDebug & DBG_TRACE_LIBPMDA)
-	fprintf(stderr, "cgroups size_metrictable: %d total x %d trees\n",
-		*total, *trees);
-}
-
-/*
- * Create new metric table entry for a group based on an existing one.
- */
-static void
-refresh_metrictable(pmdaMetric *source, pmdaMetric *dest, int id)
-{
-    int domain = pmid_domain(source->m_desc.pmid);
-    int cluster = pmid_cluster(source->m_desc.pmid);
-    int item = pmid_item(source->m_desc.pmid);
-
-    memcpy(dest, source, sizeof(pmdaMetric));
-    dest->m_desc.pmid = cgroup_pmid_build(domain, cluster, id, item);
-
-    if (pmDebug & DBG_TRACE_LIBPMDA)
-	fprintf(stderr, "cgroup refresh_metrictable: (%p -> %p) "
-			"metric ID dup: %d.%d.%d.%d -> %d.%d.%d.%d\n",
-		source, dest, domain, cluster,
-		cgroup_pmid_group(source->m_desc.pmid),
-		cgroup_pmid_metric(source->m_desc.pmid),
-		pmid_domain(dest->m_desc.pmid), pmid_cluster(dest->m_desc.pmid),
-		cgroup_pmid_group(dest->m_desc.pmid),
-		cgroup_pmid_metric(dest->m_desc.pmid));
 }
 
 static int
-cgroup_text(pmdaExt *pmda, pmID pmid, int type, char **buf)
+read_oneline_string(const char *file)
 {
-    return PM_ERR_TEXT;
+    char buffer[4096], *result;
+    size_t length;
+    FILE *fp;
+
+    if ((fp = fopen(file, "r")) == NULL)
+	return -ENOENT;
+    result = fgets(buffer, sizeof(buffer), fp);
+    fclose(fp);
+    if (!result)
+	return -ENOMEM;
+    length = strlen(result);
+    while (result[--length] == '\n')
+	result[length] = '\0';
+    return proc_strings_insert(result);
+}
+
+static __uint64_t
+read_oneline_ull(const char *file)
+{
+    char buffer[4096], *result, *endp;
+    FILE *fp;
+
+    if ((fp = fopen(file, "r")) == NULL)
+	return -ENOENT;
+    result = fgets(buffer, sizeof(buffer), fp);
+    fclose(fp);
+    if (!result)
+	return -ENOMEM;
+    return strtoull(result, &endp, 0);
 }
 
 void
-cgroup_init(pmdaMetric *metrics, int nmetrics)
+setup_cpuset(void)
 {
-    int set[] = { CLUSTER_CPUSET_GROUPS,
-		  CLUSTER_CPUACCT_GROUPS,
-		  CLUSTER_CPUSCHED_GROUPS,
-		  CLUSTER_MEMORY_GROUPS,
-		  CLUSTER_NET_CLS_GROUPS,
-		};
+    pmdaCacheOp(INDOM(CGROUP_CPUSET_INDOM), PMDA_CACHE_INACTIVE);
+}
 
-    pmdaDynamicPMNS(CGROUP_ROOT,
-		    set, sizeof(set)/sizeof(int),
-		    refresh_cgroups, cgroup_text,
-		    refresh_metrictable, size_metrictable,
-		    metrics, nmetrics);
+void
+refresh_cpuset(const char *path, const char *name)
+{
+    pmInDom indom = INDOM(CGROUP_CPUSET_INDOM);
+    cgroup_cpuset_t *cpuset;
+    char file[MAXPATHLEN];
+    int sts;
+
+    sts = pmdaCacheLookupName(indom, name, NULL, (void **)&cpuset);
+    if (sts == PMDA_CACHE_ACTIVE)
+	return;
+    if (sts != PMDA_CACHE_INACTIVE) {
+	cpuset = (cgroup_cpuset_t *)malloc(sizeof(cgroup_cpuset_t));
+	if (!cpuset)
+	    return;
+    }
+    snprintf(file, sizeof(file), "%s/cpuset.cpus", path);
+    cpuset->cpus = read_oneline_string(file);
+    snprintf(file, sizeof(file), "%s/cpuset.mems", path);
+    cpuset->mems = read_oneline_string(file);
+    pmdaCacheStore(indom, PMDA_CACHE_ADD, name, cpuset);
+}
+
+void
+setup_cpuacct(void)
+{
+    refresh_cgroup_cpus();
+    pmdaCacheOp(INDOM(CGROUP_CPUACCT_INDOM), PMDA_CACHE_INACTIVE);
+    pmdaCacheOp(INDOM(CGROUP_PERCPUACCT_INDOM), PMDA_CACHE_INACTIVE);
+}
+
+static int
+read_cpuacct_stats(const char *file, cgroup_cpuacct_t *cap)
+{
+    static cgroup_cpuacct_t cpuacct;
+    static struct {
+	char		*field;
+	__uint64_t	*offset;
+    } cpuacct_fields[] = {
+	{ "user",			&cpuacct.user },
+	{ "system",			&cpuacct.system },
+	{ NULL, NULL }
+    };
+    char buffer[4096], name[64];
+    unsigned long long value;
+    FILE *fp;
+    int i;
+
+    if ((fp = fopen(file, "r")) == NULL)
+	return -ENOENT;
+    while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+	if (sscanf(buffer, "%s %llu\n", &name[0], &value) < 2)
+	    continue;
+	for (i = 0; cpuacct_fields[i].field != NULL; i++) {
+	    if (strcmp(name, cpuacct_fields[i].field) != 0)
+		continue;
+	    *cpuacct_fields[i].offset = value;
+	    break;
+	}
+    }
+    fclose(fp);
+    memcpy(cap, &cpuacct, sizeof(cpuacct));
+    return 0;
+}
+
+static int
+read_percpuacct_usage(const char *file, const char *name)
+{
+    pmInDom indom =  INDOM(CGROUP_PERCPUACCT_INDOM);
+    cgroup_percpuacct_t *percpuacct;
+    char buffer[16 * 4096], *endp;
+    char inst[MAXPATHLEN], *p;
+    unsigned long long value;
+    FILE *fp;
+    int cpu, sts;
+
+    if ((fp = fopen(file, "r")) == NULL)
+	return -ENOENT;
+    p = fgets(buffer, sizeof(buffer), fp);
+    if (!p) {
+	fclose(fp);
+	return -ENOMEM;
+    }
+
+    for (cpu = 0; ; cpu++) {
+	value = strtoull(p, &endp, 0);
+	if (*endp == '\0' || endp == p)
+	    break;
+	p = endp;
+	while (p && isspace((int)*p))
+	    p++;
+	snprintf(inst, sizeof(inst), "%s::cpu%d", name, cpu);
+	sts = pmdaCacheLookupName(indom, inst, NULL, (void **)&percpuacct);
+	if (sts == PMDA_CACHE_ACTIVE)
+	    continue;
+	if (sts != PMDA_CACHE_INACTIVE) {
+	    percpuacct = (cgroup_percpuacct_t *)malloc(sizeof(cgroup_percpuacct_t));
+	    if (!percpuacct)
+		continue;
+	}
+	percpuacct->usage = value;
+	pmdaCacheStore(indom, PMDA_CACHE_ADD, inst, percpuacct);
+    }
+    fclose(fp);
+    return 0;
+}
+
+void
+refresh_cpuacct(const char *path, const char *name)
+{
+    pmInDom indom = INDOM(CGROUP_CPUACCT_INDOM);
+    cgroup_cpuacct_t *cpuacct;
+    char file[MAXPATHLEN];
+    int sts;
+
+    sts = pmdaCacheLookupName(indom, name, NULL, (void **)&cpuacct);
+    if (sts == PMDA_CACHE_ACTIVE)
+	return;
+    if (sts != PMDA_CACHE_INACTIVE) {
+	cpuacct = (cgroup_cpuacct_t *)malloc(sizeof(cgroup_cpuacct_t));
+	if (!cpuacct)
+	    return;
+    }
+    snprintf(file, sizeof(file), "%s/cpuacct.stat", path);
+    read_cpuacct_stats(file, cpuacct);
+    snprintf(file, sizeof(file), "%s/cpuacct.usage", path);
+    cpuacct->usage = read_oneline_ull(file);
+    snprintf(file, sizeof(file), "%s/cpuacct.usage_percpu", path);
+    read_percpuacct_usage(file, name);
+    pmdaCacheStore(indom, PMDA_CACHE_ADD, name, cpuacct);
+}
+
+void
+setup_cpusched(void)
+{
+    pmdaCacheOp(INDOM(CGROUP_CPUSCHED_INDOM), PMDA_CACHE_INACTIVE);
+}
+
+void
+refresh_cpusched(const char *path, const char *name)
+{
+    pmInDom indom = INDOM(CGROUP_CPUSCHED_INDOM);
+    cgroup_cpusched_t *cpusched;
+    char file[MAXPATHLEN];
+    int sts;
+
+    sts = pmdaCacheLookupName(indom, name, NULL, (void **)&cpusched);
+    if (sts == PMDA_CACHE_ACTIVE)
+	return;
+    if (sts != PMDA_CACHE_INACTIVE) {
+	cpusched = (cgroup_cpusched_t *)malloc(sizeof(cgroup_cpusched_t));
+	if (!cpusched)
+	    return;
+    }
+    snprintf(file, sizeof(file), "%s/cpu.shares", path);
+    cpusched->shares = read_oneline_ull(file);
+    /* cpu.stat - nr_periods, nr_throttled, throttled_time */
+    pmdaCacheStore(indom, PMDA_CACHE_ADD, name, cpusched);
+}
+
+void
+setup_memory(void)
+{
+    pmdaCacheOp(INDOM(CGROUP_MEMORY_INDOM), PMDA_CACHE_INACTIVE);
+}
+
+static int
+read_memory_stats(const char *file, cgroup_memory_t *cmp)
+{
+    static cgroup_memory_t memory;
+    static struct {
+	char		*field;
+	__uint64_t	*offset;
+    } memory_fields[] = {
+	{ "cache",			&memory.stat.cache },
+	{ "rss",			&memory.stat.rss },
+	{ "rss_huge",			&memory.stat.rss_huge },
+	{ "mapped_file",		&memory.stat.mapped_file },
+	{ "writeback",			&memory.stat.writeback },
+	{ "swap",			&memory.stat.swap },
+	{ "pgpgin",			&memory.stat.pgpgin },
+	{ "pgpgout",			&memory.stat.pgpgout },
+	{ "pgfault",			&memory.stat.pgfault },
+	{ "pgmajfault",			&memory.stat.pgmajfault },
+	{ "inactive_anon",		&memory.stat.inactive_anon },
+	{ "active_anon",		&memory.stat.active_anon },
+	{ "inactive_file",		&memory.stat.inactive_file },
+	{ "active_file",		&memory.stat.active_file },
+	{ "unevictable",		&memory.stat.unevictable },
+	{ "total_cache",		&memory.total.cache },
+	{ "total_rss",			&memory.total.rss },
+	{ "total_rss_huge",		&memory.total.rss_huge },
+	{ "total_mapped_file",		&memory.total.mapped_file },
+	{ "total_writeback",		&memory.total.writeback },
+	{ "total_swap",			&memory.total.swap },
+	{ "total_pgpgin",		&memory.total.pgpgin },
+	{ "total_pgpgout",		&memory.total.pgpgout },
+	{ "total_pgfault",		&memory.total.pgfault },
+	{ "total_pgmajfault",		&memory.total.pgmajfault },
+	{ "total_inactive_anon",	&memory.total.inactive_anon },
+	{ "total_active_anon",		&memory.total.active_anon },
+	{ "total_inactive_file",	&memory.total.inactive_file },
+	{ "total_active_file",		&memory.total.active_file },
+	{ "total_unevictable",		&memory.total.unevictable },
+	{ "recent_rotated_anon",	&memory.recent_rotated_anon },
+	{ "recent_rotated_file",	&memory.recent_rotated_file },
+	{ "recent_scanned_anon",	&memory.recent_scanned_anon },
+	{ "recent_scanned_file",	&memory.recent_scanned_file },
+	{ NULL, NULL }
+    };
+    char buffer[4096], name[64];
+    unsigned long long value;
+    FILE *fp;
+    int i;
+
+    memset(&memory, 0, sizeof(memory));
+    if ((fp = fopen(file, "r")) == NULL) {
+	memcpy(cmp, &memory, sizeof(memory));
+	return -ENOENT;
+    }
+    while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+	if (sscanf(buffer, "%s %llu\n", &name[0], &value) < 2)
+	    continue;
+	for (i = 0; memory_fields[i].field != NULL; i++) {
+	    if (strcmp(name, memory_fields[i].field) != 0)
+		continue;
+	    *memory_fields[i].offset = value;
+	    break;
+	}
+    }
+    fclose(fp);
+    memcpy(cmp, &memory, sizeof(memory));
+    return 0;
+}
+
+void
+refresh_memory(const char *path, const char *name)
+{
+    pmInDom indom = INDOM(CGROUP_MEMORY_INDOM);
+    cgroup_memory_t *memory;
+    char file[MAXPATHLEN];
+    int sts;
+
+    sts = pmdaCacheLookupName(indom, name, NULL, (void **)&memory);
+    if (sts == PMDA_CACHE_ACTIVE)
+	return;
+    if (sts != PMDA_CACHE_INACTIVE) {
+	memory = (cgroup_memory_t *)malloc(sizeof(cgroup_memory_t));
+	if (!memory)
+	    return;
+    }
+    snprintf(file, sizeof(file), "%s/memory.stat", path);
+    read_memory_stats(file, memory);
+
+    pmdaCacheStore(indom, PMDA_CACHE_ADD, name, memory);
+}
+
+void
+setup_netcls(void)
+{
+    pmdaCacheOp(INDOM(CGROUP_NETCLS_INDOM), PMDA_CACHE_INACTIVE);
+}
+
+void
+refresh_netcls(const char *path, const char *name)
+{
+    pmInDom indom = INDOM(CGROUP_NETCLS_INDOM);
+    cgroup_netcls_t *netcls;
+    char file[MAXPATHLEN];
+    int sts;
+
+    sts = pmdaCacheLookupName(indom, name, NULL, (void **)&netcls);
+    if (sts == PMDA_CACHE_ACTIVE)
+	return;
+    if (sts != PMDA_CACHE_INACTIVE) {
+	netcls = (cgroup_netcls_t *)malloc(sizeof(cgroup_netcls_t));
+	if (!netcls)
+	    return;
+    }
+    snprintf(file, sizeof(file), "%s/net_cls.classid", path);
+    netcls->classid = read_oneline_ull(file);
+    pmdaCacheStore(indom, PMDA_CACHE_ADD, name, netcls);
+}
+
+void
+setup_blkio(void)
+{
+    refresh_cgroup_devices();
+    pmdaCacheOp(INDOM(CGROUP_BLKIO_INDOM), PMDA_CACHE_INACTIVE);
+    pmdaCacheOp(INDOM(CGROUP_PERDEVBLKIO_INDOM), PMDA_CACHE_INACTIVE);
+}
+
+static cgroup_blkiops_t *
+get_blkiops(int style, cgroup_perdevblkio_t *perdev)
+{
+    switch (style) {
+    case CG_BLKIO_IOMERGED_TOTAL:
+	return &perdev->stats.io_merged;
+    case CG_BLKIO_IOQUEUED_TOTAL:
+	return &perdev->stats.io_queued;
+    case CG_BLKIO_IOSERVICEBYTES_TOTAL:
+	return &perdev->stats.io_service_bytes;
+    case CG_BLKIO_IOSERVICED_TOTAL:
+	return &perdev->stats.io_serviced;
+    case CG_BLKIO_IOSERVICETIME_TOTAL:
+	return &perdev->stats.io_service_time;
+    case CG_BLKIO_IOWAITTIME_TOTAL:
+	return &perdev->stats.io_wait_time;
+    }
+    return NULL;
+}
+
+static char *
+get_blkdev(pmInDom devtindom, unsigned int major, unsigned int minor)
+{
+    char	buf[64];
+    device_t	*dev;
+    int		sts;
+
+    snprintf(buf, sizeof(buf), "%u:%u", major, minor);
+    sts = pmdaCacheLookupName(devtindom, buf, NULL, (void **)&dev);
+    if (sts == PMDA_CACHE_ACTIVE)
+	return dev->name;
+    return NULL;
+}
+
+static cgroup_perdevblkio_t *
+get_perdevblkio(pmInDom indom, const char *name, const char *disk,
+		char *inst, size_t size)
+{
+    cgroup_perdevblkio_t *cdevp;
+    int		sts;
+
+    snprintf(inst, size, "%s::%s", name, disk);
+    sts = pmdaCacheLookupName(indom, inst, NULL, (void **)&cdevp);
+    if (sts == PMDA_CACHE_ACTIVE) {
+	if (pmDebug & DBG_TRACE_APPL0)
+	    fprintf(stderr, "get_perdevblkio active %s\n", inst);
+	return cdevp;
+    }
+    if (sts != PMDA_CACHE_INACTIVE) {
+	if (pmDebug & DBG_TRACE_APPL0)
+	    fprintf(stderr, "get_perdevblkio new %s\n", inst);
+	cdevp = (cgroup_perdevblkio_t *)malloc(sizeof(cgroup_perdevblkio_t));
+	if (!cdevp)
+	    return NULL;
+    } else {
+	if (pmDebug & DBG_TRACE_APPL0)
+	    fprintf(stderr, "get_perdevblkio inactive %s\n", inst);
+    }
+    memset(cdevp, 0, sizeof(cgroup_perdevblkio_t));
+    return cdevp;
+}
+
+static int
+read_blkio_devices_stats(const char *file, const char *name, int style,
+			cgroup_blkiops_t *total)
+{
+    pmInDom indom = INDOM(CGROUP_PERDEVBLKIO_INDOM);
+    pmInDom devtindom = INDOM(DEVT_INDOM);
+    cgroup_perdevblkio_t *blkdev;
+    cgroup_blkiops_t *blkios;
+    char *devname = NULL;
+    char buffer[4096];
+    FILE *fp;
+
+    static cgroup_blkiops_t blkiops;
+    static struct {
+	char		*field;
+	__uint64_t	*offset;
+    } blkio_fields[] = {
+	{ "Read",			&blkiops.read },
+	{ "Write",			&blkiops.write },
+	{ "Sync",			&blkiops.sync },
+	{ "Async",			&blkiops.async },
+	{ "Total",			&blkiops.total },
+	{ NULL, NULL },
+    };
+
+    /* reset, so counts accumulate from zero for this set of devices */
+    memset(total, 0, sizeof(cgroup_blkiops_t));
+
+    if ((fp = fopen(file, "r")) == NULL)
+	return -ENOENT;
+
+    while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+	unsigned int major, minor;
+	unsigned long long value;
+	char *realname, op[8];
+	int i;
+
+	i = sscanf(buffer, "Total %llu\n", &value);
+	if (i == 2) {	/* final field - per-cgroup Total operations */
+	    break;
+	}
+
+	i = sscanf(buffer, "%u:%u %s %llu\n", &major, &minor, &op[0], &value);
+	if (i < 3)
+	    continue;
+	realname = get_blkdev(devtindom, major, minor);
+	if (!realname)
+	    continue;
+	if (!devname || strcmp(devname, realname) != 0) /* lines for next device */
+	    memset(&blkiops, 0, sizeof(cgroup_blkiops_t));
+	devname = realname;
+	for (i = 0; blkio_fields[i].field != NULL; i++) {
+	    if (strcmp(name, blkio_fields[i].field) != 0)
+		continue;
+	    *blkio_fields[i].offset = value;
+	    if (strcmp("Total", blkio_fields[i].field) != 0)
+		break;
+	    /* all device fields are now acquired, update indom and cgroup totals */
+	    blkdev = get_perdevblkio(indom, name, devname, buffer, sizeof(buffer));
+	    blkios = get_blkiops(style, blkdev);
+	    memcpy(blkios, &blkiops, sizeof(cgroup_blkiops_t));
+	    pmdaCacheStore(indom, PMDA_CACHE_ADD, buffer, blkdev);
+	    /* accumulate stats for this latest device into the per-cgroup totals */
+	    total->read += blkiops.read;
+	    total->write += blkiops.write;
+	    total->sync += blkiops.sync;
+	    total->async += blkiops.async;
+	    total->total += blkiops.total;
+	    break;
+	}
+    }
+    fclose(fp);
+    return 0;
+}
+
+static int
+read_blkio_devices_value(const char *file, const char *name, int style,
+			__uint64_t *total)
+{
+    pmInDom indom = INDOM(CGROUP_PERDEVBLKIO_INDOM);
+    pmInDom devtindom = INDOM(DEVT_INDOM);
+    cgroup_perdevblkio_t *blkdev;
+    char buffer[4096];
+    FILE *fp;
+
+    /* reset, so counts accumulate from zero for this set of devices */
+    memset(total, 0, sizeof(__uint64_t));
+
+    if ((fp = fopen(file, "r")) == NULL)
+	return -ENOENT;
+
+    while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+	unsigned int major, minor;
+	unsigned long long value;
+	char *devname;
+	int i;
+
+	i = sscanf(buffer, "%u:%u %llu\n", &major, &minor, &value);
+	if (i < 3)
+	    continue;
+	if ((devname = get_blkdev(devtindom, major, minor)) == NULL)
+	    continue;
+	/* all device fields are now acquired, update indom and cgroup total */
+	blkdev = get_perdevblkio(indom, name, devname, buffer, sizeof(buffer));
+	if (style == CG_BLKIO_SECTORS)
+	    blkdev->stats.sectors = value;
+	if (style == CG_BLKIO_TIME)
+	    blkdev->stats.time = value;
+	pmdaCacheStore(indom, PMDA_CACHE_ADD, buffer, blkdev);
+	/* accumulate stats for this latest device into the per-cgroup total */
+	*total += value;
+    }
+    fclose(fp);
+    return 0;
+}
+
+void
+refresh_blkio(const char *path, const char *name)
+{
+    pmInDom indom = INDOM(CGROUP_BLKIO_INDOM);
+    cgroup_blkio_t *blkio;
+    char file[MAXPATHLEN];
+    int sts;
+
+    sts = pmdaCacheLookupName(indom, name, NULL, (void **)&blkio);
+    if (sts == PMDA_CACHE_ACTIVE)
+	return;
+    if (sts != PMDA_CACHE_INACTIVE) {
+	blkio = (cgroup_blkio_t *)malloc(sizeof(cgroup_blkio_t));
+	if (!blkio)
+	    return;
+    }
+    snprintf(file, sizeof(file), "%s/blkio.io_merged", path);
+    read_blkio_devices_stats(file, name,
+		CG_BLKIO_IOMERGED_TOTAL, &blkio->total.io_merged);
+    snprintf(file, sizeof(file), "%s/blkio.io_queued", path);
+    read_blkio_devices_stats(file, name,
+		CG_BLKIO_IOQUEUED_TOTAL, &blkio->total.io_queued);
+    snprintf(file, sizeof(file), "%s/blkio.io_service_bytes", path);
+    read_blkio_devices_stats(file, name,
+		CG_BLKIO_IOSERVICEBYTES_TOTAL, &blkio->total.io_service_bytes);
+    snprintf(file, sizeof(file), "%s/blkio.io_serviced", path);
+    read_blkio_devices_stats(file, name,
+		CG_BLKIO_IOSERVICED_TOTAL, &blkio->total.io_serviced);
+    snprintf(file, sizeof(file), "%s/blkio.io_service_time", path);
+    read_blkio_devices_stats(file, name,
+		CG_BLKIO_IOSERVICETIME_TOTAL, &blkio->total.io_service_time);
+    snprintf(file, sizeof(file), "%s/blkio.io_wait_time", path);
+    read_blkio_devices_stats(file, name,
+		CG_BLKIO_IOWAITTIME_TOTAL, &blkio->total.io_wait_time);
+    snprintf(file, sizeof(file), "%s/blkio.sectors", path);
+    read_blkio_devices_value(file, name,
+		CG_BLKIO_SECTORS, &blkio->total.sectors);
+    snprintf(file, sizeof(file), "%s/blkio.time", path);
+    read_blkio_devices_value(file, name,
+		CG_BLKIO_TIME, &blkio->total.time);
+
+    pmdaCacheStore(indom, PMDA_CACHE_ADD, name, blkio);
 }

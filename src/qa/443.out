@@ -80,16 +80,16 @@ pmevent: foo:bar: only one metric source allowed, found hosts localhost and foo
 pmevent: foo:bar: only one type of metric source allowed
 
 --- problems at source of metrics ---
-=== -h no.such.host sample.event.records ===
-pmevent: Cannot connect to PMCD on host "no.such.host": No route to host
+=== -h no.such.host.pcp.io sample.event.records ===
+pmevent: Cannot connect to PMCD on host "no.such.host.pcp.io": No route to host
 === -a /no/such/archive sample.event.records ===
 pmevent: Cannot open archive "/no/such/archive": No such file or directory
 === -L sample.event.records ===
 pmevent: pmLookupDesc: sample.event.records: No PMCD agent for domain of request
 === sample.event.records sample.colour ===
-pmevent: sample.colour: metrics must be of type PM_TYPE_EVENT
+pmevent: sample.colour: metrics must be of event type
 === -Dappl0 sample.colour[red] ===
-pmevent: sample.colour: metrics must be of type PM_TYPE_EVENT
+pmevent: sample.colour: metrics must be of event type
 === -Dappl0 sample.event.no_indom_records[red] ===
 pmevent: sample.event.no_indom_records[red]: singular metrics do not have instances
 
@@ -307,3 +307,64 @@ samples:   all
   15:26:04.073 --- event record [1] flags 0x1 (point) ---
     sample.event.type 2
     sample.event.param_64 -3
+
+--- highres events ---
+=== -z src/eventrec/sample.event.highres_records ===
+Note: timezone set to local timezone of host "smash" from archive
+
+archive:   src/eventrec
+host:      smash
+start:     Thu Nov 13 12:00:50 2014
+end:       Thu Nov 13 12:00:55 2014
+samples:   all
+12:00:51.556  sample.event.highres_records[fungus]: 0 event records
+sample.event.highres_records[bogus]: 2 event records
+  12:00:51.555941984 --- event record [0] flags 0x1 (point) ---
+    sample.event.param_string "fetch #0"
+  12:00:51.555941984 --- event record [1] flags 0x1 (point) ---
+    sample.event.param_string "bingo!"
+12:00:52.555  sample.event.highres_records[fungus]: 1 event records
+  12:00:42.555871929 --- event record [0] flags 0x1 (point) ---
+sample.event.highres_records[bogus]: 1 event records
+  12:00:52.555874181 --- event record [0] flags 0x1 (point) ---
+    sample.event.param_string "fetch #1"
+12:00:53.555  sample.event.highres_records[fungus]: 2 event records
+  12:00:43.555914894 --- event record [0] flags 0x1 (point) ---
+    sample.event.type 1
+  12:00:44.555914894 --- event record [1] flags 0x1 (point) ---
+    sample.event.type 2
+    sample.event.param_64 -3
+sample.event.highres_records[bogus]: 1 event records
+  12:00:53.555920898 --- event record [0] flags 0x1 (point) ---
+    sample.event.param_string "fetch #2"
+12:00:54.555  sample.event.highres_records[fungus]: 5 event records
+  12:00:44.555893310 --- event record [0] flags 0x1a (start,id,parent) ---
+    sample.event.type 4
+    sample.event.param_u64 5
+    sample.event.param_string "6"
+  12:00:45.555893310 --- event record [1] flags 0x1 (point) ---
+    sample.event.type 7
+    sample.event.param_double 8
+    sample.event.param_double -9
+  12:00:46.555893310 --- event record [2] flags 0x4 (end) ---
+    sample.event.type 10
+    sample.event.param_u64 11
+    sample.event.param_string "twelve"
+    sample.event.param_string "thirteen"
+    sample.event.param_32 -14
+    sample.event.param_u32 15
+  12:00:47.555893310 --- event record [3] flags 0x80000000 (missed) ---
+    ==> 0 missed event records
+  12:00:48.555893310 --- event record [4] flags 0x1 (point) ---
+    sample.event.type 16
+    sample.event.param_float -17
+    sample.event.param_aggregate [0103070f1f3f7fff]
+sample.event.highres_records[bogus]: 2 event records
+  12:00:54.555905229 --- event record [0] flags 0x1 (point) ---
+    sample.event.param_string "fetch #3"
+  12:00:54.555905229 --- event record [1] flags 0x1 (point) ---
+    sample.event.param_string "bingo!"
+12:00:55.555  sample.event.highres_records[fungus]: 0 event records
+sample.event.highres_records[bogus]: 1 event records
+  12:00:55.555886181 --- event record [0] flags 0x1 (point) ---
+    sample.event.param_string "fetch #4"

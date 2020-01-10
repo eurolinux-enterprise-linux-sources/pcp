@@ -34,6 +34,10 @@ PCPIMPORTSAR = pcp-import-sar2pcp
 PCPIMPORTSAR_FILES = pcp-import-sar2pcp.install
 PCPIMPORTSAR_DOC_DIR = $(PCP_DOC_DIR)/../pcp-import-sar2pcp
 
+PCPIMPORTSAR = pcp-import-ganglia2pcp
+PCPIMPORTSAR_FILES = pcp-import-ganglia2pcp.install
+PCPIMPORTSAR_DOC_DIR = $(PCP_DOC_DIR)/../pcp-import-ganglia2pcp
+
 PCPIMPORTMRTG = pcp-import-mrtg2pcp
 PCPIMPORTMRTG_FILES = pcp-import-mrtg2pcp.install
 PCPIMPORTMRTG_DOC_DIR = $(PCP_DOC_DIR)/../pcp-import-mrtg2pcp
@@ -104,26 +108,6 @@ LDIRT = *.debhelper *.substvars *.log pcp files pcp.postrm \
 	$(PCPIMPORTSAR) $(PCPIMPORTMRTG) $(PCPIMPORTSHEET) $(PCPIMPORTIOSTAT) \
 	$(PCPIMPORTCOLLECTL)
 
-LSRCFILES = changelog compat copyright rules \
-	configversions control control.master \
-	control.webapi control.pcpgui control.pmdaib \
-	pcp.preinst.head.in pcp.preinst.head pcp.preinst.tail \
-	pcp.postinst.head.in pcp.postinst.head pcp.postinst.tail \
-	pcp.postrm.head pcp.postrm.tail \
-	$(LINTIAN) $(PCP_LINT) \
-	$(PCP_FILES) $(LIBPCP_FILES) $(DEVPCP_FILES) \
-	$(PCPCFG_FILES) $(PCPTESTSUITE_FILES) \
-	$(PCPWEBAPI_FILES) $(PCPMANAGER_FILES) \
-	$(LIBGUI_FILES) $(DEVGUI_FILES) \
-	$(LIBMMV_FILES) $(DEVMMV_FILES) \
-	$(LIBPMDA_FILES) $(DEVPMDA_FILES) \
-	$(LIBTRACE_FILES) $(DEVTRACE_FILES) \
-	$(LIBIMPORT_FILES) $(DEVIMPORT_FILES) \
-	$(PCPIMPORTSAR_FILES) $(PCPIMPORTMRTG_FILES) \
-	$(PCPIMPORTSHEET_FILES) $(PCPIMPORTIOSTAT_FILES) \
-	$(PCPIMPORTCOLLECTL_FILES) $(PCPPMDAINFINIBAND_FILES) \
-	$(PCPGUI_FILES) $(PCPDOC_FILES)
-
 default: pcp.preinst pcp.postinst pcp.postrm control
 
 include $(BUILDRULES)
@@ -139,7 +123,7 @@ default_pcp : default
 install_pcp : install
 
 install-pcpgui:
-ifeq ($(HAVE_QT), 1)
+ifeq ($(ENABLE_QT), true)
 ifeq ($(PACKAGE_DISTRIBUTION), debian)
 	$(INSTALL) -m 755 -d $(PCPGUI_DOC_DIR)
 	$(INSTALL) -m 644 copyright $(PCPGUI_DOC_DIR)
@@ -148,7 +132,7 @@ endif
 endif
 
 install-webapi:
-ifeq ($(HAVE_LIBMICROHTTPD), 1)
+ifeq ($(ENABLE_WEBAPI), true)
 ifeq ($(PACKAGE_DISTRIBUTION), debian)
 	$(INSTALL) -m 755 -d $(PCPWEBAPI_DOC_DIR)
 	$(INSTALL) -m 644 copyright $(PCPWEBAPI_DOC_DIR)
@@ -157,10 +141,12 @@ endif
 endif
 
 install-manager: default
+ifeq ($(ENABLE_MANAGER), true)
 ifeq ($(PACKAGE_DISTRIBUTION), debian)
 	$(INSTALL) -m 755 -d $(PCPMANAGER_DOC_DIR)
 	$(INSTALL) -m 644 copyright $(PCPMANAGER_DOC_DIR)
 	$(INSTALL) -m 644 changelog $(PCPMANAGER_DOC_DIR)/changelog.Debian
+endif
 endif
 
 install-testsuite: default
@@ -317,7 +303,7 @@ pcp.postrm:	pcp.postrm.head configversions pcp.postrm.tail
 
 control:	control.master control.webapi control.pcpgui
 	cat control.master >control
-ifeq ($(HAVE_LIBMICROHTTPD), 1)
+ifeq ($(ENABLE_WEBAPI), true)
 	cat control.webapi >>control
 endif
 ifeq ($(ENABLE_QT), true)

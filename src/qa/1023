@@ -4,7 +4,9 @@
 #
 seq=`basename $0`
 echo "QA output created by $seq"
-. ./common.test
+. ./common.qt
+
+which pmdumptext >/dev/null 2>&1 || _notrun "pmdumptext not installed"
 
 status=1	# failure is the default!
 trap "rm -f $tmp.*; exit \$status" 0 1 2 3 15
@@ -13,8 +15,7 @@ trap "rm -f $tmp.*; exit \$status" 0 1 2 3 15
 pminfo proc.nprocs >/dev/null 2>&1 || _notrun "proc PMDA not installed"
 
 # see if unix domain sockets are available (permissions)
-unix_domain_sockets=false
-eval `pmconfig -L 2>/dev/null`
+eval `pmconfig -L -s unix_domain_sockets`
 target="-h localhost"
 $unix_domain_sockets && target="-h unix:"
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 Red Hat.
+ * Copyright (c) 2012-2015 Red Hat.
  * Copyright (c) 1995-2000,2003,2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This library is free software; you can redistribute it and/or modify it
@@ -475,6 +475,9 @@ pmdaRehash(pmdaExt *pmda, pmdaMetric *metrics, int nmetrics)
     }
     if (m == pmda->e_nmetrics)
 	pmda->e_flags |= PMDA_EXT_FLAG_HASHED;
+	if (pmDebug & DBG_TRACE_LIBPMDA)
+	    __pmNotifyErr(LOG_DEBUG, "pmdaRehash: PMDA %s: successful rebuild\n",
+			pmda->e_name);
     else {
 	pmda->e_flags &= ~PMDA_EXT_FLAG_HASHED;
 	pmdaHashDelete(hashp);
@@ -565,13 +568,13 @@ pmdaInit(pmdaInterface *dispatch, pmdaIndom *indoms, int nindoms,
     }
     if ((nmetrics == 0 && metrics != NULL) ||
         (nmetrics != 0 && metrics == NULL)){
-	__pmNotifyErr(LOG_CRIT, "pmdaInit: PMDA %s: metrics not consistent with nmetrics", pmda->e_name);
+	__pmNotifyErr(LOG_CRIT, "pmdaInit: PMDA %s: metrics (" PRINTF_P_PFX "%p) not consistent with nmetrics (%d)", pmda->e_name, metrics, nmetrics);
 	dispatch->status = PM_ERR_GENERIC;
 	return;
     }
     if ((nindoms == 0 && indoms != NULL) ||
         (nindoms != 0 && indoms == NULL)){
-	__pmNotifyErr(LOG_CRIT, "pmdaInit: PMDA %s: indoms not consistent with nindoms", pmda->e_name);
+	__pmNotifyErr(LOG_CRIT, "pmdaInit: PMDA %s: indoms (" PRINTF_P_PFX "%p) not consistent with nindoms (%d)", pmda->e_name, indoms, nindoms);
 	dispatch->status = PM_ERR_GENERIC;
 	return;
     }
@@ -649,7 +652,7 @@ pmdaInit(pmdaInterface *dispatch, pmdaIndom *indoms, int nindoms,
     }
     else {
 	if (dispatch->version.two.text == pmdaText)
-	    __pmNotifyErr(LOG_WARNING, "pmdaInit: PMDA %s: No help text file specified", pmda->e_name); 
+	    __pmNotifyErr(LOG_WARNING, "pmdaInit: PMDA %s: No help text file specified for pmdaText", pmda->e_name); 
 #ifdef PCP_DEBUG
 	else
 	    if (pmDebug & DBG_TRACE_LIBPMDA)
@@ -917,7 +920,7 @@ __pmdaSetup(pmdaInterface *dispatch, int version, char *name)
 	dispatch->status = PM_ERR_GENERIC;
 	return;
     }
-    extp->pmda_interface = version;
+    extp->dispatch = dispatch;
     pmda->e_ext = (void *)extp;
 
     pmdaSetResultCallBack(dispatch, __pmFreeResultValues);
@@ -981,4 +984,19 @@ pmdaOpenLog(pmdaInterface *dispatch)
 
     __pmOpenLog(dispatch->version.any.ext->e_name, 
 		dispatch->version.any.ext->e_logfile, stderr, &c);
+}
+
+/*
+ * pmdaInterface was moved ... fix e_ext back pointer
+ */
+void
+pmdaInterfaceMoved(pmdaInterface *dispatch)
+{
+    if (dispatch->version.any.ext != NULL) {
+	if (dispatch->version.any.ext->e_ext != NULL) {
+	    e_ext_t	*extp;
+	    extp = (e_ext_t *)dispatch->version.any.ext->e_ext;
+	    extp->dispatch = dispatch;
+	}
+    }
 }

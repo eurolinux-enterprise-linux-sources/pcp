@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Red Hat.
+ * Copyright (c) 2012-2014 Red Hat.
  * Copyright (c) 1995-2001 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This library is free software; you can redistribute it and/or modify it
@@ -31,6 +31,7 @@
 extern int __pmConvertTimeout(int) _PCP_HIDDEN;
 extern const struct timeval *__pmConnectTimeout(void) _PCP_HIDDEN;
 extern const struct timeval * __pmDefaultRequestTimeout(void) _PCP_HIDDEN;
+extern int __pmConnectWithFNDELAY(int, void *, __pmSockLen) _PCP_HIDDEN;
 
 extern int __pmPtrToHandle(__pmContext *) _PCP_HIDDEN;
 extern int __pmFetchLocal(__pmContext *, int, pmID *, pmResult **) _PCP_HIDDEN;
@@ -152,16 +153,9 @@ extern void __pmCheckAcceptedAddress(__pmSockAddr *) _PCP_HIDDEN;
 #define SECURE_SERVER_CERTIFICATE "PCP Collector certificate"
 #define SECURE_USERDB_DEFAULT_KEY "\n"
 
-struct __pmSockAddr {
-    PRNetAddr		sockaddr;
-};
-
-typedef PRAddrInfo __pmAddrInfo;
-
 /* internal NSS/NSPR/SSL/SASL implementation details */
 extern int __pmSecureSocketsError(int) _PCP_HIDDEN;
-
-#else /* native sockets only */
+#endif
 
 #if defined(HAVE_SYS_UN_H)
 #include <sys/un.h>
@@ -180,13 +174,16 @@ struct __pmSockAddr {
 
 typedef struct addrinfo __pmAddrInfo;
 
-#endif
-
 struct __pmHostEnt {
     char		*name;
     __pmAddrInfo	*addresses;
 };
 #endif
+
+extern unsigned __pmFirstInetSubnetAddr(unsigned, int) _PCP_HIDDEN;
+extern unsigned __pmNextInetSubnetAddr(unsigned, int) _PCP_HIDDEN;
+extern unsigned char *__pmFirstIpv6SubnetAddr(unsigned char *, int maskBits) _PCP_HIDDEN;
+extern unsigned char *__pmNextIpv6SubnetAddr(unsigned char *, int maskBits) _PCP_HIDDEN;
 
 extern int __pmInitSecureSockets(void) _PCP_HIDDEN;
 extern int __pmInitCertificates(void) _PCP_HIDDEN;
@@ -194,6 +191,7 @@ extern int __pmInitSocket(int, int) _PCP_HIDDEN;
 extern int __pmSocketReady(int, struct timeval *) _PCP_HIDDEN;
 extern void *__pmGetSecureSocket(int) _PCP_HIDDEN;
 extern void *__pmGetUserAuthData(int) _PCP_HIDDEN;
+extern int __pmSecureServerInit(void) _PCP_HIDDEN;
 extern int __pmSecureServerIPCFlags(int, int) _PCP_HIDDEN;
 extern int __pmSecureServerHasFeature(__pmServerFeature) _PCP_HIDDEN;
 extern int __pmSecureServerSetFeature(__pmServerFeature) _PCP_HIDDEN;
@@ -204,6 +202,7 @@ extern int __pmShutdownCertificates(void) _PCP_HIDDEN;
 extern int __pmShutdownSecureSockets(void) _PCP_HIDDEN;
 
 #define SECURE_SERVER_SASL_SERVICE "PCP Collector"
+#define LIMIT_ATTR_PDU	4096	/* maximum size of an attribute value (bytes) */
 #define LIMIT_AUTH_PDU	2048	/* maximum size of a SASL transfer (in bytes) */
 #define LIMIT_CLIENT_CALLBACKS 8	/* maximum size of callback array */
 #define DEFAULT_SECURITY_STRENGTH 0	/* SASL security strength factor */
@@ -252,8 +251,28 @@ struct __pmServerPresence {
 typedef struct {
     const char		*spec;
     __pmSockAddr	*address;
+    const char		*protocol;
 } __pmServiceInfo;
 
-extern int  __pmAddDiscoveredService(__pmServiceInfo *, int, char ***) _PCP_HIDDEN;
+typedef struct {
+    const volatile unsigned	*flags;		/* Service discovery flags */
+    struct timeval		timeout;	/* Global timeout period */
+    volatile int		timedOut;	/* Global timeout occurred */
+    int				resolve;	/* Resolve discovered addresses */
+} __pmServiceDiscoveryOptions;
+
+extern int __pmAddDiscoveredService(__pmServiceInfo *,
+				    const __pmServiceDiscoveryOptions *,
+				    int,
+				    char ***) _PCP_HIDDEN;
+extern char *__pmServiceDiscoveryParseTimeout (const char *s,
+					       struct timeval *timeout)
+					       _PCP_HIDDEN;
+
+extern int __pmServiceAddPorts(const char *, int **, int) _PCP_HIDDEN;
+extern int __pmPMCDAddPorts(int **, int) _PCP_HIDDEN;
+extern int __pmProxyAddPorts(int **, int) _PCP_HIDDEN;
+extern int __pmWebdAddPorts(int **, int) _PCP_HIDDEN;
+extern int __pmAddPorts(const char *, int **, int) _PCP_HIDDEN;
 
 #endif /* _INTERNAL_H */

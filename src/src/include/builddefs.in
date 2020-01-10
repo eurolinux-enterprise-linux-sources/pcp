@@ -40,10 +40,7 @@ SGI_ISSP_BUILD ?= 0
 
 BUILDRULES = $(TOPDIR)/src/include/buildrules
 
-# LCFLAGS, LLDFLAGS, LLDLIBS, LSRCFILES and LDIRT may be specified in
-# user Makefiles. Note: LSRCFILES is anything other than Makefile,
-# $(CXXFILES), $(CFILES), or $(HFILES) and is used to construct the
-# manifest list during the "dist" phase (packaging).
+# LCFLAGS, LLDFLAGS, LLDLIBS, LDIRT may be specified in local makefiles.
 
 # turn on all warnings by default
 ifeq "@cc_is_gcc@" "yes"
@@ -62,12 +59,12 @@ PCP_LIBS = $(PCPLIB_LDFLAGS)
 #
 # Note:
 # 	Need PCFLAGS setting here to match the CFLAGS settings in
-# 	../../configure.in (likewise for PLDFLAGS and LDFLAGS).
+# 	../../configure.ac (likewise for PLDFLAGS and LDFLAGS).
 #
 TARGET_OS = @target_os@
 PCFLAGS = @PCFLAGS@
 PLDFLAGS = @PLDFLAGS@
-ifneq (, $(filter linux kfreebsd, $(TARGET_OS)))
+ifneq (, $(filter linux kfreebsd gnu, $(TARGET_OS)))
 DSOSUFFIX = so
 endif
 ifeq "$(TARGET_OS)" "darwin"
@@ -78,7 +75,7 @@ ifeq "$(TARGET_OS)" "mingw"
 DSOSUFFIX = dll
 EXECSUFFIX = .exe
 SHELLSUFFIX = .sh
-PLDLIBS = -lwsock32 -L$$PCP_DIR/local/bin -L$$PCP_DIR/local/lib -L$$PCP_DIR/lib
+PLDLIBS = -lwsock32
 endif
 ifeq "$(TARGET_OS)" "solaris"
 PLDFLAGS += -fPIC
@@ -119,6 +116,8 @@ NSSCFLAGS = @NSSCFLAGS@
 NSPRCFLAGS = @NSPRCFLAGS@
 SASLCFLAGS = @SASLCFLAGS@
 AVAHICFLAGS = @avahi_CFLAGS@
+CAIROCFLAGS = @cairo_CFLAGS@
+LIBMICROHTTPDCFLAGS = @libmicrohttpd_CFLAGS@
 
 LDFLAGS += $(PLDFLAGS) $(WARN_OFF) $(PCP_LIBS) $(LLDFLAGS)
 
@@ -161,6 +160,7 @@ LN_S	= @LN_S@
 GREP    = @grep@
 GIT	= @GIT@
 PYTHON	= @PYTHON@
+PYTHON3	= @PYTHON3@
 DTRACE  = @DTRACE@
 QMAKE	= @qmake@
 
@@ -218,11 +218,17 @@ NEED_OLD_TBL_HEADER = @need_old_tbl_header@
 RDYNAMIC_FLAG = @rdynamic_flag@
 QT_RELEASE = @qt_release@
 
+# configuration state affecting the entire build
 ENABLE_SHARED = @enable_shared@
 ENABLE_SECURE = @enable_secure@
 ENABLE_PROBES = @enable_probes@
-ENABLE_AVAHI  = @enable_avahi@
-ENABLE_QT     = @enable_qt@
+ENABLE_AVAHI = @enable_avahi@
+ENABLE_QT = @enable_qt@
+ENABLE_PYTHON = @enable_python@
+ENABLE_PYTHON3 = @enable_python3@
+ENABLE_SYSTEMD = @enable_systemd@
+ENABLE_MANAGER = @enable_manager@
+ENABLE_WEBAPI = @enable_webapi@
 
 # additional libraries needed for particular functions
 LIB_FOR_BASENAME = @lib_for_basename@
@@ -240,8 +246,23 @@ LIB_FOR_SSL = @lib_for_ssl@
 LIB_FOR_AVAHI = @lib_for_avahi@
 LIB_FOR_ATOMIC = @lib_for_atomic@
 
+HAVE_CAIRO = @HAVE_CAIRO@
+LIB_FOR_CAIRO = @cairo_LIBS@
 HAVE_LIBMICROHTTPD = @HAVE_LIBMICROHTTPD@
-HAVE_RPMLIB = @HAVE_RPMLIB@
+LIB_FOR_MICROHTTPD = @libmicrohttpd_LIBS@
+
+# configuration state for optional performance domains
+SYSTEMD_CFLAGS = @SYSTEMD_CFLAGS@
+SYSTEMD_LIBS = @SYSTEMD_LIBS@
+PAPI_CFLAGS = @PAPI_CFLAGS@
+PAPI_LIBS = @PAPI_LIBS@
+PFM_LIBS = @PFM_LIBS@
+IB_LIBS = @IB_LIBS@
+PMDA_RPM = @PMDA_RPM@
+PMDA_PAPI = @PMDA_PAPI@
+PMDA_SYSTEMD = @PMDA_SYSTEMD@
+PMDA_PERFEVENT = @PMDA_PERFEVENT@
+PMDA_INFINIBAND = @PMDA_INFINIBAND@
 
 SHELL = /bin/sh
 IMAGES_DIR = $(TOPDIR)/all-images
@@ -274,10 +295,22 @@ SUBDIRS_MAKERULE = \
 # prepare symbols file for the GNU toolchain (linker) for DSO PMDAs
 VERSION_SCRIPT_MAKERULE = \
 	@rm -f $@; \
-	echo "{" >$@; \
+	echo "$(DOMAIN) {" >$@; \
 	echo "    global: $(PMDAINIT);" >>$@; \
 	echo "    local: *;" >>$@; \
 	echo "};" >>$@; \
+
+# prepare symbols file for other platforms toolchain for shared libs
+# (convert one canonical format - GNU toolchain style - into others)
+ifeq "$(TARGET_OS)" "solaris"
+EXPORTS_MAKERULE = \
+	$(AWK) <$< >$@ '\
+BEGIN	{ print "$$mapfile_version 2"; print } \
+/\{$$/	{ print "SYMBOL_VERSION", $$0; next } \
+	{ print }'
+else
+EXPORTS_MAKERULE =
+endif
 
 # prepare domain.h used during the PMDA build process for each PMDA
 DOMAIN_MAKERULE = \
@@ -292,20 +325,23 @@ DOMAIN_MAKERULE = \
 	    END {\
 		if (found == 0) { \
 		    print "Botch: no define for domain $(DOMAIN) in $<"; \
+		    system("rm '$@'"); \
 		    exit(1) \
 		}\
 		if (found > 1) { \
 		    print "Botch: multiple defines for domain $(DOMAIN) in $<";\
 		    print "... see $@ for details"; \
+		    system("rm '$@'"); \
 		    exit(1) \
 		}\
         	exit(0) \
-            }'
+            }' || ( rm -f $@ && false )
 
 DOMAIN_PERLRULE = \
 	@export perldomain=`sed -n \
 		-e '/PCP::PMDA->new/s/[^0-9]*$$//' \
-		-e '/PCP::PMDA->new/s/^[^0-9]*//p' pmda$(IAM).pl`; \
+		-e '/PCP::PMDA->new/s/^[^0-9]*//p' pmda$(IAM).pl | \
+		$(AWK) '{ print $$NF }'`; \
 	$(AWK) <$< '\
 	    BEGIN {\
 		domain = toupper("$(IAM)") \
@@ -332,7 +368,8 @@ DOMAIN_PERLRULE = \
 DOMAIN_PYTHONRULE = \
 	@export pythondomain=`sed -n \
 		-e '/PMDA(/s/[^0-9]*$$//' \
-		-e '/PMDA(/s/^[^0-9]*//p' $(PYSCRIPT)`; \
+		-e '/PMDA(/s/^[^0-9]*//p' $(PYSCRIPT) | \
+		$(AWK) '{ print $$NF }'`; \
 	$(AWK) <$< '\
 	    BEGIN {\
 		domain = toupper("$(IAM)") \
@@ -527,14 +564,6 @@ else
 PERL_INSTALL =
 endif
 
-SYSTEMD_CFLAGS=@SYSTEMD_CFLAGS@
-SYSTEMD_LIBS=@SYSTEMD_LIBS@
-PMDA_SYSTEMD=@PMDA_SYSTEMD@
-
-IB_LIBS=@IB_LIBS@
-PMDA_INFINIBAND=@PMDA_INFINIBAND@
-
-
 #
 # Python platform-specific installation quirks
 PYTHON_PREFIX=@python_prefix@
@@ -542,7 +571,6 @@ SETUP_PY_BUILD_OPTIONS = --include-dirs=$(TOPDIR)/src/include
 SETUP_PY_BUILD_OPTIONS += --library-dirs=$(TOPDIR)/src/libpcp/src:$(TOPDIR)/src/libpcp_pmda/src:$(TOPDIR)/src/libpcp_gui/src:$(TOPDIR)/src/libpcp_import/src:$(TOPDIR)/src/libpcp_mmv/src
 SETUP_PY_INSTALL_OPTIONS = --skip-build
 SETUP_PY_INSTALL_OPTIONS += --root=$${DIST_ROOT-/}
-SETUP_PY_INSTALL_OPTIONS += --record=$(TOPDIR)/python-pcp.list
 ifeq "$(PYTHON_PREFIX)" "/usr"
 ifeq "$(PACKAGE_DISTRIBUTION)" "debian"
 SETUP_PY_INSTALL_OPTIONS += --install-layout=deb
@@ -558,6 +586,12 @@ PYTHON_INSTALL = \
 	$(AWK) '{print} /.pyc$$/ {sub(/.pyc$$/,".pyo"); print}' \
 		< $(TOPDIR)/python-pcp.list > $(TOPDIR)/python-pcp.list.rpm; \
 	cat $(TOPDIR)/python-pcp.list.rpm | while read f; do \
+	    touch $${DIST_ROOT-/}$$f; \
+	done
+PYTHON3_INSTALL = \
+	$(AWK) '{print} /.pyc$$/ {sub(/.pyc$$/,".pyo"); print}' \
+		< $(TOPDIR)/python3-pcp.list > $(TOPDIR)/python3-pcp.list.rpm; \
+	cat $(TOPDIR)/python3-pcp.list.rpm | while read f; do \
 	    touch $${DIST_ROOT-/}$$f; \
 	done
 else
@@ -587,29 +621,51 @@ PYTHON_INSTALL = \
 		$(INSTALL) $$src $$f || exit 1; \
 	    done; \
 	fi
+PYTHON3_INSTALL = \
+	if [ -n "$(DIST_MANIFEST)" ]; then \
+	    cat $(TOPDIR)/python3-pcp.list \
+	    | while read f; do \
+		bn=`basename $$f`; \
+		dn=`dirname $$f`; \
+		$(INSTALL) -d $$dn || exit 1; \
+		src=`find $(TOPDIR)/src/python/build -name $$bn`; \
+		$(INSTALL) $$src $$f || exit 1; \
+	    done; \
+	fi
 else
 PYTHON_INSTALL = 
 endif
 endif
 
+# qmake botches the order of the -L arguments in the generated $(LIBS)
+# in the Makefile ... need to get the Qt libraries dir (begins with a /)
+# out from the head of the list and insert it before the first -l argument
+# (or the end of the list).
+# So, for example
+# LIBS = $(SUBLIBS) -L/usr/lib -L../libpcp/src -L../libpcp_qmc/src ... -lpcp_qmc ...
+# becomes
+# LIBS = $(SUBLIBS) -L../libpcp/src -L../libpcp_qmc/src ... -L/usr/lib -lpcp_qmc ...
+#
+QTFIX = $(AWK) '$$1 == "LIBS" { printf $$1; for (i=2;i<=NF;i++) { if ($$i~/^-L\//) { save=save " " $$i; continue } else if (save!="" && $$i~/^-l/) { printf " %s",save; save="" } printf " %s",$$i } if (save!="") printf " %s",save; print ""; next } { print }'
+
 # Qt magic for build/installs across all the supported platforms
 ifeq ($(PCP_PLATFORM),darwin)
-QTMAKE = $(QMAKE) -spec macx-g++ CONFIG+=$(QT_RELEASE) && make -f Makefile
+QTMAKE = $(QMAKE) -spec macx-g++ CONFIG+=$(QT_RELEASE) && $(QTFIX) <Makefile >Makefile.fix && mv Makefile.fix Makefile && make -f Makefile
 MACBUILD = build/$(QT_RELEASE)/$(COMMAND).app/Contents
 BINARY = $(MACBUILD)/MacOS/$(COMMAND)
-LNMAKE = test ! -f $(BINARY) -o -L $(COMMAND) || $(LN_S) $(BINARY) $(COMMAND)
+LNMAKE = test ! -f $(BINARY) -o -L $(COMMAND) || ( rm -f $(COMMAND) && $(LN_S) $(BINARY) $(COMMAND) )
 WINDOW = mac
 endif
 ifeq ($(PCP_PLATFORM),mingw)
-QTMAKE = $(QMAKE) CONFIG+=$(QT_RELEASE) && $(MAKE) -f Makefile
+QTMAKE = $(QMAKE) CONFIG+=$(QT_RELEASE) && $(QTFIX) <Makefile >Makefile.fix && mv Makefile.fix Makefile && $(MAKE) -f Makefile
 BINARY = $(QT_RELEASE)/$(COMMAND)
 LNMAKE =
 WINDOW = win
 endif
 ifeq "$(findstring $(PCP_PLATFORM),darwin mingw)" ""
-QTMAKE = $(QMAKE) CONFIG+=$(QT_RELEASE) && $(MAKE) $(MAKEOPTS) -f Makefile
+QTMAKE = $(QMAKE) CONFIG+=$(QT_RELEASE) && $(QTFIX) <Makefile >Makefile.fix && mv Makefile.fix Makefile && $(MAKE) $(MAKEOPTS) -f Makefile
 BINARY = build/$(QT_RELEASE)/$(COMMAND)
-LNMAKE = test ! -f $(BINARY) -o -L $(COMMAND) || $(LN_S) $(BINARY) $(COMMAND)
+LNMAKE = test ! -f $(BINARY) -o -L $(COMMAND) || ( rm -f $(COMMAND) && $(LN_S) $(BINARY) $(COMMAND) )
 WINDOW = x11
 endif
 
@@ -684,7 +740,7 @@ ifneq "$(PCPLIB)" "$(LIB_FOR_BASENAME)"
 PCPLIB += $(LIB_FOR_BASENAME)
 endif
 ifeq "$(ENABLE_SHARED)" "no"
-PCPLIB += $(LIB_FOR_MATH) $(LIB_FOR_PTHREADS) $(LIB_FOR_DLOPEN)
+PCPLIB += $(LIB_FOR_MATH) $(LIB_FOR_PTHREADS) $(LIB_FOR_DLOPEN) $(LIB_FOR_RT)
 endif
 PCP_GUILIB = -lpcp_gui $(PCPLIB)
 PCP_PMDALIB = -lpcp_pmda $(PCPLIB)
@@ -699,7 +755,5 @@ PCP_ALTLIBS =
 endif
 endif
 endif
-
-BUILD_PMMGR=@BUILD_PMMGR@
 
 endif # _BUILDDEFS_INCLUDED_

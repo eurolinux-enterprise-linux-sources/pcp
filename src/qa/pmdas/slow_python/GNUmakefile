@@ -18,13 +18,8 @@ include $(TOPDIR)/src/include/builddefs
 IAM	= slow_python
 TESTDIR = $(PCP_VAR_DIR)/testsuite/pmdas/$(IAM)
 PYSCRIPT = pmda$(IAM).python
-LSRCFILES = Install Remove $(PYSCRIPT) GNUmakefile.install
 
-# Uses some domain as slow PMDA (QA never installs both together)
-#
-DOMAIN	= SLOW
-
-LDIRT	= domain.h $(IAM).log
+LDIRT	= domain.h $(IAM).log pmns.python
 
 default default_pcp setup: check_domain
 

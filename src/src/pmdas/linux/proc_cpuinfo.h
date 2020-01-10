@@ -1,7 +1,7 @@
 /*
  * Linux /proc/cpuinfo metrics cluster
  *
- * Copyright (c) 2013 Red Hat.
+ * Copyright (c) 2013-2015 Red Hat.
  * Copyright (c) 2001 Gilly Ran (gilly@exanet.com) for the
  * portions of the code supporting the Alpha platform.
  * All rights reserved.
@@ -17,10 +17,6 @@
  * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * for more details.
  */
-
-#ifdef  __alpha__
-#define HAVE_ALPHA_LINUX
-#endif
 
 typedef struct {
     int			cpu_num;
@@ -46,4 +42,5 @@ typedef struct {
 } proc_cpuinfo_t;
 
 extern int refresh_proc_cpuinfo(proc_cpuinfo_t *);
-extern char *cpu_name(proc_cpuinfo_t *, int);
+extern char *cpu_name(proc_cpuinfo_t *, unsigned int);
+extern int refresh_sysfs_online(unsigned int, const char *);

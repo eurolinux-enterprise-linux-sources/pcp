@@ -72,7 +72,6 @@ pmlogger processes:
 ps: pmlogger-pid-2 pmlogger -x 6 -h localhost
 
 files:
-MKTEMP
 MKTEMP.HOST.0
 MKTEMP.HOST.config
 MKTEMP.HOST.index
@@ -132,7 +131,6 @@ The application that launched pmlogger has asked pmlogger to continue independen
 
 At any time this pmlogger process may be terminated with the following command:
   $ pmsignal -s TERM pmlogger-pid-2
-pmlogger: Signalled (signal=15), exiting
 
 Log finished DATE
 
@@ -261,7 +259,6 @@ pmlogger processes:
 ps: pmlogger-pid-2 pmlogger -x 7 -h localhost
 
 files:
-MKTEMP
 MKTEMP.HOST.0
 MKTEMP.HOST.config
 MKTEMP.HOST.index
@@ -315,7 +312,6 @@ The application that launched pmlogger has asked pmlogger to continue independen
 
 At any time this pmlogger process may be terminated with the following command:
   $ pmsignal -s TERM pmlogger-pid-2
-pmlogger: Signalled (signal=15), exiting
 
 Log finished DATE
 

@@ -4,7 +4,9 @@
 #
 seq=`basename $0`
 echo "QA output created by $seq"
-. ./common.test
+. ./common.qt
+
+which pmdumptext >/dev/null 2>&1 || _notrun "pmdumptext not installed"
 
 status=1	# failure is the default!
 trap "rm -f $tmp.*; exit \$status" 0 1 2 3 15
@@ -13,7 +15,8 @@ _filter()
 {
     $PCP_AWK_PROG '
 BEGIN			{ state = 0 }
-$1 == "Options:"	{ print; print "..."; state = 1; next }
+$1 == "General"		{ print; print "...:"; state = 1; next }
+$1 == "Reporting"	{ print; print "...:"; state = 1; next }
 state == 1 && NF == 0	{ state = 0 }
 state == 1		{ next }
 			{ print }' \

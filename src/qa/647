@@ -14,7 +14,7 @@ echo "QA output created by $seq"
 . ./common.check
 
 rm -f $seq.out
-if [ $PCP_VER -lt 3600 ]
+if [ $PCP_VER -lt 30600 ]
 then
     ln $seq.out.1 $seq.out || exit 1
 else
@@ -39,7 +39,11 @@ _cleanup()
     then
 	:
     else
-	[ -f $tmp.pmcd.conf ] && $sudo mv $tmp.pmcd.conf $PCP_PMCDCONF_PATH
+	if [ -f $tmp.pmcd.conf ]
+	then
+	    $sudo cp $tmp.pmcd.conf $PCP_PMCDCONF_PATH
+	    rm -f $tmp.pmcd.conf
+	fi
 	if [ -d $tmp.mmv.dir ]
 	then
 	    $sudo rm -fr "$MMV_STATS_DIR"
@@ -136,8 +140,9 @@ $sudo ./Remove >$tmp.out 2>&1
 _filter_pmda_remove <$tmp.out
 
 echo
-echo "=== $iam agent re-installation ==="
+echo "=== $iam agent re-installation ===" | tee -a $here/$seq.full
 $sudo ./Install <$tmp.input >$tmp.out 2>&1
+cat $tmp.out >>$here/$seq.full
 _filter_pmda_install <$tmp.out
 
 status=0

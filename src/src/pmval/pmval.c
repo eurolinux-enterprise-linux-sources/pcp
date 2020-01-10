@@ -1,7 +1,7 @@
 /*
  * pmval - simple performance metrics value dumper
  *
- * Copyright (c) 2014 Red Hat.
+ * Copyright (c) 2014-2015 Red Hat.
  * Copyright (c) 2008-2009 Aconex.  All Rights Reserved.
  * Copyright (c) 1995-2001 Silicon Graphics, Inc.  All Rights Reserved.
  * 
@@ -49,6 +49,7 @@ static pmLongOptions longopts[] = {
     PMAPI_GENERAL_OPTIONS,
     PMOPT_SPECLOCAL,
     PMOPT_LOCALPMDA,
+    PMOPT_CONTAINER,
     PMAPI_OPTIONS_HEADER("Reporting options"),
     { "delay", 0, 'd', 0, "delay, pause between updates for archive replay" },
     { "precision", 1, 'f', "N", "fixed output format with N digits precision" },
@@ -279,8 +280,7 @@ getvals(Context *x,		/* in - full pm description */
     if (opts.guiflag)
 	pmTimeStateAck(&controls, pmtime);
 
-    if ((double)r->timestamp.tv_sec + (double)r->timestamp.tv_usec/1000000 >
-	(double)opts.finish.tv_sec + (double)opts.finish.tv_usec/1000000) {
+    if (__pmtimevalToReal(&r->timestamp) > __pmtimevalToReal(&opts.finish)) {
 	pmFreeResult(r);
 	return -2;
     }
@@ -1018,8 +1018,9 @@ main(int argc, char *argv[])
 	pmTimeStateMode(amode, opts.interval, &opts.origin);
 
     /* TODO: bring logic from pmevent, reunify the two binaries */
-    if (context.desc.type == PM_TYPE_EVENT) {
-	fprintf(stderr, "%s: Cannot display values for PM_TYPE_EVENT metrics\n",
+    if (context.desc.type == PM_TYPE_EVENT ||
+	context.desc.type == PM_TYPE_HIGHRES_EVENT) {
+	fprintf(stderr, "%s: Cannot display values for event type metrics\n",
 		pmProgname);
 	exit(EXIT_FAILURE);
     }

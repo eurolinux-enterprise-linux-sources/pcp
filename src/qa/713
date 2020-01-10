@@ -26,6 +26,7 @@ _cleanup()
 
 status=1	# failure is the default!
 username=`id -u -n`
+signal=$PCP_BINADM_DIR/pmsignal
 $sudo rm -rf $tmp.* $seq.full
 trap "_cleanup; exit \$status" 0 1 2 3 15
 $sudo $PCP_RC_DIR/pcp stop | _filter_pcp_stop
@@ -63,6 +64,11 @@ nss_import_cert_userdb
 export PMPROXY_HOST=$hostname
 export PCP_SECURE_SOCKETS=enforce
 yes | pminfo -h $hostname -f hinv.ncpu 2>&1 | tee -a $seq.full | nss_filter_pminfo
+
+# Try a second connection
+echo "checking client, user certificate only, second time.  should pass..."
+yes | pminfo -h $hostname -f hinv.ncpu 2>&1 | tee -a $seq.full | nss_filter_pminfo
+
 unset PMPROXY_HOST PCP_SECURE_SOCKETS
 
 # success, all done

@@ -167,33 +167,6 @@ printdelta(FILE *f, struct timeval *tp)
     fprintf(stderr, "%02d:%02d:%02d.%06ld", tmp->tm_hour, tmp->tm_min, tmp->tm_sec, (long)tp->tv_usec);
 }
 #endif
-/*
- * a := a + b for struct timevals
- */
-static void
-tadd(struct timeval *a, struct timeval *b)
-{
-    a->tv_usec += b->tv_usec;
-    if (a->tv_usec > 1000000) {
-	a->tv_usec -= 1000000;
-	a->tv_sec++;
-    }
-    a->tv_sec += b->tv_sec;
-}
-
-/*
- * a := a - b for struct timevals
- */
-static void
-tsub_real(struct timeval *a, struct timeval *b)
-{
-    a->tv_usec -= b->tv_usec;
-    if (a->tv_usec < 0) {
-	a->tv_usec += 1000000;
-	a->tv_sec--;
-    }
-    a->tv_sec -= b->tv_sec;
-}
 
 /*
  * a := a - b for struct timevals, but result is never less than zero
@@ -201,7 +174,7 @@ tsub_real(struct timeval *a, struct timeval *b)
 static void
 tsub(struct timeval *a, struct timeval *b)
 {
-    tsub_real(a, b);
+    __pmtimevalDec(a, b);
     if (a->tv_sec < 0) {
 	/* clip negative values at zero */
 	a->tv_sec = 0;
@@ -323,10 +296,10 @@ onalarm(int dummy)
 		     */
 		    __pmtimevalNow(&now);
 		    for ( ; ; ) {
-			tadd(&qp->q_when, &qp->q_delta);
+			__pmtimevalInc(&qp->q_when, &qp->q_delta);
 			tmp = qp->q_when;
-			tsub_real(&tmp, &now);
-			tadd(&tmp, &qp->q_delta);
+			__pmtimevalDec(&tmp, &now);
+			__pmtimevalInc(&tmp, &qp->q_delta);
 			if (tmp.tv_sec >= 0)
 			    break;
 #ifdef PCP_DEBUG
@@ -350,8 +323,13 @@ onalarm(int dummy)
 	}
 
 	if (root == NULL) {
-	    pmprintf("Warning: AF event queue is empty, nothing more will be scheduled\n");
-	    pmflush();
+#ifdef PCP_DEBUG
+	    if (pmDebug & DBG_TRACE_AF) {
+		__pmPrintStamp(stderr, &now);
+		fprintf(stderr, "Warning: AF event queue is empty, nothing more will be scheduled\n");
+	    }
+#endif
+	    ;
 	}
 	else {
 	    /* set itimer for head of queue */
@@ -385,6 +363,8 @@ __pmAFregister(const struct timeval *delta, void *data, void (*func)(int, void *
     struct timeval	now;
     struct timeval	interval;
 
+    __pmInitLocks();
+
     if (PM_MULTIPLE_THREADS(PM_SCOPE_AF))
 	return PM_ERR_THREAD;
 
@@ -400,7 +380,7 @@ __pmAFregister(const struct timeval *delta, void *data, void (*func)(int, void *
     qp->q_delta = *delta;
     qp->q_func = func;
     __pmtimevalNow(&qp->q_when);
-    tadd(&qp->q_when, &qp->q_delta);
+    __pmtimevalInc(&qp->q_when, &qp->q_delta);
 
     enqueue(qp);
     if (root == qp) {
@@ -436,6 +416,8 @@ __pmAFunregister(int afid)
     qelt		*priorp;
     struct timeval	now;
     struct timeval	interval;
+
+    __pmInitLocks();
 
     if (PM_MULTIPLE_THREADS(PM_SCOPE_AF))
 	return PM_ERR_THREAD;
@@ -488,6 +470,8 @@ __pmAFunregister(int afid)
 void
 __pmAFblock(void)
 {
+    __pmInitLocks();
+
     if (PM_MULTIPLE_THREADS(PM_SCOPE_AF))
 	return;
     block = 1;
@@ -497,6 +481,8 @@ __pmAFblock(void)
 void
 __pmAFunblock(void)
 {
+    __pmInitLocks();
+
     if (PM_MULTIPLE_THREADS(PM_SCOPE_AF))
 	return;
     block = 0;

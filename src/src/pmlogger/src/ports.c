@@ -36,10 +36,8 @@
 
 static char	*ctlfile;	/* Control directory/portmap name */
 static char	*linkfile;	/* Link name for primary logger */
-#if defined(HAVE_STRUCT_SOCKADDR_UN)
 static const char *socketPath;	/* Path to unix domain sockets. */
 static const char *linkSocketPath;/* Link to socket for primary logger */
-#endif
 
 int		ctlfds[CFD_NUM] = {-1, -1, -1};/* fds for control ports: */
 int		ctlport;	/* pmlogger control port number */
@@ -47,26 +45,46 @@ int		ctlport;	/* pmlogger control port number */
 static void
 cleanup(void)
 {
+    /*
+     * flush all stdio buffers, _then_ remove the control files ...
+     * we have QA than camps on the control file(s) and assumes the
+     * log file is complete once the control file(s) is removed.
+     */
+    fflush(NULL);
+
     if (linkfile != NULL)
 	unlink(linkfile);
     if (ctlfile != NULL)
 	unlink(ctlfile);
-#if defined(HAVE_STRUCT_SOCKADDR_UN)
     if (linkSocketPath != NULL)
 	unlink(linkSocketPath);
     if (socketPath != NULL)
 	unlink(socketPath);
-#endif
 }
 
 static void
 sigexit_handler(int sig)
 {
 #ifdef PCP_DEBUG
-    fprintf(stderr, "pmlogger: Signalled (signal=%d), exiting\n", sig);
+    if (pmDebug & DBG_TRACE_DESPERATE)
+	fprintf(stderr, "pmlogger: Signalled (signal=%d), exiting\n", sig);
 #endif
     cleanup();
-    exit(1);
+    _exit(sig);
+}
+
+static void
+sigterm_handler(int sig)
+{
+    /* exit as soon as possible, handler is deferred for log cleanup */
+    exit_code = sig;
+}
+
+static void
+sighup_handler(int sig)
+{
+    __pmSetSignalHandler(SIGHUP, sighup_handler);
+    vol_switch_flag = 1;
 }
 
 #ifndef IS_MINGW
@@ -74,24 +92,14 @@ static void
 sigcore_handler(int sig)
 {
 #ifdef PCP_DEBUG
-    fprintf(stderr, "pmlogger: Signalled (signal=%d), exiting (core dumped)\n", sig);
+    if (pmDebug & DBG_TRACE_DESPERATE)
+	fprintf(stderr, "pmlogger: Signalled (signal=%d), exiting (core dumped)\n", sig);
 #endif
     __pmSetSignalHandler(SIGABRT, SIG_DFL);	/* Don't come back here */
     cleanup();
-    abort();
-}
-#endif
-
-static void
-sighup_handler(int sig)
-{
-    /* SIGHUP is used to force a log volume change */
-    __pmSetSignalHandler(SIGHUP, SIG_IGN);
-    newvolume(VOL_SW_SIGHUP);
-    __pmSetSignalHandler(SIGHUP, sighup_handler);
+    _exit(sig);
 }
 
-#ifndef IS_MINGW
 static void
 sigpipe_handler(int sig)
 {
@@ -101,7 +109,6 @@ sigpipe_handler(int sig)
      */
     __pmSetSignalHandler(SIGPIPE, sigpipe_handler);
 }
-#endif
 
 static void
 sigusr1_handler(int sig)
@@ -109,20 +116,7 @@ sigusr1_handler(int sig)
     /*
      * no-op now that all archive write I/O is unbuffered
      */
-#ifndef IS_MINGW
     __pmSetSignalHandler(SIGUSR1, sigusr1_handler);
-#endif
-}
-
-#ifndef IS_MINGW
-/*
- * if we are launched from pmRecord*() in libpcp, then we
- * may end up using popen() to run xconfirm(1), and then there
- * is a chance of us receiving SIGCHLD ... just ignore this signal
- */
-static void
-sigchld_handler(int sig)
-{
 }
 #endif
 
@@ -136,7 +130,7 @@ typedef struct {
  */
 static sig_map_t	sig_handler[] = {
     { SIGHUP,	sighup_handler },	/* Exit   Hangup [see termio(7)] */
-    { SIGINT,	sigexit_handler },	/* Exit   Interrupt [see termio(7)] */
+    { SIGINT,	sigterm_handler },	/* Exit   Interrupt [see termio(7)] */
 #ifndef IS_MINGW
     { SIGQUIT,	sigcore_handler },	/* Core   Quit [see termio(7)] */
     { SIGILL,	sigcore_handler },	/* Core   Illegal Instruction */
@@ -151,13 +145,13 @@ static sig_map_t	sig_handler[] = {
     { SIGSEGV,	sigcore_handler },	/* Core   Segmentation Fault */
     { SIGSYS,	sigcore_handler },	/* Core   Bad System Call */
     { SIGPIPE,	sigpipe_handler },	/* Exit   Broken Pipe */
-    { SIGALRM,	sigexit_handler },	/* Exit   Alarm Clock */
+    { SIGALRM,	sigterm_handler },	/* Exit   Alarm Clock */
 #endif
-    { SIGTERM,	sigexit_handler },	/* Exit   Terminated */
-    { SIGUSR1,	sigusr1_handler },	/* Exit   User Signal 1 */
+    { SIGTERM,	sigterm_handler },	/* Exit   Terminated */
 #ifndef IS_MINGW
+    { SIGUSR1,	sigusr1_handler },	/* NOP    User Signal 1 - [was fflush(3)] */
     { SIGUSR2,	sigexit_handler },	/* Exit   User Signal 2 */
-    { SIGCHLD,	sigchld_handler },	/* NOP    Child stopped or terminated */
+    { SIGCHLD,	SIG_IGN },		/* NOP    Child stopped or terminated */
 #ifdef SIGPWR
     { SIGPWR,	SIG_DFL },		/* Ignore Power Fail/Restart */
 #endif
@@ -171,9 +165,9 @@ static sig_map_t	sig_handler[] = {
     { SIGCONT,	SIG_DFL },		/* Ignore Continued */
     { SIGTTIN,	SIG_DFL },		/* Stop   Stopped (tty input) */
     { SIGTTOU,	SIG_DFL },		/* Stop   Stopped (tty output) */
-    { SIGVTALRM, sigexit_handler },	/* Exit   Virtual Timer Expired */
+    { SIGVTALRM, sigterm_handler },	/* Exit   Virtual Timer Expired */
 
-    { SIGPROF,	sigexit_handler },	/* Exit   Profiling Timer Expired */
+    { SIGPROF,	sigterm_handler },	/* Exit   Profiling Timer Expired */
     { SIGXCPU,	sigcore_handler },	/* Core   CPU time limit exceeded [see getrlimit(2)] */
     { SIGXFSZ,	sigcore_handler}	/* Core   File size limit exceeded [see getrlimit(2)] */
 #endif
@@ -296,16 +290,22 @@ GetPorts(char *file)
 	    if (ctlix == CFD_INET) {
 		fd = __pmCreateSocket();
 		if (fd < 0) {
-		    fprintf(stderr, "GetPorts: inet socket creation failed: %s\n",
+#ifdef PCP_DEBUG
+		    if (pmDebug & DBG_TRACE_CONTEXT)
+			fprintf(stderr, "GetPorts: inet socket creation failed: %s\n",
 			    netstrerror());
+#endif
 		    continue;
 		}
 	    }
 	    else {
 		fd = __pmCreateIPv6Socket();
 		if (fd < 0) {
-		    fprintf(stderr, "GetPorts: ipv6 socket creation failed: %s\n",
+#ifdef PCP_DEBUG
+		    if (pmDebug & DBG_TRACE_CONTEXT)
+			fprintf(stderr, "GetPorts: ipv6 socket creation failed: %s\n",
 			    netstrerror());
+#endif
 		    continue;
 		}
 	    }

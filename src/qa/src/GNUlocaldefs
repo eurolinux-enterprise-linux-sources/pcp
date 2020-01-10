@@ -1,11 +1,8 @@
 #
-# Copyright (c) 2012-2014 Red Hat.
+# Copyright (c) 2012-2015 Red Hat.
 # Copyright (c) 2009 Aconex.  All Rights Reserved.
 # Copyright (c) 1997-2002 Silicon Graphics, Inc.  All Rights Reserved.
 #
-
-PMLOGGER	= $(PCP_BINADM_DIR)/pmlogger
-PMLOGEXTRACT	= $(PCP_BINADM_DIR)/pmlogextract
 
 #DBG    = -DPCP_DEBUG -DDEBUG -DMALLOC_AUDIT -g
 DBG     = -DPCP_DEBUG -DDEBUG -g
@@ -38,12 +35,12 @@ SRCARCH	= mirage.0 moomba.client.0 \
 	bozo.client_v2.meta.bad.1 bozo.client_v2.meta.bad.2 \
 	rewrite.0 proc.0 section-a.0 section-b.0 section-c.0 section-d.0 \
 	interpmark.0 all-irix-6.5.25.0 all-sles9-sp1.0 naslog.0 \
-	multi-vm00.0 multi-vm01.0 multi-vm02.0 multi-vm03.0 pmatop-722.0 \
+	multi-vm00.0 multi-vm01.0 multi-vm02.0 multi-vm03.0 pmatop-log.0 \
 	new_mysql.0 new_snmp.0 old_xfs.0 node_archive.0 count-mark.0 \
 	pyapi.0 pcp-free.0 pcp-uptime.0 pcp-numastat-1-node.0 numa.0 \
-	slow.0
+	bug1057.0
 
-SRCARCHPART = ok-noti-bigbin.0 \
+SRCARCHPART = ok-noti-bigbin.0 pmatop-log.folio \
 	20130706.0.bz2 20130706.index 20130706.meta
 
 MKARCH	= foo.0 mv-foo.0 noti-foo.0 bar.0 mv-bar.0 noti-bar.0 \
@@ -73,10 +70,11 @@ CFILES = disk_test.c exercise.c context_test.c chkoptfetch.c \
 	matchInstanceName.c torture_pmns.c \
 	mmv_genstats.c mmv_instances.c mmv_poke.c mmv_noinit.c mmv_nostats.c \
 	record.c record-setarg.c clientid.c killparent.c grind_ctx.c \
-	pmdacache.c check_import.c unpack.c aggrstore.c atomstr.c \
+	pmdacache.c check_import.c unpack.c hrunpack.c aggrstore.c atomstr.c \
 	grind_conv.c getconfig.c err.c torture_logmeta.c keycache.c \
 	keycache2.c pmdaqueue.c drain-server.c template.c anon-sa.c \
-	username.c rtimetest.c getcontexthost.c badpmda.c chkputlogresult.c
+	username.c rtimetest.c getcontexthost.c badpmda.c chkputlogresult.c \
+	churnctx.c badUnitsStr_r.c units-parse.c rootclient.c
 
 ifeq ($(shell test -f ../localconfig && echo 1), 1)
 include ../localconfig
@@ -160,14 +158,19 @@ PERLFILES = \
 # not installed:
 PLFILES = $(shell echo $(PERLFILES) | sed -e 's/\.perl/.pl/g')
 
+ifeq "$(ENABLE_PYTHON)" "true"
 PYTHONFILES = \
 	test_pcp.python test_pmcc.python \
 	test_pmi.python check_import.python \
 	test_mmv.python test_webapi.python \
 	test_pcp_options.python test_pcp_getopts.python \
-	test_pcp_time.python
+	test_pcp_time.python test_pmnswalk.python
 # not installed:
 PYFILES = $(shell echo $(PYTHONFILES) | sed -e 's/\.python/.py/g')
+else
+PYTHONFILES =
+PYFILES =
+endif
 
 ifneq "$(TARGET_OS)" "mingw"
 CFILES += $(POSIXFILES) $(TRACEFILES)
@@ -189,12 +192,16 @@ MYFILES += $(SRCARCH) \
 	simple.sxc simple.xls simple.xlsx \
 	iostat iostat-c iostat-d iostat-d-k iostat-d-m iostat-p-ALL \
 	iostat-t iostat-t.ISO iostat-x iostat-z iostat-z-p-ALL \
+	iostat-t-x-bud \
 	pthread_barrier.h pv.c qa_test.c qa_timezone.c \
-	sa-sysstat-10.0.1 sa-sysstat-9.0.6 sa-sysstat-9.1.7 permslist
+	sa-sysstat-9.0.4 sa-sysstat-9.0.6 sa-sysstat-9.0.6.1 \
+	sa-sysstat-10.0.1 sa-sysstat-10.0.5 sa-sysstat-10.2.0 \
+	permslist
 
 MYSCRIPTS = grind-tools ipcs_clear make.dodgey mkarch-all mkbadlen \
 	mkeventrec mkinterpmark mkmirage mkproc mkrewrite mksample_expr \
-	mksa-sysstat mktzchange show-args mkbig1 fixhosts mkpermslist
+	mksa-sysstat mktzchange show-args mkbig1 fixhosts mkpermslist \
+	memcachestats.pl
 
 PSCRIPTS = $(PERLFILES) $(PYTHONFILES)
 
@@ -210,6 +217,13 @@ endif
 
 LCFLAGS = -DHAVE_TRACE
 LLDLIBS	= $(PCPLIB) $(LDFLAGS)
+
+ifneq ($(NVIDIAQALIB),)
+LIBTARGET = true
+MYCFILES += nvidia-ml.c
+LCFLAGS += $(NVIDIACFLAGS)
+TARGETS += $(NVIDIAQALIB)
+endif
 
 # libpcp_trace is ready
 TRACELIB	= -lpcp_trace $(LLDLIBS)
@@ -435,7 +449,7 @@ domain.h:	$(PCP_VAR_DIR)/pmns/stdpmid
 
 pmdashutdown:	pmdashutdown.c
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ pmdashutdown.c -lpcp_pmda $(LDLIBS)
+	$(CCF) $(CDEFS) -o $@ $@.c -lpcp_pmda $(LDLIBS)
 
 dumb_pmda: dumb_pmda.c
 	$(CCF) $(LCDEFS) $(LCOPTS) -o $@ $@.c -lpcp_pmda $(LDLIBS)
@@ -444,6 +458,9 @@ pmdacache: pmdacache.c
 	$(CCF) $(LCDEFS) $(LCOPTS) -o $@ $@.c -lpcp_pmda $(LDLIBS)
 
 pmdaqueue: pmdaqueue.c
+	$(CCF) $(LCDEFS) $(LCOPTS) -o $@ $@.c -lpcp_pmda $(LDLIBS)
+
+rootclient: rootclient.c
 	$(CCF) $(LCDEFS) $(LCOPTS) -o $@ $@.c -lpcp_pmda $(LDLIBS)
 
 atomstr: atomstr.c
@@ -606,11 +623,11 @@ endif
 
 foo.0:	config.foo
 	rm -f foo.index foo.meta foo.0
-	$(PMLOGGER) -c config.foo -s 8 foo
+	pmlogger -c config.foo -s 8 foo
 
 mv-foo.0:	config.foo
 	rm -f mv-foo.index mv-foo.meta mv-foo.?
-	$(PMLOGGER) -c config.foo -s 8 -v 3 mv-foo
+	pmlogger -c config.foo -s 8 -v 3 mv-foo
 
 noti-foo.0:	foo.0
 	cp foo.0 noti-foo.0
@@ -622,11 +639,11 @@ noti-ok-foo.0:	ok-foo.0
 
 bar.0:	config.bar
 	rm -f bar.index bar.meta bar.0
-	$(PMLOGGER) -c config.bar -s 70 bar
+	pmlogger -c config.bar -s 70 bar
 
 mv-bar.0:	config.bar
 	rm -f mv-bar.index mv-bar.meta mv-bar.?
-	$(PMLOGGER) -c config.bar -s 70 -v 20 mv-bar
+	pmlogger -c config.bar -s 70 -v 20 mv-bar
 
 noti-bar.0:	bar.0
 	cp bar.0 noti-bar.0
@@ -634,7 +651,7 @@ noti-bar.0:	bar.0
 
 mirage.0:
 	rm -f mirage.index mirage.meta mirage.0
-	$(PMLOGGER) -c config.mirage -s 20 mirage
+	pmlogger -c config.mirage -s 20 mirage
 
 dodgey-some.0:	make.dodgey config.dodgey-some
 	./make.dodgey some 50
@@ -649,13 +666,13 @@ bigbin.0:	config.bigbin
 	rm -f bigbin.index bigbin.meta bigbin.0
 	sync
 	sleep 3
-	$(PMLOGGER) -c config.bigbin -s 1000 bigbin
+	pmlogger -c config.bigbin -s 1000 bigbin
 
 mv-bigbin.0:	config.bigbin
 	rm -f mv-bigbin.index mv-bigbin.meta mv-bigbin.?
 	sync
 	sleep 3
-	$(PMLOGGER) -c config.bigbin -s 1000 -v 101 mv-bigbin
+	pmlogger -c config.bigbin -s 1000 -v 101 mv-bigbin
 
 noti-bigbin.0:	bigbin.0
 	cp bigbin.0 noti-bigbin.0
@@ -663,11 +680,11 @@ noti-bigbin.0:	bigbin.0
 
 interp.0:	$(CONFIG_INTERP)
 	rm -f interp.index interp.meta interp.0
-	$(PMLOGGER) -c $(CONFIG_INTERP) -s 30 interp
+	pmlogger -c $(CONFIG_INTERP) -s 30 interp
 
 mv-interp.0:	$(CONFIG_INTERP)
 	rm -f mv-interp.index mv-interp.meta mv-interp.?
-	$(PMLOGGER) -c $(CONFIG_INTERP) -s 30 -v 10 mv-interp
+	pmlogger -c $(CONFIG_INTERP) -s 30 -v 10 mv-interp
 
 noti-interp.0:	interp.0
 	cp interp.0 noti-interp.0
@@ -709,13 +726,13 @@ changeinst.0:
 	echo '  sample.seconds,sample.bin["bin-200","bin-300","bin-400","bin-500"]' >>tmp/C.config
 	echo '  irix.network.interface.total.packets["ec2","lo0"]' >>tmp/C.config
 	echo '}' >>tmp/C.config
-	$(PMLOGGER) -s 5 -c tmp/A.config tmp/A
+	pmlogger -s 5 -c tmp/A.config tmp/A
 	sleep 3
-	$(PMLOGGER) -s 5 -c tmp/B.config tmp/B
+	pmlogger -s 5 -c tmp/B.config tmp/B
 	sleep 3
-	$(PMLOGGER) -s 5 -c tmp/C.config tmp/C
+	pmlogger -s 5 -c tmp/C.config tmp/C
 	rm -f changeinst.index changeinst.meta changeinst.0
-	$(PMLOGEXTRACT) tmp/A tmp/B tmp/C changeinst
+	pmlogextract tmp/A tmp/B tmp/C changeinst
 	rm -rf tmp
 
 # gap: 10 sec data, 5 sec gap, 10 sec data
@@ -728,20 +745,20 @@ gap.0 gap2.0:
 	echo 'log mandatory on 1sec { pmcd.pdu_in,pmcd.numagents,hinv.ncpu,sample.bin["bin-100","bin-200","bin-400"] }' >tmp/A.config
 	echo 'log mandatory on 1sec { pmcd.pdu_in,pmcd.numagents,hinv.ncpu,sample.bin["bin-100","bin-300","bin-400"] }' >tmp/B.config
 	echo 'log mandatory on 1sec { pmcd.pdu_in,pmcd.numagents,hinv.ncpu,sample.bin["bin-100","bin-400"] }' >tmp/C.config
-	$(PMLOGGER) -s 10 -c tmp/A.config tmp/A
+	pmlogger -s 10 -c tmp/A.config tmp/A
 	sleep 5
-	$(PMLOGGER) -s 10 -c tmp/B.config tmp/B
+	pmlogger -s 10 -c tmp/B.config tmp/B
 	sleep 5
-	$(PMLOGGER) -s 10 -c tmp/C.config tmp/C
+	pmlogger -s 10 -c tmp/C.config tmp/C
 	rm -f gap.index gap.meta gap.0
-	$(PMLOGEXTRACT) tmp/A tmp/B gap
+	pmlogextract tmp/A tmp/B gap
 	rm -f gap2.index gap2.meta gap2.0
-	$(PMLOGEXTRACT) tmp/A tmp/B tmp/C gap2
+	pmlogextract tmp/A tmp/B tmp/C gap2
 	rm -rf tmp
 
 reduce-gap.0:	reduce-1.0 reduce-2.0
 	rm -f reduce-gap.*
-	$(PMLOGEXTRACT) reduce-1 reduce-2 reduce-gap
+	pmlogextract reduce-1 reduce-2 reduce-gap
 
 torture_indom: torture_indom.c
 	rm -f $@
@@ -751,24 +768,22 @@ torture_pmns: torture_pmns.c
 	rm -f $@
 	$(CCF) $(CDEFS) -o $@ torture_pmns.c $(LDLIBS)
 
+units-parse: units-parse.c
+	rm -f $@
+	$(CCF) $(CDEFS) -o $@ units-parse.c $(LDLIBS)
+
 # --- miscellaneous
 #
-getpid.so:	getpid.o
-	$(LD) -shared -o getpid.so -nostdlib getpid.o
+qa_timezone.$(DSOSUFFIX):	qa_timezone.o
+	$(LD) -shared -o $@ -nostdlib $<
 
-qa_timezone.so:	qa_timezone.o
-	$(LD) -shared -o qa_timezone.so -nostdlib qa_timezone.o
+ifneq ($(NVIDIAQALIB),)
+$(NVIDIAQALIB):	nvidia-ml.o
+	$(CC) $(LDFLAGS) $(_SHAREDOPTS) -o $@ $<
+endif
 
 arch_maxfd.o:	localconfig.h
 scale.o:	localconfig.h
 
 bozo:
 	@echo TARGETS=$(TARGETS)
-
-# Suffix rules to support transition for perl and python scripts
-%.py : %.python
-	$(LN_S) $< $@
-
-%.pl : %.perl
-	$(LN_S) $< $@
-

@@ -1,5 +1,7 @@
 *.o
-*.pl
+*.so
+*.dll
+*.dylib
 *.py
 779246
 agenttimeout
@@ -8,12 +10,14 @@ anon-sa
 archinst
 arch_maxfd
 atomstr
+badUnitsStr_r
 badloglabel
 badpmcdpmid
 badpmda
 bar.0
 bar.index
 bar.meta
+batch_import.pl
 big1.0
 big1.1
 big1.index
@@ -24,6 +28,7 @@ bigbin.meta
 check_fault_injection
 check_import
 check_import_name
+check_import.pl
 chkacc1
 chkacc2
 chkacc3
@@ -40,6 +45,7 @@ chkopenlog
 chkoptfetch
 chkputlogresult
 chktrim
+churnctx
 clientid
 compare
 context_fd_leak
@@ -81,14 +87,16 @@ gap2.index
 gap2.meta
 gap.index
 gap.meta
-getcontexthost
 getconfig
+getcontexthost
 getoptions
 grind_conv
 grind_ctx
 hashwalk
 hex2nbo
 hp-mib
+hrunpack
+import_limit_test.pl
 indom
 interp0
 interp.0
@@ -107,8 +115,8 @@ killparent
 logcontrol
 mark-bug
 matchInstanceName
-mkfiles
 mkbig1.log
+mkfiles
 mmv_genstats
 mmv_instances
 mmv_noinit
@@ -182,6 +190,7 @@ permfetch
 pmcdgone
 pmconvscale
 pmdacache
+pmdaqueue
 pmdashutdown
 pmlcmacro
 pmnsinarchives
@@ -201,6 +210,7 @@ record-setarg
 reduce-gap.0
 reduce-gap.index
 reduce-gap.meta
+rootclient
 rtimetest
 scale
 slow_af
@@ -224,6 +234,7 @@ truncbin.meta
 tstate
 tztest
 unpack
+units-parse
 username
 whichtimezone
 wrap_int
@@ -233,4 +244,3 @@ xlog
 xmktime
 xval
 xxx
-pmdaqueue

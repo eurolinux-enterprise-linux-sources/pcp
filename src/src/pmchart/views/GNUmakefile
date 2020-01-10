@@ -1,10 +1,9 @@
 TOPDIR = ../../..
 include $(TOPDIR)/src/include/builddefs
 
-VIEWDIR = $(PCP_VAR_DIR)/config/pmchart
 VIEWS	= CPU Disk Diskbytes Loadavg NFS2 NFS3 Filesystem Memory Netbytes \
 	  Netpackets PMCD Syscalls Paging Overview Schemes Sockets Swap \
-	  ApacheServer ElasticsearchServer
+	  ApacheServer ElasticsearchServer vCPU MemAvailable
 
 LSRCFILES = $(VIEWS)
 
@@ -13,8 +12,8 @@ default build-me:
 include $(BUILDRULES)
 
 install:	default
-	$(INSTALL) -m 755 -d $(VIEWDIR)
-	$(INSTALL) -m 0444 $(VIEWS) $(VIEWDIR)
+	$(INSTALL) -m 755 -d $(PCP_VAR_DIR)/config/pmchart
+	$(INSTALL) -m 644 $(VIEWS) $(PCP_VAR_DIR)/config/pmchart
 
 default_pcp:	default
 

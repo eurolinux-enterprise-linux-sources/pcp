@@ -57,12 +57,12 @@ typedef union {				/* value from pmResult */
 #define S_UNDEFINED	0	/* no searching done yet */
 #define S_NOTFOUND	1	/* searched to end or start of archive and
 				   did not find a value or a <mark> */
-#define S_MARK		2	/* searched and found <mark> before value
-				   at t_prior or t_mext */
+#define S_MARK		2	/* searched and found <mark> at t_prior or
+				   t_next before a value was found */
 #define S_VALUE		3	/* searched and found value at t_prior or
 				   t_next */
 
-static const char *statestr[] = { " <undefined>", " <notfound>", " <mark>", "" };
+static const char *statestr[] = { "<undefined>", "<notfound>", "<mark>", "" };
 
 
 typedef struct instcntl {		/* metric-instance control */
@@ -102,7 +102,6 @@ typedef struct {
 } cache_t;
 
 #define NUMCACHE 4
-static cache_t		cache[NUMCACHE];
 
 /*
  * diagnostic counters ... indexed by PM_MODE_FORW (2) and
@@ -111,16 +110,17 @@ static cache_t		cache[NUMCACHE];
 static long	nr_cache[PM_MODE_BACK+1];
 static long	nr[PM_MODE_BACK+1];
 
+/*
+ * called with the context lock held
+ */
 static int
 cache_read(__pmArchCtl *acp, int mode, pmResult **rp)
 {
     long	posn;
     cache_t	*cp;
     cache_t	*lfup;
+    cache_t	*cache;
     int		save_curvol;
-    static int	round_robin = -1;
-
-    PM_LOCK(__pmLock_libpcp);
 
     if (acp->ac_vol == acp->ac_log->l_curvol) {
 	posn = ftell(acp->ac_log->l_mfp);
@@ -129,17 +129,21 @@ cache_read(__pmArchCtl *acp, int mode, pmResult **rp)
     else
 	posn = 0;
 
-    if (round_robin == -1) {
+    if (acp->ac_cache == NULL) {
 	/* cache initialization */
+	acp->ac_cache = cache = (cache_t *)malloc(NUMCACHE*sizeof(cache_t));
+	/* TODO error check */
 	for (cp = cache; cp < &cache[NUMCACHE]; cp++) {
 	    cp->rp = NULL;
 	    cp->mfp = NULL;
 	}
-	round_robin = 0;
+	acp->ac_cache_idx = 0;
     }
+    else
+	cache = acp->ac_cache;
 
 #ifdef PCP_DEBUG
-    if ((pmDebug & DBG_TRACE_LOG) && (pmDebug & DBG_TRACE_INTERP)) {
+    if ((pmDebug & DBG_TRACE_LOG) && (pmDebug & DBG_TRACE_DESPERATE)) {
 	fprintf(stderr, "cache_read: fd=%d mode=%s vol=%d (curvol=%d) %s_posn=%ld ",
 	    fileno(acp->ac_log->l_mfp),
 	    mode == PM_MODE_FORW ? "forw" : "back",
@@ -149,8 +153,8 @@ cache_read(__pmArchCtl *acp, int mode, pmResult **rp)
     }
 #endif
 
-    round_robin = (round_robin + 1) % NUMCACHE;
-    lfup = &cache[round_robin];
+    acp->ac_cache_idx = (acp->ac_cache_idx + 1) % NUMCACHE;
+    lfup = &cache[acp->ac_cache_idx];
     for (cp = cache; cp < &cache[NUMCACHE]; cp++) {
 	if (cp->mfp == acp->ac_log->l_mfp && cp->vol == acp->ac_vol &&
 	    ((mode == PM_MODE_FORW && cp->head_posn == posn) ||
@@ -164,7 +168,7 @@ cache_read(__pmArchCtl *acp, int mode, pmResult **rp)
 	    else
 		fseek(acp->ac_log->l_mfp, cp->head_posn, SEEK_SET);
 #ifdef PCP_DEBUG
-	    if ((pmDebug & DBG_TRACE_LOG) && (pmDebug & DBG_TRACE_INTERP)) {
+	    if ((pmDebug & DBG_TRACE_LOG) && (pmDebug & DBG_TRACE_DESPERATE)) {
 		__pmTimeval	tmp;
 		double		t_this;
 		tmp.tv_sec = (__int32_t)cp->rp->timestamp.tv_sec;
@@ -176,13 +180,12 @@ cache_read(__pmArchCtl *acp, int mode, pmResult **rp)
 	    }
 #endif
 	    sts = cp->sts;
-	    PM_UNLOCK(__pmLock_libpcp);
 	    return sts;
 	}
     }
 
 #ifdef PCP_DEBUG
-    if ((pmDebug & DBG_TRACE_LOG) && (pmDebug & DBG_TRACE_INTERP))
+    if ((pmDebug & DBG_TRACE_LOG) && (pmDebug & DBG_TRACE_DESPERATE))
 	fprintf(stderr, "miss\n");
     nr[mode]++;
 #endif
@@ -205,7 +208,7 @@ cache_read(__pmArchCtl *acp, int mode, pmResult **rp)
 	 */
 	lfup->mfp = NULL;
 #ifdef PCP_DEBUG
-	if ((pmDebug & DBG_TRACE_LOG) && (pmDebug & DBG_TRACE_INTERP))
+	if ((pmDebug & DBG_TRACE_LOG) && (pmDebug & DBG_TRACE_DESPERATE))
 	    fprintf(stderr, "cache_read: reload vol switch, mark cache[%d] unused\n",
 		(int)(lfup - cache));
 #endif
@@ -226,7 +229,7 @@ cache_read(__pmArchCtl *acp, int mode, pmResult **rp)
 	    assert(lfup->head_posn >= 0);
 	}
 #ifdef PCP_DEBUG
-	if ((pmDebug & DBG_TRACE_LOG) && (pmDebug & DBG_TRACE_INTERP)) {
+	if ((pmDebug & DBG_TRACE_LOG) && (pmDebug & DBG_TRACE_DESPERATE)) {
 	    fprintf(stderr, "cache_read: reload cache[%d] vol=%d (curvol=%d) head=%ld tail=%ld ",
 		(int)(lfup - cache), lfup->vol, acp->ac_log->l_curvol,
 		(long)lfup->head_posn, (long)lfup->tail_posn);
@@ -240,27 +243,14 @@ cache_read(__pmArchCtl *acp, int mode, pmResult **rp)
 #endif
     }
 
-    PM_UNLOCK(__pmLock_libpcp);
     return lfup->sts;
 }
 
 void
 __pmLogCacheClear(FILE *mfp)
 {
-    cache_t	*cp;
-
-    PM_INIT_LOCKS();
-    PM_LOCK(__pmLock_libpcp);
-    for (cp = cache; cp < &cache[NUMCACHE]; cp++) {
-	if (cp->mfp == mfp) {
-	    if (cp->rp != NULL)
-		pmFreeResult(cp->rp);
-	    cp->rp = NULL;
-	    cp->mfp = NULL;
-	    cp->used = 0;
-	}
-    }
-    PM_UNLOCK(__pmLock_libpcp);
+    /* retired ... functionality moved to __pmFreeInterpData() */
+    return;
 }
 
 #ifdef PCP_DEBUG
@@ -270,26 +260,18 @@ __pmLogCacheClear(FILE *mfp)
 static void
 dumpval(FILE *f, int type, int valfmt, int prior, instcntl_t *icp)
 {
-    int		mark;
+    int		state;
     value	*vp;
     if (prior) {
-	if (icp->t_prior == -1) {
-	    fprintf(stderr, " <undefined>");
-	    return;
-	}
-	mark = icp->s_prior == S_MARK;
+	state = icp->s_prior;
 	vp = &icp->v_prior;
     }
     else {
-	if (icp->t_next == -1) {
-	    fprintf(stderr, " <undefined>");
-	    return;
-	}
-	mark = icp->s_next == S_MARK;
+	state = icp->s_next;
 	vp = &icp->v_next;
     }
-    if (mark) {
-	fprintf(f, " <mark>");
+    if (state != S_VALUE) {
+	fprintf(f, " state=%s", statestr[state]);
 	return;
     }
     if (type == PM_TYPE_32 || type == PM_TYPE_U32)
@@ -320,7 +302,21 @@ dumpval(FILE *f, int type, int valfmt, int prior, instcntl_t *icp)
         fprintf(f, " v=%f", tmp);
     }
     else
-        fprintf(f, "v=??? (lval=%d)", vp->lval);
+        fprintf(f, " v=??? (lval=%d)", vp->lval);
+}
+
+static void
+dumpicp(const char *tag, instcntl_t *icp)
+{
+    char	strbuf[20];
+    fprintf(stderr, "%s: pmid %s", tag, pmIDStr_r(icp->metric->desc.pmid, strbuf, sizeof(strbuf)));
+    if (icp->inst != PM_IN_NULL)
+	fprintf(stderr, "[inst=%d]", icp->inst);
+    fprintf(stderr, ": t_first=%.6f t_prior=%.6f", icp->t_first, icp->t_prior);
+    dumpval(stderr, icp->metric->desc.type, icp->metric->valfmt, 1, icp);
+    fprintf(stderr, " t_next=%.6f", icp->t_next);
+    dumpval(stderr, icp->metric->desc.type, icp->metric->valfmt, 0, icp);
+    fprintf(stderr, " t_last=%.6f\n", icp->t_last);
 }
 #endif
 
@@ -361,11 +357,8 @@ update_bounds(__pmContext *ctxp, double t_req, pmResult *logrp, int do_mark, int
 		    icp->v_prior.pval = NULL;
 		}
 #ifdef PCP_DEBUG
-		if (pmDebug & DBG_TRACE_INTERP) {
-		    char	strbuf[20];
-		    fprintf(stderr, "pmid %s inst %d <mark> t_prior=%.6f t_first=%.6f t_last=%.6f\n",
-			pmIDStr_r(icp->metric->desc.pmid, strbuf, sizeof(strbuf)), icp->inst, icp->t_prior, icp->t_first, icp->t_last);
-		}
+		if (pmDebug & DBG_TRACE_INTERP)
+		    dumpicp("update_bounds: mark@prior", icp);
 #endif
 		if (icp->search && done_prior != NULL) {
 		    icp->search = 0;
@@ -384,11 +377,8 @@ update_bounds(__pmContext *ctxp, double t_req, pmResult *logrp, int do_mark, int
 		    icp->v_next.pval = NULL;
 		}
 #ifdef PCP_DEBUG
-		if (pmDebug & DBG_TRACE_INTERP) {
-		    char	strbuf[20];
-		    fprintf(stderr, "pmid %s inst %d <mark> t_next=%.6f t_first=%.6f t_last=%.6f\n",
-			pmIDStr_r(icp->metric->desc.pmid, strbuf, sizeof(strbuf)), icp->inst, icp->t_next, icp->t_first, icp->t_last);
-		}
+		if (pmDebug & DBG_TRACE_INTERP)
+		    dumpicp("update_bounds: mark@next", icp);
 #endif
 		if (icp->search && done_next != NULL) {
 		    icp->search = 0;
@@ -412,14 +402,9 @@ update_bounds(__pmContext *ctxp, double t_req, pmResult *logrp, int do_mark, int
 		if (logrp->vset[k]->vlist[i].inst == icp->inst ||
 		    icp->inst == PM_IN_NULL) {
 		    /* matched on instance */
-#if defined(PCP_DEBUG) && defined(DESPERATE)
-		    if (pmDebug & DBG_TRACE_INTERP) {
-			char	strbuf[20];
-			fprintf(stderr, "update: match pmid %s inst %d t_this=%.6f t_prior=%.6f t_next=%.6f t_first=%.6f t_last=%.6f\n",
-			    pmIDStr_r(logrp->vset[k]->pmid, strbuf, sizeof(strbuf)), icp->inst,
-			    t_this, icp->t_prior, icp->t_next,
-			    icp->t_first, icp->t_last);
-		    }
+#ifdef PCP_DEBUG
+		    if ((pmDebug & DBG_TRACE_INTERP) && (pmDebug & DBG_TRACE_DESPERATE))
+			dumpicp("update_bounds: match", icp);
 #endif
 		    if (t_this <= t_req &&
 			(icp->t_prior > t_req || t_this >= icp->t_prior)) {
@@ -431,6 +416,7 @@ update_bounds(__pmContext *ctxp, double t_req, pmResult *logrp, int do_mark, int
 			if (icp->t_prior < icp->t_next && icp->t_prior >= t_req) {
 			    /* shuffle prior to next */
 			    icp->t_next = icp->t_prior;
+			    icp->s_next = icp->s_prior;
 			    if (pcp->valfmt == PM_VAL_INSITU)
 				icp->v_next.lval = icp->v_prior.lval;
 			    else {
@@ -494,15 +480,10 @@ update_bounds(__pmContext *ctxp, double t_req, pmResult *logrp, int do_mark, int
 		    }
 #ifdef PCP_DEBUG
 		    if ((pmDebug & DBG_TRACE_INTERP) && changed) {
-			char	strbuf[20];
-			fprintf(stderr, "update%s pmid %s inst %d prior: t=%.6f",
-			    changed & 2 ? "+search" : "",
-			    pmIDStr_r(logrp->vset[k]->pmid, strbuf, sizeof(strbuf)), icp->inst, icp->t_prior);
-			dumpval(stderr, pcp->desc.type, icp->metric->valfmt, 1, icp);
-			fprintf(stderr, " next: t=%.6f", icp->t_next);
-			dumpval(stderr, pcp->desc.type, icp->metric->valfmt, 0, icp);
-			fprintf(stderr, " t_first=%.6f t_last=%.6f\n",
-			    icp->t_first, icp->t_last);
+			if (changed & 2)
+			    dumpicp("update_bounds: update+search", icp);
+			else
+			    dumpicp("update_bounds: update", icp);
 		    }
 #endif
 		    goto next_inst;
@@ -537,7 +518,7 @@ do_roll(__pmContext *ctxp, double t_req)
 
 #ifdef PCP_DEBUG
 	    if (pmDebug & DBG_TRACE_INTERP)
-		fprintf(stderr, "roll forw to t=%.6f%s\n",
+		fprintf(stderr, "do_roll: forw to t=%.6f%s\n",
 		    t_this, logrp->numpmid == 0 ? " <mark>" : "");
 #endif
 	    ctxp->c_archctl->ac_offset = ftell(ctxp->c_archctl->ac_log->l_mfp);
@@ -556,7 +537,7 @@ do_roll(__pmContext *ctxp, double t_req)
 
 #ifdef PCP_DEBUG
 	    if (pmDebug & DBG_TRACE_INTERP)
-		fprintf(stderr, "roll back to t=%.6f%s\n",
+		fprintf(stderr, "do_roll: back to t=%.6f%s\n",
 		    t_this, logrp->numpmid == 0 ? " <mark>" : "");
 #endif
 	    ctxp->c_archctl->ac_offset = ftell(ctxp->c_archctl->ac_log->l_mfp);
@@ -870,14 +851,8 @@ retry_back:
 		    icp->unbound = (instcntl_t *)ctxp->c_archctl->ac_unbound;
 		    ctxp->c_archctl->ac_unbound = icp;
 #ifdef PCP_DEBUG
-		    if (pmDebug & DBG_TRACE_INTERP) {
-			char	strbuf[20];
-			fprintf(stderr, "search back for inst %d and pmid %s (t_first=%.6f t_prior=%.6f%s t_next=%.6f%s t_last=%.6f)\n",
-			    icp->inst, pmIDStr_r(pmidlist[j], strbuf, sizeof(strbuf)), icp->t_first,
-			    icp->t_prior, statestr[icp->s_prior],
-			    icp->t_next, statestr[icp->s_next],
-			    icp->t_last);
-		    }
+			if (pmDebug & DBG_TRACE_INTERP)
+			    dumpicp("search back", icp);
 #endif
 		}
 	    }
@@ -932,11 +907,8 @@ retry_back:
 		icp->t_first < t_req) {
 		icp->t_first = t_req;
 #ifdef PCP_DEBUG
-		if (pmDebug & DBG_TRACE_INTERP) {
-		    char	strbuf[20];
-		    fprintf(stderr, "pmid %s inst %d no values before t_first=%.6f\n",
-			pmIDStr_r(icp->metric->desc.pmid, strbuf, sizeof(strbuf)), icp->inst, icp->t_first);
-		}
+		if (pmDebug & DBG_TRACE_INTERP)
+		    dumpicp("no values before t_first", icp);
 #endif
 	    }
 	    icp->search = 0;
@@ -986,14 +958,8 @@ retry_forw:
 		    icp->unbound = (instcntl_t *)ctxp->c_archctl->ac_unbound;
 		    ctxp->c_archctl->ac_unbound = icp;
 #ifdef PCP_DEBUG
-		    if (pmDebug & DBG_TRACE_INTERP) {
-			char	strbuf[20];
-			fprintf(stderr, "search forw for inst %d and pmid %s (t_first=%.6f t_prior=%.6f%s t_next=%.6f%s t_last=%.6f)\n",
-			    icp->inst, pmIDStr_r(pmidlist[j], strbuf, sizeof(strbuf)), icp->t_first,
-			    icp->t_prior, statestr[icp->s_prior],
-			    icp->t_next, statestr[icp->s_next],
-			    icp->t_last);
-		    }
+			if (pmDebug & DBG_TRACE_INTERP)
+			    dumpicp("search forw", icp);
 #endif
 		}
 	    }
@@ -1014,7 +980,7 @@ retry_forw:
 		/* ran into end of log */
 #ifdef PCP_DEBUG
 		if (pmDebug & DBG_TRACE_INTERP) {
-		    fprintf(stderr, "End of Log, %d metric-inst not found\n",
+		    fprintf(stderr, "End of Log, %d metric-insts not found\n",
 		    		forw - done);
 		}
 #endif
@@ -1512,6 +1478,7 @@ retry_forw:
 		}
 		else if ((pcp->desc.type == PM_TYPE_AGGREGATE ||
 			  pcp->desc.type == PM_TYPE_EVENT ||
+			  pcp->desc.type == PM_TYPE_HIGHRES_EVENT ||
 			  pcp->desc.type == PM_TYPE_STRING) &&
 			 icp->t_prior >= 0) {
 		    int		need;
@@ -1612,6 +1579,111 @@ __pmLogResetInterp(__pmContext *ctxp)
 		    }
 		    icp->v_prior.pval = icp->v_next.pval = NULL;
 		}
+	    }
+	}
+    }
+}
+
+/*
+ * Free interp data when context is closed ...
+ * - pinned PDU buffers holding values used for interpolation
+ * - hash structures for finding metrics and instances
+ * - read_cache contents
+ *
+ * Called with ctxp->c_lock held.
+ */
+void
+__pmFreeInterpData(__pmContext *ctxp)
+{
+    if (ctxp->c_archctl->ac_pmid_hc.hsize > 0) {
+	/* we have done some interpolation ... */
+	__pmHashCtl	*hcp = &ctxp->c_archctl->ac_pmid_hc;
+	__pmHashNode	*hp;
+	pmidcntl_t	*pcp;
+	instcntl_t	*icp;
+	int		j;
+
+	for (j = 0; j < hcp->hsize; j++) {
+	    __pmHashNode	*last_hp = NULL;
+	    /*
+	     * Don't free __pmHashNode until hp->next has been traversed,
+	     * hence free lags one node in the chain (last_hp used for free).
+	     * Same for linked list of instcntl_t structs (use last_icp
+	     * for free in this case).
+	     */
+	    for (hp = hcp->hash[j]; hp != NULL; hp = hp->next) {
+		instcntl_t		*last_icp = NULL;
+		pcp = (pmidcntl_t *)hp->data;
+		for (icp = pcp->first; icp != NULL; icp = icp->next) {
+		    if (pcp->valfmt != PM_VAL_INSITU) {
+			/*
+			 * Held values may be in PDU buffers, unpin the PDU
+			 * buffers just in case (__pmUnpinPDUBuf is a NOP if
+			 * the value is not in a PDU buffer)
+			 */
+			if (icp->v_prior.pval != NULL) {
+#ifdef PCP_DEBUG
+			    if ((pmDebug & DBG_TRACE_INTERP) && (pmDebug & DBG_TRACE_DESPERATE)) {
+			    char	strbuf[20];
+			    fprintf(stderr, "release pmid %s inst %d prior\n",
+				pmIDStr_r(pcp->desc.pmid, strbuf, sizeof(strbuf)), icp->inst);
+			    }
+#endif
+			    __pmUnpinPDUBuf((void *)icp->v_prior.pval);
+			}
+			if (icp->v_next.pval != NULL) {
+#ifdef PCP_DEBUG
+			    if ((pmDebug & DBG_TRACE_INTERP) && (pmDebug & DBG_TRACE_DESPERATE)) {
+			    char	strbuf[20];
+			    fprintf(stderr, "release pmid %s inst %d next\n",
+				pmIDStr_r(pcp->desc.pmid, strbuf, sizeof(strbuf)), icp->inst);
+			    }
+#endif
+			    __pmUnpinPDUBuf((void *)icp->v_next.pval);
+			}
+		    }
+		    if (last_icp != NULL)
+			free(last_icp);
+		    last_icp = icp;
+		}
+		if (last_icp != NULL)
+		    free(last_icp);
+		if (last_hp != NULL) {
+		    if (last_hp->data != NULL)
+			free(last_hp->data);
+		    free(last_hp);
+		}
+		last_hp = hp;
+	    }
+	    if (last_hp != NULL) {
+		if (last_hp->data != NULL)
+		    free(last_hp->data);
+		free(last_hp);
+	    }
+	    free(hcp->hash);
+	    /* just being paranoid here */
+	    hcp->hash = NULL;
+	    hcp->hsize = 0;
+	}
+    }
+
+    if (ctxp->c_archctl->ac_cache != NULL) {
+	/* read cache allocated, work to be done */
+	cache_t		*cache = (cache_t *)ctxp->c_archctl->ac_cache;
+	cache_t		*cp;
+
+	for (cp = cache; cp < &cache[NUMCACHE]; cp++) {
+#ifdef PCP_DEBUG
+	    if ((pmDebug & DBG_TRACE_LOG) && (pmDebug & DBG_TRACE_INTERP)) {
+		fprintf(stderr, "read cache entry " PRINTF_P_PFX "%p: mfp=" PRINTF_P_PFX "%p rp=" PRINTF_P_PFX "%p\n", cp, cp->mfp, cp->rp);
+	    }
+#endif
+	    if (cp->mfp == ctxp->c_archctl->ac_log->l_mfp) {
+		if (cp->rp != NULL)
+		    pmFreeResult(cp->rp);
+		cp->rp = NULL;
+		cp->mfp = NULL;
+		cp->used = 0;
 	    }
 	}
     }

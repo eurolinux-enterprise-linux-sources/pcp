@@ -17,7 +17,7 @@ signal=$PCP_BINADM_DIR/pmsignal
 status=1
 done_clean=false
 LOCALHOST=`hostname`
-[ $PCP_VER -lt 3806 ] && LOCALHOST=`echo $LOCALHOST | sed -e 's/\..*//'`
+[ $PCP_VER -lt 30806 ] && LOCALHOST=`echo $LOCALHOST | sed -e 's/\..*//'`
 
 _cleanup()
 {
@@ -27,7 +27,11 @@ _cleanup()
     else
 	echo
 	echo "Restore pmcd.conf and restart PMCD ..."
-	[ -f $tmp.pmcd.conf ] && $sudo mv $tmp.pmcd.conf $PCP_PMCDCONF_PATH
+	if [ -f $tmp.pmcd.conf ]
+	then
+	    $sudo cp $tmp.pmcd.conf $PCP_PMCDCONF_PATH
+	    rm -f $tmp.pmcd.conf
+	fi
 	_restore_primary_logger
 	$sudo $PCP_RC_DIR/pcp restart | _filter_pcp_start
 	rm -f $tmp.*

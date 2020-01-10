@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2014-2015 Red Hat.
  * Copyright (c) 2010 Aconex.  All Rights Reserved.
  * Copyright (c) 2000,2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
@@ -18,6 +19,8 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include "pmapi.h"
+#include "pmda.h"
+#include "indom.h"
 
 char *
 get_distro_info(void)
@@ -29,30 +32,31 @@ get_distro_info(void)
     static char		*distro_name;
     struct stat		sbuf;
     int			r, sts, fd = -1, len = 0;
+    char		path[MAXPATHLEN];
     char		prefix[16];
     enum {	/* rfiles array offsets */
 	DEB_VERSION	= 0,
-	LSB_RELEASE	= 5,
+	LSB_RELEASE	= 6,
     };
-    char *rfiles[] = {
-		"/etc/debian_version",
-		"/etc/oracle-release",
-		"/etc/fedora-release",
-		"/etc/redhat-release",
-		"/etc/slackware-version",
-		"/etc/SuSE-release",
-		"/etc/lsb-release",
-		NULL
+    char *rfiles[] = { "debian_version", "oracle-release", "fedora-release",
+	"redhat-release", "slackware-version", "SuSE-release", "lsb-release",
+	/* insert any new distribution release variants here */
+	NULL
     };
 
     if (distro_name)
 	return distro_name;
 
     for (r = 0; rfiles[r] != NULL; r++) {
-	if (stat(rfiles[r], &sbuf) == 0 && S_ISREG(sbuf.st_mode)) {
-	    fd = open(rfiles[r], O_RDONLY);
-	    break;
+	snprintf(path, sizeof(path), "%s/etc/%s", linux_statspath, rfiles[r]);
+	if ((fd = open(path, O_RDONLY)) == -1)
+	    continue;
+	if (fstat(fd, &sbuf) == -1) {
+	    close(fd);
+	    fd = -1;
+	    continue;
 	}
+	break;
     }
     if (fd != -1) {
 	if (r == DEB_VERSION) {	/* Debian, needs a prefix */

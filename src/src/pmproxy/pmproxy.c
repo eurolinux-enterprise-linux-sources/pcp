@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Red Hat.
+ * Copyright (c) 2012-2014 Red Hat.
  * Copyright (c) 2002 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -226,9 +226,14 @@ VerifyClient(ClientInfo *cp, __pmPDU *pb)
     if (sts >= 0)
 	sts = __pmXmitPDU(cp->pmcd_fd, pb);
 
-    /* finally perform any additional handshaking needed with pmcd */
+    /*
+     * finally perform any additional handshaking needed with pmcd.
+     * Do not initialize NSS again.
+     */
     if (sts >= 0 && flags)
-	sts = __pmSecureClientHandshake(cp->pmcd_fd, flags, hostname, &attrs);
+	sts = __pmSecureClientHandshake(cp->pmcd_fd,
+					flags | PDU_FLAG_NO_NSS_INIT,
+					hostname, &attrs);
    
     return sts;
 }
@@ -394,25 +399,31 @@ ClientLoop(void)
     }
 }
 
+#ifdef IS_MINGW
 static void
 SigIntProc(int s)
 {
-#ifdef IS_MINGW
     SignalShutdown();
+}
 #else
+static void
+SigIntProc(int s)
+{
     signal(SIGINT, SigIntProc);
     signal(SIGTERM, SigIntProc);
     timeToDie = 1;
-#endif
 }
+#endif
 
 static void
 SigBad(int sig)
 {
-    __pmNotifyErr(LOG_ERR, "Unexpected signal %d ...\n", sig);
-    fprintf(stderr, "\nDumping to core ...\n");
-    fflush(stderr);
-    abort();
+    if (pmDebug & DBG_TRACE_DESPERATE) {
+	__pmNotifyErr(LOG_ERR, "Unexpected signal %d ...\n", sig);
+	fprintf(stderr, "\nDumping to core ...\n");
+	fflush(stderr);
+    }
+    _exit(sig);
 }
 
 /*
@@ -466,6 +477,7 @@ main(int argc, char *argv[])
     if (run_daemon) {
 	fflush(stderr);
 	StartDaemon(argc, argv);
+	__pmServerCreatePIDFile(PM_SERVER_PROXY_SPEC, 0);
     }
 
     __pmSetSignalHandler(SIGHUP, SIG_IGN);

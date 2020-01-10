@@ -251,9 +251,9 @@ do
 		shift
 		if [ ! -f "$config" ]
 		then
-		    if [ -f "$PCP_SYSCONF_DIR/pmlogger/$config" ]
+		    if [ -f "$PCP_VAR_DIR/config/pmlogger/$config" ]
 		    then
-			config="$PCP_SYSCONF_DIR/pmlogger/$config"
+			config="$PCP_VAR_DIR/config/pmlogger/$config"
 		    else
 			echo "$prog: Error: cannot find configfile ($config)"
 			_abandon
@@ -461,7 +461,7 @@ then
     else
 	echo "connect $connect" >$tmp/pmlc.cmd
 	for top in `pminfo -h $hostname $namespace \
-		    | sed -e 's/\..*//' -e '/^proc$/d' \
+                    | sed -e 's/\..*//' -e '/^proc$/d' -e '/^hotproc$/d'\
 		    | sort -u`
 	do
 	    echo "query $top" >>$tmp/pmlc.cmd

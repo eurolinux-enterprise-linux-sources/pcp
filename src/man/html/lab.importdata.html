@@ -9,21 +9,22 @@
 </head>
 <body lang="en-AU" text="#000060" dir="LTR">
 <table width="100%" border=0 cellpadding=0 cellspacing=0>
-	<tr> <td width=64 height=64><font color="#000080"><a href="http://oss.sgi.com/projects/pcp/"><img src="images/pcpicon.png" alt="pmcharticon" align=top width=64 height=64 border=0></a></font></td>
+	<tr> <td width=64 height=64><font color="#000080"><a href="http://pcp.io/"><img src="images/pcpicon.png" alt="pmcharticon" align=top width=64 height=64 border=0></a></font></td>
 	<td width=1><p>&nbsp;&nbsp;&nbsp;&nbsp;</p></td>
 	<td width=500><p style="vertical-align:middle; text-align:left;"><a href="index.html"><font color="#cc0000">Home</font></a>&nbsp;&nbsp;&middot;&nbsp;<a href="lab.pmlogger.html"><font color="#cc0000">Archive Logger</font></a></p></td>
 	</tr>
 </table>
 <h1>Importing data and creating PCP archives</h1>
+<p><br></p>
 <table width="15%" border=0 cellpadding=5 cellspacing=10 align=right>
-	<tr><td bgcolor="#e2e2e2"><img src="images/system-search.png" alt="search" width=16 height=16 border=0>&nbsp;&nbsp;<i>Tools</i><br><pre>
+	<tr><td bgcolor="#e2e2e2">
+<pre><img src="images/system-search.png" alt="search" width=16 height=16 border=0><i>Tools</i>
 PCP::LogImport
 pmlogsummary
 pmlogger
 pmchart
 pmie
-perl
-</pre></td></tr>
+perl</pre></td></tr>
 </table>
 <p>For most performance data processed by the Performance Co-Pilot (PCP),
 the information is gathered by domain-specific agents or Performance
@@ -159,7 +160,7 @@ a name &ndash; the rules must conform to those for the Performance Metrics
 Name Space (PMNS), namely a number of components separated by periods
 &quot;.&quot; with each component starting with an alphabetic followed
 by zero or more characters drawn from the alphabetics, digits and the
-underscore &quot;_&quot; character (see <b>pmns</b>(4) for more
+underscore &quot;_&quot; character (see <b>pmns</b>(5) for more
 details). For our metrics we'll use the prefix <b>mover.</b> and so the
 first metric will be known as <b>mover.nfile</b>.
 </p>
@@ -421,7 +422,7 @@ This produces a PCP archive that can be plotted with <i>pmchart</i>
 to produce the following graph.</p>
 <p><center>
 <img src="images/mover.v3.png" alt="mover.v3">
-</center></p>
+</center>
 
 <h2><a name="instances">Multi-valued Metrics and Instance Domains</a></h2>
 
@@ -476,7 +477,7 @@ This produces our final PCP archive that can be plotted with <i>pmchart</i>
 to produce the following graph.</p>
 <p><center>
 <img src="images/mover.png" alt="mover">
-</center></p>
+</center>
 
 <h2><a name="handles">Handles</a></h2>
 
@@ -550,11 +551,11 @@ value has been added to the next output record.</li>
 <p>The complete mover2pcp Perl script can be viewed <a href="importdata/mover2pcp">here</a>.</p>
 
 <hr>
-<center>
-<table width="100%" border=0 cellpadding=0 cellspacing=0>
-	<tr> <td width="50%"><p>Copyright &copy; 2010 <a href="http://www.kenj.com.au"><font color="#000060">Ken McDonell</font></a></p></td>
-	<td width=50%><p align=right><a href="http://oss.sgi.com/projects/pcp/"><font color="#000060">PCP</font></a></p></td> </tr>
-</table>
-</center>
-</body>
-</html>
+<CENTER>
+<TABLE WIDTH="100%" BORDER=0 CELLPADDING=0 CELLSPACING=0>
+	<TR> <TD WIDTH="50%"><P>Copyright &copy; 2007-2010 <A HREF="http://www.aconex.com/"><FONT COLOR="#000060">Aconex</FONT></A><BR>Copyright &copy; 2000-2004 <A HREF="http://www.sgi.com/"><FONT COLOR="#000060">Silicon Graphics Inc</FONT></A></P></TD>
+	<TD WIDTH="50%"><P ALIGN=RIGHT><A HREF="http://pcp.io/"><FONT COLOR="#000060">PCP Site</FONT></A><BR>Copyright &copy; 2012-2014 <A HREF="http://www.redhat.com/"><FONT COLOR="#000060">Red Hat</FONT></A></P></TD> </TR>
+</TABLE>
+</CENTER>
+</BODY>
+</HTML>

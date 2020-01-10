@@ -23,7 +23,6 @@
 #include <dirent.h>
 #include <ctype.h>
 #include <sys/stat.h>
-#include <sys/utsname.h>
 #include "proc_cpuinfo.h"
 #include "proc_stat.h"
 
@@ -31,6 +30,7 @@ int
 refresh_proc_stat(proc_cpuinfo_t *proc_cpuinfo, proc_stat_t *proc_stat)
 {
     pmdaIndom *idp = PMDAINDOM(CPU_INDOM);
+    char buf[MAXPATHLEN];
     char fmt[64];
     static int fd = -1; /* kept open until exit() */
     static int started;
@@ -48,7 +48,8 @@ refresh_proc_stat(proc_cpuinfo_t *proc_cpuinfo, proc_stat_t *proc_stat)
 	if (lseek(fd, 0, SEEK_SET) < 0)
 	    return -oserror();
     } else {
-	if ((fd = open("/proc/stat", O_RDONLY)) < 0)
+	snprintf(buf, sizeof(buf), "%s/proc/stat", linux_statspath);
+	if ((fd = open(buf, O_RDONLY)) < 0)
 	    return -oserror();
     }
 
@@ -174,20 +175,20 @@ refresh_proc_stat(proc_cpuinfo_t *proc_cpuinfo, proc_stat_t *proc_stat)
      */
     if (proc_stat->ncpu == 1) {
 	/*
-	 * Don't bother scanning - the counters are the same
-	 * as for "all" cpus, as already scanned above.
+	 * Don't bother scanning - the per-cpu and per-node counters are the
+         * same as for "all" cpus, as already scanned above.
 	 * This also handles the non-SMP code where
 	 * there is no line starting with "cpu0".
 	 */
-	proc_stat->p_user[0] = proc_stat->user;
-	proc_stat->p_nice[0] = proc_stat->nice;
-	proc_stat->p_sys[0] = proc_stat->sys;
-	proc_stat->p_idle[0] = proc_stat->idle;
-	proc_stat->p_wait[0] = proc_stat->wait;
-	proc_stat->p_irq[0] = proc_stat->irq;
-	proc_stat->p_sirq[0] = proc_stat->sirq;
-	proc_stat->p_steal[0] = proc_stat->steal;
-    	proc_stat->p_guest[0] = proc_stat->guest;
+	proc_stat->p_user[0] = proc_stat->n_user[0] = proc_stat->user;
+	proc_stat->p_nice[0] = proc_stat->n_nice[0] = proc_stat->nice;
+	proc_stat->p_sys[0] = proc_stat->n_sys[0] = proc_stat->sys;
+	proc_stat->p_idle[0] = proc_stat->n_idle[0] = proc_stat->idle;
+	proc_stat->p_wait[0] = proc_stat->n_wait[0] = proc_stat->wait;
+	proc_stat->p_irq[0] = proc_stat->n_irq[0] = proc_stat->irq;
+	proc_stat->p_sirq[0] = proc_stat->n_sirq[0] = proc_stat->sirq;
+	proc_stat->p_steal[0] = proc_stat->n_steal[0] = proc_stat->steal;
+    	proc_stat->p_guest[0] = proc_stat->n_guest[0] = proc_stat->guest;
     }
     else {
 	strcpy(fmt, "cpu%d %llu %llu %llu %llu %llu %llu %llu %llu %llu");

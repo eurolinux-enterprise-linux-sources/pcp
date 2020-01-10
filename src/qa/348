@@ -20,7 +20,7 @@ kvm_stats_path=/sys/kernel/debug/kvm
 $sudo [ -d $kvm_stats_path ] || _notrun "KVM sysfs interface not available"
 
 rm -f $seq.out
-if [ $PCP_VER -lt 3600 ]
+if [ $PCP_VER -lt 30600 ]
 then
     ln $seq.out.1 $seq.out || exit 1
 else
@@ -40,7 +40,11 @@ _cleanup()
     then
 	:
     else
-	[ -f $tmp.pmcd.conf ] && $sudo mv $tmp.pmcd.conf $PCP_PMCDCONF_PATH
+	if [ -f $tmp.pmcd.conf ]
+	then
+	    $sudo cp $tmp.pmcd.conf $PCP_PMCDCONF_PATH
+	    rm -f $tmp.pmcd.conf
+	fi
 	rm -f $tmp.*
 	$sudo $PCP_RC_DIR/pcp restart | _filter_pcp_start
 	_wait_for_pmcd
@@ -111,7 +115,7 @@ done
 LC_COLLATE=POSIX sort $tmp.stats > $tmp.values
 echo "from /sys/kernel/debug/kvm ..." >>$here/$seq.full
 cat $tmp.values >>$here/$seq.full
-join $tmp.probe $tmp.values >$tmp.all
+LC_COLLATE=POSIX join $tmp.probe $tmp.values >$tmp.all
 echo >>$here/$seq.full
 cat $tmp.all >>$here/$seq.full
 

@@ -1,0 +1,72 @@
+commit 5918e33f23600dd2b9919c1331f65f093921c8eb
+Author: Nathan Scott <nathans@redhat.com>
+Date:   Mon May 4 15:56:36 2015 +1000
+
+    pcp-lvmcache: added link, an exact synonym for pcp-dmcache(1)
+    
+    Resolves Red Hat BZ #1218007
+
+diff --git a/src/pcp/dmcache/GNUmakefile b/src/pcp/dmcache/GNUmakefile
+index c94e876..e95c6a8 100644
+--- a/src/pcp/dmcache/GNUmakefile
++++ b/src/pcp/dmcache/GNUmakefile
+@@ -1,5 +1,5 @@
+ #
+-# Copyright (c) 2014 Red Hat.
++# Copyright (c) 2014-2015 Red Hat.
+ # Copyright (c) 2000,2004 Silicon Graphics, Inc.  All Rights Reserved.
+ # 
+ # This program is free software; you can redistribute it and/or modify it
+@@ -17,6 +17,7 @@ TOPDIR = ../../..
+ include $(TOPDIR)/src/include/builddefs
+ 
+ TARGET = pcp-dmcache
++LVTARGET = pcp-lvmcache
+ MAN_SECTION = 1
+ MAN_PAGES = $(TARGET).$(MAN_SECTION)
+ MAN_DEST = $(PCP_MAN_DIR)/man$(MAN_SECTION)
+@@ -28,6 +29,7 @@ include $(BUILDRULES)
+ install: default
+ ifeq "$(ENABLE_PYTHON)" "true"
+ 	$(INSTALL) -m 755 $(TARGET).py $(PCP_BINADM_DIR)/$(TARGET)
++	$(INSTALL) -S $(PCP_BINADM_DIR)/$(TARGET) $(PCP_BINADM_DIR)/$(LVTARGET)
+ 	@$(INSTALL_MAN)
+ endif
+ 
+diff --git a/src/pcp/dmcache/pcp-dmcache.1 b/src/pcp/dmcache/pcp-dmcache.1
+index cac4fc3..3faaf00 100644
+--- a/src/pcp/dmcache/pcp-dmcache.1
++++ b/src/pcp/dmcache/pcp-dmcache.1
+@@ -1,6 +1,7 @@
+ .TH PCP-DMCACHE 1 "PCP" "Performance Co-Pilot"
+ .SH NAME
+-\f3pcp-dmcache\f1 \- report on Device Mapper Cache devices
++\f3pcp-dmcache\f1,
++\f3pcp-lvmcache\f1 \- report on logical storage device caches
+ .SH SYNOPSIS
+ \f3pcp-dmcache\f1
+ [\f3\-i\f1/\f3--iops\f1]
+@@ -13,6 +14,11 @@ The reported information includes device IOPs, cache and metadata device
+ utilization, as well as hit and miss rates and ratios for both reads and
+ writes for each cache device.
+ .PP
++.B pcp-lvmcache
++(Logical Volume Manager cache) is an exact synonym for
++.B pcp-dmcache
++(Device Mapper cache).
++.PP
+ When invoked via the
+ .BR pcp (1)
+ command, the
+@@ -47,6 +53,9 @@ displays total read and write operations instead of the default cache hit ratio.
+ changes the frequency at which the column heading is displayed.
+ By default, a header is displayed after every tenth sample.
+ .SH "SEE ALSO"
+-.BR pcp (1)
++.BR pcp (1),
++.BR pmdadm (1),
++.BR dmsetup (1),
++.BR PCPIntro (1)
+ and
+-.BR PCPIntro (1).
++.BR LVMCACHE (7).

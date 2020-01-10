@@ -29,7 +29,7 @@
 #include <sys/wait.h>
 #endif
 
-INTERN int	__pmLogReads = 0;
+INTERN int	__pmLogReads;
 
 /*
  * Suffixes and associated compresssion application for compressed filenames.
@@ -39,6 +39,7 @@ INTERN int	__pmLogReads = 0;
 #define	USE_NONE	0
 #define	USE_BZIP2	1
 #define USE_GZIP	2
+#define USE_XZ		3
 static const struct {
     const char	*suff;
     const int	appl;
@@ -47,7 +48,9 @@ static const struct {
     { ".bz",	USE_BZIP2 },
     { ".gz",	USE_GZIP },
     { ".Z",	USE_GZIP },
-    { ".z",	USE_GZIP }
+    { ".z",	USE_GZIP },
+    { ".lzma",	USE_XZ },
+    { ".xz",	USE_XZ },
 };
 static const int	ncompress = sizeof(compress_ctl) / sizeof(compress_ctl[0]);
 
@@ -276,6 +279,8 @@ fopen_compress(const char *fname)
 	cmd = "bzip2 -dc";
     else if (compress_ctl[i].appl == USE_GZIP)
 	cmd = "gzip -dc";
+    else if (compress_ctl[i].appl == USE_XZ)
+	cmd = "xz -dc";
     else {
 	/* botch in compress_ctl[] ... should not happen */
 	return NULL;
@@ -657,7 +662,6 @@ __pmLogClose(__pmLogCtl *lcp)
 	lcp->l_mdfp = NULL;
     }
     if (lcp->l_mfp != NULL) {
-	__pmLogCacheClear(lcp->l_mfp);
 	__pmResetIPC(fileno(lcp->l_mfp));
 	fclose(lcp->l_mfp);
 	lcp->l_mfp = NULL;
@@ -892,7 +896,7 @@ done:
 		char	*q;
 		int	vol;
 		vol = (int)strtol(tp, &q, 10);
-		if (*q != '0') {
+		if (*q != '\0') {
 		    /* may have one of the trailing compressed file suffixes */
 		    int		i;
 		    for (i = 0; i < ncompress; i++) {

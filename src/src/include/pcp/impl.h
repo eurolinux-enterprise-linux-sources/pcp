@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 Red Hat.
+ * Copyright (c) 2012-2015 Red Hat.
  * Copyright (c) 2008-2009 Aconex.  All Rights Reserved.
  * Copyright (c) 1995-2002 Silicon Graphics, Inc.  All Rights Reserved.
  * 
@@ -83,17 +83,19 @@ extern int __pmGetInternalState(void);
  * environment
  */
 #define SERVER_PORT 44321
-
+#define SERVER_PROTOCOL "pcp"
 /*
  * port that clients connect to pmproxy(1) on by default, over-ride with
  * $PMPROXY_PORT in environment
  */
 #define PROXY_PORT 44322
+#define PROXY_PROTOCOL "proxy"
 
 /*
  * port that clients connect to pmwebd(1) by default
  */
 #define PMWEBD_PORT 44323
+#define PMWEBD_PROTOCOL "http"
 
 /*
  * Internally, this is how to decode a PMID!
@@ -244,6 +246,8 @@ extern void __pmUsePMNS(__pmnsTree *); /* for debugging */
 extern int __pmFixPMNSHashTab(__pmnsTree *, int, int);
 extern int __pmAddPMNSNode(__pmnsTree *, int, const char *);
 
+/* helper routine to print all names of a metric */
+extern void __pmPrintMetricNames(FILE *, int, char **, char *);
 
 /* return true if the named pmns file has changed */
 extern int __pmHasPMNSFileChanged(const char *);
@@ -286,18 +290,24 @@ EXTERN int	pmDebug;
 #define DBG_TRACE_FAULT		(1<<23) /* fault injection tracing */
 #define DBG_TRACE_AUTH		(1<<24) /* authentication tracing */
 #define DBG_TRACE_DISCOVERY	(1<<25) /* service discovery tracing */
-/* not yet allocated, bits (1<<26) ... (1<<29) */
+#define DBG_TRACE_ATTR		(1<<26) /* all connection attributes */
+/* not yet allocated, bits (1<<27) ... (1<<29) */
 #define DBG_TRACE_DESPERATE	(1<<30) /* verbose/desperate level */
 
 extern int __pmParseDebug(const char *);
 extern void __pmDumpResult(FILE *, const pmResult *);
+extern void __pmDumpHighResResult(FILE *, const pmHighResResult *);
 extern void __pmPrintStamp(FILE *, const struct timeval *);
+extern void __pmPrintHighResStamp(FILE *, const struct timespec *);
+extern void __pmPrintTimespec(FILE *, const __pmTimespec *);
 extern void __pmPrintTimeval(FILE *, const __pmTimeval *);
 extern void __pmPrintDesc(FILE *, const pmDesc *);
 extern void __pmFreeResultValues(pmResult *);
 extern char *__pmPDUTypeStr_r(int, char *, int);
 extern const char *__pmPDUTypeStr(int);			/* NOT thread-safe */
 extern void __pmDumpNameSpace(FILE *, int);
+extern void __pmDumpNameNode(FILE *, __pmnsNode *, int);
+extern void __pmDumpStack(FILE *);
 EXTERN int __pmLogReads;
 
 #ifdef PCP_DEBUG
@@ -519,6 +529,7 @@ typedef enum {
     PCP_ATTR_GROUPID	= 12,	/* gid - group identifier (posix) */
     PCP_ATTR_LOCAL	= 13,	/* AF_UNIX socket with localhost fallback */
     PCP_ATTR_PROCESSID	= 14,	/* pid - process identifier (posix) */
+    PCP_ATTR_CONTAINER	= 15,	/* container name (linux) */
 } __pmAttrKey;
 
 extern __pmAttrKey __pmLookupAttrKey(const char *, size_t);
@@ -565,16 +576,7 @@ extern void __pmSecureServerShutdown(void);
 extern int __pmSecureServerHandshake(int, int, __pmHashCtl *);
 extern int __pmSecureClientHandshake(int, int, const char *, __pmHashCtl *);
 
-#ifdef HAVE_SECURE_SOCKETS
-typedef struct {
-    fd_set		native_set;
-    fd_set		nspr_set;
-    int			num_native_fds;
-    int			num_nspr_fds;
-} __pmFdSet;
-#else
 typedef fd_set __pmFdSet;
-#endif
 typedef struct __pmSockAddr __pmSockAddr;
 typedef struct __pmHostEnt __pmHostEnt;
 
@@ -628,9 +630,11 @@ extern int	     __pmSockAddrIsLoopBack(const __pmSockAddr *);
 extern int	     __pmSockAddrIsInet(const __pmSockAddr *);
 extern int	     __pmSockAddrIsIPv6(const __pmSockAddr *);
 extern int	     __pmSockAddrIsUnix(const __pmSockAddr *);
-extern char *	     __pmSockAddrToString(__pmSockAddr *);
+extern char *	     __pmSockAddrToString(const __pmSockAddr *);
 extern __pmSockAddr *__pmStringToSockAddr(const char *);
 extern __pmSockAddr *__pmLoopBackAddress(int);
+extern __pmSockAddr *__pmSockAddrFirstSubnetAddr(const __pmSockAddr *, int);
+extern __pmSockAddr *__pmSockAddrNextSubnetAddr(__pmSockAddr *, int);
 
 extern __pmHostEnt * __pmHostEntAlloc(void);
 extern void	     __pmHostEntFree(__pmHostEnt *);
@@ -651,12 +655,14 @@ typedef enum {
     PM_SERVER_FEATURE_CREDS_REQD,
     PM_SERVER_FEATURE_UNIX_DOMAIN,
     PM_SERVER_FEATURE_DISCOVERY,
+    PM_SERVER_FEATURE_CONTAINERS,
     PM_SERVER_FEATURES
 } __pmServerFeature;
 
 extern int __pmServerHasFeature(__pmServerFeature);
 extern int __pmServerSetFeature(__pmServerFeature);
 extern int __pmServerClearFeature(__pmServerFeature);
+extern int __pmServerCreatePIDFile(const char *, int);
 extern int __pmServerAddPorts(const char *);
 extern int __pmServerAddInterface(const char *);
 extern void __pmServerSetLocalSocket(const char *);
@@ -687,6 +693,8 @@ typedef struct {
     double		ac_end;		/* time at end of archive */
     void		*ac_want;	/* used in interp.c */
     void		*ac_unbound;	/* used in interp.c */
+    void		*ac_cache;	/* used in interp.c */
+    int			ac_cache_idx;	/* used in interp.c */
 } __pmArchCtl;
 
 /*
@@ -772,6 +780,9 @@ typedef struct {
 #define PDU_FLAG_COMPRESS	(1U<<1)
 #define PDU_FLAG_AUTH		(1U<<2)
 #define PDU_FLAG_CREDS_REQD	(1U<<3)
+#define PDU_FLAG_SECURE_ACK	(1U<<4)
+#define PDU_FLAG_NO_NSS_INIT	(1U<<5)
+#define PDU_FLAG_CONTAINER	(1U<<6)
 
 /* Credential CVERSION PDU elements look like this */
 typedef struct {
@@ -786,6 +797,7 @@ typedef struct {
 #endif
 } __pmVersionCred;
 
+extern void __pmIgnoreSignalPIPE(void);
 extern int __pmXmitPDU(int, __pmPDU *);
 extern int __pmGetPDU(int, int, int, __pmPDU **);
 extern int __pmGetPDUCeiling(void);
@@ -798,7 +810,7 @@ extern void __pmSetPDUCntBuf(unsigned *, unsigned *);
 /* timeout options for PDU handling */
 #define TIMEOUT_NEVER	 0
 #define TIMEOUT_DEFAULT	-1
-#define TIMEOUT_ASYNC	-2
+/*#define TIMEOUT_ASYNC -2*/
 #define TIMEOUT_CONNECT	-3
 
 /* mode options for __pmGetPDU */
@@ -811,7 +823,7 @@ extern int __pmUnpinPDUBuf(void *);
 extern void __pmCountPDUBuf(int, int *, int *);
 
 #define PDU_START		0x7000
-#define PDU_ERROR		0x7000
+#define PDU_ERROR		PDU_START
 #define PDU_RESULT		0x7001
 #define PDU_PROFILE		0x7002
 #define PDU_FETCH		0x7003
@@ -827,7 +839,8 @@ extern void __pmCountPDUBuf(int, int *, int *);
 #define PDU_PMNS_NAMES		0x700e
 #define PDU_PMNS_CHILD		0x700f
 #define PDU_PMNS_TRAVERSE	0x7010
-#define PDU_AUTH		0x7011
+#define PDU_ATTR		0x7011
+#define PDU_AUTH		PDU_ATTR
 #define PDU_FINISH		0x7011
 #define PDU_MAX		 	(PDU_FINISH - PDU_START)
 
@@ -886,6 +899,8 @@ extern int __pmSendTraversePMNSReq(int, int, const char *);
 extern int __pmDecodeTraversePMNSReq(__pmPDU *, char **);
 extern int __pmSendAuth(int, int, int, const char *, int);
 extern int __pmDecodeAuth(__pmPDU *, int *, char **, int *);
+extern int __pmSendAttr(int, int, int, const char *, int);
+extern int __pmDecodeAttr(__pmPDU *, int *, char **, int *);
 
 #if defined(HAVE_64BIT_LONG)
 
@@ -1041,6 +1056,7 @@ extern int __pmLogFetch(__pmContext *, int, pmID *, pmResult **);
 extern int __pmLogFetchInterp(__pmContext *, int, pmID *, pmResult **);
 extern void __pmLogSetTime(__pmContext *);
 extern void __pmLogResetInterp(__pmContext *);
+extern void __pmFreeInterpData(__pmContext *);
 
 extern int __pmLogChangeVol(__pmLogCtl *, int);
 extern int __pmLogChkLabel(__pmLogCtl *, FILE *, __pmLogLabel *, int);
@@ -1095,7 +1111,9 @@ extern int __pmIsLocalhost(const char *);
  * struct timeval manipulations
  */
 extern double __pmtimevalAdd(const struct timeval *, const struct timeval *);
+extern void __pmtimevalInc(struct timeval *, const struct timeval *);
 extern double __pmtimevalSub(const struct timeval *, const struct timeval *);
+extern void __pmtimevalDec(struct timeval *, const struct timeval *);
 extern double __pmtimevalToReal(const struct timeval *);
 extern void __pmtimevalFromReal(double, struct timeval *);
 extern void __pmtimevalSleep(struct timeval);
@@ -1297,6 +1315,7 @@ extern const char *__pmGetAPIConfig(const char *);
 extern void __pmStartOptions(pmOptions *);
 extern void __pmAddOptArchive(pmOptions *, char *);
 extern void __pmAddOptArchiveList(pmOptions *, char *);
+extern void __pmAddOptArchiveFolio(pmOptions *, char *);
 extern void __pmAddOptHost(pmOptions *, char *);
 extern void __pmAddOptHostList(pmOptions *, char *);
 extern void __pmEndOptions(pmOptions *);
@@ -1416,19 +1435,23 @@ extern int __pmLocalPMDA(int, int, const char *, const char *);
 extern char *__pmSpecLocalPMDA(const char *);
 
 /*
- * helper methods for packed arrays of event records (PM_TYPE_EVENT)
+ * Helper methods for packed arrays of event records
  */
 extern int __pmCheckEventRecords(pmValueSet *, int);
+extern int __pmCheckHighResEventRecords(pmValueSet *, int);
 extern void __pmDumpEventRecords(FILE *, pmValueSet *, int);
+extern void __pmDumpHighResEventRecords(FILE *, pmValueSet *, int);
 
-/* anonymous metric registration (uses derived metrics support) */
+/* Get nanosecond precision timestamp from system clocks */
+extern int __pmGetTimespec(struct timespec *);
+
+/* Anonymous metric registration (uses derived metrics support) */
 extern int __pmRegisterAnon(const char *, int);
 
 /*
  * Multi-thread support
  * Use PM_MULTI_THREAD_DEBUG for lock debugging with -Dlock[,appl?...]
  */
-
 extern void __pmInitLocks(void);
 extern int __pmLock(void *, const char *, int);
 extern int __pmUnlock(void *, const char *, int);
@@ -1454,6 +1477,21 @@ extern pthread_mutex_t	__pmLock_libpcp;	/* big libpcp lock */
 #else
 extern void *__pmLock_libpcp;			/* symbol exposure */
 #endif
+
+/*
+ * Service discovery with options.
+ * The 4th argument is a pointer to a mask of flags for boolean options
+ * and status. It is set and tested using the following bits.
+ */
+#define PM_SERVICE_DISCOVERY_INTERRUPTED	0x1
+#define PM_SERVICE_DISCOVERY_RESOLVE		0x2
+
+extern int __pmDiscoverServicesWithOptions(const char *,
+					   const char *,
+					   const char *,
+					   const volatile unsigned *,
+					   char ***);
+
 
 #ifdef __cplusplus
 }

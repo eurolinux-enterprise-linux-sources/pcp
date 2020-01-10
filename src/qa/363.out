@@ -55,7 +55,7 @@ network.interface.out.bytes ["sl0"] 834.937 807.640 0.000 2802.711 6 count / sec
 Note: timezone set to local timezone of host "moomba" from archive
 
 === Down-rev error check ===
-pmlogsummary: Cannot open archive "src/err_v1": Illegal label record at start of a PCP archive log file
+pmlogsummary: Cannot open archive "archives/err_v1": Illegal label record at start of a PCP archive log file
 
 === Changing inst check ===
 Note: timezone set to local timezone of host "gonzo" from archive
@@ -127,7 +127,7 @@ sampledso.bucket ["bin-700"] 700.000 none
 sampledso.bucket ["bin-800"] 800.000 none
 sampledso.bucket ["bin-900"] 900.000 none
 pmcd.pmlogger.port [PID] PORT none
-pmlogsummary: Cannot locate end of archive src/null: Corrupted record in a PCP archive log
+pmlogsummary: Cannot locate end of archive tmparch/null: Corrupted record in a PCP archive log
 
 WARNING: This archive is sufficiently damaged that it may not be possible to
          produce complete information.  Continuing and hoping for the best.

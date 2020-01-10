@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 Red Hat.
+ * Copyright (c) 2012-2015 Red Hat.
  * Copyright (c) 1995-2002,2004 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This library is free software; you can redistribute it and/or modify it
@@ -29,7 +29,7 @@
 #include <sys/wait.h>
 #endif
 
-INTERN int	__pmLogReads;
+PCP_DATA int	__pmLogReads;
 
 /*
  * Suffixes and associated compresssion application for compressed filenames.
@@ -44,15 +44,15 @@ static const struct {
     const char	*suff;
     const int	appl;
 } compress_ctl[] = {
+    { ".xz",	USE_XZ },
+    { ".lzma",	USE_XZ },
     { ".bz2",	USE_BZIP2 },
     { ".bz",	USE_BZIP2 },
     { ".gz",	USE_GZIP },
     { ".Z",	USE_GZIP },
     { ".z",	USE_GZIP },
-    { ".lzma",	USE_XZ },
-    { ".xz",	USE_XZ },
 };
-static const int	ncompress = sizeof(compress_ctl) / sizeof(compress_ctl[0]);
+static const int ncompress = sizeof(compress_ctl) / sizeof(compress_ctl[0]);
 
 /*
  * first two fields are made to look like a pmValueSet when no values are
@@ -253,49 +253,27 @@ popen_uncompress(const char *cmd, const char *fname, const char *suffix, int fd)
     return (bytes == 0) ? 0 : -1;
 }
 
-static FILE *
-fopen_compress(const char *fname)
+static int
+fopen_securetmp(const char *fname)
 {
-    int		sts;
-    int		fd;
-    int		i;
-    char	*cmd;
-    char	*msg;
-    FILE	*fp;
     char	tmpname[MAXPATHLEN];
     mode_t	cur_umask;
-
-    for (i = 0; i < ncompress; i++) {
-	snprintf(tmpname, sizeof(tmpname), "%s%s", fname, compress_ctl[i].suff);
-	if (access(tmpname, R_OK) == 0) {
-	    break;
-	}
-    }
-    if (i == ncompress) {
-	/* end up here if it does not look like a compressed file */
-	return NULL;
-    }
-    if (compress_ctl[i].appl == USE_BZIP2)
-	cmd = "bzip2 -dc";
-    else if (compress_ctl[i].appl == USE_GZIP)
-	cmd = "gzip -dc";
-    else if (compress_ctl[i].appl == USE_XZ)
-	cmd = "xz -dc";
-    else {
-	/* botch in compress_ctl[] ... should not happen */
-	return NULL;
-    }
+    char	*msg;
+    int		fd;
 
     cur_umask = umask(S_IXUSR | S_IRWXG | S_IRWXO);
 #if HAVE_MKSTEMP
-    snprintf(tmpname, sizeof(tmpname),
-		"%s/XXXXXX", pmGetConfig("PCP_TMPFILE_DIR"));
+    if ((msg = pmGetOptionalConfig("PCP_TMPFILE_DIR")) == NULL) {
+	umask(cur_umask);
+	return -1;
+    }
+    snprintf(tmpname, sizeof(tmpname), "%s/XXXXXX", msg);
     msg = tmpname;
     fd = mkstemp(tmpname);
 #else
     if ((msg = tmpnam(NULL)) == NULL) {
 	umask(cur_umask);
-	return NULL;
+	return -1;
     }
     fd = open(msg, O_RDWR|O_CREAT|O_EXCL, 0600);
 #endif
@@ -305,8 +283,52 @@ fopen_compress(const char *fname)
      */
     unlink(msg);
     umask(cur_umask);
+    return fd;
+}
 
-    if (fd < 0) {
+/*
+ * Lookup whether the suffix matches one of the compression styles,
+ * and if so return the matching index into the compress_ctl table.
+ */
+static int
+index_compress(const char *fname)
+{
+    int		i;
+    char	tmpname[MAXPATHLEN];
+
+    for (i = 0; i < ncompress; i++) {
+	snprintf(tmpname, sizeof(tmpname), "%s%s", fname, compress_ctl[i].suff);
+	if (access(tmpname, R_OK) == 0)
+	    return i;
+    }
+    /* end up here if it does not look like a compressed file */
+    return -1;
+}
+
+static FILE *
+fopen_compress(const char *fname)
+{
+    int		sts;
+    int		fd;
+    int		i;
+    char	*cmd;
+    FILE	*fp;
+
+    if ((i = index_compress(fname)) < 0)
+	return NULL;
+
+    if (compress_ctl[i].appl == USE_XZ)
+	cmd = "xz -dc";
+    else if (compress_ctl[i].appl == USE_BZIP2)
+	cmd = "bzip2 -dc";
+    else if (compress_ctl[i].appl == USE_GZIP)
+	cmd = "gzip -dc";
+    else {
+	/* botch in compress_ctl[] ... should not happen */
+	return NULL;
+    }
+
+    if ((fd = fopen_securetmp(fname)) < 0) {
 	sts = oserror();
 #ifdef PCP_DEBUG
 	if (pmDebug & DBG_TRACE_LOG)
@@ -1600,7 +1622,7 @@ again:
 	    char	*p;
 	    int	jend = PM_PDU_SIZE(header->len);
 
-	    /* for Purify ... */
+	    /* clear the padding bytes, lest they contain garbage */
 	    p = (char *)pb + header->len;
 	    while (p < (char *)pb + jend*sizeof(__pmPDU))
 		*p++ = '~';	/* buffer end */
@@ -1713,14 +1735,12 @@ check_all_derived(int numpmid, pmID pmidlist[])
      * Special case ... if we ONLY have derived metrics in the input
      * pmidlist then all the derived metrics must be constant
      * expressions, so skip all the processing.
-     * Derived metrics have domain == DYNAMIC_PMID and item != 0.
      * This rare, but avoids reading to the end of an archive
      * for no good reason.
      */
 
     for (i = 0; i < numpmid; i++) {
-	if (pmid_domain(pmidlist[i]) != DYNAMIC_PMID ||
-	    pmid_item(pmidlist[i]) == 0)
+	if (!IS_DERIVED(pmidlist[i]))
 	    return 0;
     }
     return 1;
@@ -2067,7 +2087,9 @@ __pmLogSetTime(__pmContext *ctxp)
 	int		j = -1;
 	int		toobig = 0;
 	int		match = 0;
+	int		vol;
 	int		numti = lcp->l_numti;
+	FILE		*f;
 	__pmLogTI	*tip = lcp->l_ti;
 	double		t_hi;
 	double		t_lo;
@@ -2082,10 +2104,11 @@ __pmLogSetTime(__pmContext *ctxp)
 	    if (tip->ti_vol == lcp->l_maxvol) {
 		/* truncated check for last volume */
 		if (sbuf.st_size < 0) {
-		    FILE	*f = _logpeek(lcp, lcp->l_maxvol);
-
 		    sbuf.st_size = 0;
-		    if (f != NULL) {
+		    vol = lcp->l_maxvol;
+		    if (vol >= 0 && vol < lcp->l_numseen && lcp->l_seen[vol])
+			fstat(fileno(lcp->l_mfp), &sbuf);
+		    else if ((f = _logpeek(lcp, lcp->l_maxvol)) != NULL) {
 			fstat(fileno(f), &sbuf);
 			fclose(f);
 		    }
@@ -2243,8 +2266,12 @@ pmGetArchiveLabel(pmLogLabel *lp)
 {
     __pmContext		*ctxp;
     ctxp = __pmHandleToPtr(pmWhichContext());
-    if (ctxp == NULL || ctxp->c_type != PM_CONTEXT_ARCHIVE)
+    if (ctxp == NULL) 
 	return PM_ERR_NOCONTEXT;
+    if (ctxp->c_type != PM_CONTEXT_ARCHIVE) {
+	PM_UNLOCK(ctxp->c_lock);
+	return PM_ERR_NOCONTEXT;
+    }
     else {
 	__pmLogLabel	*rlp;
 	/*
@@ -2299,6 +2326,12 @@ __pmGetArchiveEnd(__pmLogCtl *lcp, struct timeval *tp)
     __pm_off_t	physend = 0;
 
     /*
+     * default, when all else fails ...
+     */
+    tp->tv_sec = INT_MAX;
+    tp->tv_usec = 0;
+
+    /*
      * expect things to be stable, so l_maxvol is not empty, and
      * l_physend does not change for l_maxvol ... the ugliness is
      * to handle situations where these expectations are not met
@@ -2313,13 +2346,15 @@ __pmGetArchiveEnd(__pmLogCtl *lcp, struct timeval *tp)
 	    assert(save >= 0);
 	}
 	else if ((f = _logpeek(lcp, vol)) == NULL) {
-	    sts = -oserror();
-	    break;
+	    /* failed to open this one, try previous volume(s) */
+	    continue;
 	}
 
 	if (fstat(fileno(f), &sbuf) < 0) {
-	    sts = -oserror();
-	    break;
+	    /* if we can't stat() this one, then try previous volume(s) */
+	    fclose(f);
+	    f = NULL;
+	    continue;
 	}
 
 	if (vol == lcp->l_maxvol && sbuf.st_size == lcp->l_physend) {

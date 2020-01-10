@@ -1394,6 +1394,15 @@ DoAttributes(AgentInfo *ap, int clientID)
 		break;
 	}
     }
+    if (sts < 0) {
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_APPL0)
+	    fprintf(stderr, "ATTR error: \"%s\" agent : %s\n",
+		    ap->pmDomainLabel, pmErrStr(sts));
+#endif
+	CleanupAgent(ap, AT_COMM, ap->inFd);
+	return PM_ERR_AGAIN;
+    }
     return sts;
 }
 
@@ -1411,6 +1420,9 @@ AgentsAttributes(int clientID)
 	   (sts = DoAttributes(&agent[agentID], clientID)) < 0)
 	    break;
     }
+    if (sts == 0 && agentID == nAgents) {
+	client[clientID].status.attributes = 0;
+    }
     return sts;
 }
 
@@ -1427,6 +1439,7 @@ ClientsAttributes(AgentInfo *ap)
 	if (client[clientID].status.connected &&
 	   (sts = DoAttributes(ap, clientID)) < 0)
 	    break;
+	client[clientID].status.attributes = 0;
     }
     return sts;
 }
@@ -1986,8 +1999,8 @@ GetAgentDso(AgentInfo *aPtr)
 #if defined(HAVE_DLOPEN)
     dlerror();
     dso->initFn = (void (*)(pmdaInterface*))dlsym(dso->dlHandle, dso->entryPoint);
-    dlerrstr = dlerror();
-    if (dlerrstr != NULL) {
+    if (dso->initFn == NULL) {
+        dlerrstr = dlerror();
 	fprintf(stderr, "Couldn't find init function `%s' in %s DSO: %s\n",
 		     dso->entryPoint, aPtr->pmDomainLabel, dlerrstr);
 	dlclose(dso->dlHandle);
@@ -2009,7 +2022,9 @@ GetAgentDso(AgentInfo *aPtr)
      */
     challenge = 0xff;
     dso->dispatch.comm.pmda_interface = challenge;
-    dso->dispatch.comm.pmapi_version = ~PMAPI_VERSION;
+    /* set in 2 steps to avoid int to bitfield truncation warnings */
+    dso->dispatch.comm.pmapi_version = PMAPI_VERSION;
+    dso->dispatch.comm.pmapi_version = ~dso->dispatch.comm.pmapi_version;
 
     dso->dispatch.comm.flags = 0;
     dso->dispatch.status = 0;

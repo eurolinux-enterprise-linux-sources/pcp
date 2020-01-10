@@ -1,0 +1,65 @@
+# Based off of;
+commit ed41c4ae60c72d5cae1962d414ba5c2fa9ae5529
+Author: Nathan Scott <nathans@redhat.com>
+Date:   Wed Feb 10 14:18:34 2016 +1100
+
+    qa: several fixes for test qa/370 (sar2pcp)
+    
+    Resolves several problems Lukas, Milos and I have encountered
+    here in the last couple of days -
+    - loosen fuzzy matching for floating-point imprecision a bit;
+    - handle an AM/PM failure Lukas observed on a buildbot, where
+      bit-after-midnight values were reported as bit-after-noon.
+    - the sar input data is currently all x86_64-specific, and so
+      this test fails on other platforms like s390x, ppc, etc; in
+      the short-term use _notrun to avoid this issue.  Over time,
+      we need to add archives with arch-specific sar2pcp input.
+
+
+diff -Naurp pcp-3.10.9-orig/qa/370 pcp-3.10.9-new/qa/370
+--- pcp-3.10.9-orig/qa/370	2015-11-22 21:07:53.000000000 -0500
++++ pcp-3.10.9-new/qa/370	2016-02-10 12:33:22.718003320 -0500
+@@ -19,6 +19,9 @@ which sar >/dev/null 2>&1 || _notrun "sa
+ which sadf >/dev/null 2>&1 || _notrun "sadf not installed"
+ which sar2pcp >/dev/null 2>&1 || _notrun "sar2pcp not installed"
+ 
++platform=`uname -p`
++[ $platform = "x86_64" ] || _notrun "No qualified input data for $platform"
++
+ version=`sar -V 2>&1 | sed -n -e '/sysstat version /{
+ s/.* //
+ p
+@@ -105,7 +108,6 @@ sar2pcp src/sa-sysstat-$file_version $tm
+ sar $sar_opt -f src/sa-sysstat-$file_version -u \
+ | tee -a $seq.full \
+ | sed -n '/^[0-2][0-9]:/{
+-s/^00\(:..:..\) PM/12\1/
+ s/^01\(:..:..\) PM/13\1/
+ s/^02\(:..:..\) PM/14\1/
+ s/^03\(:..:..\) PM/15\1/
+@@ -117,6 +119,7 @@ s/^08\(:..:..\) PM/20\1/
+ s/^09\(:..:..\) PM/21\1/
+ s/^10\(:..:..\) PM/22\1/
+ s/^11\(:..:..\) PM/23\1/
++s/^12\(:..:..\) AM/00\1/
+ s/^\(..:..:..\) AM/\1/
+ p
+ }' \
+@@ -209,7 +212,7 @@ p
+ cat $tmp.pcp >>$seq.full
+ paste $tmp.sar $tmp.pcp >$tmp.both
+ $PCP_AWK_PROG <$tmp.both '
+-{ if ($2-$NF > 0.01 || $2-$NF < -0.01) print "[",NR,"] mismatch:",$1,$2,$NF }'
++{ if ($2-$NF > 0.02 || $2-$NF < -0.02) print "[",NR,"] mismatch:",$1,$2,$NF }'
+ 
+ echo
+ echo "check user disk write thruput ..."
+@@ -223,7 +226,7 @@ p
+ cat $tmp.pcp >>$seq.full
+ paste $tmp.sar $tmp.pcp >$tmp.both
+ $PCP_AWK_PROG <$tmp.both '
+-{ if ($6-$NF > 0.01 || $6-$NF < -0.01) print "[",NR,"] mismatch:",$1,$6,$NF }'
++{ if ($6-$NF > 0.02 || $6-$NF < -0.02) print "[",NR,"] mismatch:",$1,$6,$NF }'
+ 
+ echo
+ echo "full dump ..."

@@ -17,6 +17,7 @@
 #include "pmapi.h"
 #include "impl.h"
 #include "pmda.h"
+#include "pmdaroot.h"
 #include <sys/stat.h>
 #include "root.h"
 #include "lxc.h"
@@ -61,6 +62,8 @@ static pmdaMetric root_metrictab[] = {
 	CONTAINERS_INDOM, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) } },
     { NULL, { PMDA_PMID(0, CONTAINERS_RESTARTING), PM_TYPE_U32,
 	CONTAINERS_INDOM, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) } },
+    { NULL, { PMDA_PMID(0, CONTAINERS_CGROUP), PM_TYPE_STRING,
+	CONTAINERS_INDOM, PM_SEM_DISCRETE, PMDA_PMUNITS(0,0,0,0,0,0) } },
 };
 #define METRICTAB_SZ (sizeof(root_metrictab)/sizeof(root_metrictab[0]))
 
@@ -112,31 +115,43 @@ root_refresh_container_indom(void)
 	dp->insts_refresh(dp, indom);
 }
 
-static void
+static int
 root_refresh_container_values(char *container, container_t *values)
 {
     container_engine_t *dp;
 
-    for (dp = &engines[0]; dp->name != NULL; dp++)
-	if (values->engine == dp)
-	    dp->value_refresh(dp, container, values);
+    for (dp = &engines[0]; dp->name != NULL; dp++) {
+	if (values->engine != dp)
+	    continue;
+	return dp->value_refresh(dp, container, values);
+    }
+    return PM_ERR_INST;
 }
 
 container_t *
 root_container_search(const char *query)
 {
     int inst, fuzzy, best = 0;
-    char *name = NULL;
+    char *name = (char *)query;
     container_t *cp = NULL, *found = NULL;
     container_engine_t *dp;
     pmInDom indom = INDOM(CONTAINERS_INDOM);
+
+    /* fast path - full instance name, always the best possible match */
+    if (query && PMDA_CACHE_ACTIVE ==
+	pmdaCacheLookupName(indom, name, &inst, (void **)&cp) &&
+	root_refresh_container_values(name, cp) >= 0) {
+	found = cp;
+	goto out;
+    }
 
     for (pmdaCacheOp(indom, PMDA_CACHE_WALK_REWIND);;) {
 	if ((inst = pmdaCacheOp(indom, PMDA_CACHE_WALK_NEXT)) < 0)
 	    break;
 	if (!pmdaCacheLookup(indom, inst, &name, (void **)&cp) || !cp)
 	    continue;
-	root_refresh_container_values(name, cp);
+	if (root_refresh_container_values(name, cp) < 0 || !query)
+	    continue;
 	for (dp = &engines[0]; dp->name != NULL; dp++) {
 	    if ((fuzzy = dp->name_matching(dp, query, cp->name, name)) <= best)
 		continue;
@@ -148,12 +163,13 @@ root_container_search(const char *query)
 	}
     }
 
+out:
     if (pmDebug & DBG_TRACE_ATTR) {
-	if (found)
+	if (found) /* query must be non-NULL */
 	    __pmNotifyErr(LOG_DEBUG, "found container: %s (%s/%d) pid=%d\n",
 				name, query, best, found->pid);
-	else
-	    __pmNotifyErr(LOG_DEBUG, "container %s not matched\n", query);
+	else /* query may be NULL */
+	    __pmNotifyErr(LOG_DEBUG, "container %s not matched\n", query ? query : "NULL");
     }
 
     return found;
@@ -193,7 +209,8 @@ root_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    return sts;
 	if (sts != PMDA_CACHE_ACTIVE)
 	    return PM_ERR_INST;
-	root_refresh_container_values(name, cp);
+	if (root_refresh_container_values(name, cp) < 0)
+	    return PM_ERR_INST;
 	switch (idp->item) {
 	case 0:		/* containers.engine */
 	    atom->cp = cp->engine->name;
@@ -202,16 +219,23 @@ root_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    atom->cp = *cp->name == '/' ? cp->name+1 : cp->name;
 	    break;
 	case 2:		/* containers.pid */
+	    if (cp->pid <= 0)
+		return PMDA_FETCH_NOVALUES;
 	    atom->ul = cp->pid;
 	    break;
 	case 3:		/* containers.state.running */
-	    atom->ul = (cp->status & CONTAINER_FLAG_RUNNING) != 0;
+	    atom->ul = (cp->flags & CONTAINER_FLAG_RUNNING) != 0;
 	    break;
 	case 4:		/* containers.state.paused */
-	    atom->ul = (cp->status & CONTAINER_FLAG_PAUSED) != 0;
+	    atom->ul = (cp->flags & CONTAINER_FLAG_PAUSED) != 0;
 	    break;
 	case 5:		/* containers.state.restarting */
-	    atom->ul = (cp->status & CONTAINER_FLAG_RESTARTING) != 0;
+	    atom->ul = (cp->flags & CONTAINER_FLAG_RESTARTING) != 0;
+	    break;
+	case 6:		/* containers.cgroup */
+	    if (cp->pid <= 0)
+		return PMDA_FETCH_NOVALUES;
+	    atom->cp = cp->cgroup;
 	    break;
 	default:
 	    return PM_ERR_PMID;
@@ -222,7 +246,7 @@ root_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	return PM_ERR_PMID;
     }
 
-    return 1;
+    return PMDA_FETCH_STATIC;
 }
 
 /* General utility routine for checking timestamp differences */
@@ -339,9 +363,9 @@ typedef struct {
     int		fd;
 } root_client_t;
 
-static root_client_t *client;
-static int client_size;	/* highwater allocation mark */
-static int nclients;
+static root_client_t *root_client;
+static int root_client_size;	/* highwater allocation mark */
+static int nrootclients;
 static const int MIN_CLIENTS_ALLOC = 8;
 
 static int
@@ -349,24 +373,27 @@ root_new_client(void)
 {
     int i, sz;
 
-    for (i = 0; i < nclients; i++)
-	if (client[i].fd < 0)
+    for (i = 0; i < nrootclients; i++)
+	if (root_client[i].fd < 0)
 	    break;
 
-    if (i == client_size) {
-	client_size = client_size ? client_size * 2 : MIN_CLIENTS_ALLOC;
-	sz = sizeof(root_client_t) * client_size;
-	client = (root_client_t *)realloc(client, sz);
-	if (client == NULL) {
+    if (i == root_client_size) {
+	if (root_client_size == 0)
+	    root_client_size = MIN_CLIENTS_ALLOC;
+	else
+	    root_client_size *= 2;
+	sz = sizeof(root_client_t) * root_client_size;
+	root_client = (root_client_t *)realloc(root_client, sz);
+	if (root_client == NULL) {
 	    __pmNoMem("root_new_client", sz, PM_RECOV_ERR);
 	    root_close_socket();
 	    exit(1);
 	}
 	sz -= (sizeof(root_client_t) * i);
-	memset(&client[i], 0, sz);
+	memset(&root_client[i], 0, sz);
     }
-    if (i >= nclients)
-	nclients = i + 1;
+    if (i >= nrootclients)
+	nrootclients = i + 1;
     return i;
 }
 
@@ -375,8 +402,8 @@ root_delete_client(root_client_t *cp)
 {
     int		i;
 
-    for (i = 0; i < nclients; i++) {
-	if (cp == &client[i])
+    for (i = 0; i < nrootclients; i++) {
+	if (cp == &root_client[i])
 	    break;
     }
 
@@ -384,13 +411,13 @@ root_delete_client(root_client_t *cp)
 	__pmFD_CLR(cp->fd, &connected_fds);
 	__pmCloseSocket(cp->fd);
     }
-    if (i >= nclients - 1)
-	nclients = i;
+    if (i >= nrootclients - 1)
+	nrootclients = i;
     if (cp->fd == maximum_fd) {
 	maximum_fd = (pmcd_fd > socket_fd) ? pmcd_fd : socket_fd;
-	for (i = 0; i < nclients; i++) {
-	    if (client[i].fd > maximum_fd)
-		maximum_fd = client[i].fd;
+	for (i = 0; i < nrootclients; i++) {
+	    if (root_client[i].fd > maximum_fd)
+		maximum_fd = root_client[i].fd;
 	}
     }
     cp->fd = -1;
@@ -408,8 +435,8 @@ root_accept_client(void)
 	if (neterror() == EPERM) {
 	    __pmNotifyErr(LOG_NOTICE, "root_accept_client(%d): %s\n",
 			fd, osstrerror());
-	    client[i].fd = -1;
-	    root_delete_client(&client[i]);
+	    root_client[i].fd = -1;
+	    root_delete_client(&root_client[i]);
 	    return NULL;
 	} else {
 	    __pmNotifyErr(LOG_ERR, "root_accept_client(%d): accept: %s\n",
@@ -422,8 +449,8 @@ root_accept_client(void)
 	maximum_fd = fd;
     __pmFD_SET(fd, &connected_fds);
 
-    client[i].fd = fd;
-    return &client[i];
+    root_client[i].fd = fd;
+    return &root_client[i];
 }
 
 static void
@@ -523,7 +550,7 @@ static int
 root_processid_request(root_client_t *cp, void *pdu, int pdulen)
 {
     container_t *container;
-    char	buffer[MAXHOSTNAMELEN], *name = &buffer[0];
+    char	buffer[MAXPATHLEN], *name = &buffer[0];
     int		sts, pid;
 
     sts = __pmdaDecodeRootPDUContainer(pdu, pdulen, &pid, name, sizeof(buffer));
@@ -566,8 +593,9 @@ root_cgroupname_request(root_client_t *cp, void *pdu, int pdulen)
     } else {
 	sts = 0;
 	pid = container->pid;
-	cgroup = container->cgroup;
-	length = strlen(container->cgroup);
+	/* skip leading slash, it is there just for exported metric value */
+	cgroup = &container->cgroup[1];
+	length = strlen(cgroup);
 	if (pmDebug & DBG_TRACE_ATTR)
 	    __pmNotifyErr(LOG_DEBUG, "container %s cgroup=%s\n", name, cgroup);
     }
@@ -618,8 +646,8 @@ root_handle_client_input(__pmFdSet *fds)
     root_client_t	*cp;
     int			i, sts;
 
-    for (i = 0; i < nclients; i++) {
-	cp = &client[i];
+    for (i = 0; i < nrootclients; i++) {
+	cp = &root_client[i];
 	if (cp->fd == -1 || !__pmFD_ISSET(cp->fd, fds))
 	    continue;
 
@@ -704,13 +732,23 @@ root_check_user(void)
 #endif
 }
 
+/*
+ * Perform early checking, and setup - before communicating with
+ * anyone else (incl. pmcd).
+ */
+static void
+root_prep(void)
+{
+    root_check_user();
+    root_setup_socket();
+    atexit(root_close_socket);
+}
+
 static void
 root_init(pmdaInterface *dp)
 {
-    root_check_user();
     root_setup_containers();
-    root_setup_socket();
-    atexit(root_close_socket);
+    root_container_search(NULL); /* potentially costly early scan */
 
     dp->version.any.fetch = root_fetch;
     dp->version.any.instance = root_instance;
@@ -762,8 +800,9 @@ main(int argc, char **argv)
     }
 
     pmdaOpenLog(&dispatch);
-    root_init(&dispatch);
+    root_prep();
     pmdaConnect(&dispatch);
+    root_init(&dispatch);
     root_main(&dispatch);
     exit(0);
 }

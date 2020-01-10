@@ -1,6 +1,6 @@
 #!/bin/sh
 # PCP QA Test No. 444
-# pmid and desc cacheing in pmevent
+# pmid and desc caching in pmevent
 #
 # Copyright (c) 2011 Ken McDonell.  All Rights Reserved.
 #
@@ -13,17 +13,6 @@ echo "QA output created by $seq"
 . ./common.filter
 . ./common.check
 
-rm -f $seq.out
-if [ $PCP_VER -ge 30805 ]
-then
-    ln $seq.out.3 $seq.out || exit 1
-elif [ $PCP_VER -ge 30803 ]
-then
-    ln $seq.out.2 $seq.out || exit 1
-else
-    ln $seq.out.1 $seq.out || exit 1
-fi
-
 status=0	# success is the default!
 host=`hostname`
 $sudo rm -rf $tmp.* $seq.full
@@ -31,7 +20,7 @@ trap "rm -f $tmp.*; exit \$status" 0 1 2 3 15
 
 # real QA test starts here
 pmstore sample.event.reset 0 >/dev/null 2>&1
-pmevent -Dpdu -t 10msec -s 20 sample.event.records >$tmp.out 2>&1
+pmevent -Dpdu,derive -t 10msec -s 20 sample.event.records >$tmp.out 2>&1
 cat $tmp.out >>$seq.full
 
 # Need to make this not host specific ...

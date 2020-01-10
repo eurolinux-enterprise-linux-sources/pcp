@@ -2,7 +2,7 @@
  * dstruct.c - central data structures and associated operations
  ***********************************************************************
  *
- * Copyright (c) 2013-2014 Red Hat.
+ * Copyright (c) 2013-2015 Red Hat.
  * Copyright (c) 1995-2003 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -53,7 +53,6 @@ Archive		*archives;			/* list of open archives */
 RealTime	first = -1;			/* archive starting point */
 RealTime	last = 0.0;			/* archive end point */
 char		*dfltHostConn;			/* default host connection string */
-char		*dfltHostName;			/* default host name */
 RealTime	dfltDelta = DELTA_DFLT;		/* default sample interval */
 char		*startFlag;			/* start time specified? */
 char		*stopFlag;			/* end time specified? */
@@ -62,6 +61,7 @@ char		*offsetFlag;			/* offset time specified? */
 RealTime	runTime;			/* run time interval */
 int		hostZone;			/* timezone from host? */
 char		*timeZone;			/* timezone from command line */
+int		quiet;				/* suppress default diagnostics */
 int		verbose;			/* verbosity 0, 1 or 2 */
 int		interactive;			/* interactive mode, -d */
 int		isdaemon;			/* run as a daemon */
@@ -372,7 +372,7 @@ zalloc(size_t size)
 void *
 aalloc(size_t align, size_t size)
 {
-    void	*p;
+    void	*p = NULL;
     int		sts = 0;
 #ifdef HAVE_POSIX_MEMALIGN
     sts = posix_memalign(&p, align, size);
@@ -404,7 +404,7 @@ ralloc(void *p, size_t size)
 }
 
 char *
-sdup(char *p)
+sdup(const char *p)
 {
     char *q;
 
@@ -475,11 +475,12 @@ newFetch(Host *owner)
 
 
 Host *
-newHost(Task *owner, Symbol name)
+newHost(Task *owner, Symbol name, Symbol conn)
 {
     Host *h = (Host *) zalloc(sizeof(Host));
 
     h->name = symCopy(name);
+    h->conn = symCopy(conn);
     h->task = owner;
     return h;
 }
@@ -728,17 +729,28 @@ changeSmpls(Expr **p, int nsmpls)
     int    i;
 
     if (nsmpls == x->nsmpls) return;
-    *p = x = (Expr *) ralloc(x, sizeof(Expr) + (nsmpls - 1) * sizeof(Sample));
+    x = (Expr *) ralloc(x, sizeof(Expr) + (nsmpls - 1) * sizeof(Sample));
     x->nsmpls = nsmpls;
     x->nvals = x->tspan * nsmpls;
     x->valid = 0;
     if (x->op == CND_FETCH) {
+	/* node relocated, fix pointers from associated Metric structures */
 	m = x->metrics;
 	for (i = 0; i < x->hdom; i++) {
 	    m->expr = x;
 	    m++;
 	}
     }
+    /*
+     * we have relocated node from *p to x ... need to fix the
+     * parent pointers in any descendent nodes
+     */
+    if (x->arg1 != NULL)
+	x->arg1->parent = x;
+    if (x->arg2 != NULL)
+	x->arg2->parent = x;
+
+    *p = x;
     newRingBfr(x);
 }
 
@@ -780,6 +792,14 @@ instExpr(Expr *x)
 	    if (!UNITS_UNKNOWN(arg1->units)) {
 		up = 1;
 		x->units = arg1->units;
+	    }
+	    if (x->op == CND_INSTANT && x->metrics->desc.sem == PM_SEM_COUNTER) {
+		up = 1;
+		x->units.dimTime++;
+	    }
+	    if (x->op == CND_RATE) {
+		up = 1;
+		x->units.dimTime--;
 	    }
 	}
 	else if (!UNITS_UNKNOWN(arg1->units) &&
@@ -895,8 +915,6 @@ void dstructInit(void)
 
     /* not-a-number initialization */
     mynan = zero / zero;
-
-    /* don't initialize dfltHost*; let pmie.c do it after getopt. */
 
     /* set up symbol tables */
     symSetTable(&hosts);
@@ -1061,6 +1079,8 @@ static struct {
     { cndPcnt_time,	"cndPcnt_time" },
     { cndRate_1,	"cndRate_1" },
     { cndRate_n,	"cndRate_n" },
+    { cndInstant_1,	"cndInstant_1" },
+    { cndInstant_n,	"cndInstant_n" },
     { cndRise_1,	"cndRise_1" },
     { cndRise_n,	"cndRise_n" },
     { cndSome_host,	"cndSome_host" },
@@ -1202,8 +1222,8 @@ __dumpMetric(int level, Metric *m)
     fprintf(stderr, "expr=" PRINTF_P_PFX "%p profile=" PRINTF_P_PFX "%p host=" PRINTF_P_PFX "%p next=" PRINTF_P_PFX "%p prev=" PRINTF_P_PFX "%p\n",
 	m->expr, m->profile, m->host, m->next, m->prev);
     for (i = 0; i < level; i++) fprintf(stderr, ".. ");
-    fprintf(stderr, "metric=%s host=%s conv=%g specinst=%d m_indom=%d\n",
-	symName(m->mname), symName(m->hname), m->conv, m->specinst, m->m_idom);
+    fprintf(stderr, "metric=%s host=%s via=%s conv=%g specinst=%d m_indom=%d\n",
+            symName(m->mname), symName(m->hname), symName(m->hconn), m->conv, m->specinst, m->m_idom);
     if (m->desc.indom != PM_INDOM_NULL) {
 	numinst =  m->specinst == 0 ? m->m_idom : m->specinst;
 	for (j = 0; j < numinst; j++) {
@@ -1289,7 +1309,7 @@ dumpTask(Task *t)
     if (t->hosts == NULL)
 	fprintf(stderr, "  host=<null>\n");
     else
-	fprintf(stderr, "  host=%s (%s)\n", symName(t->hosts->name), t->hosts->down ? "down" : "up");
+	fprintf(stderr, "  host=%s via=%s (%s)\n", symName(t->hosts->name), symName(t->hosts->conn), t->hosts->down ? "down" : "up");
     fprintf(stderr, "  rules:\n");
     for (i = 0; i < t->nrules; i++) {
 	fprintf(stderr, "    %s\n", symName(t->rules[i]));

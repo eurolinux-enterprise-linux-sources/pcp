@@ -7,6 +7,11 @@
  * under the terms of the GNU Lesser General Public License as published
  * by the Free Software Foundation; either version 2.1 of the License, or
  * (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
+ * License for more details.
  */
 #ifndef QMC_SOURCE_H
 #define QMC_SOURCE_H
@@ -34,13 +39,17 @@ public:
     int status() const { return my.status; }
     int flags() const { return my.flags; }
     int type() const { return my.type; }
+
     bool isArchive() const { return my.type == PM_CONTEXT_ARCHIVE; }
+    bool isContainer() const { return my.context_container != QString::null; }
+    QString hostLabel() const;
+
     QString source() const { return my.source; }
-    char *sourceAscii() const { return strdup((const char*)my.source.toAscii()); }
+    char *sourceAscii() const { return strdup((const char*)my.source.toLatin1()); }
     QString host() const { return my.host; }
-    char *hostAscii() const { return strdup((const char *)my.host.toAscii()); }
+    char *hostAscii() const { return strdup((const char *)my.host.toLatin1()); }
     QString proxy() const { return my.proxy; }
-    char *proxyAscii() const { return strdup((const char *)my.proxy.toAscii()); }
+    char *proxyAscii() const { return strdup((const char *)my.proxy.toLatin1()); }
     int tzHandle() const { return my.tz; }
     QString attributes() const { return my.attrs; }
     QString timezone() const { return my.timezone; }
@@ -49,8 +58,7 @@ public:
     struct timeval end() const { return my.end; }
     QString endTime() { return timeString(&my.end); }
     QString desc() const { return my.desc; }
-    char *descAscii() const { return strdup((const char *)my.desc.toAscii()); }
-    QString context_hostname() const { return my.context_hostname; }
+    char *descAscii() const { return strdup((const char *)my.desc.toLatin1()); }
 
     // Number of active contexts to this source
     uint numContexts() const { return my.handles.size(); }
@@ -93,6 +101,7 @@ private:
 	QString attrs;
 	QString host;
 	QString context_hostname; // from pmcd/archive, not from -h/-a argument
+	QString context_container;
 	QString	desc;
 	QString timezone;
 	QList<int> handles;	// Contexts created for this source

@@ -7,7 +7,13 @@
  * under the terms of the GNU Lesser General Public License as published
  * by the Free Software Foundation; either version 2.1 of the License, or
  * (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
+ * License for more details.
  */
+
 #include "qmc_source.h"
 
 QString QmcSource::localHost;
@@ -28,7 +34,31 @@ QmcSource::QmcSource(int type, QString &source, int flags)
 	localHost = buf;
     }
 
+    my.attrs = QString::null;
+    my.context_hostname = QString::null;
+    my.context_container = QString::null;
+
     this->retryConnect(type, source);
+}
+
+QString
+QmcSource::hostLabel(void) const
+{
+    if (my.context_container != QString::null) {
+	QString label;
+	label.append(my.host);
+	label.append(":");
+	label.append(my.context_container);
+	if (my.context_container != my.context_hostname) {
+	    label.append("::");
+	    label.append(my.context_hostname);
+	}
+	return label;
+    }
+    if (my.context_hostname != QString::null)
+	return my.context_hostname;
+    // fallback to the name extracted from the hostspec string
+    return my.host;
 }
 
 void
@@ -39,10 +69,10 @@ QmcSource::retryConnect(int type, QString &source)
     int offset;
     int sts;
     char *tzs;
+    QString name;
     QString hostSpec;
 
-    my.attrs = QString::null;
-    switch(type) {
+    switch (type) {
     case PM_CONTEXT_LOCAL:
 	my.desc = "Local context";
 	my.host = my.source = localHost;
@@ -59,6 +89,10 @@ QmcSource::retryConnect(int type, QString &source)
 	    my.attrs = my.host;
 	    my.attrs.remove(0, offset+1);
 	    my.host.truncate(offset);
+	    name = my.attrs.section(QString("container="), -1);
+	    if (name != QString::null && (offset = name.indexOf(',')) > 0)
+		name.truncate(offset);
+	    my.context_container = name;
 	}
 	if ((offset = my.host.indexOf('@')) >= 0) {
 	    my.proxy = my.host;
@@ -78,12 +112,12 @@ QmcSource::retryConnect(int type, QString &source)
 
     oldContext = pmWhichContext();
     hostSpec = source;
-    my.status = pmNewContext(type | my.flags, (const char *)hostSpec.toAscii());
+    my.status = pmNewContext(type | my.flags, (const char *)hostSpec.toLatin1());
     if (my.status >= 0) {
 	my.handles.append(my.status);
 
         // Fetch the server-side host name for this context, properly as of pcp 3.8.3+.
-        my.context_hostname = pmGetContextHostName (my.status); // NB: may leak memory
+        my.context_hostname = pmGetContextHostName(my.status); // NB: may leak memory
         if (my.context_hostname == "") // may be returned for errors or PM_CONTEXT_LOCAL
             my.context_hostname = localHost;
 
@@ -92,7 +126,7 @@ QmcSource::retryConnect(int type, QString &source)
 	    sts = pmGetArchiveLabel(&lp);
 	    if (sts < 0) {
 		pmprintf("%s: Unable to obtain log label for \"%s\": %s\n",
-			 pmProgname, (const char *)my.desc.toAscii(),
+			 pmProgname, (const char *)my.desc.toLatin1(),
 			 pmErrStr(sts));
 		my.host = "unknown?";
 		my.status = sts;
@@ -105,7 +139,7 @@ QmcSource::retryConnect(int type, QString &source)
 	    sts = pmGetArchiveEnd(&my.end);
 	    if (sts < 0) {
 		pmprintf("%s: Unable to determine end of \"%s\": %s\n",
-			 pmProgname, (const char *)my.desc.toAscii(),
+			 pmProgname, (const char *)my.desc.toLatin1(),
 			 pmErrStr(sts));
 		my.status = sts;
 		goto done;
@@ -126,7 +160,7 @@ QmcSource::retryConnect(int type, QString &source)
 	my.tz = pmNewContextZone();
 	if (my.tz < 0)
 	    pmprintf("%s: Warning: Unable to obtain timezone for %s: %s\n",
-		     pmProgname, (const char *)my.desc.toAscii(),
+		     pmProgname, (const char *)my.desc.toLatin1(),
 		     pmErrStr(my.tz));
 	else {
 	    sts = pmWhichZone(&tzs);
@@ -134,7 +168,7 @@ QmcSource::retryConnect(int type, QString &source)
 		my.timezone = tzs;
 	    else
 		pmprintf("%s: Warning: Unable to obtain timezone for %s: %s\n",
-			 pmProgname, (const char *)my.desc.toAscii(),
+			 pmProgname, (const char *)my.desc.toLatin1(),
 			 pmErrStr(sts));
 	}
 
@@ -143,7 +177,7 @@ QmcSource::retryConnect(int type, QString &source)
 	    if (sts < 0) {
 		pmprintf("%s: Warning: Unable to switch timezones."
 			 " Using timezone for %s: %s\n",
-			 pmProgname, (const char *)my.desc.toAscii(),
+			 pmProgname, (const char *)my.desc.toLatin1(),
 			 pmErrStr(sts));
 	    }	
 	}
@@ -162,7 +196,7 @@ QmcSource::retryConnect(int type, QString &source)
 	if (sts < 0) {
 	    pmprintf("%s: Warning: Unable to switch contexts."
 		     " Using context to %s: %s\n",
-		     pmProgname, (const char *)my.desc.toAscii(),
+		     pmProgname, (const char *)my.desc.toLatin1(),
 		     pmErrStr(sts));
 	}
     }
@@ -300,7 +334,7 @@ QmcSource::dupContext()
 	}
 	else
 	    pmprintf("%s: Error: Unable to switch to context for \"%s\": %s\n",
-		     pmProgname, (const char *)my.desc.toAscii(),
+		     pmProgname, (const char *)my.desc.toLatin1(),
 		     pmErrStr(sts));
     }
     else if (my.handles.size()) {
@@ -319,12 +353,12 @@ QmcSource::dupContext()
 	    else
 		pmprintf("%s: Error: "
 			 "Unable to duplicate context to \"%s\": %s\n",
-			 pmProgname, (const char *)my.desc.toAscii(),
+			 pmProgname, (const char *)my.desc.toLatin1(),
 			 pmErrStr(sts));
 	}
 	else
 	    pmprintf("%s: Error: Unable to switch to context for \"%s\": %s\n",
-		     pmProgname, (const char *)my.desc.toAscii(),
+		     pmProgname, (const char *)my.desc.toLatin1(),
 		     pmErrStr(sts));
     }
     // No active contexts, create a new context

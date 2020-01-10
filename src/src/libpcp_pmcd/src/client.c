@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Red Hat.
+ * Copyright (c) 2012-2015 Red Hat.
  * Copyright (c) 1995-2001,2004 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -17,9 +17,52 @@
 #include "impl.h"
 #include "pmcd.h"
 
-PMCD_INTERN ClientInfo	*client;
-PMCD_INTERN int		nClients;	/* Number in array, (not all in use) */
-PMCD_INTERN int		this_client_id;
+PMCD_DATA ClientInfo	*client;
+PMCD_DATA int		nClients;	/* Number in array, (not all in use) */
+PMCD_DATA int		this_client_id;
+
+/*
+ * Expose ClientInfo struct for client #n
+ */
+ClientInfo *
+GetClient(int n)
+{
+    if (0 <= n && n < nClients && client[n].status.connected)
+	return &client[n];
+    return NULL;
+}
+
+/*
+ * Modify an attribute value for this client
+ */
+int
+SetClientAttribute(int client, int attr, char *value)
+{
+    int			sts;
+    ClientInfo		*cp;
+    __pmHashNode	*node;
+
+    if ((cp = GetClient(client)) == NULL)
+	return -EINVAL;
+
+    if ((value = strdup(value)) == NULL)
+	return -ENOMEM;
+
+    /* Add supplied value into attribute hash, permanently */
+    if ((node = __pmHashSearch(attr, &cp->attrs)) == NULL) {	/* insert */
+	if ((sts = __pmHashAdd(attr, (void *)value, &cp->attrs)) < 0) {
+	    free(value);
+	    return sts;
+	}
+    } else {	/* replace existing */
+	free(node->data);
+	node->data = (void *)value;
+    }
+
+    /* Flag a need to inform PMDAs that attributes changed */
+    cp->status.attributes = 1;
+    return 0;
+}
 
 void
 ShowClients(FILE *f)

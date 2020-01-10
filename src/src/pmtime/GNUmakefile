@@ -14,8 +14,6 @@ HEADERS = aboutdialog.h console.h pmtime.h pmtimearch.h pmtimelive.h \
 	  seealsodialog.h showboundsdialog.h timelord.h timezone.h
 SOURCES = aboutdialog.cpp console.cpp pmtime.cpp pmtimearch.cpp pmtimelive.cpp \
 	  seealsodialog.cpp showboundsdialog.cpp timelord.cpp main.cpp
-LSRCFILES = $(PROJECT) $(QRCFILE) $(RCFILE) $(UIFILES) $(HEADERS) \
-	   $(SOURCES) $(WRAPPER).in $(XMLFILE).in
 LDIRT = $(COMMAND) $(WRAPPER) $(XMLFILE) images
 
 default: build-me
@@ -24,7 +22,7 @@ include $(BUILDRULES)
 
 ifeq "$(ENABLE_QT)" "true"
 build-me: images wrappers
-	$(QTMAKE)
+	+$(QTMAKE)
 	$(LNMAKE)
 
 ifeq ($(WINDOW),mac)

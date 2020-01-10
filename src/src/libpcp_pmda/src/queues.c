@@ -1,18 +1,18 @@
 /*
  * Generic event queue support for PMDAs
  *
- * Copyright (c) 2011 Red Hat Inc.
+ * Copyright (c) 2011,2015 Red Hat.
  * Copyright (c) 2011 Nathan Scott.  All rights reserved.
  * 
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
+ * This library is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation; either version 2.1 of the License, or
+ * (at your option) any later version.
  * 
- * This program is distributed in the hope that it will be useful, but
+ * This library is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * for more details.
+ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
+ * License for more details.
  */
 
 #include "pmapi.h"
@@ -109,7 +109,7 @@ pmdaEventNewActiveQueue(const char *name, size_t maxmemory, unsigned int numclie
     if (i == numqueues) {
 	/*
 	 * No free slots - extend the available set.
-	 * realloc() potential moves "queues" address, fix up 
+	  realloc potentially moves "queues" address, fix up 
 	 * must tear down existing queues which may have back
 	 * references and then re-initialise them afterward.
 	 */
@@ -410,6 +410,14 @@ pmdaEventQueueRecords(int handle, pmAtomValue *atom, int context,
     return (atom->vbp == NULL) ? PMDA_FETCH_NOVALUES : PMDA_FETCH_STATIC;
 }
 
+static void
+queue_release(event_queue_t *queue)
+{
+    /* free resources and mark as no longer inuse */
+    pmdaEventReleaseArray(queue->eventarray);
+    memset(queue, 0, sizeof(*queue));
+}
+
 /*
  * We've lost a client (disconnected).
  * Cleanup any filter and any back references across the queues.
@@ -442,7 +450,24 @@ queue_cleanup(int handle, event_clientq_t *clientq)
 	event = next;
     }
 
-    queue->numclients--;
+    if (--queue->numclients <= 0) {
+	if (queue->shutdown)
+	    queue_release(queue);
+    }
+}
+
+int
+pmdaEventQueueShutdown(int handle)
+{
+    event_queue_t *queue = queue_lookup(handle);
+
+    if (!queue)
+	return -EINVAL;
+    if (queue->numclients > 0)
+	queue->shutdown = 1;	/* defer until last client disconnects */
+    else
+	queue_release(queue);	/* immediately release any resources */
+    return 0;
 }
 
 char *

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014, Red Hat.
+ * Copyright (c) 2012-2015, Red Hat.
  * Copyright (c) 2012, Nathan Scott.  All Rights Reserved.
  * Copyright (c) 2006-2010, Aconex.  All Rights Reserved.
  * Copyright (c) 2006, Ken McDonell.  All Rights Reserved.
@@ -19,11 +19,11 @@
 #include "sampling.h"
 #include "saveviewdialog.h"
 
-#include <QtCore/QPoint>
-#include <QtCore/QRegExp>
-#include <QtGui/QApplication>
-#include <QtGui/QWhatsThis>
-#include <QtGui/QCursor>
+#include <QPoint>
+#include <QRegExp>
+#include <QApplication>
+#include <QWhatsThis>
+#include <QCursor>
 #include <qwt_plot_curve.h>
 #include <qwt_plot_picker.h>
 #include <qwt_plot_renderer.h>
@@ -166,8 +166,7 @@ ChartItem::expandLegendLabel(const QString &legend)
 QString
 ChartItem::hostname(void) const
 {
-    return my.metric->context()->source().context_hostname();
-
+    return my.metric->context()->source().hostLabel();
 }
 
 QString
@@ -177,9 +176,9 @@ ChartItem::shortHostName(void) const
     int index;
 
     if ((index = hostName.indexOf(QChar('.'))) != -1) {
-	// no change if it looks even vaguely like an IP address
+	// no change if it looks even vaguely like an IP address or container
 	if (!hostName.contains(QRegExp("^\\d+\\.")) &&	// IPv4
-	    !hostName.contains(QChar(':')))		// IPv6
+	    !hostName.contains(QChar(':')))		// IPv6 or container
 	    hostName.truncate(index);
     }
     return hostName;
@@ -475,20 +474,15 @@ Chart::hostNameString(bool shortened)
         if ((*item)->removed())
 	    continue;
 
-	// QString host = (*item)->metricContext()->source().host();
-	// ... but .host() is a possibly-munged of the pmchart -h STRING 
-	// argument, not the actual host name.  So get the data source's
-	// self-declared host name.  This string will not have pmproxy @
-	// stuff, or pcp://....&attr=... miscellanea.
-	QString hostName = (*item)->metricContext()->source().context_hostname();
+	QString hostName = (*item)->metricContext()->source().hostLabel();
 
 	// decide whether or not to truncate this hostname
 	if (shortened)
 	    dot = hostName.indexOf(QChar('.'));
 	if (dot != -1) {
-	    // no change if it looks even vaguely like an IP address
+	    // no change if it looks even vaguely like an IP address or container
 	    if (!hostName.contains(QRegExp("^\\d+\\.")) &&	// IPv4
-		!hostName.contains(QChar(':')))		// IPv6
+		!hostName.contains(QChar(':')))		// IPv6 or container
 		hostName.truncate(dot);
 	}
 	hostNameSet.insert(hostName);
@@ -546,14 +540,14 @@ Chart::scheme() const
 }
 
 void
-Chart::setScheme(QString scheme)
+Chart::setScheme(const QString &scheme)
 {
     my.sequence = 0;
     my.scheme = scheme;
 }
 
 void
-Chart::setScheme(QString scheme, int sequence)
+Chart::setScheme(const QString &scheme, int sequence)
 {
     my.sequence = sequence;
     my.scheme = scheme;
@@ -661,16 +655,16 @@ Chart::YAxisTitle(void) const
 void
 Chart::setYAxisTitle(const char *p)
 {
-    QwtText *t;
+    QwtText t;
     bool enable = (my.tab->currentGadget() == this);
 
     if (!p || *p == '\0')
-	t = new QwtText(" ");	// for y-axis alignment (space is invisible)
+	t = QwtText(" ");	// for y-axis alignment (space is invisible)
     else
-	t = new QwtText(p);
-    t->setFont(*globalFont);
-    t->setColor(enable ? globalSettings.chartHighlight : "black");
-    setAxisTitle(QwtPlot::yLeft, *t);
+	t = QwtText(p);
+    t.setFont(*globalFont);
+    t.setColor(enable ? globalSettings.chartHighlight : "black");
+    setAxisTitle(QwtPlot::yLeft, t);
 }
 
 void
@@ -918,9 +912,9 @@ QmcContext *Chart::metricContext(int index) const
     return my.items[index]->metricContext();
 }
 
-QmcMetric *Chart::metric(int index) const
+QmcMetric *Chart::metricPtr(int index) const
 {
-    return my.items[index]->metric();
+    return my.items[index]->metricPtr();
 }
 
 QSize Chart::minimumSizeHint() const
@@ -960,7 +954,7 @@ Chart::addToTree(QTreeWidget *treeview, const QString &metric,
     int depth, index;
 
     console->post("Chart::addToTree src=%s metric=%s, isInst=%d",
-		(const char *)source.toAscii(), (const char *)metric.toAscii(),
+		(const char *)source.toLatin1(), (const char *)metric.toLatin1(),
 		isInst);
 
     depth = name.indexOf(regexInstance);
@@ -1047,11 +1041,12 @@ ChartCurve::drawLegendIdentifier(QPainter *painter, const QRectF &rect) const
     QRectF r(0, 0, rect.width()-1, rect.height()-1);
     r.moveCenter(rect.center());
 
-    QPen pen(QColor(Qt::black));
+    const QBrush brush(legendColor, Qt::SolidPattern);
+    const QColor black(Qt::black);
+    QPen pen(black);
     pen.setCapStyle(Qt::FlatCap);
-    QBrush brush(legendColor, Qt::SolidPattern);
 
-    painter->setPen(pen);
+    painter->setPen((const QPen &)pen);
     painter->setBrush(brush);
     painter->setRenderHint(QPainter::Antialiasing, false);
     painter->drawRect(r.x(), r.y(), r.width(), r.height());

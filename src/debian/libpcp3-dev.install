@@ -16,6 +16,7 @@ usr/share/man/man3/pmAddProfile.3.gz
 usr/share/man/man3/pmaf.3.gz
 usr/share/man/man3/__pmAFblock.3.gz
 usr/share/man/man3/__pmAFisempty.3.gz
+usr/share/man/man3/__pmAFsetup.3.gz
 usr/share/man/man3/__pmAFregister.3.gz
 usr/share/man/man3/__pmAFunblock.3.gz
 usr/share/man/man3/__pmAFunregister.3.gz
@@ -64,12 +65,14 @@ usr/share/man/man3/pmGetContextHostName_r.3.gz
 usr/share/man/man3/pmGetContextOptions.3.gz
 usr/share/man/man3/pmGetInDom.3.gz
 usr/share/man/man3/pmGetInDomArchive.3.gz
+usr/share/man/man3/pmGetOptionalConfig.3.gz
 usr/share/man/man3/pmgetoptions.3.gz
 usr/share/man/man3/pmGetOptions.3.gz
 usr/share/man/man3/pmGetOptions.3.gz
 usr/share/man/man3/pmGetOptions.3.gz
 usr/share/man/man3/pmgetopt_r.3.gz
 usr/share/man/man3/pmGetPMNSLocation.3.gz
+usr/share/man/man3/pmGetVersion.3.gz
 usr/share/man/man3/pmiAddInstance.3.gz
 usr/share/man/man3/pmiAddMetric.3.gz
 usr/share/man/man3/pmIDStr.3.gz

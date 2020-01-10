@@ -1,20 +1,21 @@
 /*
- * Copyright (c) 2014, Red Hat.
+ * Copyright (c) 2014-2015, Red Hat.
  * Copyright (c) 2007-2009, Aconex.  All Rights Reserved.
  * Copyright (c) 2006, Ken McDonell.  All Rights Reserved.
  * 
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
+ * This library is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation; either version 2.1 of the License, or
+ * (at your option) any later version.
  * 
- * This program is distributed in the hope that it will be useful, but
+ * This library is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * for more details.
+ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
+ * License for more details.
  */
-#include <QtGui/QMenu>
-#include <QtGui/QMessageBox>
+
+#include <QMenu>
+#include <QMessageBox>
 #include "qed_console.h"
 #include "qed_viewcontrol.h"
 #include "qed_recorddialog.h"
@@ -94,7 +95,7 @@ bool QedViewControl::stopRecording(QString &errmsg)
 	    error = true;
 	}
 	else {
-	    my.loggerList.at(i)->write(msg.toAscii());
+	    my.loggerList.at(i)->write(msg.toLatin1());
 	    my.loggerList.at(i)->terminate();
 	}
     }
@@ -126,14 +127,14 @@ bool QedViewControl::queryRecording(QString &errmsg)
 	    error = true;
 	}
 	else {
-	    my.loggerList.at(i)->write(msg.toAscii());
+	    my.loggerList.at(i)->write(msg.toLatin1());
 	}
     }
 
     if (error) {
 	msg = "Q\n";    // if one fails, we shut down all loggers
 	for (i = 0; i < count; i++)
-	    my.loggerList.at(i)->write(msg.toAscii());
+	    my.loggerList.at(i)->write(msg.toLatin1());
 	cleanupRecording();
     }
 
@@ -156,7 +157,7 @@ bool QedViewControl::detachLoggers(QString &errmsg)
 	    error = true;
 	}
 	else {
-	    my.loggerList.at(i)->write(msg.toAscii());
+	    my.loggerList.at(i)->write(msg.toLatin1());
 	}
     }
     if (error)

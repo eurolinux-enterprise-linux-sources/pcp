@@ -36,8 +36,6 @@ _filter_solaris()
 	    -e '/network.tcp.* Unknown metric name/d' \
 	    -e '/network.udp.* Unknown metric name/d' \
 	    -e '/filesys.* Unknown metric name/d' \
-	    -e '/nfs.* Unknown metric name/d' \
-	    -e '/rpc.* Unknown metric name/d' \
 	    -e '/swap .* Unknown metric name/d' \
 	    -e '/swap.pages.* Unknown metric name/d' \
 	    -e '/swapdev .* Unknown metric name/d' \
@@ -58,7 +56,6 @@ _filter_darwin()
 	    -e '/network.ip.* Unknown metric name/d' \
 	    -e '/network.tcp.* Unknown metric name/d' \
 	    -e '/network.udp.* Unknown metric name/d' \
-	    -e '/nfs.* Unknown metric name/d' \
 	    -e '/swap .* Unknown metric name/d' \
 	    -e '/swap.pages.* Unknown metric name/d' \
 	    -e '/swapdev .* Unknown metric name/d' \
@@ -66,17 +63,17 @@ _filter_darwin()
     fi
 }
 
-_filter_irix()
+_filter_linux()
 {
-    # these are always-on in older oss versions of pcp
-    sed \
-	-e '/disk.dev.avg_disk.active .* metric name/d' \
-	-e '/disk.all.avg_disk.active .* metric name/d' \
-	-e '/disk.dev.bytes .* Unknown metric name/d' \
-	-e '/disk.all.bytes .* Unknown metric name/d' \
-	-e '/network.igmp .* Unknown metric name/d' \
-	-e '/swap.in .* Metric not supported/d' \
-	-e '/swap.out .* Metric not supported/d'
+    # pcp-atop uses metrics not supported on some kernels
+    if [ $PCP_PLATFORM != linux ]
+    then
+	cat
+    else
+	sed \
+	    -e '/proc.namespaces.* Metric not supported/d' \
+	# linux
+    fi
 }
 
 # remove all known platform-dependencies from output
@@ -84,7 +81,20 @@ _filter_irix()
 #
 _filter()
 {
-    _filter_irix | _filter_solaris | _filter_darwin
+    # these are always-on in older oss versions of pcp
+    sed \
+       -e '/disk.dev.avg_disk.active .* metric name/d' \
+       -e '/disk.all.avg_disk.active .* metric name/d' \
+       -e '/disk.dev.bytes .* Unknown metric name/d' \
+       -e '/disk.all.bytes .* Unknown metric name/d' \
+       -e '/network.igmp .* Unknown metric name/d' \
+       -e '/nfs.* Unknown metric name/d' \
+       -e '/rpc.* Unknown metric name/d' \
+       -e '/nfsclient.* Unknown metric name/d' \
+       -e '/elasticsearch.search.all.* Metric not supported/d' \
+       -e '/swap.in .* Metric not supported/d' \
+       -e '/swap.out .* Metric not supported/d' \
+    | _filter_linux | _filter_solaris | _filter_darwin
 }
 
 # real QA test starts here

@@ -1,7 +1,7 @@
 /*
  * General Utility Routines
  *
- * Copyright (c) 2012-2014 Red Hat.
+ * Copyright (c) 2012-2015 Red Hat.
  * Copyright (c) 2009 Aconex.  All Rights Reserved.
  * Copyright (c) 1995-2002,2004 Silicon Graphics, Inc.  All Rights Reserved.
  * 
@@ -61,7 +61,7 @@ static int	dosyslog;
 static int	pmState = PM_STATE_APPL;
 static int	done_exit;
 
-INTERN char	*pmProgname = "pcp";		/* the real McCoy */
+PCP_DATA char	*pmProgname = "pcp";		/* the real McCoy */
 
 static int vpmprintf(const char *, va_list);
 
@@ -83,7 +83,7 @@ __pmSyslog(int onoff)
 }
 
 /*
- * This is a wrapper around syslog(3C) that writes similar messages to stderr,
+ * This is a wrapper around syslog(3) that writes similar messages to stderr,
  * but if __pmSyslog(1) is called, the messages will really go to syslog
  */
 void
@@ -332,20 +332,19 @@ __pmRotateLog(const char *progname, const char *logname, FILE *oldstream,
 char *
 pmIDStr_r(pmID pmid, char *buf, int buflen)
 {
-    __pmID_int*	p = (__pmID_int*)&pmid;
     if (pmid == PM_ID_NULL)
 	snprintf(buf, buflen, "%s", "PM_ID_NULL");
-    else if (p->domain == DYNAMIC_PMID && p->item == 0)
+    else if (IS_DYNAMIC_ROOT(pmid))
 	/*
 	 * this PMID represents the base of a dynamic subtree in the PMNS
 	 * ... identified by setting the domain field to the reserved
 	 * value DYNAMIC_PMID and storing the real domain of the PMDA
 	 * that can enumerate the subtree in the cluster field, while
-	 * the item field is not used
+	 * the item field is zero
 	 */
-	snprintf(buf, buflen, "%d.*.*", p->cluster);
+	snprintf(buf, buflen, "%d.*.*", pmid_cluster(pmid));
     else
-	snprintf(buf, buflen, "%d.%d.%d", p->domain, p->cluster, p->item);
+	snprintf(buf, buflen, "%d.%d.%d", pmid_domain(pmid), pmid_cluster(pmid), pmid_item(pmid));
     return buf;
 }
 
@@ -1295,8 +1294,8 @@ __pmSetInternalState(int state)
  */
 
 #define MSGBUFLEN	256
-static FILE	*fptr = NULL;
-static int	msgsize = 0;
+static FILE	*fptr;
+static int	msgsize;
 static char	*fname;		/* temporary file name for buffering errors */
 static char	*ferr;		/* error output filename from PCP_STDERR */
 
@@ -1309,6 +1308,7 @@ static int
 pmfstate(int state)
 {
     static int	errtype = -1;
+    char	errmsg[PM_MAXERRMSGLEN];
 
     if (state > PM_QUERYERR)
 	errtype = state;
@@ -1319,12 +1319,13 @@ pmfstate(int state)
 	errtype = PM_USESTDERR;
 	if ((ferr = getenv("PCP_STDERR")) != NULL) {
 	    if (strcasecmp(ferr, "DISPLAY") == 0) {
-		char * xconfirm = pmGetConfig("PCP_XCONFIRM_PROG");
-		if (access(__pmNativePath(xconfirm), X_OK) < 0) {
-		    char	errmsg[PM_MAXERRMSGLEN];
+		char *xconfirm = pmGetOptionalConfig("PCP_XCONFIRM_PROG");
+		if (!xconfirm)
+		    fprintf(stderr, "%s: using stderr - no PCP_XCONFIRM_PROG\n",
+			    pmProgname);
+		else if (access(__pmNativePath(xconfirm), X_OK) < 0)
 		    fprintf(stderr, "%s: using stderr - cannot access %s: %s\n",
 			    pmProgname, xconfirm, osstrerror_r(errmsg, sizeof(errmsg)));
-		}
 		else
 		    errtype = PM_USEDIALOG;
 	    }
@@ -1345,9 +1346,9 @@ vpmprintf(const char *msg, va_list arg)
     PM_LOCK(__pmLock_libpcp);
     if (fptr == NULL && msgsize == 0) {		/* create scratch file */
 	int	fd = -1;
-	char	*tmpdir = pmGetConfig("PCP_TMPFILE_DIR");
+	char	*tmpdir = pmGetOptionalConfig("PCP_TMPFILE_DIR");
 
-	if (tmpdir[0] != '\0') {
+	if (tmpdir && tmpdir[0] != '\0') {
 	    mode_t cur_umask;
 
 	    /*
@@ -1426,7 +1427,9 @@ pmflush(void)
     int		len;
     int		state;
     FILE	*eptr = NULL;
+    char	*envptr;
     char	outbuf[MSGBUFLEN];
+    char	errmsg[PM_MAXERRMSGLEN];
 
     PM_INIT_LOCKS();
     PM_LOCK(__pmLock_libpcp);
@@ -1435,7 +1438,6 @@ pmflush(void)
 	state = pmfstate(PM_QUERYERR);
 	if (state == PM_USEFILE) {
 	    if ((eptr = fopen(ferr, "a")) == NULL) {
-		char	errmsg[PM_MAXERRMSGLEN];
 		fprintf(stderr, "pmflush: cannot append to file '%s' (from "
 			"$PCP_STDERR): %s\n", ferr, osstrerror_r(errmsg, sizeof(errmsg)));
 		state = PM_USESTDERR;
@@ -1447,7 +1449,6 @@ pmflush(void)
 	    while ((len = (int)read(fileno(fptr), outbuf, MSGBUFLEN)) > 0) {
 		sts = write(fileno(stderr), outbuf, len);
 		if (sts != len) {
-		    char	errmsg[PM_MAXERRMSGLEN];
 		    fprintf(stderr, "pmflush: write() failed: %s\n", 
 			osstrerror_r(errmsg, sizeof(errmsg)));
 		}
@@ -1456,12 +1457,16 @@ pmflush(void)
 	    break;
 	case PM_USEDIALOG:
 	    /* If we're here, it means xconfirm has passed access test */
+	    if ((envptr = pmGetOptionalConfig("PCP_XCONFIRM_PROG")) == NULL) {
+		fprintf(stderr, "%s: no PCP_XCONFIRM_PROG\n", pmProgname);
+		sts = PM_ERR_GENERIC;
+		break;
+	    }
 	    snprintf(outbuf, sizeof(outbuf), "%s -file %s -c -B OK -icon info"
 		    " %s -header 'PCP Information' >/dev/null",
-		    __pmNativePath(pmGetConfig("PCP_XCONFIRM_PROG")), fname,
+		    __pmNativePath(envptr), fname,
 		    (msgsize > 80 ? "-useslider" : ""));
 	    if (system(outbuf) < 0) {
-		char	errmsg[PM_MAXERRMSGLEN];
 		fprintf(stderr, "%s: system failed: %s\n", pmProgname,
 			osstrerror_r(errmsg, sizeof(errmsg)));
 		sts = -oserror();
@@ -1472,7 +1477,6 @@ pmflush(void)
 	    while ((len = (int)read(fileno(fptr), outbuf, MSGBUFLEN)) > 0) {
 		sts = write(fileno(eptr), outbuf, len);
 		if (sts != len) {
-		    char	errmsg[PM_MAXERRMSGLEN];
 		    fprintf(stderr, "pmflush: write() failed: %s\n", 
 			osstrerror_r(errmsg, sizeof(errmsg)));
 		}
@@ -1509,7 +1513,7 @@ __pmSetClientId(const char *id)
     char		*name = "pmcd.client.whoami";
     pmID		pmid;
     int			sts;
-    pmResult		store = { .numpmid = 1 };
+    pmResult		store;
     pmValueSet		pmvs;
     pmValueBlock	*pmvb;
     char        	host[MAXHOSTNAMELEN];
@@ -1569,7 +1573,7 @@ __pmSetClientId(const char *id)
     vblen += strlen(host) + strlen(id) + 2;
 
     /* build pmResult for pmStore() */
-    pmvb = (pmValueBlock *)malloc(PM_VAL_HDR_SIZE+vblen);
+    pmvb = (pmValueBlock *)calloc(1, PM_VAL_HDR_SIZE+vblen);
     if (pmvb == NULL) {
 	__pmNoMem("__pmSetClientId", PM_VAL_HDR_SIZE+vblen, PM_RECOV_ERR);
 	return -ENOMEM;
@@ -1592,6 +1596,8 @@ __pmSetClientId(const char *id)
     pmvs.vlist[0].value.pval = pmvb;
     pmvs.vlist[0].inst = PM_IN_NULL;
 
+    memset(&store, 0, sizeof(store));
+    store.numpmid = 1;
     store.vset[0] = &pmvs;
     sts = pmStore(&store);
     free(pmvb);
@@ -1724,7 +1730,7 @@ strchrnul(const char *s, int c)
 #ifndef HAVE_SCANDIR
 /*
  * Scan the directory dirname, building an array of pointers to
- * dirent entries using malloc(3C).  select() and compare() are
+ * dirent entries using malloc(3).  select() and compare() are
  * used to optionally filter and sort directory entries.
  */
 int

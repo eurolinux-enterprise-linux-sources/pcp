@@ -2,15 +2,15 @@
  * Copyright (c) 2014-2015, Red Hat.
  * Copyright (c) 2007, Aconex.  All Rights Reserved.
  * 
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
+ * This library is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation; either version 2.1 of the License, or
+ * (at your option) any later version.
  * 
- * This program is distributed in the hope that it will be useful, but
+ * This library is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * for more details.
+ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
+ * License for more details.
  */
 #include "qed_fileiconprovider.h"
 #include "qed_console.h"
@@ -27,6 +27,7 @@ QedFileIconProvider::QedFileIconProvider() : QFileIconProvider()
     my.computer = QIcon(":/images/computer.png");
 
     // PCP GUI specific images
+    my.container = QIcon(":/images/container.png");
     my.fileView = QIcon(":/images/fileview.png");
     my.fileFolio = QIcon(":/images/filefolio.png");
     my.fileArchive = QIcon(":/images/filearchive.png");
@@ -49,6 +50,8 @@ QIcon QedFileIconProvider::icon(FileIconType type) const
 	return my.fileFolio;
     case Archive:
 	return my.fileArchive;
+    case Container:
+	return my.container;
     case Html:
 	return my.fileHtml;
     case Image:
@@ -91,7 +94,7 @@ QIcon QedFileIconProvider::icon(const QFileInfo &fi) const
 {
 #if DESPERATE
     console->post("QedFileIconProvider::icon - %s",
-			(const char *)fi.filePath().toAscii());
+			(const char *)fi.filePath().toLatin1());
 #endif
 
     if (fi.isFile()) {
@@ -116,7 +119,7 @@ QIcon QedFileIconProvider::icon(const QFileInfo &fi) const
 	}
 #if DESPERATE
 	console->post("  Got %d bytes from %s: \"%c%c%c%c%c%c%c%c\"", count,
-		(const char *) fi.filePath().toAscii(), block[0], block[1],
+		(const char *) fi.filePath().toLatin1(), block[0], block[1],
 		block[2], block[3], block[4], block[5], block[6], block[7]);
 #endif
 	QString ext = fi.suffix();

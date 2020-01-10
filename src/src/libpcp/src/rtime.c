@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Red Hat.
+ * Copyright (c) 2014-2015 Red Hat.
  * Copyright (c) 1995 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This library is free software; you can redistribute it and/or modify it
@@ -291,12 +291,15 @@ __pmParseCtime(
     struct tm *rslt,		/* result stored here */
     char **errmsg)		/* error message */
 {
-    struct tm	tm = {-1, -1, -1, -1, -1, -1, NO_OFFSET, -1, -1};
+    struct tm	tm;
     double	d;
     const char	*scan = spec;
     int		pm = -1;
     int		ignored = -1;
     int		dflt;
+
+    memset(&tm, -1, sizeof(tm));
+    tm.tm_wday = NO_OFFSET;
 
     /* parse time spec */
     parse3char(&scan, wdays, N_WDAYS, &ignored);
@@ -539,7 +542,7 @@ glib_relative_date(const char *date_string)
 }
 
 /*
- * Helper interface to wrap calls to the __pmGlibGetDate interface
+ * Helper interface to wrap calls to the __pmGetDate interface
  */
 static int
 glib_get_date(
@@ -555,18 +558,18 @@ glib_get_date(
     rel_type = glib_relative_date(scan);
 
     if (rel_type == NO_OFFSET)
-	sts = __pmGlibGetDate(&tsrslt, scan, NULL);
+	sts = __pmGetDate(&tsrslt, scan, NULL);
     else if (rel_type == NEG_OFFSET && end->tv_sec < INT_MAX) {
 	struct timespec tsend;
 	tsend.tv_sec = end->tv_sec;
 	tsend.tv_nsec = end->tv_usec * 1000;
-	sts = __pmGlibGetDate(&tsrslt, scan, &tsend);
+	sts = __pmGetDate(&tsrslt, scan, &tsend);
     }
     else {
 	struct timespec tsstart;
 	tsstart.tv_sec = start->tv_sec;
 	tsstart.tv_nsec = start->tv_usec * 1000;
-	sts = __pmGlibGetDate(&tsrslt, scan, &tsstart);
+	sts = __pmGetDate(&tsrslt, scan, &tsstart);
     }
     if (sts < 0)
 	return sts;

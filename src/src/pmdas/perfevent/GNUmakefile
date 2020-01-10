@@ -1,7 +1,7 @@
 #
 # Copyright (c) 2000,2003,2004,2008 Silicon Graphics, Inc.  All Rights Reserved.
 # Copyright (c) 2007-2010 Aconex.  All Rights Reserved.
-# Copyright (c) 2013 Red Hat.
+# Copyright (c) 2013-2015 Red Hat.
 # 
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
@@ -29,31 +29,27 @@ CFILES	= pmda.c perfmanager.c perfinterface.c architecture.c \
 HFILES  = architecture.h configparser.h perfinterface.h perfmanager.h \
 		  rapl-interface.h perflock.h
 
-SCRIPTS		= Install Remove
+SCRIPTS		= Install Remove perfevent-makerewrite.pl
 
 DFILES	= README help
 
 VERSION := $(shell head -n 1 ChangeLog | cut -d ":" -f 1)
 
-default:	build-me
+default_pcp default:	build-me
 
 include $(BUILDRULES)
 
 ifeq "$(PMDA_PERFEVENT)" "true"
-build-me: domain.h $(CMDTARGET) $(HELPTARGETS) perfalloc
+build-me: $(CMDTARGET) $(HELPTARGETS) perfalloc
 
-install: default
+install_pcp install: default
 	$(INSTALL) -m 755 -d $(PMDADIR)
 	$(INSTALL) -m 644 domain.h help root pmns perfevent.conf $(PMDADIR)
 	$(INSTALL) -m 755 $(CMDTARGET) $(SCRIPTS) perfalloc $(PMDADIR)
 else
 build-me:
-install:
+install_pcp install:
 endif
-
-default_pcp : default
-
-install_pcp : install
 
 TARGETS = $(CMDTARGET) perfalloc
 
@@ -62,6 +58,7 @@ LLDLIBS += $(LIB_FOR_RT) $(LIB_FOR_MATH) $(LIB_FOR_PTHREADS)
 LCFLAGS = -I.
 CFLAGS += -DVERSION=\"$(VERSION)\"
 
+$(OBJECTS): domain.h
 
 domain.h: ../../pmns/stdpmid
 	$(DOMAIN_MAKERULE)

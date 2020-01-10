@@ -4,18 +4,17 @@ QA output created by 088
 TIMESTAMP             ?           ?           ?         900 
 TIMESTAMP             ?         500           ?           ? 
 TIMESTAMP           100           ?           ?           ? 
-archive:   src/bar
+archive:   tmparch/bar
 metric:    sampledso.bin
 samples:   all
 semantics: instantaneous value
 units:     none
 
                 bin-100     bin-500     bin-700     bin-900 
-TIMESTAMP           100           ?           ?         900 
 TIMESTAMP           100         500           ?           ? 
 TIMESTAMP           100         500           ?         900 
 TIMESTAMP     No values available
-archive:   src/bar
+archive:   tmparch/bar
 interval:  0.50 sec
 metric:    sampledso.bin
 samples:   11
@@ -26,18 +25,17 @@ units:     none
 TIMESTAMP             ?           ?           ?         900 
 TIMESTAMP             ?         500           ?           ? 
 TIMESTAMP           100           ?           ?           ? 
-archive:   src/mv-bar
+archive:   tmparch/mv-bar
 metric:    sampledso.bin
 samples:   all
 semantics: instantaneous value
 units:     none
 
                 bin-100     bin-500     bin-700     bin-900 
-TIMESTAMP           100           ?           ?         900 
 TIMESTAMP           100         500           ?           ? 
 TIMESTAMP           100         500           ?         900 
 TIMESTAMP     No values available
-archive:   src/mv-bar
+archive:   tmparch/mv-bar
 interval:  0.50 sec
 metric:    sampledso.bin
 samples:   11
@@ -48,18 +46,17 @@ units:     none
 TIMESTAMP             ?           ?           ?         900 
 TIMESTAMP             ?         500           ?           ? 
 TIMESTAMP           100           ?           ?           ? 
-archive:   src/noti-bar
+archive:   tmparch/noti-bar
 metric:    sampledso.bin
 samples:   all
 semantics: instantaneous value
 units:     none
 
                 bin-100     bin-500     bin-700     bin-900 
-TIMESTAMP           100           ?           ?         900 
 TIMESTAMP           100         500           ?           ? 
 TIMESTAMP           100         500           ?         900 
 TIMESTAMP     No values available
-archive:   src/noti-bar
+archive:   tmparch/noti-bar
 interval:  0.50 sec
 metric:    sampledso.bin
 samples:   11
@@ -68,7 +65,7 @@ units:     none
 Note: timezone set to local timezone of host "rattle" from archive
 
 metric:    sampledso.bin
-archive:   src/late
+archive:   archives/late
 host:      rattle
 start:     Sat Jun 14 23:23:02 1997
 end:       Sat Jun 14 23:23:08 1997

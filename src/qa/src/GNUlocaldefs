@@ -11,45 +11,8 @@ DEBUG   = $(DBG)
 
 HAVE_64	= $(shell test `uname -m | sed -e 's/.*64/64/g'` = "64" && echo 1 || echo 0)
 
-SRCARCH	= mirage.0 moomba.client.0 \
-	babylon.percpu.0 babylon.percpu_v2.0 \
-	omen.client.0 bozo.client.0 bozo.client_v2.0 \
-	late.0 ok-bigbin.0 ok-mv-bigbin.0 ok-truncbin.0 \
-	babylon.pmview.0 babylon.pmview_v2.0 ok-foo.0 ok-mv-foo.0 \
-	bug.0 bug_v2.0 ace.0 ace_v2.0 bigace.0 bigace_v2.0 \
-	951127.23.01.0 951127.23.01_v2.0 960624.08.17.0 960624.08.17_v2.0 \
-	rattle.0 mark-bug.0 arch_a.0 arch_b.0 \
-	err_v1.0 changeinst.0 19970807.09.54.0 19970807.09.59.0 \
-	binning.0 wrap.0 573184.0 xbug1.0 pcpcmd.0 markmerge.0 \
-	sample-secs.0 gmt-boring.0 kenj-pc-1.0 kenj-pc-2.0 \
-	reduce-1.0 reduce-2.0 kenj-pc-diskstat.0 snort-disks.0 \
-	vldb-disks.0 moomba.pmkstat.0 fcsw_indom.0 \
-	uwrap.0 20041125.0 ac15.0 conn20070309.0 logsummary-bug.0 \
-	tzchange-10-a.0 tzchange-10-b.0 tzchange-11-a.0 tzchange-11-b.0 \
-	tzchange-12-a.0 tzchange-12-b.0 sample_expr.0 \
-	mirage-1.0 mirage-2.0 eventrec-old.0 eventrec.0 \
-	badlen-0.0 badlen-1.0 badlen-2.0 badlen-3.0 badlen-4.0 \
-	badlen-5.0 badlen-6.0 badlen-7.0 badlen-8.0 badlen-9.0 \
-	badlen-10.0 badlen-11.0 \
-	540117-short.0 541380.0 541380_v2.0 573184.0 20101004-trunc.0 \
-	bozo.client_v2.meta.bad.1 bozo.client_v2.meta.bad.2 \
-	rewrite.0 proc.0 section-a.0 section-b.0 section-c.0 section-d.0 \
-	interpmark.0 all-irix-6.5.25.0 all-sles9-sp1.0 naslog.0 \
-	multi-vm00.0 multi-vm01.0 multi-vm02.0 multi-vm03.0 pmatop-log.0 \
-	new_mysql.0 new_snmp.0 old_xfs.0 node_archive.0 count-mark.0 \
-	pyapi.0 pcp-free.0 pcp-uptime.0 pcp-numastat-1-node.0 numa.0 \
-	bug1057.0
-
-SRCARCHPART = ok-noti-bigbin.0 pmatop-log.folio \
-	20130706.0.bz2 20130706.index 20130706.meta
-
-MKARCH	= foo.0 mv-foo.0 noti-foo.0 bar.0 mv-bar.0 noti-bar.0 \
-	bigbin.0 mv-bigbin.0 noti-bigbin.0 truncbin.0 null.0 \
-	interp.0 mv-interp.0 noti-interp.0 noti-ok-foo.0 gap.0 gap2.0 \
-	dodgey-some.0 dodgey-all.0 dodgey-mixed.0 reduce-gap.0
-
 CFILES = disk_test.c exercise.c context_test.c chkoptfetch.c \
-	xval.c xxx.c chkopenlog.c chkconnect.c t_fetch.c \
+	xval.c xxx.c chkopenlog.c chkconnect.c t_fetch.c clienttimeout.c \
 	hp-mib.c agenttimeout.c chkctx2.c pmcdgone.c chkhelp.c \
 	scale.c chktrim.c store.c torture_api.c logcontrol.c xlog.c \
 	hex2nbo.c chknumval.c xarch.c eofarch.c defctx.c chkacc1.c chkacc2.c \
@@ -74,7 +37,9 @@ CFILES = disk_test.c exercise.c context_test.c chkoptfetch.c \
 	grind_conv.c getconfig.c err.c torture_logmeta.c keycache.c \
 	keycache2.c pmdaqueue.c drain-server.c template.c anon-sa.c \
 	username.c rtimetest.c getcontexthost.c badpmda.c chkputlogresult.c \
-	churnctx.c badUnitsStr_r.c units-parse.c rootclient.c
+	churnctx.c badUnitsStr_r.c units-parse.c rootclient.c \
+	lookupnametest.c getversion.c pdubufbounds.c statvfs.c storepmcd.c \
+	github-50.c archfetch.c
 
 ifeq ($(shell test -f ../localconfig && echo 1), 1)
 include ../localconfig
@@ -130,12 +95,6 @@ MYFILES += getoptions.c
 LDIRT += getoptions
 endif
 
-ifeq ($(shell test $(PCP_VER) -ge 3811 && echo 1), 1)
-CONFIG_INTERP = config2.interp
-else
-CONFIG_INTERP = config1.interp
-endif
-
 ifeq ($(shell test -f /usr/include/pcp/fault.h && echo 1), 1)
 # only make these ones if the fault injection version of libpcp
 # appears to have been installed (assumes PCP >= 3.5), and then
@@ -158,15 +117,19 @@ PERLFILES = \
 # not installed:
 PLFILES = $(shell echo $(PERLFILES) | sed -e 's/\.perl/.pl/g')
 
-ifeq "$(ENABLE_PYTHON)" "true"
+ifeq "$(HAVE_PYTHON)" "true"
 PYTHONFILES = \
 	test_pcp.python test_pmcc.python \
 	test_pmi.python check_import.python \
 	test_mmv.python test_webapi.python \
 	test_pcp_options.python test_pcp_getopts.python \
-	test_pcp_time.python test_pmnswalk.python
+	test_pcp_time.python test_pmnswalk.python \
+	pmapi_exceptions.python fsstats.python procpid.python \
+	test_set_source.python test_pmda_memleak.python \
+	test_webcontainers.python test_webprocesses.python
 # not installed:
 PYFILES = $(shell echo $(PYTHONFILES) | sed -e 's/\.python/.py/g')
+LDIRT += $(PYFILES)
 else
 PYTHONFILES =
 PYFILES =
@@ -178,15 +141,8 @@ else
 MYFILES += $(POSIXFILES) $(TRACEFILES)
 endif
 
-MYFILES += $(SRCARCH) \
-	$(patsubst %.0,%.meta,$(SRCARCH)) $(patsubst %.0,%.index,$(SRCARCH)) \
-	ok-mv-bigbin.[1-9] ok-mv-foo.[12] \
-	$(SRCARCHPART) \
-	ok-noti-bigbin.meta err_v1.dump \
-	bigace.pmns \
-	config.bar config.bigbin config.dodgey-all config.dodgey-mixed \
-	config.dodgey-some config.foo config1.interp config2.interp \
-	kenj-pc-2.config reduce.config uwrap.config wrap.config \
+MYFILES += \
+	pmatop-log.folio err_v1.dump \
 	root_irix root_pmns tiny.pmns sgi.bf versiondefs \
 	simple.csv simple.ods simple-resave.csv simple-resave.xlsx \
 	simple.sxc simple.xls simple.xlsx \
@@ -196,12 +152,12 @@ MYFILES += $(SRCARCH) \
 	pthread_barrier.h pv.c qa_test.c qa_timezone.c \
 	sa-sysstat-9.0.4 sa-sysstat-9.0.6 sa-sysstat-9.0.6.1 \
 	sa-sysstat-10.0.1 sa-sysstat-10.0.5 sa-sysstat-10.2.0 \
-	permslist
+	sa-sysstat-9.0.4_rh6.5 sa-sysstat-9.1.7 \
+	permslist \
+	qa_shmctl.c
 
-MYSCRIPTS = grind-tools ipcs_clear make.dodgey mkarch-all mkbadlen \
-	mkeventrec mkinterpmark mkmirage mkproc mkrewrite mksample_expr \
-	mksa-sysstat mktzchange show-args mkbig1 fixhosts mkpermslist \
-	memcachestats.pl
+MYSCRIPTS = grind-tools ipcs_clear mksa-sysstat show-args fixhosts \
+	    mkpermslist memcachestats.pl
 
 PSCRIPTS = $(PERLFILES) $(PYTHONFILES)
 
@@ -211,49 +167,33 @@ TARGETS = $(subst broken_pmda,,$(basename $(CFILES_TARGETS))) \
 	chkctx2_lite template \
 	fetchrate_lite pv
 
+ifeq "$(TARGET_OS)" "linux"
+TARGETS += qa_shmctl.$(DSOSUFFIX)
+endif
+
 ifeq ($(HAVE_64), 1)
 TARGETS	+= pv64
 endif
 
 LCFLAGS = -DHAVE_TRACE
-LLDLIBS	= $(PCPLIB) $(LDFLAGS)
+LLDLIBS	= $(LDFLAGS) $(PCPLIB)
 
 ifneq ($(NVIDIAQALIB),)
 LIBTARGET = true
 MYCFILES += nvidia-ml.c
+LDIRT += nvidia-ml.o
 LCFLAGS += $(NVIDIACFLAGS)
 TARGETS += $(NVIDIAQALIB)
 endif
 
 # libpcp_trace is ready
-TRACELIB	= -lpcp_trace $(LLDLIBS)
+TRACELIB	= $(LLDLIBS) -lpcp_trace
 
 # all archives, except the ones checked into the source tree,
 # then add executables beyond $(TARGETS)
 #
 LDIRT	+= *.log domain.h help.pag help.dir \
-	foo.0 foo.index foo.meta \
-	mv-foo.[0-9] mv-foo.index mv-foo.meta \
-	noti-foo.0 noti-foo.meta \
-	bar.0 bar.index bar.meta \
 	big[0-2].[0-2] big[0-2].index big[0-2].meta \
-	mv-bar.[0-9] mv-bar.index mv-bar.meta \
-	noti-bar.0 noti-bar.meta \
-	bigbin.0 bigbin.index bigbin.meta \
-	mv-bigbin.[0-9] mv-bigbin.index mv-bigbin.meta \
-	noti-bigbin.0 noti-bigbin.meta \
-	truncbin.0 truncbin.index truncbin.meta \
-	null.0 null.index null.meta \
-	interp.0 interp.index interp.meta \
-	mv-interp.[0-9] mv-interp.index mv-interp.meta \
-	noti-interp.0 noti-interp.meta \
-	noti-ok-foo.0 noti-ok-foo.meta \
-	gap.0 gap.index gap.meta \
-	gap2.0 gap2.index gap2.meta \
-	dodgey-some.0 dodgey-some.index dodgey-some.meta \
-	dodgey-all.0 dodgey-all.index dodgey-all.meta \
-	dodgey-mixed.0 dodgey-mixed.index dodgey-mixed.meta \
-	reduce-gap.0 reduce-gap.index reduce-gap.meta \
 	chkctx2_lite.c fetchrate_lite.c \
 	localconfig.h gmon.out \
 	$(TARGETS)
@@ -263,11 +203,11 @@ LDIRT	+= *.log domain.h help.pag help.dir \
 
 default default_pcp: \
 	$(CFILES_TARGETS) $(TARGETS) \
-	$(SRCARCH) $(SRCARCHPART) \
+	$(SRCARCHPART) \
 	$(PLFILES) $(PYFILES) \
 	ipcs_clear
 
-setup: default $(MKARCH) $(XTRATARGETS)
+setup: default $(XTRATARGETS)
 
 $(TARGETS):
 
@@ -280,19 +220,18 @@ clean-exec:
 	rm -f $(OBJECTS)
 	rm -f pv64
 
-# remake just the archives, not the binaries
-#
-clean-arch:
-	rm -f $(MKARCH) $(subst 0,meta,$(MKARCH)) $(subst 0,index,$(MKARCH))
-
 OBJECTS = $(shell echo $(CFILES) | sed -e 's/\.c/.o/g')
 
 # make just the archives, not the binaries
 #
-arch:	$(SRCARCH) $(SRCARCHPART) $(MKARCH)
+arch:	$(SRCARCHPART)
 
 # --- do NOT need libpcp
 #
+
+statvfs:	statvfs.c
+	rm -f $@
+	$(CCF) $(CDEFS) -o $@ statvfs.c
 
 pause:	pause.c
 	$(CCF) $(CDEFS) -o pause pause.c
@@ -449,64 +388,64 @@ domain.h:	$(PCP_VAR_DIR)/pmns/stdpmid
 
 pmdashutdown:	pmdashutdown.c
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ $@.c -lpcp_pmda $(LDLIBS)
+	$(CCF) $(CDEFS) -o $@ $@.c $(LDLIBS) -lpcp_pmda
 
 dumb_pmda: dumb_pmda.c
-	$(CCF) $(LCDEFS) $(LCOPTS) -o $@ $@.c -lpcp_pmda $(LDLIBS)
+	$(CCF) $(LCDEFS) $(LCOPTS) -o $@ $@.c $(LDLIBS) -lpcp_pmda
 
 pmdacache: pmdacache.c
-	$(CCF) $(LCDEFS) $(LCOPTS) -o $@ $@.c -lpcp_pmda $(LDLIBS)
+	$(CCF) $(LCDEFS) $(LCOPTS) -o $@ $@.c $(LDLIBS) -lpcp_pmda
 
 pmdaqueue: pmdaqueue.c
-	$(CCF) $(LCDEFS) $(LCOPTS) -o $@ $@.c -lpcp_pmda $(LDLIBS)
+	$(CCF) $(LCDEFS) $(LCOPTS) -o $@ $@.c $(LDLIBS) -lpcp_pmda
 
 rootclient: rootclient.c
-	$(CCF) $(LCDEFS) $(LCOPTS) -o $@ $@.c -lpcp_pmda $(LDLIBS)
+	$(CCF) $(LCDEFS) $(LCOPTS) -o $@ $@.c $(LDLIBS) -lpcp_pmda
 
 atomstr: atomstr.c
-	$(CCF) $(LCDEFS) $(LCOPTS) -o $@ $@.c -lpcp_pmda $(LDLIBS)
+	$(CCF) $(LCDEFS) $(LCOPTS) -o $@ $@.c $(LDLIBS) -lpcp_pmda
 
 keycache: keycache.c
-	$(CCF) $(LCDEFS) $(LCOPTS) -o $@ $@.c -lpcp_pmda $(LDLIBS)
+	$(CCF) $(LCDEFS) $(LCOPTS) -o $@ $@.c $(LDLIBS) -lpcp_pmda
 
 keycache2: keycache2.c
-	$(CCF) $(LCDEFS) $(LCOPTS) -o $@ $@.c -lpcp_pmda $(LDLIBS)
+	$(CCF) $(LCDEFS) $(LCOPTS) -o $@ $@.c $(LDLIBS) -lpcp_pmda
 
 badpmda: badpmda.c
-	$(CCF) $(LCDEFS) $(LCOPTS) -o $@ $@.c -lpcp_pmda $(LDLIBS)
+	$(CCF) $(LCDEFS) $(LCOPTS) -o $@ $@.c $(LDLIBS) -lpcp_pmda
 
 # --- need libpcp_gui
 #
 
 record:	record.c
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ $@.c -lpcp_gui $(LDLIBS)
+	$(CCF) $(CDEFS) -o $@ $@.c $(LDLIBS) -lpcp_gui
 
 record-setarg: record-setarg.c
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ $@.c -lpcp_gui $(LDLIBS)
+	$(CCF) $(CDEFS) -o $@ $@.c $(LDLIBS) -lpcp_gui
 
 # --- need libpcp_mmv
 #
 mmv_genstats:	mmv_genstats.c
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ $@.c -lpcp_mmv $(LDLIBS)
+	$(CCF) $(CDEFS) -o $@ $@.c $(LDLIBS) -lpcp_mmv
 
 mmv_instances:	mmv_instances.c
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ $@.c -lpcp_mmv $(LDLIBS)
+	$(CCF) $(CDEFS) -o $@ $@.c $(LDLIBS) -lpcp_mmv
 
 mmv_noinit:	mmv_noinit.c
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ $@.c -lpcp_mmv $(LDLIBS)
+	$(CCF) $(CDEFS) -o $@ $@.c $(LDLIBS) -lpcp_mmv
 
 mmv_nostats:	mmv_nostats.c
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ $@.c -lpcp_mmv $(LDLIBS)
+	$(CCF) $(CDEFS) -o $@ $@.c $(LDLIBS) -lpcp_mmv
 
 pducheck:	pducheck.o 
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ pducheck.o  $(TRACELIB) -lpcp_pmda $(LDLIBS)
+	$(CCF) $(CDEFS) -o $@ pducheck.o  $(TRACELIB) $(LDLIBS) -lpcp_pmda
 
 pducrash:	pducrash.o 
 	rm -f $@
@@ -518,7 +457,7 @@ pdu-server:	pdu-server.o
 
 torture_cache:	torture_cache.o 
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ torture_cache.o -lpcp_pmda $(LDLIBS)
+	$(CCF) $(CDEFS) -o $@ torture_cache.o $(LDLIBS) -lpcp_pmda
 
 obs:	obs.c
 	rm -f $@
@@ -541,11 +480,11 @@ tabort:	tabort.c
 
 check_import:	check_import.c
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ $@.c -lpcp_import $(LDLIBS)
+	$(CCF) $(CDEFS) -o $@ $@.c $(LDLIBS) -lpcp_import
 
 check_import_name:	check_import_name.c
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ $@.c -lpcp_import $(LDLIBS)
+	$(CCF) $(CDEFS) -o $@ $@.c $(LDLIBS) -lpcp_import
 
 # --- need libpcp_fault
 #
@@ -621,145 +560,6 @@ endif
 # -- archives
 #
 
-foo.0:	config.foo
-	rm -f foo.index foo.meta foo.0
-	pmlogger -c config.foo -s 8 foo
-
-mv-foo.0:	config.foo
-	rm -f mv-foo.index mv-foo.meta mv-foo.?
-	pmlogger -c config.foo -s 8 -v 3 mv-foo
-
-noti-foo.0:	foo.0
-	cp foo.0 noti-foo.0
-	cp foo.meta noti-foo.meta
-
-noti-ok-foo.0:	ok-foo.0
-	cp ok-foo.0 noti-ok-foo.0
-	cp ok-foo.meta noti-ok-foo.meta
-
-bar.0:	config.bar
-	rm -f bar.index bar.meta bar.0
-	pmlogger -c config.bar -s 70 bar
-
-mv-bar.0:	config.bar
-	rm -f mv-bar.index mv-bar.meta mv-bar.?
-	pmlogger -c config.bar -s 70 -v 20 mv-bar
-
-noti-bar.0:	bar.0
-	cp bar.0 noti-bar.0
-	cp bar.meta noti-bar.meta
-
-mirage.0:
-	rm -f mirage.index mirage.meta mirage.0
-	pmlogger -c config.mirage -s 20 mirage
-
-dodgey-some.0:	make.dodgey config.dodgey-some
-	./make.dodgey some 50
-
-dodgey-all.0:	make.dodgey config.dodgey-all
-	./make.dodgey all 50
-
-dodgey-mixed.0:	make.dodgey config.dodgey-mixed
-	./make.dodgey mixed 150
-
-bigbin.0:	config.bigbin
-	rm -f bigbin.index bigbin.meta bigbin.0
-	sync
-	sleep 3
-	pmlogger -c config.bigbin -s 1000 bigbin
-
-mv-bigbin.0:	config.bigbin
-	rm -f mv-bigbin.index mv-bigbin.meta mv-bigbin.?
-	sync
-	sleep 3
-	pmlogger -c config.bigbin -s 1000 -v 101 mv-bigbin
-
-noti-bigbin.0:	bigbin.0
-	cp bigbin.0 noti-bigbin.0
-	cp bigbin.meta noti-bigbin.meta
-
-interp.0:	$(CONFIG_INTERP)
-	rm -f interp.index interp.meta interp.0
-	pmlogger -c $(CONFIG_INTERP) -s 30 interp
-
-mv-interp.0:	$(CONFIG_INTERP)
-	rm -f mv-interp.index mv-interp.meta mv-interp.?
-	pmlogger -c $(CONFIG_INTERP) -s 30 -v 10 mv-interp
-
-noti-interp.0:	interp.0
-	cp interp.0 noti-interp.0
-	cp interp.meta noti-interp.meta
-
-truncbin.0:	bigbin.0
-	rm -f truncbin.index truncbin.meta truncbin.0
-	ln bigbin.meta truncbin.meta
-	ln bigbin.index truncbin.index
-	dd ibs=1024 count=200 if=bigbin.0 of=truncbin.0
-
-# just the label record
-null.0:	foo.0
-	rm -f null.index null.meta null.0
-	ln foo.meta null.meta
-	ln foo.index null.index
-	dd ibs=132 count=1 if=foo.0 of=null.0
-
-# 4 secs, 3 sec gap, 4 secs, 3 sec gap, 4 secs
-# and indom changes ... checked in, this is the recipe that was
-# used
-#
-changeinst.0:
-	rm -rf tmp
-	mkdir tmp
-	echo 'log mandatory on once { hinv.ncpu }' >tmp/A.config
-	echo 'log mandatory on 1sec {' >>tmp/A.config
-	echo '  sample.seconds,hinv.ncpu,sample.bin["bin-100","bin-200","bin-400"]' >>tmp/A.config
-	echo '  sample.drift' >>tmp/A.config
-	echo '  irix.network.interface.total.packets["lo0","ec0"]' >>tmp/A.config
-	echo '}' >>tmp/A.config
-	echo 'log mandatory on once { sample.bin["bin-500"] }' >tmp/B.config
-	echo 'log mandatory on 1sec {' >>tmp/B.config
-	echo '  sample.seconds,sample.milliseconds,sample.bin["bin-100","bin-300","bin-400"]' >>tmp/B.config
-	echo '}' >>tmp/B.config
-	echo 'log mandatory on once { hinv.ncpu }' >tmp/C.config
-	echo 'log mandatory on 1sec {' >>tmp/C.config
-	echo '  sample.drift' >>tmp/C.config
-	echo '  sample.seconds,sample.bin["bin-200","bin-300","bin-400","bin-500"]' >>tmp/C.config
-	echo '  irix.network.interface.total.packets["ec2","lo0"]' >>tmp/C.config
-	echo '}' >>tmp/C.config
-	pmlogger -s 5 -c tmp/A.config tmp/A
-	sleep 3
-	pmlogger -s 5 -c tmp/B.config tmp/B
-	sleep 3
-	pmlogger -s 5 -c tmp/C.config tmp/C
-	rm -f changeinst.index changeinst.meta changeinst.0
-	pmlogextract tmp/A tmp/B tmp/C changeinst
-	rm -rf tmp
-
-# gap: 10 sec data, 5 sec gap, 10 sec data
-# gap2: 10 sec data, 5 sec gap, 10 sec data, 5 sec gap, 10 sec data
-# sample.bin instances change across gaps
-#
-gap.0 gap2.0:
-	rm -rf tmp
-	mkdir tmp
-	echo 'log mandatory on 1sec { pmcd.pdu_in,pmcd.numagents,hinv.ncpu,sample.bin["bin-100","bin-200","bin-400"] }' >tmp/A.config
-	echo 'log mandatory on 1sec { pmcd.pdu_in,pmcd.numagents,hinv.ncpu,sample.bin["bin-100","bin-300","bin-400"] }' >tmp/B.config
-	echo 'log mandatory on 1sec { pmcd.pdu_in,pmcd.numagents,hinv.ncpu,sample.bin["bin-100","bin-400"] }' >tmp/C.config
-	pmlogger -s 10 -c tmp/A.config tmp/A
-	sleep 5
-	pmlogger -s 10 -c tmp/B.config tmp/B
-	sleep 5
-	pmlogger -s 10 -c tmp/C.config tmp/C
-	rm -f gap.index gap.meta gap.0
-	pmlogextract tmp/A tmp/B gap
-	rm -f gap2.index gap2.meta gap2.0
-	pmlogextract tmp/A tmp/B tmp/C gap2
-	rm -rf tmp
-
-reduce-gap.0:	reduce-1.0 reduce-2.0
-	rm -f reduce-gap.*
-	pmlogextract reduce-1 reduce-2 reduce-gap
-
 torture_indom: torture_indom.c
 	rm -f $@
 	$(CCF) $(CDEFS) -o $@ torture_indom.c $(LDLIBS)
@@ -776,6 +576,11 @@ units-parse: units-parse.c
 #
 qa_timezone.$(DSOSUFFIX):	qa_timezone.o
 	$(LD) -shared -o $@ -nostdlib $<
+
+qa_shmctl.$(DSOSUFFIX):	 qa_shmctl.c
+	$(CC) -fPIC -c qa_shmctl.c
+	$(LD) -shared -o $@ -nostdlib qa_shmctl.o
+	@rm -f qa_shmctl.o
 
 ifneq ($(NVIDIAQALIB),)
 $(NVIDIAQALIB):	nvidia-ml.o

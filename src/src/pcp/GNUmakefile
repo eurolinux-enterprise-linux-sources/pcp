@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2014 Red Hat.
+# Copyright (c) 2014-2015 Red Hat.
 # Copyright (c) 2000,2004 Silicon Graphics, Inc.  All Rights Reserved.
 # 
 # This program is free software; you can redistribute it and/or modify it
@@ -16,8 +16,18 @@
 TOPDIR = ../..
 include $(TOPDIR)/src/include/builddefs
 
-LSRCFILES = pcp.sh
-SUBDIRS = free uptime numastat dmcache
+SUBDIRS = \
+	atop \
+	collectl \
+	dmcache \
+	free \
+	iostat \
+	numastat \
+	python \
+	shping \
+	summary \
+	uptime \
+	verify
 
 default :: default_pcp
 

@@ -565,6 +565,7 @@ decode_pmns_names(const char *name)
     memset(namelist, 0, sizeof(*namelist));
     sts = __pmDecodeNameList((__pmPDU *)namelist, &numnames, &names, &status);
     fprintf(stderr, "  __pmDecodeNameList: sts = %d (%s)\n", sts, pmErrStr(sts));
+    if (sts >= 0) { free(status); free(names); }
 
     fprintf(stderr, "[%s] checking large numnames field\n", name);
     memset(namelist, 0, sizeof(*namelist));
@@ -1175,7 +1176,7 @@ decode_trace_data(const char *name)
     trace_data->hdr.len = sizeof(*trace_data);
     trace_data->hdr.type = TRACE_PDU_DATA;
     trace_data->bits.version = TRACE_PDU_VERSION;
-    trace_data->bits.taglen = -1;
+    trace_data->bits.taglen = (-1 & 0xff);
     ip = (int *)&trace_data->bits;
     *ip = htonl(*ip);
     sts = __pmtracedecodedata((__pmPDU *)trace_data, &tag, &len, &type, &p, &data);

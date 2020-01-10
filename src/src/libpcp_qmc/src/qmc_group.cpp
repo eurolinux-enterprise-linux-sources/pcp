@@ -7,8 +7,12 @@
  * under the terms of the GNU Lesser General Public License as published
  * by the Free Software Foundation; either version 2.1 of the License, or
  * (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
+ * License for more details.
  */
-
 #include <limits.h>
 #include <float.h>
 #include <math.h>
@@ -134,7 +138,7 @@ QmcGroup::use(int type, const QString &theSource, int flags)
 	    if (my.mode == PM_CONTEXT_HOST && type == PM_CONTEXT_ARCHIVE) {
 		pmprintf("%s: Error: Archive \"%s\" requested "
 			 "after live mode was assumed.\n", pmProgname,
-			 (const char *)source.toAscii());
+			 (const char *)source.toLatin1());
 		return PM_ERR_NOCONTEXT;
 	    }
 
@@ -151,7 +155,7 @@ QmcGroup::use(int type, const QString &theSource, int flags)
 		if (i == numContexts()) {
 		    pmprintf("%s: Error: No archives were specified "
 			     "for host \"%s\"\n", pmProgname,
-			     (const char *)source.toAscii());
+			     (const char *)source.toLatin1());
 		    return PM_ERR_NOTARCHIVE;
 		}
 	    }
@@ -168,7 +172,7 @@ QmcGroup::use(int type, const QString &theSource, int flags)
 	QmcSource *src = QmcSource::getSource(type, source, flags, false);
 	if (src == NULL) {
 	    pmprintf("%s: Error: No archives were specified for host \"%s\"\n",
-		     pmProgname, (const char *)source.toAscii());
+		     pmProgname, (const char *)source.toLatin1());
 	    return PM_ERR_NOTARCHIVE;
 	}
 
@@ -176,7 +180,7 @@ QmcGroup::use(int type, const QString &theSource, int flags)
 	if (newContext->handle() < 0) {
 	    sts = newContext->handle();
 	    pmprintf("%s: Error: %s: %s\n", pmProgname,
-		     (const char *)source.toAscii(), pmErrStr(sts));
+		     (const char *)source.toLatin1(), pmErrStr(sts));
 	    delete newContext;
 	    return sts;
 	}
@@ -257,7 +261,7 @@ QmcGroup::useTZ()
 int
 QmcGroup::useTZ(const QString &tz)
 {
-    int sts = pmNewZone(tz.toAscii());
+    int sts = pmNewZone(tz.toLatin1());
 
     if (sts >= 0) {
 	my.tzUser = sts;
@@ -347,7 +351,7 @@ QmcGroup::createLocalContext()
 	QmcContext *newContext = new QmcContext(localSource);
 	if (newContext->handle() < 0) {
 	    pmprintf("%s: Error: %s: %s\n", pmProgname,
-		     (const char *)localHost.toAscii(), pmErrStr(newContext->handle()));
+		     (const char *)localHost.toLatin1(), pmErrStr(newContext->handle()));
 	}
 	my.contexts.append(newContext);
 	my.use = my.contexts.size() - 1;

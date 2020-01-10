@@ -8,10 +8,10 @@
 seq=`basename $0`
 echo "QA output created by $seq"
 
-# get standard filters
+# get standard environment, filters and checks
 . ./common.product
 . ./common.filter
-. ./localconfig
+. ./common.check
 
 rm -f $seq.out
 if [ $PCP_EOE_VER -ge 60512 -o \
@@ -25,10 +25,10 @@ fi
 if [ $PCP_VER -lt 30600 ]
 then
     # V1 archives supported
-    arch=src/bigace
+    arch=archives/bigace
 else
     # no support for V1 archives
-    arch=src/bigace_v2
+    arch=archives/bigace_v2
     rm -f $seq.out
     ln $seq.out.3 $seq.out
 fi

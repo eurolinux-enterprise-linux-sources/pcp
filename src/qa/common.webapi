@@ -11,9 +11,25 @@
 unset http_proxy
 unset HTTP_PROXY
 
+_check_pmwebd()
+{
+    [ -f ${PCP_BINADM_DIR}/pmwebd ] || _notrun "pmwebd package not installed"
+}
+
+_check_requests_json()
+{
+    version=`$python --version 2>&1 | sed -e 's/Python //'`
+    case "$version"
+    in
+	2.7.3|2.7.4)
+	    _notrun "requests.json() broken in Python $version"
+	    ;;
+    esac
+}
+
 _webapi_header_filter()
 {
-    tee -a $seq.full \
+    tee -a $here/$seq.full \
     | col -b \
     | sed \
 	-e 's/^\(Content-Length:\) [0-9][0-9]*/\1 SIZE/g' \
@@ -25,7 +41,7 @@ _webapi_header_filter()
 
 _webapi_response_filter()
 {
-    tee -a $seq.full \
+    tee -a $here/$seq.full \
     | col -b \
     | sed -e 's,#[0-9]*,####,g' \
         -e 's/ connected$//g' \
@@ -38,28 +54,27 @@ _webapi_response_filter()
         -e 's/PMWEBD error, .*/PMWEBD error, XXX/g' \
         -e 's/localhost[\.a-zA-Z0-9]*/LOCALHOST/g' \
         -e 's/Date:.*/Date: DATE/' \
-        -e 's/User-Agent:.*/User-Agent: FOO/' \
+	-e 's/\[[0-9][0-9]* bytes data]/[data not shown]/' \
+        -e '/> User-Agent: /d' \
 	-e '/Connection: Keep-Alive/d' \
     # end
 }
 
 _webapi_json_pretty()
 {
-    # python 2.6+:  python -mjson.tool
-    # python 2.5-:
-    python -c 'from simplejson.tool import main; main()' \
+    $python -c "from json.tool import main; main()" \
     | sed -e 's/, $/,/g'
 }
 
 _webapi_img_pretty()
 {
-    python -c "
+    imgname=$1
+
+    $python -c "
 import sys
 from PIL import Image
-from StringIO import StringIO
-data = sys.stdin.read()
-img = Image.open(StringIO(data))
-print 'size=%dx%d\n' % (img.size[0], img.size[1])
+img = Image.open('$imgname')
+print('size=%dx%d\n' % (img.size[0], img.size[1]))
 "
 }
 
@@ -67,7 +82,12 @@ _wait_for_pmwebd()
 {
     webport=$1
 
-    [ -z "$webport" ] && webport=44323
+    if [ -z "$webport" ]
+    then
+	echo "Must specify a web port (system default 44323)"
+	status=1
+	exit
+    fi
 
     count=0
     while ! $PCP_BINADM_DIR/telnet-probe -c localhost $webport
@@ -76,6 +96,8 @@ _wait_for_pmwebd()
 	if [ $count -ge 20 ]
 	then
 	    echo "pmwebd failed to start on port $webport"
+	    echo "likely looking processes ..."
+	    $PCP_PS_PROG $PCP_PS_ALL_FLAGS | egrep '[P]ID|[p]mwebd'
 	    status=1
 	    exit
 	fi
@@ -86,16 +108,34 @@ _wait_for_pmwebd()
 _wait_for_pmwebd_logfile()
 {
     logfile="$1"
+    webport="$2"
 
-    sleep 2		# let it start up
-    if [ -f "$logfile" ]
+    if [ -z "$logfile" ]
     then
-	cat "$logfile" >>$seq.full
-    else
-	echo "pmwebd failed to start, $logfile not created"
-	$PCP_PS_PROG $PCP_PS_ALL_FLAGS | egrep '[P]ID|[p]mwebd'
+	echo "Must specify log (system default $PCP_LOG_DIR/pmwebd/pmwebd.log)"
 	status=1
 	exit
     fi
+
+    # let it start up
+    _wait_for_pmwebd $webport
+
+    count=0
+    while [ ! -f "$logfile" ]
+    do
+	count=`expr $count + 1`
+	if [ $count -ge 20 ]
+	then
+	    date
+	    echo "pmwebd failed to start, $logfile not created"
+	    echo "likely looking processes ..."
+	    $PCP_PS_PROG $PCP_PS_ALL_FLAGS | egrep '[P]ID|[p]mwebd'
+	    status=1
+	    exit
+	fi
+	pmsleep 0.1
+    done
+    date >>$here/$seq.full
+    cat "$logfile" >>$here/$seq.full
 }
 

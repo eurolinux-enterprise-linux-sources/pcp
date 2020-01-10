@@ -277,6 +277,9 @@ add_metric(pmValueSet *vsp, task_t **result)
     tp->t_pmidlist[i] = pmid;
     tp->t_namelist[i] = name;
     tp->t_desclist[i] = *dp;	/* struct assignment */
+    /* is this a derived metric? */
+    if (IS_DERIVED(pmid))
+	tp->t_dm++;
 
     rqp = (optreq_t *)calloc(1, sizeof(optreq_t));
     if (rqp == NULL) {
@@ -1104,8 +1107,7 @@ do_control(__pmPDU *pb)
 		newtp->t_state = PMLC_GET_STATE(reqstate);
 		if (PMLC_GET_ON(reqstate)) {
 		    newtp->t_delta = tdelta;
-		    newtp->t_afid = __pmAFregister(&tdelta, (void *)newtp,
-					       log_callback);
+		    newtp->t_afid = __pmAFsetup(NULL, &tdelta, (void *)newtp, log_callback);
 		}
 		else
 		    newtp->t_delta.tv_sec = newtp->t_delta.tv_usec = 0;

@@ -213,7 +213,7 @@ __pmdaMainPDU(pmdaInterface *dispatch)
 		/* Not INTERFACE_4 or later */
 		sts = PM_ERR_NAME;
 	    }
-	    __pmUnpinPDUBuf(namelist);
+	    free(namelist);
 	}
 	if (sts < 0)
 	    __pmSendError(pmda->e_outfd, FROM_ANON, sts);
@@ -243,6 +243,7 @@ __pmdaMainPDU(pmdaInterface *dispatch)
 		/* Not INTERFACE_4 */
 		sts = PM_ERR_NAME;
 	    }
+	    free(name);
 	}
 	if (sts < 0)
 	    __pmSendError(pmda->e_outfd, FROM_ANON, sts);

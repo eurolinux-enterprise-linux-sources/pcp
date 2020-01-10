@@ -393,18 +393,24 @@ _script_qa()
     cat <<End-of-File
 rm -f *.out.bad
 ./changeversion >/dev/null 2>&1
-if ./check -l $check_what >>\$HOME/daily.log 2>&1
-then
-    echo "Info: QA $what" | tee -a \$HOME/daily.log
-else
-    echo "Error: QA $what failed!" | tee -a \$HOME/daily.log
-    sed -e '/^    [0-9 ]*\$/d' <check.log \
-    | awk '
+echo "Info: QA $check_what starting"
+./check -l $check_what >>\$HOME/daily.log 2>&1
+sts=\$?
+# get last block from check.log ... then get the summary on
+# stdout (not needed in the daily.log, already there)
+sed -e '/^    [0-9 ]*\$/d' <check.log \
+| awk '
 NF == 0	{ txt = ""; next }
 	{ if (txt == "") txt = \$0
 	  else txt = txt "\n" \$0
 	}
-END	{ print txt }' | tee -a \$HOME/daily.log
+END	{ print txt }' \
+| egrep '^(Failures:|Failed|Passed)'
+if [ "\$sts" = 0 ]
+then
+    echo "Info: QA $check_what done" | tee -a \$HOME/daily.log
+else
+    echo "Error: QA $what failed!" | tee -a \$HOME/daily.log
 fi
 End-of-File
 }
@@ -457,7 +463,7 @@ list_1="vm03 vm01 vm04 vm07 vm12 vm14 vm16 vm18 vm20 vm22 vm24"
 list_2="fuji grundy vm02 vm00 vm05 vm11 vm15 vm19 vm21 vm23"
 
 args="$*"
-pcp_branch=dev
+pcp_branch=master
 pcp_tree=pcp
 cflag=false
 fflag=false
@@ -610,7 +616,10 @@ in
 	echo "grundy.sgi.com" >>$tmp.domains
 	# and open up the X server
 	#
-	DISPLAY=localhost:0.0 xhost + >/dev/null
+	# Ubuntu up to 15.04
+	#DISPLAY=localhost:0.0 xhost + >/dev/null
+	# Ubuntu 15.10
+	DISPLAY=:0.0 xhost + >/dev/null
 	;;
 esac
 
@@ -776,8 +785,8 @@ End-of-File
 		#
 		[ X"$what" = Xall ] && check_what='$check_what -x remote'
 		;;
-	    vm06|vm10)
-		# Only -g sanity at this stage for FreeBSD
+	    vm06|vm10|vm09)
+		# Only -g sanity at this stage for FreeBSD or NetBSD
 		#
 		[ X"$what" = Xall ] && check_what='-g sanity'
 		;;
@@ -883,8 +892,8 @@ End-of-File
 		    echo "Warning: Already shutdown"
 		fi
 	    else
-		ssh -t -q $host sudo poweroff -f </dev/null >/dev/null 2>&1 &
-		sleep 20
+		ssh -t -q $host "sync; sleep 2; sync; ( sudo poweroff || sudo halt )" -f </dev/null >/dev/null 2>&1 &
+		sleep 60
 		sudo virsh shutdown $domain >/dev/null 2>&1
 		sleep 10
 		# seems a bit harsh, but we've given you two chances to

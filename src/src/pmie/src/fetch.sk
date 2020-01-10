@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 1995-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2015 Red Hat
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -129,7 +130,7 @@ indom_changed(Metric *m)
 		    /* set up temporary context */
 		    if (old_handle < 0)
 			old_handle = pmWhichContext();
-		    handle = newContext(symName(m->hname));
+		    handle = newContext(&m->hname, symName(m->hconn));
 		}
 		if (handle < 0) {
 		    sts = -1;
@@ -139,7 +140,7 @@ indom_changed(Metric *m)
 			if ((sts = pmNameInDomArchive(m->desc.indom, m->iids[new], &m->inames[new])) < 0) {
 			    __pmNotifyErr(LOG_ERR, "metric %s from %s: instance domain not "
 				"available in archive\npmNameInDomArchive failed: %s\n",
-				symName(m->mname), findsource(symName(m->hname)), pmErrStr(sts));
+				symName(m->mname), findsource(symName(m->hname),symName(m->hconn)), pmErrStr(sts));
 			}
 		    }
 		    else {
@@ -147,7 +148,7 @@ indom_changed(Metric *m)
 			    if ((sts = pmGetInDom(m->desc.indom, &get_iids, &get_inames)) < 0) {
 				__pmNotifyErr(LOG_ERR, "metric %s from %s: instance domain not (currently) available\n"
 				    "pmGetInDom failed: %s\n",
-				    symName(m->mname), findsource(symName(m->hname)), pmErrStr(sts));
+				    symName(m->mname), findsource(symName(m->hname),symName(m->hconn)), pmErrStr(sts));
 			    }
 			    else
 				numinst = sts;
@@ -208,10 +209,24 @@ cndFetch_1(Expr *x)
     pmAtomValue	a;
     double	t;
     int		i, j;
+    int		dorate = 0;
 
     ROTATE(x)
     x->valid++;
     op = (double *)x->smpls[0].ptr;
+
+    if (m->desc.sem == PM_SEM_COUNTER) {
+	/* need rate conversion, unless some parent node is CND_INSTANT */
+	Expr	*p = x->parent;
+	dorate = 1;
+	while (p != NULL) {
+	    if (p->op == CND_INSTANT) {
+		dorate = 0;
+		break;
+	    }
+	    p = p->parent;
+	}
+    }
 
     for (i = 0; i < x->hdom; i++) {
 	/* extract value */
@@ -241,7 +256,7 @@ cndFetch_1(Expr *x)
 	m->vset = NULL;
 
 	/* rate computation */
-	if (m->desc.sem == PM_SEM_COUNTER) {
+	if (dorate) {
 	    op--;
 	    if (m->m_idom > 0) {
 		t = *op - m->vals[0];
@@ -285,6 +300,7 @@ cndFetch_all(Expr *x)
     double	t;
     int		fix_idom = 0;
     int		i, j;
+    int		dorate = 0;
 
     ROTATE(x)
 
@@ -313,9 +329,23 @@ cndFetch_all(Expr *x)
      */
     x->valid++;
 
+    m = x->metrics;
+
+    if (m->desc.sem == PM_SEM_COUNTER) {
+	/* need rate conversion, unless some parent node is CND_INSTANT */
+	Expr	*p = x->parent;
+	dorate = 1;
+	while (p != NULL) {
+	    if (p->op == CND_INSTANT) {
+		dorate = 0;
+		break;
+	    }
+	    p = p->parent;
+	}
+    }
+
     /* extract values */
     op = (double *)x->smpls[0].ptr;
-    m = x->metrics;
     for (i = 0; i < x->hdom; i++) {
 
 	/* extract values from m->vset */
@@ -334,7 +364,7 @@ cndFetch_all(Expr *x)
 	m->vset = NULL;
 
 	/* rate computation */
-	if (m->desc.sem == PM_SEM_COUNTER) {
+	if (dorate) {
 	    op -= m->m_idom;
 	    for (j = 0; j < m->m_idom; j++) {
 		t = *op - m->vals[j];
@@ -377,10 +407,24 @@ cndFetch_n(Expr *x)
     pmAtomValue	a;
     double	t;
     int		i, j, k;
+    int		dorate = 0;
 
     ROTATE(x)
     x->valid++;
     op = (double *)x->smpls[0].ptr;
+
+    if (m->desc.sem == PM_SEM_COUNTER) {
+	/* need rate conversion, unless some parent node is CND_INSTANT */
+	Expr	*p = x->parent;
+	dorate = 1;
+	while (p != NULL) {
+	    if (p->op == CND_INSTANT) {
+		dorate = 0;
+		break;
+	    }
+	    p = p->parent;
+	}
+    }
 
     for (i = 0; i < x->hdom; i++) {
 	/* no values */
@@ -423,7 +467,7 @@ cndFetch_n(Expr *x)
 	m->vset = NULL;
 
 	/* rate computation */
-	if (m->desc.sem == PM_SEM_COUNTER) {
+	if (dorate) {
 	    op -= m->m_idom;
 	    for (j = 0; j < m->m_idom; j++) {
 		t = *op - m->vals[j];

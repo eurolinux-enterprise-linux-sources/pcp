@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Red Hat.
+ * Copyright (c) 2014-2015 Red Hat.
  * Copyright (c) 2008 Aconex.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -240,7 +240,7 @@ main(int argc, char *argv[])
 	}
     }
 
-    if (opts.optind != argc - 1) {
+    if (opts.optind != argc - 1 && opts.narchives == 0) {
 	pmprintf("%s: insufficient arguments\n", pmProgname);
 	opts.errors++;
     }
@@ -250,7 +250,7 @@ main(int argc, char *argv[])
 	exit(1);
     }
 
-    archive = argv[opts.optind];
+    archive = opts.narchives > 0? opts.archives[0] : argv[opts.optind];
     warnings = (readonly || verbose);
 
     if (verbose)
@@ -392,7 +392,7 @@ main(int argc, char *argv[])
 	printf("Log Label (Log Format Version %d)\n", golden.ill_magic & 0xff);
 	printf("Performance metrics from host %s\n", golden.ill_hostname);
 
-	ddmm = pmCtime(&t, buffer);
+	ddmm = pmCtime((const time_t *)&t, buffer);
 	ddmm[10] = '\0';
 	yr = &ddmm[20];
 	printf("  commencing %s ", ddmm);
@@ -405,7 +405,7 @@ main(int argc, char *argv[])
 	else if (__pmGetArchiveEnd(&logctl, &tv) < 0)
 	    printf("  ending     UNKNOWN\n");
 	else {
-	    ddmm = pmCtime(&tv.tv_sec, buffer);
+	    ddmm = pmCtime((const time_t *)&tv.tv_sec, buffer);
 	    ddmm[10] = '\0';
 	    yr = &ddmm[20];
 	    printf("  ending     %s ", ddmm);

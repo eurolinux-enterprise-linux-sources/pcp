@@ -25,7 +25,7 @@ deflate=none	# default compression mode (e.g. bzip2)
 inflate=none	# default compression mode (e.g. unbzip2)
 suffix=.huh	# default compression file suffix (e.g. bz2)
 
-$sudo rm -rf $tmp $tmp.* $seq.full
+$sudo rm -rf $tmp $tmp.* $here/$seq.full
 trap "cd $here; rm -rf $tmp $tmp.*; exit \$status" 0 1 2 3 15
 
 _prepare_compress()
@@ -35,7 +35,7 @@ _prepare_compress()
     suffix="$3"
 
     mkdir $tmp
-    cp src/mv-bigbin* $tmp
+    cp tmparch/mv-bigbin* $tmp
 }
 
 _run_tools()
@@ -58,7 +58,7 @@ _run_tools()
 
 _exercise_compression()
 {
-    _run_tools src/mv-bigbin n | tee $full >$tmp.orig
+    _run_tools tmparch/mv-bigbin n | tee $full >$tmp.orig
 
     cd $tmp
     echo "expect only a few lines of diff output ..."

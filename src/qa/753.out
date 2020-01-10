@@ -20,7 +20,7 @@ interval:  0.50 sec
 No values available
 
               bin-100               bin-200               bin-300               bin-400               bin-500               bin-600               bin-700               bin-800               bin-900 
-                  0.0                   0.0                   0.0                   0.0                   0.0                   0.0                   0.0                   0.0                   0.0 
+                    0                     0                     0                     0                     0                     0                     0                     0                     0 
 
 --- sample.colour ---
 
@@ -42,7 +42,7 @@ interval:  0.50 sec
 No values available
 
                   red                 green                  blue 
-                  6.0                   6.0                   6.0 
+                    6                     6                     6 
 
 --- sample.datasize ---
 
@@ -60,7 +60,7 @@ units:     Kbyte / sec
 samples:   2
 interval:  0.50 sec
 No values available
-                  0.0
+                    0
 
 --- hinv.ncpu ---
 
@@ -78,17 +78,15 @@ units:     / sec
 samples:   2
 interval:  0.50 sec
 No values available
-                  0.0
+                    0
 
 --- sample.string.hullo ---
 Semantic error: derived metric d: DELTA(sample.string.hullo): Non-arithmetic operand for function
 Semantic error: derived metric r: RATE(sample.string.hullo): Non-arithmetic operand for function
 pmval: pmLookupDesc: Unknown or illegal metric identifier
-
 Semantic error: derived metric d: DELTA(sample.string.hullo): Non-arithmetic operand for function
 Semantic error: derived metric r: RATE(sample.string.hullo): Non-arithmetic operand for function
 pmval: pmLookupDesc: Unknown or illegal metric identifier
-
 
 --- sample.kbyte_rate ---
 Semantic error: derived metric r: RATE(sample.kbyte_rate): Incorrect time dimension for operand
@@ -102,4 +100,3 @@ No values available
 abs(N) < 4096
 Semantic error: derived metric r: RATE(sample.kbyte_rate): Incorrect time dimension for operand
 pmval: pmLookupDesc: Unknown or illegal metric identifier
-

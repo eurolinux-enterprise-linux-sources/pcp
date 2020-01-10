@@ -1,0 +1,27 @@
+commit 98fb83f882c266f8a39e5ec41dcfc2643118401e
+Author: Miloš Prchlík <mprchlik@redhat.com>
+Date:   Wed Jan 6 09:48:26 2016 +1100
+
+    pmdalinux: fix i386 buffer overflow in softnet stats
+    
+    The "fmt" array was 1 byte short - 11 * 7 is enough for 11 groups but
+    the last \0 can't fit in.  Enlarge and word-align this static buffer.
+    Caught by test qa/1030, on i386 platforms only.
+    
+    Resolves RHBZ #1295801.
+
+diff --git a/src/pmdas/linux/proc_net_softnet.c b/src/pmdas/linux/proc_net_softnet.c
+index 446fa97..d88c213 100644
+--- a/src/pmdas/linux/proc_net_softnet.c
++++ b/src/pmdas/linux/proc_net_softnet.c
+@@ -27,7 +27,9 @@ refresh_proc_net_softnet(proc_net_softnet_t *proc_net_softnet)
+     FILE *fp;
+     uint64_t filler;
+     proc_net_softnet_t sn;
+-    static char fmt[11*7] = { '\0' };	/* 7 == strlen("%08llx ") */
++
++    /* size > (11*7)+1 bytes, where 7 == strlen("%08llx "), and +1 for '\0' */
++    static char fmt[128] = { '\0' };
+ 
+     if (fmt[0] == '\0') {
+ 	int i;

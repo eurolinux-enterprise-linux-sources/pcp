@@ -3,7 +3,7 @@ QA output created by 206
 pmval args: -U -r
 
 metric:    hinv.ncpu
-archive:   src/gap
+archive:   tmparch/gap
 host:      HOST
 start:     START_TIME
 end:       END_TIME
@@ -32,12 +32,10 @@ TIME VALUE
 TIME VALUE
 TIME VALUE
 
-pmval: pmFetchArchive: End of PCP archive log
-
 pmval args: -a -r
 
 metric:    hinv.ncpu
-archive:   src/gap
+archive:   tmparch/gap
 host:      HOST
 start:     START_TIME
 end:       END_TIME
@@ -52,14 +50,14 @@ TIME VALUE
 TIME VALUE
 TIME  No values available
 TIME  No values available
-TIME  No values available
+TIME VALUE
 TIME VALUE
 TIME VALUE
 
 pmval args: -a
 
 metric:    hinv.ncpu
-archive:   src/gap
+archive:   tmparch/gap
 host:      HOST
 start:     START_TIME
 end:       END_TIME
@@ -74,14 +72,14 @@ TIME VALUE
 TIME VALUE
 TIME  No values available
 TIME  No values available
-TIME  No values available
+TIME VALUE
 TIME VALUE
 TIME VALUE
 
 pmval args: -U -r
 
 metric:    pmcd.pdu_in.total
-archive:   src/gap
+archive:   tmparch/gap
 host:      HOST
 start:     START_TIME
 end:       END_TIME
@@ -110,12 +108,10 @@ TIME VALUE
 TIME VALUE
 TIME VALUE
 
-pmval: pmFetchArchive: End of PCP archive log
-
 pmval args: -a -r
 
 metric:    pmcd.pdu_in.total
-archive:   src/gap
+archive:   tmparch/gap
 host:      HOST
 start:     START_TIME
 end:       END_TIME
@@ -130,14 +126,14 @@ TIME VALUE
 TIME VALUE
 TIME  No values available
 TIME  No values available
-TIME  No values available
+TIME VALUE
 TIME VALUE
 TIME VALUE
 
 pmval args: -a
 
 metric:    pmcd.pdu_in.total
-archive:   src/gap
+archive:   tmparch/gap
 host:      HOST
 start:     START_TIME
 end:       END_TIME
@@ -152,7 +148,7 @@ TIME VALUE
 TIME  No values available
 TIME  No values available
 TIME  No values available
-TIME  No values available
+TIME VALUE
 TIME VALUE
 TIME VALUE
 TIME VALUE
@@ -160,7 +156,7 @@ TIME VALUE
 pmval args: -U -r
 
 metric:    pmcd.pdu_in.fetch
-archive:   src/gap
+archive:   tmparch/gap
 host:      HOST
 start:     START_TIME
 end:       END_TIME
@@ -189,12 +185,10 @@ TIME VALUE
 TIME VALUE
 TIME VALUE
 
-pmval: pmFetchArchive: End of PCP archive log
-
 pmval args: -a -r
 
 metric:    pmcd.pdu_in.fetch
-archive:   src/gap
+archive:   tmparch/gap
 host:      HOST
 start:     START_TIME
 end:       END_TIME
@@ -209,14 +203,14 @@ TIME VALUE
 TIME VALUE
 TIME  No values available
 TIME  No values available
-TIME  No values available
+TIME VALUE
 TIME VALUE
 TIME VALUE
 
 pmval args: -a
 
 metric:    pmcd.pdu_in.fetch
-archive:   src/gap
+archive:   tmparch/gap
 host:      HOST
 start:     START_TIME
 end:       END_TIME
@@ -231,7 +225,7 @@ TIME VALUE
 TIME  No values available
 TIME  No values available
 TIME  No values available
-TIME  No values available
+TIME VALUE
 TIME VALUE
 TIME VALUE
 TIME VALUE
@@ -239,7 +233,7 @@ TIME VALUE
 pmval args: -U -r
 
 metric:    pmcd.numagents
-archive:   src/gap
+archive:   tmparch/gap
 host:      HOST
 start:     START_TIME
 end:       END_TIME
@@ -268,12 +262,10 @@ TIME VALUE
 TIME VALUE
 TIME VALUE
 
-pmval: pmFetchArchive: End of PCP archive log
-
 pmval args: -a -r
 
 metric:    pmcd.numagents
-archive:   src/gap
+archive:   tmparch/gap
 host:      HOST
 start:     START_TIME
 end:       END_TIME
@@ -288,14 +280,14 @@ TIME VALUE
 TIME VALUE
 TIME  No values available
 TIME  No values available
-TIME  No values available
+TIME VALUE
 TIME VALUE
 TIME VALUE
 
 pmval args: -a
 
 metric:    pmcd.numagents
-archive:   src/gap
+archive:   tmparch/gap
 host:      HOST
 start:     START_TIME
 end:       END_TIME
@@ -310,14 +302,14 @@ TIME VALUE
 TIME VALUE
 TIME  No values available
 TIME  No values available
-TIME  No values available
+TIME VALUE
 TIME VALUE
 TIME VALUE
 
 pmval args: -U -r
 
 metric:    sample.bin
-archive:   src/gap
+archive:   tmparch/gap
 host:      HOST
 start:     START_TIME
 end:       END_TIME
@@ -350,12 +342,10 @@ TIME VALUE           ?         300         400           ?           ?          
 TIME VALUE           ?         300         400           ?           ?           ?           ?           ? 
 TIME VALUE           ?         300         400           ?           ?           ?           ?           ? 
 
-pmval: pmFetchArchive: End of PCP archive log
-
 pmval args: -a -r
 
 metric:    sample.bin
-archive:   src/gap
+archive:   tmparch/gap
 host:      HOST
 start:     START_TIME
 end:       END_TIME
@@ -372,16 +362,16 @@ TIME VALUE         200           ?         400           ?           ?          
 TIME VALUE         200           ?         400           ?           ?           ?           ?           ? 
 TIME  No values available
 TIME  No values available
-TIME  No values available
 
                 bin-100     bin-200     bin-300     bin-400     bin-500     bin-600     bin-700     bin-800     bin-900 
+TIME VALUE           ?         300         400           ?           ?           ?           ?           ? 
 TIME VALUE           ?         300         400           ?           ?           ?           ?           ? 
 TIME VALUE           ?         300         400           ?           ?           ?           ?           ? 
 
 pmval args: -a
 
 metric:    sample.bin
-archive:   src/gap
+archive:   tmparch/gap
 host:      HOST
 start:     START_TIME
 end:       END_TIME
@@ -398,8 +388,8 @@ TIME VALUE         200           ?         400           ?           ?          
 TIME VALUE         200           ?         400           ?           ?           ?           ?           ? 
 TIME  No values available
 TIME  No values available
-TIME  No values available
 
                 bin-100     bin-200     bin-300     bin-400     bin-500     bin-600     bin-700     bin-800     bin-900 
+TIME VALUE           ?         300         400           ?           ?           ?           ?           ? 
 TIME VALUE           ?         300         400           ?           ?           ?           ?           ? 
 TIME VALUE           ?         300         400           ?           ?           ?           ?           ? 

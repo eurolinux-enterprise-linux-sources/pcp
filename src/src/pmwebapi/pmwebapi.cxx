@@ -1,7 +1,7 @@
 /*
  * JSON web bridge for PMAPI.
  *
- * Copyright (c) 2011-2014 Red Hat Inc.
+ * Copyright (c) 2011-2015 Red Hat Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -199,6 +199,14 @@ pmwebapi_respond_new_context (struct MHD_Connection *connection,
         char *hostAttrsError;
         __pmHashInit (&hostAttrs);
 
+        if ((strstr(val.c_str (), "unix:") != NULL ||
+            strstr(val.c_str (), "local:") != NULL) &&
+            !permissive) {
+            connstamp (cerr, connection) << "local mode requested, denied" << endl;
+            rc = -EPERM;
+            goto out;
+        }
+
         rc = __pmParseHostAttrsSpec (val.c_str (), &hostSpec, &hostSpecCount, &hostAttrs,
                                      &hostAttrsError);
         if (rc == 0) {
@@ -236,6 +244,11 @@ pmwebapi_respond_new_context (struct MHD_Connection *connection,
             context = pmNewContext (PM_CONTEXT_ARCHIVE, archivefile.c_str ());
             context_description = string ("PM_CONTEXT_ARCHIVE ") + archivefile;
         } else if (MHD_lookup_connection_value (connection, MHD_GET_ARGUMENT_KIND, "local")) {
+            if (!permissive) {
+                connstamp (cerr, connection) << "local context requested, denied" << endl;
+                rc = -EPERM;
+                goto out;
+            }
             /* Note we need to use a dummy parameter to local=FOO,
                since the MHD_lookup* API does not differentiate
                between an absent argument vs. an argument given
@@ -248,7 +261,8 @@ pmwebapi_respond_new_context (struct MHD_Connection *connection,
     }
 
     if (context < 0) {
-        connstamp (cerr, connection) << "new context failed: " << pmErrStr (context) << endl;
+        char pmmsg[PM_MAXERRMSGLEN];
+        connstamp (cerr, connection) << "new context failed: " << pmErrStr_r (context, pmmsg, sizeof (pmmsg)) << endl;
         rc = context;
         goto out;
     }
@@ -309,7 +323,8 @@ pmwebapi_respond_new_context (struct MHD_Connection *connection,
     }
 
     if (verbosity) {
-        const char *context_hostname = pmGetContextHostName (context);
+        char hostname[MAXHOSTNAMELEN];
+        char *context_hostname = pmGetContextHostName_r (context, hostname, sizeof(hostname));
 
         timestamp (clog) << "context " << context_description << (context_hostname ? " (" : "")
                          << (context_hostname ? context_hostname : "") << (context_hostname ? ")" : "") << " (web"
@@ -381,6 +396,7 @@ metric_list_traverse (const char *metric, void *closure)
     pmID metric_id;
     pmDesc metric_desc;
     int rc;
+    char buffer[64];	/* sufficient for any type/units strings */
     char *metric_text;
     char *metrics[1] = {
         (char *) metric
@@ -422,8 +438,8 @@ metric_list_traverse (const char *metric, void *closure)
     json_key_value (*mltc->mhdb, "sem",
                     string (metric_desc.sem == PM_SEM_COUNTER ? "counter" : metric_desc.sem == PM_SEM_INSTANT
                             ? "instant" : metric_desc.sem == PM_SEM_DISCRETE ? "discrete" : "unknown"), ",");
-    json_key_value (*mltc->mhdb, "units", string (pmUnitsStr (&metric_desc.units)), ",");
-    json_key_value (*mltc->mhdb, "type", string (pmTypeStr (metric_desc.type)), "");
+    json_key_value (*mltc->mhdb, "units", string (pmUnitsStr_r (&metric_desc.units, buffer, sizeof (buffer))), ",");
+    json_key_value (*mltc->mhdb, "type", string (pmTypeStr_r (metric_desc.type, buffer, sizeof (buffer))), "");
 
     *mltc->mhdb << "}";
     mltc->num_metrics++;
@@ -549,7 +565,8 @@ pmwebapi_format_value (ostream & output, pmDesc * desc, pmValueSet * pvs, int vs
                     json_key_value (output, "name", string(fieldname));
                     free (fieldname);
                 } else {
-                    json_key_value (output, "name", string(pmIDStr (fieldvsp->pmid)));
+                    char pmidstr[20];
+                    json_key_value (output, "name", string(pmIDStr_r (fieldvsp->pmid, pmidstr, sizeof(pmidstr))));
                 }
 
                 output << "}\n";
@@ -728,7 +745,8 @@ pmwebapi_respond_metric_fetch (struct MHD_Connection *connection,
     rc = pmFetch (num_metrics, metrics, &results);
     free (metrics);		/* don't need any more */
     if (rc < 0) {
-        connstamp (cerr, connection) << "pmFetch failed: " << pmErrStr (rc) << endl;
+        char pmmsg[PM_MAXERRMSGLEN];
+        connstamp (cerr, connection) << "pmFetch failed: " << pmErrStr_r (rc, pmmsg, sizeof (pmmsg)) << endl;
         goto out;
     }
     /* NB: we don't care about the possibility of PMCD_*_AGENT bits
@@ -893,7 +911,7 @@ pmwebapi_respond_instance_list (struct MHD_Connection *connection,
     }
 
     /* Pessimistically overestimate maximum number of instance IDs needed. */
-    max_num_instances = strlen (val_indom) + strlen (val_name);
+    max_num_instances = strlen (val_instance) + strlen (val_iname);
     num_instances = 0;
     instances = (int *) calloc ((size_t) max_num_instances, sizeof (int));
     if (instances == NULL) {
@@ -943,7 +961,7 @@ pmwebapi_respond_instance_list (struct MHD_Connection *connection,
         }
 
         iid = pmLookupInDom (inDom, iname);
-        if (iid > 0) {
+        if (iid >= 0) {
             assert (num_instances < max_num_instances);
             instances[num_instances++] = iid;
         }
@@ -998,6 +1016,247 @@ pmwebapi_respond_instance_list (struct MHD_Connection *connection,
     if (namelist != NULL) {
         free (namelist);
     }
+    {
+        string s = output.str ();
+        resp = MHD_create_response_from_buffer (s.length (), (void *) s.c_str (),
+                                                MHD_RESPMEM_MUST_COPY);
+    }
+    if (resp == NULL) {
+        connstamp (cerr, connection) << "MHD_create_response_from_buffer failed" << endl;
+        rc = -ENOMEM;
+        goto out;
+    }
+
+    rc = MHD_add_response_header (resp, "Content-Type", "application/json");
+    if (rc != MHD_YES) {
+        connstamp (cerr, connection) << "MHD_add_response_header failed" << endl;
+        rc = -ENOMEM;
+        goto out1;
+    }
+
+    rc = MHD_add_response_header (resp, "Access-Control-Allow-Origin", "*");
+    if (rc != MHD_YES) {
+        connstamp (cerr, connection) << "MHD_add_response_header ACAO failed" << endl;
+        rc = -ENOMEM;
+        goto out1;
+    }
+
+    rc = MHD_queue_response (connection, MHD_HTTP_OK, resp);
+    if (rc != MHD_YES) {
+        connstamp (cerr, connection) << "MHD_queue_response failed" << endl;
+        rc = -ENOMEM;
+        goto out1;
+    }
+    MHD_destroy_response (resp);
+    return MHD_YES;
+out1:
+    MHD_destroy_response (resp);
+out:
+    return mhd_notify_error (connection, rc);
+}
+
+
+/* ------------------------------------------------------------------------ */
+
+
+static int
+pmwebapi_respond_metric_store (struct MHD_Connection *connection,
+                                const http_params & /*params*/,
+                                struct webcontext *c)
+{
+    const char *val_pmid;
+    const char *val_name;
+    const char *val_value;
+    const char *val_instance;
+    const char *val_iname;
+    struct MHD_Response *resp;
+    int rc = 0;
+    int num_values = 0;
+    int max_num_instances;
+    int num_instances;
+    int *instances;
+    pmID metric_id = PM_ID_NULL;
+    pmDesc metric_desc;
+    pmResult *result;
+    pmValueSet *vset;
+    pmAtomValue atom;
+    ostringstream output;
+
+    (void) c;
+    val_pmid = MHD_lookup_connection_value (connection, MHD_GET_ARGUMENT_KIND, "pmid");
+    if (val_pmid == NULL) {
+        val_pmid = "";
+    }
+    val_name = MHD_lookup_connection_value (connection, MHD_GET_ARGUMENT_KIND, "name");
+    if (val_name == NULL) {
+        val_name = "";
+    }
+    val_instance = MHD_lookup_connection_value (connection, MHD_GET_ARGUMENT_KIND,
+                   "instance");
+    if (val_instance == NULL) {
+        val_instance = "";
+    }
+    val_iname = MHD_lookup_connection_value (connection, MHD_GET_ARGUMENT_KIND, "iname");
+    if (val_iname == NULL) {
+        val_iname = "";
+    }
+    val_value = MHD_lookup_connection_value (connection, MHD_GET_ARGUMENT_KIND, "value");
+    if (val_value == NULL) {
+        connstamp (cerr, connection) << "store with no metric value" << endl;
+        rc = PM_ERR_VALUE;
+        goto out;
+    }
+
+    /* Extract target metric identifier from name or pmid. */
+    if (*val_name != '\0') {
+        rc = pmLookupName (1, (char **) &val_name, &metric_id);
+        if (rc != 1) {
+            connstamp (cerr, connection) << "failed to lookup metric " << val_name << endl;
+            goto out;
+        }
+    }
+    if (*val_pmid != '\0') {
+        char *numend;
+        unsigned long pmid = strtoul (val_pmid, &numend, 0); // accept hex too
+        if (numend != val_pmid) {
+            metric_id = pmid;
+        }
+    }
+
+    if (metric_id == PM_ID_NULL) {
+        connstamp (cerr, connection) << "store with no metric given" << endl;
+        rc = PM_ERR_TOOSMALL;
+        goto out;
+    }
+    rc = pmLookupDesc (metric_id, &metric_desc);
+    if (rc != 0) {
+        connstamp (cerr, connection) << "store failed to lookup desc" << endl;
+        goto out;
+    }
+    if (metric_desc.type == PM_TYPE_AGGREGATE ||
+        metric_desc.type == PM_TYPE_AGGREGATE_STATIC ||
+        metric_desc.type == PM_TYPE_EVENT ||
+        metric_desc.type == PM_TYPE_HIGHRES_EVENT) {
+        connstamp (cerr, connection) << "cannot store aggregate or event metrics" << endl;
+        rc = PM_ERR_TYPE;
+        goto out;
+    }
+
+    /* Extract the supplied string value based on type. */
+    rc = __pmStringValue (val_value, &atom, metric_desc.type);
+    if (rc != 0) {
+        connstamp (cerr, connection) << "store value conversion failed " << val_value << endl;
+        rc = -ENOMEM;
+        goto out;
+    }
+
+    /* Pessimistically overestimate maximum number of instance IDs needed. */
+    max_num_instances = strlen (val_instance) + strlen (val_iname);
+    num_instances = 0;
+    instances = (int *) calloc ((size_t) max_num_instances, sizeof (int));
+    if (instances == NULL) {
+        connstamp (cerr, connection) << "calloc instances[" << max_num_instances << "] oom" <<
+                                     endl;
+        rc = -ENOMEM;
+        goto out;
+    }
+
+    /* Loop over instance= numbers in val_instance, collect them in instances[]. */
+    while (*val_instance != '\0') {
+        char *numend;
+        int iid = (int) strtoul (val_instance, &numend, 0);
+        if (numend == val_instance) {
+            break;		/* invalid contents */
+        }
+        assert (num_instances < max_num_instances);
+        instances[num_instances++] = iid;
+        if (*numend == '\0') {
+            break;		/* end of string */
+        }
+        val_instance = numend + 1;	/* advance to next string */
+    }
+
+    /* Loop over iname= names in val_iname, collect them in instances[]. */
+    while (*val_iname != '\0') {
+        char *iname;
+        const char *iname_end = strchr (val_iname, ',');
+        int iid;
+        /* Ignore plain "," XXX: elsewhere too? */
+        if (*val_iname == ',') {
+            val_iname++;
+            continue;
+        }
+
+        if (iname_end) {
+            iname = strndup (val_iname, (iname_end - val_iname));
+            val_iname = iname_end + 1;	/* skip past , */
+        } else {
+            iname = strdup (val_iname);
+            val_iname += strlen (val_iname);	/* skip onto \0 */
+        }
+
+        iid = pmLookupInDom (metric_desc.indom, iname);
+        if (iid >= 0) {
+            assert (num_instances < max_num_instances);
+            instances[num_instances++] = iid;
+        }
+        free (iname);
+    }
+
+    /* Restrict instances to just the given set. */
+    if (num_instances != 0) {
+        pmDelProfile (metric_desc.indom, 0, NULL);
+        rc = pmAddProfile (metric_desc.indom, num_instances, instances);
+        if (rc != 0) {
+            connstamp (cerr, connection) << "store profile failed" << endl;
+            goto out;
+        }
+        free (instances);
+	num_values = num_instances;
+    } else {
+	num_values = 1;
+    }
+
+    /* Setup the result structure with new value(s) and send it */
+    if ((vset = (pmValueSet *) calloc (1, sizeof(pmValueSet) + sizeof(pmValue) * (num_values - 1))) == NULL) {
+        connstamp (cerr, connection) << "store vset allocation failed" << endl;
+        rc = -ENOMEM;
+        goto out;
+    }
+    if ((result = (pmResult *) calloc (1, sizeof(pmResult))) == NULL) {
+        connstamp (cerr, connection) << "store result allocation failed" << endl;
+        free (vset);
+        rc = -ENOMEM;
+        goto out;
+    }
+    result->vset[0] = vset;
+    result->numpmid = 1;
+
+    for (int vi = 0; vi < num_values; vi++) {
+        rc = __pmStuffValue (&atom, &vset->vlist[vi], metric_desc.type);
+        if (rc < 0) {
+            connstamp (cerr, connection) << "stuff value failed " << endl;
+            free (result);
+            free (vset);
+            goto out;
+        }
+    }
+    vset->valfmt = rc;
+    vset->numval = num_values;
+    vset->pmid = metric_id;
+
+    rc = pmStore (result);
+    pmFreeResult (result);
+
+    if (rc < 0) {
+        connstamp (cerr, connection) << "store value failed: " << pmErrStr(rc) << endl;
+        goto out;
+    }
+
+    output << "{";
+    json_key_value (output, "success", true);
+    output << "}";		// iteration over instances
+
     {
         string s = output.str ();
         resp = MHD_create_response_from_buffer (s.length (), (void *) s.c_str (),
@@ -1165,7 +1424,8 @@ pmwebapi_respond (struct MHD_Connection *connection, const http_params & params,
     /* if-multithreaded: watch out. */
     rc = pmUseContext (c->context);
     if (rc) {
-	connstamp (cerr, connection) << "pmUseContext(" << c->context << ") failed: " << pmErrStr(rc) << endl;
+        char pmmsg[PM_MAXERRMSGLEN];
+	connstamp (cerr, connection) << "pmUseContext(" << c->context << ") failed: " << pmErrStr_r (rc, pmmsg, sizeof (pmmsg)) << endl;
         goto out;
     }
     /* -------------------------------------------------------------------- */
@@ -1182,6 +1442,10 @@ pmwebapi_respond (struct MHD_Connection *connection, const http_params & params,
     /* metric fetch: /context/$ID/_fetch */
     else if (context_command == "_fetch") {
         return pmwebapi_respond_metric_fetch (connection, params, c);
+    }
+    /* metric store: /context/$ID/_store */
+    else if (context_command == "_store") {
+        return pmwebapi_respond_metric_store (connection, params, c);
     }
 
     connstamp (cerr, connection) << "unknown context command " << context_command << endl;

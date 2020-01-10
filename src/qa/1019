@@ -4,24 +4,26 @@
 #
 seq=`basename $0`
 echo "QA output created by $seq"
-. ./common.qt
 
-[ -x qt/qmc_group/qmc_group ] || _notrun "qmc_group not built or installed"
+status=1	# failure is the default!
+. ./common.qt
 
 _cleanup()
 {
     if [ ! -f $tmp.done ]
     then
 	cd $here/pmdas/dynamic
-	$sudo ./Remove >>$here/src/$seq.full
+	$sudo ./Remove >>$here/$seq.full
 	cd $here
 	touch $tmp.done
     fi
+    _cleanup_qt
 }
 
-status=1	# failure is the default!
+trap "_cleanup; exit \$status" 0 1 2 3 15
+
+[ -x qt/qmc_group/qmc_group ] || _notrun "qmc_group not built or installed"
 rm -f $seq.full
-trap "_cleanup; rm -f $tmp.*; exit \$status" 0 1 2 3 15
 
 _filter1()
 {
@@ -69,9 +71,9 @@ _filter2()
     | uniq -c \
     | sed -e 's/  */ /g'
 
-    echo "*** Transactions ***" >> $seq.full
-    echo >> $seq.full
-    cat $tmp.filtered >> $seq.full
+    echo "*** Transactions ***" >> $here/$seq.full
+    echo >> $here/$seq.full
+    cat $tmp.filtered >> $here/$seq.full
 }
 
 # real QA test starts here

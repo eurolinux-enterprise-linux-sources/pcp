@@ -1,6 +1,6 @@
 #! /bin/sh
 #
-# Copyright (c) 2014 Red Hat.
+# Copyright (c) 2014-2015 Red Hat.
 # Copyright (c) 2005 Silicon Graphics, Inc.  All Rights Reserved.
 # 
 # This program is free software; you can redistribute it and/or modify it
@@ -38,6 +38,7 @@
 
 PMPROXY=$PCP_BINADM_DIR/pmproxy
 PMPROXYOPTS=$PCP_PMPROXYOPTIONS_PATH
+PMPROXYENVS=$PCP_SYSCONFIG_DIR/pmproxy
 RUNDIR=$PCP_LOG_DIR/pmproxy
 pmprog=$PCP_RC_DIR/pmproxy
 prog=$PCP_RC_DIR/`basename $0`
@@ -215,6 +216,13 @@ case "$1" in
 Error: pmproxy options file "$PMPROXYOPTS" is missing, cannot start pmproxy.'
 		exit
 	    fi
+	    # create directory housing daemon pid file
+	    if [ ! -d "$PCP_RUN_DIR" ]
+	    then
+		mkdir -p -m 775 "$PCP_RUN_DIR"
+		chown $PCP_USER:$PCP_GROUP "$PCP_RUN_DIR"
+	    fi
+	    # create directory which will serve as cwd
 	    if [ ! -d "$RUNDIR" ]
 	    then
 		mkdir -p -m 775 "$RUNDIR"
@@ -232,7 +240,9 @@ Error: pmproxy options file "$PMPROXYOPTS" is missing, cannot start pmproxy.'
 
 	    $ECHO $PCP_ECHO_N "Starting pmproxy ..." "$PCP_ECHO_C"
 
-	    # options file processing ...
+	    # only consider variables which start with PMPROXY
+	    ENVS=`grep ^PMPROXY $PMPROXYENVS 2>/dev/null`
+
 	    # only consider lines which start with a hyphen
 	    # get rid of the -f option
 	    # ensure multiple lines concat onto 1 line
@@ -245,21 +255,13 @@ Error: pmproxy options file "$PMPROXYOPTS" is missing, cannot start pmproxy.'
 			    -e 's/ $//' \
 		    | tr '\012' ' ' `
 
-	    # environment stuff
-	    #
-	    eval `sed -e 's/"/\\"/g' "$PMPROXYOPTS" \
-	    | awk -F= '
-BEGIN			{ exports="" }
-/^[A-Z]/ && NF == 2	{ exports=exports" "$1
-			  printf "%s=${%s:-\"%s\"}\n", $1, $1, $2
-			}
-END			{ if (exports != "") print "export", exports }'`
-
-	    $PMPROXY $OPTS
+	    eval $ENVS '$PMPROXY $OPTS'
 	    $RC_STATUS -v
 
 	    $PCP_BINADM_DIR/pmpost "start pmproxy from $pmprog"
 
+	    # finally, stop here if running in a container
+	    [ -z "$PCP_CONTAINER_IMAGE" ] || exec $PCP_BINADM_DIR/pmpause
 	fi
 	status=0
         ;;
@@ -292,6 +294,7 @@ END			{ if (exports != "") print "export", exports }'`
 	;;
 
   *)
+	[ -z "$PCP_CONTAINER_IMAGE" ] || exec "$@"
 	_usage
         ;;
 esac

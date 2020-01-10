@@ -39,20 +39,9 @@
 PMCD=$PCP_BINADM_DIR/pmcd
 PMCDOPTS=$PCP_PMCDOPTIONS_PATH
 PCPLOCAL=$PCP_PMCDRCLOCAL_PATH
+PMCDENVS=$PCP_SYSCONFIG_DIR/pmcd
 RUNDIR=$PCP_LOG_DIR/pmcd
 prog=$PCP_RC_DIR/`basename $0`
-
-# search for your mail agent of choice ...
-#
-MAIL=''
-for try in Mail mail email
-do
-    if which $try >/dev/null 2>&1
-    then
-	MAIL=$try
-	break
-    fi
-done
 
 tmp=`mktemp -d /var/tmp/pcp.XXXXXXXXX` || exit 1
 status=1
@@ -161,48 +150,60 @@ _reboot_setup()
     fi
 }
 
-# Note: _pmda_setup() runs in the background, in parallel with
-# the rest of the script.  It might complete well after the caller.
+# Note: _pmda_setup() is run only once per rc script invocation ...
+#       even though this may call Install and/or Remove scripts
+#       for multiple PMDAs which may in turn (recursively) call
+#       the rc script
 #
 _pmda_setup()
 {
-    # Auto-Install PMDAs?
+    # Auto-Install and/or Auto-Remove PMDAs?
     #
-    if [ -d $PCP_PMDAS_DIR ]
+    if [ -d "$PCP_PMDAS_DIR" ]
     then
 	here=`pwd`
-	cd $PCP_PMDAS_DIR
-	for file in */.NeedInstall
-	do
-	    [ "$file" = '*/.NeedInstall' ] && break
-	    pmda=`dirname $file`
-	    if [ -d "$pmda" -a -f "$pmda/.NeedInstall" ]
-	    then
-		cd $pmda
-		$PCP_ECHO_PROG "Installing $pmda PMDA ..."
-
-		# rename .NeedInstall _before_ calling Install because
-		# Install can call this start script (recursively) and
-		# we don't want to get stuck in an infinite loop.
-		# 
-		rm -f .NeedInstall.sav
-		mv .NeedInstall .NeedInstall.sav
-		if ./Install </dev/null >/dev/null
-		then
-		    # success
-		    $PCP_BINADM_DIR/pmpost "PMDA setup: automated install: $pmda"
-		    rm -f .NeedInstall.sav
-		else
-		    # put the file back, maybe we'll be luckier next time
-		    $PCP_BINADM_DIR/pmpost "PMDA setup: automated install FAILED (exit=$?): $pmda"
-		    mv .NeedInstall.sav .NeedInstall
-		fi
-
-		cd $PCP_PMDAS_DIR
-	    fi
-	done
+	cd "$PCP_PMDAS_DIR"
+	_pmda_enact Remove Removing
+	_pmda_enact Install Installing
 	cd "$here"
     fi
+}
+
+# Take automated setup action (Install or Remove) for PMDAs
+#
+_pmda_enact()
+{
+    action=$1
+    verb=$2
+
+    for file in */.Need$action
+    do
+	[ "$file" = "*/.Need$action" ] && break
+	pmda=`dirname $file`
+	if [ -d "$pmda" -a -f "$pmda/.Need$action" ]
+	then
+	    cd $pmda
+	    $PCP_ECHO_PROG "$verb $pmda PMDA ..."
+
+	    # rename marker file _before_ calling action script because
+	    # that script might call this start script recursively, and
+	    # we don't want to get stuck in an infinite loop.
+	    # 
+	    rm -f .Need${action}.sav
+	    mv .Need${action} .Need${action}.sav
+	    if ./${action} </dev/null >/dev/null
+	    then
+		# success
+		$PCP_BINADM_DIR/pmpost "PMDA setup: automated $action: $pmda"
+		rm -f .Need$action.sav
+	    else
+		# put the file back, maybe we'll be luckier next time
+		$PCP_BINADM_DIR/pmpost "PMDA setup: automated $action FAILED (exit=$?): $pmda"
+		mv .Need$action.sav .Need$action
+	    fi
+	    cd "$PCP_PMDAS_DIR"
+	fi
+    done
 }
 
 _start_pmcheck()
@@ -219,13 +220,9 @@ _start_pmcheck()
 	:
     else
 	status=$?
-	$PCP_BINADM_DIR/pmpost "pmcd_wait failed in $prog: exit status: $status" 
-	if [ ! -z "$MAIL" ]
-	then
-	    echo "pmcd_wait exit status: $status" | $MAIL -s "pmcd_wait failed in $prog" root
-	else
-	    echo "$prog: pmcd_wait failed: exit status: $status"
-	fi
+	message="pmcd_wait failed in $prog: exit status: $status"
+	$PCP_SYSLOG_PROG -p daemon.warning "$message"
+	$PCP_BINADM_DIR/pmpost "$message"
     fi
 }
 
@@ -472,6 +469,9 @@ Error: pmcd control file '"$PCP_PMCDCONF_PATH"' is missing, cannot start pmcd.'
 
 	    $ECHO $PCP_ECHO_N "Starting pmcd ..." "$PCP_ECHO_C"
 
+	    # only consider variables which start with PMCD
+	    ENVS=`grep ^PMCD $PMCDENVS 2>/dev/null`
+
 	    # only consider lines which start with a hyphen
 	    # get rid of the -f option
 	    # ensure multiple lines concat onto 1 line
@@ -484,24 +484,50 @@ Error: pmcd control file '"$PCP_PMCDCONF_PATH"' is missing, cannot start pmcd.'
 			    -e 's/ $//' \
 		    | tr '\012' ' ' `
 
-	    $PMCD $OPTS
+	    eval $ENVS '$PMCD $OPTS'
             _start_pmcheck
 	    $RC_STATUS -v
 
-	    $PCP_BINADM_DIR/pmpost "start pmcd from $prog"
-
-	    # install any extra PMDAs, in the background
-	    _pmda_setup &
-
-	    # force removal of primary pmlogger link ... if primary
-	    # pmlogger is started, this will re-create the link
+	    # auto-install and/or auto-removal of PMDAs may trigger
+	    # a recursive call into this script to restart pmcd,
+	    # so be careful to only run _pmda_setup once and do other
+	    # tasks related to the initial script invocation only once
 	    #
-	    rm -f "$PCP_TMP_DIR/pmlogger/primary"
+	    if [ -z "$PMDA_SETUP_RUNNING" ]
+	    then
+		# not a recursive call ...
 
-	    # site-local customisations after PMCD startup
-	    #
-	    [ -x $PCPLOCAL ] && $PCPLOCAL $VFLAG start
-	    
+		$PCP_BINADM_DIR/pmpost "start pmcd from $prog"
+
+		# force removal of primary pmlogger link ... if primary
+		# pmlogger is started, this will re-create the link
+		#
+		rm -f "$PCP_TMP_DIR/pmlogger/primary"
+
+		# site-local customisations after PMCD startup
+		[ -x $PCPLOCAL ] && $PCPLOCAL $VFLAG start
+
+		# auto install/remove any PMDAs ... this may trigger the
+		# recursion and setting $PMDA_SETUP_RUNNING in the
+		# environment is the guard
+		#
+		PMDA_SETUP_RUNNING=yes _pmda_setup &
+
+		# container environment
+		if [ -n "$PCP_CONTAINER_IMAGE" ]
+		then
+		    # in a container, _pmda_setup cannot run indefinitely -
+		    # if it did then the pmpause signal handler would reap
+		    # the _pmda_setup child and exit.
+		    wait
+
+		    # finally, stop here when running as a container
+		    exec $PCP_BINADM_DIR/pmpause
+		fi
+	    else
+		$PCP_BINADM_DIR/pmpost "start pmcd from PMDA setup called from $prog"
+	    fi
+
 	fi
 	status=0
         ;;
@@ -537,6 +563,7 @@ Error: pmcd control file '"$PCP_PMCDCONF_PATH"' is missing, cannot start pmcd.'
 	;;
 
   *)
+	[ -z "$PCP_CONTAINER_IMAGE" ] || exec "$@"
 	_usage
         ;;
 esac

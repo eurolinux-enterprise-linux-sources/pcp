@@ -39,7 +39,7 @@ status=0	# success by default
 trap "rm -f $tmp.*; exit \$status" 0 1 2 3 15
 
 # need a constant archive for this ...
-ARCH=src/omen.client
+ARCH=archives/omen.client
 
 # deal with an annoying libc error ... using TZ=:Australia/Melbourne
 # causes the -z option to report the wrong time, at least for some
@@ -55,7 +55,7 @@ echo "sum of $ARCH ..."
 if [ $PCP_PLATFORM = darwin ]
 then
     SUM=sum
-elif [ $PCP_PLATFORM = freebsd ]
+elif [ $PCP_PLATFORM = freebsd -o $PCP_PLATFORM = netbsd ]
 then
     # defaults to cksum -o1 - historic BSD algorithm
     SUM=sum

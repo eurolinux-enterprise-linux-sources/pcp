@@ -26,7 +26,14 @@ enum {
     CONTAINERS_RUNNING,
     CONTAINERS_PAUSED,
     CONTAINERS_RESTARTING,
+    CONTAINERS_CGROUP,
     NUM_METRICS
+};
+
+enum {
+    CONTAINERS_UPTODATE_NAME,
+    CONTAINERS_UPTODATE_STATE,
+    NUM_UPTODATE
 };
 
 /*
@@ -47,9 +54,9 @@ typedef int (*container_match_t)(struct container_engine *,
 		const char *, const char *, const char *);
 
 typedef struct container_engine {
-    char		*name;
-    int			state;
-    char		path[60];
+    char		*name;		/* docker, lxc, rkt, etc. */
+    int			state;		/* external driver states */
+    char		path[60];	/* suffix for cgroup path */
     container_setup_t	setup;
     container_changed_t	indom_changed;
     container_insts_t	insts_refresh;
@@ -57,10 +64,17 @@ typedef struct container_engine {
     container_match_t	name_matching;
 } container_engine_t;
 
+enum {
+    CONTAINER_STATE_SYSTEMD	= (1<<0),
+};
+
 typedef struct container {
     int			pid;
-    int			status;
-    char		*name;
+    int			flags : 8;	/* CONTAINER_FLAG bitwise */
+    int			state : 8;	/* internal driver states */
+    int			uptodate : 8;	/* refreshed values count */ 
+    int			padding : 8;
+    char		*name;		/* human-presentable name */
     char		cgroup[128];
     struct stat		stat;
     container_engine_t	*engine;

@@ -6,6 +6,11 @@
  * under the terms of the GNU Lesser General Public License as published
  * by the Free Software Foundation; either version 2.1 of the License, or
  * (at your option) any later version.
+ * 
+ * This library is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
+ * License for more details.
  */
 
 #include <strings.h>
@@ -544,7 +549,7 @@ void
 QmcMetric::dumpErr() const
 {
     pmprintf("%s: Error: %s: %s\n", pmProgname,
-	     (const char *)spec(true).toAscii(), pmErrStr(my.status));
+	     (const char *)spec(true).toLatin1(), pmErrStr(my.status));
 }
 
 // Instance list may not be valid, so pass inst as a string rather than
@@ -554,7 +559,7 @@ void
 QmcMetric::dumpErr(const char *inst) const
 {
     pmprintf("%s: Error: %s[%s]: %s\n", pmProgname,
-	     (const char *)spec(true).toAscii(), inst, pmErrStr(my.status));
+	     (const char *)spec(true).toLatin1(), inst, pmErrStr(my.status));
 }
 
 const char *

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014 Red Hat.
+ * Copyright (c) 2013-2015 Red Hat.
  * Copyright (c) 1995-2001,2003 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -33,6 +33,7 @@ static pmLongOptions longopts[] = {
     PMOPT_ORIGIN,
     PMOPT_TIMEZONE,
     PMOPT_HOSTZONE,
+    PMOPT_VERSION,
     PMOPT_HELP,
     PMAPI_OPTIONS_HEADER("Protocol options"),
     { "batch",    1, 'b', "N", "fetch N metrics at a time for -f and -v [20]" },
@@ -44,7 +45,7 @@ static pmLongOptions longopts[] = {
     { "oneline",  0, 't', 0, "get and display (terse) oneline text" },
     { "helptext", 0, 'T', 0, "get and display (verbose) help text" },
     PMAPI_OPTIONS_HEADER("Metrics options"),
-    { "derived",  1, 'c', "FILE", "load derived metric definitions from FILE" },
+    { "derived",  1, 'c', "FILE", "load derived metric definitions from FILE(s)" },
     { "events",   0, 'x', 0, "unpack and report on any fetched event records" },
     { "verify",   0, 'v', 0, "verify mode, be quiet and only report errors" },
     PMAPI_OPTIONS_END
@@ -52,7 +53,7 @@ static pmLongOptions longopts[] = {
 
 static pmOptions opts = {
     .flags = PM_OPTFLAG_STDOUT_TZ,
-    .short_options = "a:b:c:dD:Ffh:K:LMmN:n:O:tTvxzZ:?",
+    .short_options = "a:b:c:dD:Ffh:K:LMmN:n:O:tTvVxzZ:?",
     .long_options = longopts,
     .short_usage = "[options] [metricname ...]",
     .override = myoverrides,
@@ -535,7 +536,7 @@ main(int argc, char **argv)
 	    case 'c':		/* derived metrics config file */
 		sts = pmLoadDerivedConfig(opts.optarg);
 		if (sts < 0) {
-		    fprintf(stderr, "%s: -c error: %s\n", pmProgname, pmErrStr(sts));
+		    fprintf(stderr, "%s: derived configuration(s) error: %s\n", pmProgname, pmErrStr(sts));
 		    /* errors are not necessarily fatal ... */
 		}
 		break;
@@ -594,9 +595,10 @@ main(int argc, char **argv)
 		break;
 	}
     }
-    if (opts.errors) {
+    if (opts.errors || (opts.flags & PM_OPTFLAG_EXIT)) {
+	exitsts = !(opts.flags & PM_OPTFLAG_EXIT);
 	pmUsageMessage(&opts);
-	exit(1);
+	exit(exitsts);
     }
 
     if (opts.context)
@@ -656,7 +658,13 @@ main(int argc, char **argv)
 	ctxid = sts;
 
 	if (opts.context == PM_CONTEXT_ARCHIVE) {
-	    pmTrimNameSpace();
+	    if (opts.nsflag) {
+		/*
+		 * loaded -n (or -N) namespace from the command line,
+		 * so cull metrics not in the archive
+		 */
+		pmTrimNameSpace();
+	    }
 	    /* complete TZ and time window option (origin) setup */
 	    if (pmGetContextOptions(ctxid, &opts)) {
 		pmflush();

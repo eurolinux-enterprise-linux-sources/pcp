@@ -27,6 +27,7 @@ static pmID		pmid_flags;
 static pmID		pmid_missed;
 static int		sflag;
 static int		xflag;		/* for -x (long timestamps) */
+static pmLogLabel	label;
 
 static pmLongOptions longopts[] = {
     PMAPI_OPTIONS_HEADER("Options"),
@@ -54,7 +55,7 @@ static pmLongOptions longopts[] = {
 static int overrides(int, pmOptions *);
 static pmOptions opts = {
     .flags = PM_OPTFLAG_DONE | PM_OPTFLAG_STDOUT_TZ | PM_OPTFLAG_BOUNDARIES,
-    .short_options = "aD:dilLmn:rS:sT:tv:xZ:z?",
+    .short_options = "aD:dilLmMn:rS:sT:tv:xZ:z?",
     .long_options = longopts,
     .short_usage = "[options] [archive [metricname ...]]",
     .override = overrides,
@@ -366,12 +367,14 @@ dump_result(pmResult *resp)
 	char	       *ddmm;
 	char	       *yr;
 
-	ddmm = pmCtime(&resp->timestamp.tv_sec, timebuf);
+	ddmm = pmCtime((const time_t *)&resp->timestamp.tv_sec, timebuf);
 	ddmm[10] = '\0';
 	yr = &ddmm[20];
 	printf("%s ", ddmm);
 	__pmPrintStamp(stdout, &resp->timestamp);
 	printf(" %4.4s", yr);
+	if (xflag >= 2)
+	    printf(" (%.6f)", __pmtimevalSub(&resp->timestamp, &label.ll_start));
     }
     else
 	__pmPrintStamp(stdout, &resp->timestamp);
@@ -386,6 +389,7 @@ dump_result(pmResult *resp)
 
 	if (i > 0)
 	    printf("            ");
+	names = NULL; /* silence coverity */
 	n = pmNameAll(vsp->pmid, &names);
 	if (vsp->numval == 0) {
 	    printf("  %s (", pmIDStr(vsp->pmid));
@@ -435,6 +439,7 @@ dumpDesc(__pmContext *ctxp)
     for (i = 0; i < ctxp->c_archctl->ac_log->l_hashpmid.hsize; i++) {
 	for (hp = ctxp->c_archctl->ac_log->l_hashpmid.hash[i]; hp != NULL; hp = hp->next) {
 	    dp = (pmDesc *)hp->data;
+	    names = NULL; /* silence coverity */
 	    sts = pmNameAll(dp->pmid, &names);
 	    if (sts < 0)
 		printf("PMID: %s (%s)\n", pmIDStr(dp->pmid), "<noname>");
@@ -495,6 +500,9 @@ dumpTI(__pmContext *ctxp)
     struct stat	sbuf;
     __pmLogTI	*tip;
     __pmLogTI	*lastp;
+    __pmLogCtl  *lcp;
+    
+    lcp = ctxp->c_archctl->ac_log;
 
     printf("\nTemporal Index\n");
     printf("             Log Vol    end(meta)     end(log)\n");
@@ -506,14 +514,14 @@ dumpTI(__pmContext *ctxp)
 	__pmPrintStamp(stdout, &tv);
 	printf("    %4d  %11d  %11d\n", tip->ti_vol, tip->ti_meta, tip->ti_log);
 	if (i == 0) {
-	    sprintf(path, "%s.meta", opts.archives[0]);
+	    sprintf(path, "%s.meta", lcp->l_name);
 	    if (stat(path, &sbuf) == 0)
 		meta_size = sbuf.st_size;
 	    else
 		meta_size = -1;
 	}
 	if (lastp == NULL || tip->ti_vol != lastp->ti_vol) { 
-	    sprintf(path, "%s.%d", opts.archives[0], tip->ti_vol);
+	    sprintf(path, "%s.%d", lcp->l_name, tip->ti_vol);
 	    if (stat(path, &sbuf) == 0)
 		log_size = sbuf.st_size;
 	    else {
@@ -569,21 +577,13 @@ dumpTI(__pmContext *ctxp)
 static void
 dumpLabel(int verbose)
 {
-    pmLogLabel	label;
     char	*ddmm;
     char	*yr;
-    int		sts;
-
-    if ((sts = pmGetArchiveLabel(&label)) < 0) {
-	fprintf(stderr, "%s: Cannot get archive label record: %s\n",
-		pmProgname, pmErrStr(sts));
-	exit(1);
-    }
 
     printf("Log Label (Log Format Version %d)\n", label.ll_magic & 0xff);
     printf("Performance metrics from host %s\n", label.ll_hostname);
 
-    ddmm = pmCtime(&label.ll_start.tv_sec, timebuf);
+    ddmm = pmCtime((const time_t *)&label.ll_start.tv_sec, timebuf);
     ddmm[10] = '\0';
     yr = &ddmm[20];
     printf("  commencing %s ", ddmm);
@@ -595,7 +595,7 @@ dumpLabel(int verbose)
 	printf("  ending     UNKNOWN\n");
     }
     else {
-	ddmm = pmCtime(&opts.finish.tv_sec, timebuf);
+	ddmm = pmCtime((const time_t *)&opts.finish.tv_sec, timebuf);
 	ddmm[10] = '\0';
 	yr = &ddmm[20];
 	printf("  ending     %s ", ddmm);
@@ -691,11 +691,14 @@ main(int argc, char *argv[])
     int			iflag = 0;
     int			Lflag = 0;
     int			lflag = 0;
+    int			Mflag = 0;
     int			mflag = 0;
     int			tflag = 0;
     int			vflag = 0;
     int			mode = PM_MODE_FORW;
     __pmContext		*ctxp;
+    pmResult		*raw_result;
+    pmResult		*skel_result = NULL;
     pmResult		*result;
     struct timeval	done;
 
@@ -727,6 +730,10 @@ main(int argc, char *argv[])
 	    mflag = 1;
 	    break;
 
+	case 'M':	/* report <mark> records */
+	    Mflag = 1;
+	    break;
+
 	case 'r':	/* read log in reverse chornological order */
 	    mode = PM_MODE_BACK;
 	    break;
@@ -745,14 +752,15 @@ main(int argc, char *argv[])
 	    break;
 
 	case 'x':	/* report Ddd Mmm DD <timestamp> YYYY */
-	    xflag = 1;
+			/* -xx reports numeric timeval also */
+	    xflag++;
 	    break;
 	}
     }
 
     if (opts.errors ||
 	(vflag && opts.optind != argc) ||
-	(!vflag && opts.optind > argc - 1)) {
+	(!vflag && opts.optind > argc - 1 && !opts.narchives)) {
 	pmUsageMessage(&opts);
 	exit(1);
     }
@@ -772,13 +780,14 @@ main(int argc, char *argv[])
 	mflag = 1;	/* default */
 
     /* delay option end processing until now that we have the archive name */
-    __pmAddOptArchive(&opts, argv[opts.optind]);
+    if (opts.narchives == 0)
+	__pmAddOptArchive(&opts, argv[opts.optind++]);
     opts.flags &= ~PM_OPTFLAG_DONE;
     __pmEndOptions(&opts);
 
     if ((sts = ctxid = pmNewContext(PM_CONTEXT_ARCHIVE, opts.archives[0])) < 0) {
 	fprintf(stderr, "%s: Cannot open archive \"%s\": %s\n",
-		pmProgname, argv[opts.optind], pmErrStr(sts));
+		pmProgname, opts.archives[0], pmErrStr(sts));
 	exit(1);
     }
     /* complete TZ and time window option (origin) setup */
@@ -787,7 +796,6 @@ main(int argc, char *argv[])
 	exit(1);
     }
 
-    opts.optind++;
     numpmid = argc - opts.optind;
     if (numpmid) {
 	numpmid = 0;
@@ -812,6 +820,24 @@ main(int argc, char *argv[])
 	if (numpmid == 0) {
 	    fprintf(stderr, "No metric names can be translated, dump abandoned\n");
 	    exit(1);
+	}
+    }
+
+    if ((sts = pmGetArchiveLabel(&label)) < 0) {
+	fprintf(stderr, "%s: Cannot get archive label record: %s\n",
+		pmProgname, pmErrStr(sts));
+	exit(1);
+    }
+
+    if (numpmid > 0) {
+	/*
+	 * setup dummy pmResult
+	 */
+	skel_result = (pmResult *)malloc(sizeof(pmResult)+(numpmid-1)*sizeof(pmValueSet *));
+	if (skel_result == NULL) {
+	    fprintf(stderr, "%s: malloc(skel_result): %s\n", pmProgname, osstrerror());
+	    exit(1);
+
 	}
     }
 
@@ -880,16 +906,60 @@ main(int argc, char *argv[])
 	}
 	sts = 0;
 	for ( ; ; ) {
-	    if (numpmid == 0)
-		sts = pmFetchArchive(&result);
-	    else
-		sts = pmFetch(numpmid, pmid, &result);
+	    sts = __pmLogFetch(ctxp, 0, NULL, &raw_result);
 	    if (sts < 0)
 		break;
+	    if (numpmid == 0 || (raw_result->numpmid == 0 && Mflag)) {
+		/*
+		 * want 'em all or <mark> record ...
+		 */
+		result = raw_result;
+	    }
+	    else if (numpmid > 0) {
+		/*
+		 * cherry pick from raw_result if pmid matches one
+		 * of interest
+		 */
+		int	picked = 0;
+		int	j;
+		skel_result->timestamp = raw_result->timestamp;
+		for (j = 0; j < numpmid; j++)
+		    skel_result->vset[j] = NULL;
+		for (i = 0; i < raw_result->numpmid; i++) {
+		    for (j = 0; j < numpmid; j++) {
+			if (pmid[j] == raw_result->vset[i]->pmid) {
+			    skel_result->vset[j] = raw_result->vset[i];
+			    picked++;
+			    break;
+			}
+		    }
+		}
+		if (picked == 0) {
+		    /* no metrics of interest, skip this record */
+		    pmFreeResult(raw_result);
+		    continue;
+		}
+		skel_result->numpmid = picked;
+		if (picked != numpmid) {
+		    /* did not find 'em all ... shuffle time */
+		    int		j;
+		    i = 0;
+		    for (j = 0; j < numpmid; j++) {
+			if (skel_result->vset[j] != NULL)
+			    skel_result->vset[i++] = skel_result->vset[j];
+		    }
+		}
+		result = skel_result;
+	    }
+	    else {
+		/* not interesting */
+		pmFreeResult(raw_result);
+		continue;
+	    }
 	    if (first && mode == PM_MODE_BACK) {
 		first = 0;
 		printf("\nLog finished at %24.24s - dump in reverse order\n",
-			pmCtime(&result->timestamp.tv_sec, timebuf));
+			pmCtime((const time_t *)&result->timestamp.tv_sec, timebuf));
 	    }
 	    if ((mode == PM_MODE_FORW && tvcmp(result->timestamp, done) > 0) ||
 		(mode == PM_MODE_BACK && tvcmp(result->timestamp, done) < 0)) {
@@ -898,7 +968,7 @@ main(int argc, char *argv[])
 	    }
 	    putchar('\n');
 	    dump_result(result);
-	    pmFreeResult(result);
+	    pmFreeResult(raw_result);
 	}
 	if (sts != PM_ERR_EOL) {
 	    fprintf(stderr, "%s: pmFetch: %s\n", pmProgname, pmErrStr(sts));

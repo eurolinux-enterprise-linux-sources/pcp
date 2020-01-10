@@ -1,0 +1,21 @@
+commit ec24477151b7e0737b8fea2d24d9e585d91c3831
+Author: Lukas Berk <lberk@redhat.com>
+Date:   Fri Jan 29 10:23:17 2016 -0500
+
+    qa/416 add notrun install test for the pmda itself
+    
+    Previously we only checked that perl bindings were installed.  With the
+    pmda subrpms, we should also check that the pmda itself is installed
+
+diff --git a/qa/416 b/qa/416
+index 671446d..252ff8d 100755
+--- a/qa/416
++++ b/qa/416
+@@ -15,6 +15,7 @@ echo "QA output created by $seq"
+ 
+ perl -e "use PCP::PMDA" >/dev/null 2>&1
+ [ $? -eq 0 ] || _notrun "perl PCP::PMDA module not installed"
++[ -f $PCP_PMDAS_DIR/news/pmdanews.pl ] || _notrun "news pmda not installed"
+ 
+ status=0	# success is the default!
+ $sudo rm -rf $tmp.* $seq.full

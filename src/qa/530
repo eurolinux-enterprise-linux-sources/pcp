@@ -18,6 +18,18 @@ echo "QA output created by $seq"
 . ./common.filter
 . ./common.check
 
+# This test is not stable in the vicinity of a timezone change, e.g.
+# daylight saving or summer time transitions.
+# Don't run if this happened in the last 2 days.
+#
+now_hr=`pmdate '%H'`
+now_hr_2=`pmdate -2d '%H'`
+if [ "$now_hr" != "$now_hr_2" ]
+then
+    _notrun "timezone change? now = ${now_hr}H:??M, 2 days ago = ${now_hr_2}H:??M"
+    # NOTREACHED
+fi
+
 _filter()
 {
     tee -a $seq.full \
@@ -57,7 +69,7 @@ END				{ if ( eatlines ) {
 }
 
 status=1	# failure is the default!
-trap "cd $here; $sudo rm -rf $tmp; $sudo mv $PCP_LOG_DIR/NOTICES.$$ $PCP_LOG_DIR/NOTICES; exit \$status" 0 1 2 3 15
+trap "cd $here; $sudo rm -rf $tmp $tmp.*; $sudo mv $PCP_LOG_DIR/NOTICES.$$ $PCP_LOG_DIR/NOTICES; exit \$status" 0 1 2 3 15
 
 # take explicit control of the umask
 #
@@ -96,9 +108,9 @@ do
 
 	for ext in 0 index meta
 	do
-	    cp src/arch_a.$ext $tmp/$namea.$ext
+	    cp archives/arch_a.$ext $tmp/$namea.$ext
 	    touch -t $stampa $tmp/$namea.$ext
-	    cp src/arch_b.$ext $tmp/$nameb.$ext
+	    cp archives/arch_b.$ext $tmp/$nameb.$ext
 	    touch -t $stampb $tmp/$nameb.$ext
 	done
     done
@@ -114,8 +126,8 @@ LOCALHOSTNAME	n   n	'"$tmp"'	./config'
     echo
     echo "=== [${verbose+verbose}] regular show ==="
     echo "=== [${verbose+verbose}] regular show ===" >>$seq.full
-    $sudo $PCP_BINADM_DIR/pmlogger_daily -o -c $tmp/control -k 3 $verbose 2>&1 \
-    | _filter
+    $sudo $PCP_BINADM_DIR/pmlogger_daily -o -c $tmp/control -k 3 $verbose -l $tmp.log
+    $sudo cat $tmp.log | _filter
     ls $tmp | sed -f $tmp/sed | LC_COLLATE=POSIX sort
 
     echo
@@ -125,8 +137,8 @@ LOCALHOSTNAME	n   n	'"$tmp"'	./config'
     do
 	mv $tmp/$yesterday.$ext $tmp/save.$ext
     done
-    $sudo $PCP_BINADM_DIR/pmlogger_daily -o -c $tmp/control -k 2 $verbose 2>&1 \
-    | _filter
+    $sudo $PCP_BINADM_DIR/pmlogger_daily -o -c $tmp/control -k 2 $verbose -l $tmp.log
+    $sudo cat $tmp.log | _filter
     ls $tmp | sed -f $tmp/sed | LC_COLLATE=POSIX sort
 
     echo
@@ -134,11 +146,11 @@ LOCALHOSTNAME	n   n	'"$tmp"'	./config'
     echo "=== [${verbose+verbose}] error, output already exists ===" >>$seq.full
     for ext in 0 index meta
     do
-	cp src/arch_a.$ext $tmp/$yesterday.17.18.$ext
+	cp archives/arch_a.$ext $tmp/$yesterday.17.18.$ext
 	mv $tmp/save.$ext $tmp/$yesterday.$ext
     done
-    $sudo $PCP_BINADM_DIR/pmlogger_daily -o -c $tmp/control -k 2 $verbose 2>&1 \
-    | _filter
+    $sudo $PCP_BINADM_DIR/pmlogger_daily -o -c $tmp/control -k 2 $verbose -l $tmp.log
+    $sudo cat $tmp.log | _filter
     ls $tmp | sed -f $tmp/sed | LC_COLLATE=POSIX sort
 
     verbose=-V

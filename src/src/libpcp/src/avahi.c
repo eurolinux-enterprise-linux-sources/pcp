@@ -1,15 +1,15 @@
 /*
- * Copyright (c) 2013-2014 Red Hat.
+ * Copyright (c) 2013-2015 Red Hat.
  * 
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
+ * This library is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation; either version 2.1 of the License, or
+ * (at your option) any later version.
  * 
- * This program is distributed in the hope that it will be useful, but
+ * This library is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * for more details.
+ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
+ * License for more details.
  */
 
 #include <assert.h>
@@ -307,7 +307,7 @@ cleanup(__pmServerAvahiPresence *s)
     }
 }
 
-/* Publish a new service. */
+/* Add a new serice to the active services list. */
 static void
 addService(__pmServerPresence *s)
 {
@@ -336,7 +336,7 @@ addService(__pmServerPresence *s)
     ++nActiveServices;
 }
 
-/* Publish a new service. */
+/* Remove a service from the active services list. */
 static void
 removeService(__pmServerPresence *s)
 {
@@ -406,8 +406,10 @@ publishService(__pmServerPresence *s)
     return;
 
  fail:
+    removeService(s);
     cleanup(s->avahi);
     free(s->avahi);
+    s->avahi = NULL;
 }
 
 void

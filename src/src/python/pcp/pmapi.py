@@ -21,7 +21,7 @@
 # Additional Information:
 #
 # Performance Co-Pilot Web Site
-# http://www.performancecopilot.org
+# http://www.pcp.io
 #
 # Performance Co-Pilot Programmer's Guide
 # cf. Chapter 3. PMAPI - The Performance Metrics API
@@ -69,8 +69,8 @@
                 print "load average 5=",atom.f
 """
 
-# for reporting on times from pmLocaltime function
-from time import mktime
+import sys
+import time
 
 # constants adapted from C header file <pcp/pmapi.h>
 import cpmapi as c_api
@@ -89,16 +89,15 @@ from ctypes.util import find_library
 #
 # dynamic library loads
 #
-
 LIBPCP = CDLL(find_library("pcp"))
-LIBC = CDLL(find_library("c"))
+libc_name = "c" if sys.platform != "win32" else "msvcrt"
+LIBC = CDLL(find_library(libc_name))
 
 
 ##############################################################################
 #
 # python version information and compatibility
 #
-import sys
 
 if sys.version >= '3':
     integer_types = (int,)
@@ -137,15 +136,18 @@ class pmErr(Exception):
     def message(self):
         errStr = create_string_buffer(c_api.PM_MAXERRMSGLEN)
         errStr = LIBPCP.pmErrStr_r(self.args[0], errStr, c_api.PM_MAXERRMSGLEN)
+        result = str(errStr.decode())
         for index in range(1, len(self.args)):
-            errStr += b" " + str(self.args[index]).encode('utf-8')
-        return str(errStr.decode())
+            result += " " + str(self.args[index])
+        return result
 
     def progname(self):
-        return c_char_p.in_dll(LIBPCP, "pmProgname").value
+        return str(c_char_p.in_dll(LIBPCP, "pmProgname").value.decode())
 
 class pmUsageErr(Exception):
     def message(self):
+        for index in range(0, len(self.args)):
+            LIBPCP.pmprintf(str(self.args[index]).encode('utf-8'))
         return c_api.pmUsageMessage()
 
 
@@ -198,7 +200,7 @@ class timeval(Structure):
 
     def sleep(self):
         """ Delay for the amount of time specified by this timeval. """
-        c_api.pmtimevalSleep(self.tv_sec, self.tv_usec)
+        time.sleep(float(self))
         return None
 
 class tm(Structure):
@@ -220,7 +222,7 @@ class tm(Structure):
                      self.tm_wday, self.tm_yday, self.tm_isdst)
         inseconds = 0.0
         try:
-            inseconds = mktime(timetuple)
+            inseconds = time.mktime(timetuple)
         except:
             pass
         return "%s %s" % (inseconds.__str__(), timetuple)
@@ -522,7 +524,7 @@ LIBPCP.pmTraversePMNS.argtypes = [c_char_p, traverseCB_type]
 LIBPCP.pmUnloadNameSpace.restype = c_int
 LIBPCP.pmUnloadNameSpace.argtypes = []
 
-LIBPCP.pmRegisterDerived.restype = c_int
+LIBPCP.pmRegisterDerived.restype = c_char_p
 LIBPCP.pmRegisterDerived.argtypes = [c_char_p, c_char_p]
 
 LIBPCP.pmLoadDerivedConfig.restype = c_int
@@ -655,8 +657,8 @@ LIBPCP.pmFetchArchive.argtypes = [POINTER(POINTER(pmResult))]
 # PMAPI Ancilliary Support Services
 
 
-LIBPCP.pmGetConfig.restype = c_char_p
-LIBPCP.pmGetConfig.argtypes = [c_char_p]
+LIBPCP.pmGetOptionalConfig.restype = c_char_p
+LIBPCP.pmGetOptionalConfig.argtypes = [c_char_p]
 
 LIBPCP.pmErrStr_r.restype = c_char_p
 LIBPCP.pmErrStr_r.argtypes = [c_int, c_char_p, c_int]
@@ -729,12 +731,17 @@ class pmOptions(object):
         return self._mode
     def _R_delta(self):
         return self._delta
+    def _R_need_reset(self):
+        return self._need_reset
+    def _W_need_reset(self, value):
+        self._need_reset = value
 
     ##
     # property definitions
 
     mode = property(_R_mode, None, None, None)
     delta = property(_R_delta, None, None, None)
+    need_reset = property(_R_need_reset, _W_need_reset, None, None)
 
     ##
     # creation and destruction
@@ -751,9 +758,11 @@ class pmOptions(object):
             c_api.pmSetOptionFlags(c_api.PM_OPTFLAG_BOUNDARIES)
         self._delta = 1			# default archive pmSetMode delta
         self._mode = c_api.PM_MODE_INTERP # default pmSetMode access mode
+        self._need_reset = False	# flag for __del__ memory reclaim
 
     def __del__(self):
-        c_api.pmResetAllOptions()
+        if LIBPCP and self._need_reset != False:
+            c_api.pmResetAllOptions()
 
     ##
     # general command line option access and manipulation
@@ -785,6 +794,10 @@ class pmOptions(object):
         """ Set sampling interval (pmParseInterval string) """
         return c_api.pmSetOptionInterval(interval)
 
+    def pmGetNonOptionsFromList(self, argv):
+        return c_api.pmGetNonOptionsFromList(argv)
+
+    # Deprecated, use pmGetNonOptionsFromList() above instead
     def pmNonOptionsFromList(self, argv):
         return c_api.pmGetNonOptionsFromList(argv)
 
@@ -928,17 +941,20 @@ class pmOptions(object):
     def pmGetOptionArchives(self):	# str list
         return c_api.pmGetOptionArchives()
 
-    def pmGetOptionAlignment(self):		# timeval
-        sec = c_api.pmGetOptionAlignment_sec()
-        if sec == None:
+    def pmGetOptionAlignment(self):	# timeval
+        alignment = c_api.pmGetOptionAlign_optarg()
+        if alignment == None:
             return None
-        return timeval(sec, c_api.pmGetOptionAlignment_sec())
+        return timeval.fromInterval(alignment)
 
     def pmGetOptionStart(self):		# timeval
         sec = c_api.pmGetOptionStart_sec()
         if sec == None:
             return None
         return timeval(sec, c_api.pmGetOptionStart_usec())
+
+    def pmGetOptionAlignOptarg(self):	# string
+        return c_api.pmGetOptionAlign_optarg()
 
     def pmGetOptionFinishOptarg(self):	# string
         return c_api.pmGetOptionFinish_optarg()
@@ -967,11 +983,17 @@ class pmOptions(object):
     def pmGetOptionTimezone(self):	# str
         return c_api.pmGetOptionTimezone()
 
+    def pmSetOptionArchive(self, archive):	# str
+        return c_api.pmSetOptionArchive(archive)
+
     def pmSetOptionArchiveList(self, archives):	# str
         return c_api.pmSetOptionArchiveList(archives)
 
     def pmSetOptionArchiveFolio(self, folio):	# str
         return c_api.pmSetOptionArchiveFolio(folio)
+
+    def pmSetOptionHost(self, host):	# str
+        return c_api.pmSetOptionHost(host)
 
     def pmSetOptionHostList(self, hosts):	# str
         return c_api.pmSetOptionHostList(hosts)
@@ -1032,7 +1054,7 @@ class pmContext(object):
         self._type = typed                              # the context type
         self._target = target                            # the context target
         self._ctx = c_api.PM_ERR_NOCONTEXT                # init'd pre-connect
-        if type(target) != type(b''):
+        if target and type(target) != type(b''):
             source = target.encode('utf-8')
         else:
             source = target
@@ -1061,7 +1083,8 @@ class pmContext(object):
             the typed/index parameters can be used to setup several
             contexts based on the given command line parameters.
         """
-        if (typed <= 0):
+        if typed == None or typed <= 0:
+            options.need_reset = True
             if c_api.pmGetOptionsFromList(argv):
                 raise pmUsageErr
             typed = options.pmGetOptionContext()
@@ -1170,12 +1193,12 @@ class pmContext(object):
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
             raise pmErr(status)
-        if type(nameA) == type('') or type(nameA) == type(b''):
+        if type(nameA) == type(u'') or type(nameA) == type(b''):
             n = 1
         else:
             n = len(nameA)
         names = (c_char_p * n)()
-        if type(nameA) == type(''):
+        if type(nameA) == type(u''):
             names[0] = c_char_p(nameA.encode('utf-8'))
         elif type(nameA) == type(b''):
             names[0] = c_char_p(nameA)
@@ -1256,13 +1279,14 @@ class pmContext(object):
             name = name.encode('utf-8')
         if type(expr) != type(b''):
             expr = expr.encode('utf-8')
-        status = LIBPCP.pmRegisterDerived(name, expr)
-        if status != 0:
-            raise pmErr(status)
+        string = LIBPCP.pmRegisterDerived(name, expr)
+        if string != None:
+            failure = ['@', str(string.decode())]
+            raise pmErr(c_api.PM_ERR_GENERIC, failure)
         status = LIBPCP.pmReconnectContext(self.ctx)
         if status < 0:
             raise pmErr(status)
-        
+
     def pmLoadDerivedConfig(self, fname):
         """PMAPI - Register derived metric names and definitions from a file
         pm.pmLoadDerivedConfig("FileName")
@@ -1283,7 +1307,9 @@ class pmContext(object):
         pm.pmRegisterDerived()
         """
         result = LIBPCP.pmDerivedErrStr()
-        return str(result.decode())
+        if result != None:
+            return str(result.decode())
+        return None
 
     ##
     # PMAPI Metrics Description Services
@@ -1387,7 +1413,7 @@ class pmContext(object):
         if status < 0:
             raise pmErr(status)
         if status > 0:
-            nameL = list(map(lambda x: str(nameA_p[x].decode()), range(status)))
+            nameL = list(map(lambda x: str(nameA_p[x].decode('ascii', 'ignore')), range(status)))
             instL = list(map(lambda x: int(instA_p[x]), range(status)))
             LIBC.free(instA_p)
             LIBC.free(nameA_p)
@@ -1427,7 +1453,7 @@ class pmContext(object):
             raise pmErr(status)
         result = name_p.value
         LIBC.free(name_p)
-        return str(result.decode())
+        return str(result.decode('ascii', 'ignore'))
 
     ##
     # PMAPI Context Services
@@ -1533,7 +1559,10 @@ class pmContext(object):
         status = LIBPCP.pmUseContext(self.ctx)
         if status < 0:
             raise pmErr(status)
-        status = LIBPCP.pmSetMode(mode, pointer(timeVal), delta)
+        when = None
+        if timeVal != None:
+            when = pointer(timeVal)
+        status = LIBPCP.pmSetMode(mode, when, delta)
         if status < 0:
             raise pmErr(status)
         return status
@@ -1706,7 +1735,7 @@ class pmContext(object):
         if status < 0:
             raise pmErr(status)
         if status > 0:
-            nameL = list(map(lambda x: str(nameA_p[x].decode()), range(status)))
+            nameL = list(map(lambda x: str(nameA_p[x].decode('ascii', 'ignore')), range(status)))
             instL = list(map(lambda x: int(instA_p[x]), range(status)))
             LIBC.free(instA_p)
             LIBC.free(nameA_p)
@@ -1745,7 +1774,7 @@ class pmContext(object):
             raise pmErr(status)
         result = name_p.value
         LIBC.free(name_p)
-        return str(result.decode())
+        return str(result.decode('ascii', 'ignore'))
 
     def pmFetchArchive(self):
         """PMAPI - Fetch measurements from the target source
@@ -1770,12 +1799,14 @@ class pmContext(object):
         """PMAPI - Return value from environment or pcp config file """
         if type(variable) != type(b''):
             variable = variable.encode('utf-8')
-        result = LIBPCP.pmGetConfig(variable)
+        result = LIBPCP.pmGetOptionalConfig(variable)
+        if result == None:
+            return result
         return str(result.decode())
 
     @staticmethod
     def pmErrStr(code):
-        """PMAPI - Return value from environment or pcp config file """
+        """PMAPI - Convert an error code to a readable string  """
         errstr = ctypes.create_string_buffer(c_api.PM_MAXERRMSGLEN)
         result = LIBPCP.pmErrStr_r(code, errstr, c_api.PM_MAXERRMSGLEN)
         return str(result.decode())
@@ -1923,7 +1954,7 @@ class pmContext(object):
 
     @staticmethod
     def pmParseUnitsStr(string):
-        if type(string) != type('') and type(string) != type(b''):
+        if type(string) != type(u'') and type(string) != type(b''):
             raise pmErr(c_api.PM_ERR_CONV, str(string))
         if type(string) != type(b''):
             string = string.encode('utf-8')
@@ -1944,4 +1975,14 @@ class pmContext(object):
             Single arg is timeval in tuple returned from pmParseInterval().
         """
         return tvp.sleep()
+
+    @staticmethod
+    def pmProgname():
+        return str(c_char_p.in_dll(LIBPCP, "pmProgname").value.decode())
+
+    @staticmethod
+    def pmDebug(flags):
+        if (c_int.in_dll(LIBPCP, "pmDebug").value & flags):
+            return True
+        return False
 

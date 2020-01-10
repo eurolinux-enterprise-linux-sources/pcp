@@ -1,0 +1,963 @@
+diff -Naurp pcp-3.10.9-orig/qa/885 pcp-3.10.9/qa/885
+--- pcp-3.10.9-orig/qa/885	2015-09-03 19:46:51.000000000 -0400
++++ pcp-3.10.9/qa/885	2016-01-15 10:30:45.301793352 -0500
+@@ -47,7 +47,7 @@ do
+ 
+     cp $file $root/proc/cpuinfo
+     base=`basename $file`
+-    ncpu=`echo $base | sed -e 's/.*-\([0-9][0-7]*\)cpu-.*/\1/'`
++    ncpu=`echo $base | sed -e 's/.*-\([0-9][0-9]*\)cpu-.*/\1/'`
+     proc_stat $root/proc/stat $ncpu
+ 
+     echo "== Checking CPU hardware metrics from $base ($ncpu CPU)"
+diff -Naurp pcp-3.10.9-orig/qa/886 pcp-3.10.9/qa/886
+--- pcp-3.10.9-orig/qa/886	1969-12-31 19:00:00.000000000 -0500
++++ pcp-3.10.9/qa/886	2016-01-15 10:30:45.302793358 -0500
+@@ -0,0 +1,64 @@
++#!/bin/sh
++# PCP QA Test No. 886
++# Verify /proc/interrupts parsing for various architectures.
++#
++# Copyright (c) 2016 Red Hat.
++#
++
++seq=`basename $0`
++echo "QA output created by $seq"
++
++# get standard environment, filters and checks
++. ./common.product
++. ./common.filter
++. ./common.check
++
++[ $PCP_PLATFORM = linux ] || _notrun "Linux interrupts test, only works with Linux"
++
++status=1	# failure is the default!
++$sudo rm -rf $tmp.* $seq.full
++trap "cd $here; rm -rf $tmp.*; exit \$status" 0 1 2 3 15
++
++proc_stat()
++{
++    path=$1
++    ncpu=$2
++
++    echo cpu 0 0 0 0 0 0 0 0 0 > $path
++    cpu=0
++    while [ $cpu -lt $ncpu ]
++    do
++	echo cpu$cpu 0 0 0 0 0 0 0 0 0 >> $path
++	cpu=`expr $cpu + 1`
++    done
++}
++
++# real QA test starts here
++root=$tmp.root
++export LINUX_STATSPATH=$root
++pmda=$PCP_PMDAS_DIR/linux/pmda_linux.so,linux_init
++files=`echo $here/linux/interrupts-* | LC_COLLATE=POSIX sort`
++
++for file in $files
++do
++    rm -fr $root
++    mkdir -p $root/proc || _fail "root in use when processing $file"
++
++    cp $file $root/proc/interrupts
++    base=`basename $file`
++    ncpu=`echo $base | sed -e 's/.*-\([0-9][0-9]*\)cpu-.*/\1/'`
++    proc_stat $root/proc/stat $ncpu
++    export LINUX_NCPUS=$ncpu
++
++    echo "== Checking interrupts metrics from $base ($ncpu CPU)"
++    pminfo -f -L -K clear -K add,60,$pmda kernel.percpu.interrupts
++    echo && echo "== done" && echo
++    echo "== Checking interrupts helptext from $base ($ncpu CPU)"
++    pminfo -tT -L -K clear -K add,60,$pmda kernel.percpu.interrupts
++    echo && echo "== done" && echo
++    cd $here
++done
++
++# success, all done
++status=0
++exit
+diff -Naurp pcp-3.10.9-orig/qa/886.out pcp-3.10.9/qa/886.out
+--- pcp-3.10.9-orig/qa/886.out	1969-12-31 19:00:00.000000000 -0500
++++ pcp-3.10.9/qa/886.out	2016-01-15 10:30:45.303793364 -0500
+@@ -0,0 +1,565 @@
++QA output created by 886
++== Checking interrupts metrics from interrupts-2cpu-s390x (2 CPU)
++
++kernel.percpu.interrupts.I_O
++    inst [0 or "cpu0"] value 6989
++    inst [1 or "cpu1"] value 33457
++
++kernel.percpu.interrupts.EXT
++    inst [0 or "cpu0"] value 31903
++    inst [1 or "cpu1"] value 57022
++
++== done
++
++== Checking interrupts helptext from interrupts-2cpu-s390x (2 CPU)
++
++kernel.percpu.interrupts.I_O One-line Help: Error: One-line or help text is not available
++
++Full Help: Error: One-line or help text is not available
++
++kernel.percpu.interrupts.EXT One-line Help: Error: One-line or help text is not available
++
++Full Help: Error: One-line or help text is not available
++
++== done
++
++== Checking interrupts metrics from interrupts-8cpu-x86_64 (8 CPU)
++
++kernel.percpu.interrupts.PIW
++    inst [0 or "cpu0"] value 0
++    inst [1 or "cpu1"] value 0
++    inst [2 or "cpu2"] value 0
++    inst [3 or "cpu3"] value 0
++    inst [4 or "cpu4"] value 0
++    inst [5 or "cpu5"] value 0
++    inst [6 or "cpu6"] value 0
++    inst [7 or "cpu7"] value 0
++
++kernel.percpu.interrupts.PIN
++    inst [0 or "cpu0"] value 0
++    inst [1 or "cpu1"] value 0
++    inst [2 or "cpu2"] value 0
++    inst [3 or "cpu3"] value 0
++    inst [4 or "cpu4"] value 0
++    inst [5 or "cpu5"] value 0
++    inst [6 or "cpu6"] value 0
++    inst [7 or "cpu7"] value 0
++
++kernel.percpu.interrupts.MIS
++    inst [0 or "cpu0"] value 0
++    inst [1 or "cpu1"] value 0
++    inst [2 or "cpu2"] value 0
++    inst [3 or "cpu3"] value 0
++    inst [4 or "cpu4"] value 0
++    inst [5 or "cpu5"] value 0
++    inst [6 or "cpu6"] value 0
++    inst [7 or "cpu7"] value 0
++
++kernel.percpu.interrupts.ERR
++    inst [0 or "cpu0"] value 0
++    inst [1 or "cpu1"] value 0
++    inst [2 or "cpu2"] value 0
++    inst [3 or "cpu3"] value 0
++    inst [4 or "cpu4"] value 0
++    inst [5 or "cpu5"] value 0
++    inst [6 or "cpu6"] value 0
++    inst [7 or "cpu7"] value 0
++
++kernel.percpu.interrupts.HYP
++    inst [0 or "cpu0"] value 0
++    inst [1 or "cpu1"] value 0
++    inst [2 or "cpu2"] value 0
++    inst [3 or "cpu3"] value 0
++    inst [4 or "cpu4"] value 0
++    inst [5 or "cpu5"] value 0
++    inst [6 or "cpu6"] value 0
++    inst [7 or "cpu7"] value 0
++
++kernel.percpu.interrupts.MCP
++    inst [0 or "cpu0"] value 2525
++    inst [1 or "cpu1"] value 2525
++    inst [2 or "cpu2"] value 2525
++    inst [3 or "cpu3"] value 2525
++    inst [4 or "cpu4"] value 2525
++    inst [5 or "cpu5"] value 2525
++    inst [6 or "cpu6"] value 2525
++    inst [7 or "cpu7"] value 2525
++
++kernel.percpu.interrupts.MCE
++    inst [0 or "cpu0"] value 0
++    inst [1 or "cpu1"] value 0
++    inst [2 or "cpu2"] value 0
++    inst [3 or "cpu3"] value 0
++    inst [4 or "cpu4"] value 0
++    inst [5 or "cpu5"] value 0
++    inst [6 or "cpu6"] value 0
++    inst [7 or "cpu7"] value 0
++
++kernel.percpu.interrupts.DFR
++    inst [0 or "cpu0"] value 0
++    inst [1 or "cpu1"] value 0
++    inst [2 or "cpu2"] value 0
++    inst [3 or "cpu3"] value 0
++    inst [4 or "cpu4"] value 0
++    inst [5 or "cpu5"] value 0
++    inst [6 or "cpu6"] value 0
++    inst [7 or "cpu7"] value 0
++
++kernel.percpu.interrupts.THR
++    inst [0 or "cpu0"] value 0
++    inst [1 or "cpu1"] value 0
++    inst [2 or "cpu2"] value 0
++    inst [3 or "cpu3"] value 0
++    inst [4 or "cpu4"] value 0
++    inst [5 or "cpu5"] value 0
++    inst [6 or "cpu6"] value 0
++    inst [7 or "cpu7"] value 0
++
++kernel.percpu.interrupts.TRM
++    inst [0 or "cpu0"] value 0
++    inst [1 or "cpu1"] value 0
++    inst [2 or "cpu2"] value 0
++    inst [3 or "cpu3"] value 0
++    inst [4 or "cpu4"] value 0
++    inst [5 or "cpu5"] value 0
++    inst [6 or "cpu6"] value 0
++    inst [7 or "cpu7"] value 0
++
++kernel.percpu.interrupts.TLB
++    inst [0 or "cpu0"] value 280553
++    inst [1 or "cpu1"] value 186882
++    inst [2 or "cpu2"] value 319241
++    inst [3 or "cpu3"] value 187637
++    inst [4 or "cpu4"] value 351230
++    inst [5 or "cpu5"] value 213259
++    inst [6 or "cpu6"] value 369334
++    inst [7 or "cpu7"] value 186595
++
++kernel.percpu.interrupts.CAL
++    inst [0 or "cpu0"] value 60497
++    inst [1 or "cpu1"] value 66829
++    inst [2 or "cpu2"] value 59929
++    inst [3 or "cpu3"] value 56784
++    inst [4 or "cpu4"] value 61385
++    inst [5 or "cpu5"] value 64420
++    inst [6 or "cpu6"] value 49034
++    inst [7 or "cpu7"] value 58256
++
++kernel.percpu.interrupts.RES
++    inst [0 or "cpu0"] value 448998
++    inst [1 or "cpu1"] value 206937
++    inst [2 or "cpu2"] value 333675
++    inst [3 or "cpu3"] value 153696
++    inst [4 or "cpu4"] value 325565
++    inst [5 or "cpu5"] value 143760
++    inst [6 or "cpu6"] value 326484
++    inst [7 or "cpu7"] value 145869
++
++kernel.percpu.interrupts.RTR
++    inst [0 or "cpu0"] value 0
++    inst [1 or "cpu1"] value 0
++    inst [2 or "cpu2"] value 0
++    inst [3 or "cpu3"] value 0
++    inst [4 or "cpu4"] value 0
++    inst [5 or "cpu5"] value 0
++    inst [6 or "cpu6"] value 0
++    inst [7 or "cpu7"] value 0
++
++kernel.percpu.interrupts.IWI
++    inst [0 or "cpu0"] value 1
++    inst [1 or "cpu1"] value 0
++    inst [2 or "cpu2"] value 1
++    inst [3 or "cpu3"] value 1
++    inst [4 or "cpu4"] value 0
++    inst [5 or "cpu5"] value 0
++    inst [6 or "cpu6"] value 0
++    inst [7 or "cpu7"] value 0
++
++kernel.percpu.interrupts.PMI
++    inst [0 or "cpu0"] value 553
++    inst [1 or "cpu1"] value 288
++    inst [2 or "cpu2"] value 586
++    inst [3 or "cpu3"] value 286
++    inst [4 or "cpu4"] value 607
++    inst [5 or "cpu5"] value 216
++    inst [6 or "cpu6"] value 389
++    inst [7 or "cpu7"] value 203
++
++kernel.percpu.interrupts.SPU
++    inst [0 or "cpu0"] value 0
++    inst [1 or "cpu1"] value 0
++    inst [2 or "cpu2"] value 0
++    inst [3 or "cpu3"] value 0
++    inst [4 or "cpu4"] value 0
++    inst [5 or "cpu5"] value 0
++    inst [6 or "cpu6"] value 0
++    inst [7 or "cpu7"] value 0
++
++kernel.percpu.interrupts.LOC
++    inst [0 or "cpu0"] value 18017794
++    inst [1 or "cpu1"] value 5791007
++    inst [2 or "cpu2"] value 18785621
++    inst [3 or "cpu3"] value 5656822
++    inst [4 or "cpu4"] value 18296406
++    inst [5 or "cpu5"] value 5364275
++    inst [6 or "cpu6"] value 18002503
++    inst [7 or "cpu7"] value 5946670
++
++kernel.percpu.interrupts.NMI
++    inst [0 or "cpu0"] value 553
++    inst [1 or "cpu1"] value 288
++    inst [2 or "cpu2"] value 586
++    inst [3 or "cpu3"] value 286
++    inst [4 or "cpu4"] value 607
++    inst [5 or "cpu5"] value 216
++    inst [6 or "cpu6"] value 389
++    inst [7 or "cpu7"] value 203
++
++kernel.percpu.interrupts.line35
++    inst [0 or "cpu0"] value 312
++    inst [1 or "cpu1"] value 386
++    inst [2 or "cpu2"] value 570
++    inst [3 or "cpu3"] value 223
++    inst [4 or "cpu4"] value 24
++    inst [5 or "cpu5"] value 51
++    inst [6 or "cpu6"] value 63
++    inst [7 or "cpu7"] value 476
++
++kernel.percpu.interrupts.line34
++    inst [0 or "cpu0"] value 46
++    inst [1 or "cpu1"] value 165
++    inst [2 or "cpu2"] value 28
++    inst [3 or "cpu3"] value 96
++    inst [4 or "cpu4"] value 0
++    inst [5 or "cpu5"] value 18
++    inst [6 or "cpu6"] value 4
++    inst [7 or "cpu7"] value 59
++
++kernel.percpu.interrupts.line33
++    inst [0 or "cpu0"] value 1469469
++    inst [1 or "cpu1"] value 144536
++    inst [2 or "cpu2"] value 72660
++    inst [3 or "cpu3"] value 67411
++    inst [4 or "cpu4"] value 30996
++    inst [5 or "cpu5"] value 54462
++    inst [6 or "cpu6"] value 55834
++    inst [7 or "cpu7"] value 36640
++
++kernel.percpu.interrupts.line32
++    inst [0 or "cpu0"] value 6
++    inst [1 or "cpu1"] value 0
++    inst [2 or "cpu2"] value 0
++    inst [3 or "cpu3"] value 1
++    inst [4 or "cpu4"] value 1
++    inst [5 or "cpu5"] value 12
++    inst [6 or "cpu6"] value 5
++    inst [7 or "cpu7"] value 0
++
++kernel.percpu.interrupts.line31
++    inst [0 or "cpu0"] value 535491
++    inst [1 or "cpu1"] value 101812
++    inst [2 or "cpu2"] value 97997
++    inst [3 or "cpu3"] value 89277
++    inst [4 or "cpu4"] value 72963
++    inst [5 or "cpu5"] value 71434
++    inst [6 or "cpu6"] value 58086
++    inst [7 or "cpu7"] value 60455
++
++kernel.percpu.interrupts.line30
++    inst [0 or "cpu0"] value 249
++    inst [1 or "cpu1"] value 54
++    inst [2 or "cpu2"] value 51
++    inst [3 or "cpu3"] value 42
++    inst [4 or "cpu4"] value 32
++    inst [5 or "cpu5"] value 37
++    inst [6 or "cpu6"] value 40
++    inst [7 or "cpu7"] value 42
++
++kernel.percpu.interrupts.line29
++    inst [0 or "cpu0"] value 3249898
++    inst [1 or "cpu1"] value 727145
++    inst [2 or "cpu2"] value 103573
++    inst [3 or "cpu3"] value 204127
++    inst [4 or "cpu4"] value 93052
++    inst [5 or "cpu5"] value 157195
++    inst [6 or "cpu6"] value 78865
++    inst [7 or "cpu7"] value 122291
++
++kernel.percpu.interrupts.line28
++    inst [0 or "cpu0"] value 1206282
++    inst [1 or "cpu1"] value 65009
++    inst [2 or "cpu2"] value 178349
++    inst [3 or "cpu3"] value 63472
++    inst [4 or "cpu4"] value 144415
++    inst [5 or "cpu5"] value 55875
++    inst [6 or "cpu6"] value 92424
++    inst [7 or "cpu7"] value 49796
++
++kernel.percpu.interrupts.line27
++    inst [0 or "cpu0"] value 836947
++    inst [1 or "cpu1"] value 368771
++    inst [2 or "cpu2"] value 86379
++    inst [3 or "cpu3"] value 84935
++    inst [4 or "cpu4"] value 71356
++    inst [5 or "cpu5"] value 61231
++    inst [6 or "cpu6"] value 59367
++    inst [7 or "cpu7"] value 47157
++
++kernel.percpu.interrupts.line25
++    inst [0 or "cpu0"] value 0
++    inst [1 or "cpu1"] value 0
++    inst [2 or "cpu2"] value 0
++    inst [3 or "cpu3"] value 0
++    inst [4 or "cpu4"] value 0
++    inst [5 or "cpu5"] value 0
++    inst [6 or "cpu6"] value 0
++    inst [7 or "cpu7"] value 0
++
++kernel.percpu.interrupts.line24
++    inst [0 or "cpu0"] value 0
++    inst [1 or "cpu1"] value 0
++    inst [2 or "cpu2"] value 0
++    inst [3 or "cpu3"] value 0
++    inst [4 or "cpu4"] value 0
++    inst [5 or "cpu5"] value 0
++    inst [6 or "cpu6"] value 0
++    inst [7 or "cpu7"] value 0
++
++kernel.percpu.interrupts.line23
++    inst [0 or "cpu0"] value 14
++    inst [1 or "cpu1"] value 3
++    inst [2 or "cpu2"] value 0
++    inst [3 or "cpu3"] value 3
++    inst [4 or "cpu4"] value 1
++    inst [5 or "cpu5"] value 4
++    inst [6 or "cpu6"] value 2
++    inst [7 or "cpu7"] value 6
++
++kernel.percpu.interrupts.line18
++    inst [0 or "cpu0"] value 0
++    inst [1 or "cpu1"] value 0
++    inst [2 or "cpu2"] value 0
++    inst [3 or "cpu3"] value 0
++    inst [4 or "cpu4"] value 0
++    inst [5 or "cpu5"] value 0
++    inst [6 or "cpu6"] value 0
++    inst [7 or "cpu7"] value 0
++
++kernel.percpu.interrupts.line16
++    inst [0 or "cpu0"] value 13
++    inst [1 or "cpu1"] value 4
++    inst [2 or "cpu2"] value 2
++    inst [3 or "cpu3"] value 3
++    inst [4 or "cpu4"] value 3
++    inst [5 or "cpu5"] value 3
++    inst [6 or "cpu6"] value 2
++    inst [7 or "cpu7"] value 1
++
++kernel.percpu.interrupts.line12
++    inst [0 or "cpu0"] value 669
++    inst [1 or "cpu1"] value 204
++    inst [2 or "cpu2"] value 411
++    inst [3 or "cpu3"] value 430
++    inst [4 or "cpu4"] value 64
++    inst [5 or "cpu5"] value 123
++    inst [6 or "cpu6"] value 41
++    inst [7 or "cpu7"] value 45
++
++kernel.percpu.interrupts.line9
++    inst [0 or "cpu0"] value 322
++    inst [1 or "cpu1"] value 79
++    inst [2 or "cpu2"] value 14
++    inst [3 or "cpu3"] value 29
++    inst [4 or "cpu4"] value 206
++    inst [5 or "cpu5"] value 65
++    inst [6 or "cpu6"] value 14
++    inst [7 or "cpu7"] value 27
++
++kernel.percpu.interrupts.line8
++    inst [0 or "cpu0"] value 0
++    inst [1 or "cpu1"] value 1
++    inst [2 or "cpu2"] value 0
++    inst [3 or "cpu3"] value 0
++    inst [4 or "cpu4"] value 0
++    inst [5 or "cpu5"] value 0
++    inst [6 or "cpu6"] value 0
++    inst [7 or "cpu7"] value 0
++
++kernel.percpu.interrupts.line1
++    inst [0 or "cpu0"] value 10
++    inst [1 or "cpu1"] value 11
++    inst [2 or "cpu2"] value 7
++    inst [3 or "cpu3"] value 5
++    inst [4 or "cpu4"] value 2
++    inst [5 or "cpu5"] value 7
++    inst [6 or "cpu6"] value 2
++    inst [7 or "cpu7"] value 1
++
++kernel.percpu.interrupts.line0
++    inst [0 or "cpu0"] value 38
++    inst [1 or "cpu1"] value 0
++    inst [2 or "cpu2"] value 0
++    inst [3 or "cpu3"] value 0
++    inst [4 or "cpu4"] value 0
++    inst [5 or "cpu5"] value 0
++    inst [6 or "cpu6"] value 0
++    inst [7 or "cpu7"] value 0
++
++== done
++
++== Checking interrupts helptext from interrupts-8cpu-x86_64 (8 CPU)
++
++kernel.percpu.interrupts.PIW [Posted-interrupt wakeup event]
++Help:
++Posted-interrupt wakeup event
++
++kernel.percpu.interrupts.PIN [Posted-interrupt notification event]
++Help:
++Posted-interrupt notification event
++
++kernel.percpu.interrupts.MIS One-line Help: Error: One-line or help text is not available
++
++Full Help: Error: One-line or help text is not available
++
++kernel.percpu.interrupts.ERR One-line Help: Error: One-line or help text is not available
++
++Full Help: Error: One-line or help text is not available
++
++kernel.percpu.interrupts.HYP [Hypervisor callback interrupts]
++Help:
++Hypervisor callback interrupts
++
++kernel.percpu.interrupts.MCP [Machine check polls]
++Help:
++Machine check polls
++
++kernel.percpu.interrupts.MCE [Machine check exceptions]
++Help:
++Machine check exceptions
++
++kernel.percpu.interrupts.DFR [Deferred Error APIC interrupts]
++Help:
++Deferred Error APIC interrupts
++
++kernel.percpu.interrupts.THR [Threshold APIC interrupts]
++Help:
++Threshold APIC interrupts
++
++kernel.percpu.interrupts.TRM [Thermal event interrupts]
++Help:
++Thermal event interrupts
++
++kernel.percpu.interrupts.TLB [TLB shootdowns]
++Help:
++TLB shootdowns
++
++kernel.percpu.interrupts.CAL [Function call interrupts]
++Help:
++Function call interrupts
++
++kernel.percpu.interrupts.RES [Rescheduling interrupts]
++Help:
++Rescheduling interrupts
++
++kernel.percpu.interrupts.RTR [APIC ICR read retries]
++Help:
++APIC ICR read retries
++
++kernel.percpu.interrupts.IWI [IRQ work interrupts]
++Help:
++IRQ work interrupts
++
++kernel.percpu.interrupts.PMI [Performance monitoring interrupts]
++Help:
++Performance monitoring interrupts
++
++kernel.percpu.interrupts.SPU [Spurious interrupts]
++Help:
++Spurious interrupts
++
++kernel.percpu.interrupts.LOC [Local timer interrupts]
++Help:
++Local timer interrupts
++
++kernel.percpu.interrupts.NMI [Non-maskable interrupts]
++Help:
++Non-maskable interrupts
++
++kernel.percpu.interrupts.line35 [IR-PCI-MSI 49152-edge snd_hda_intel]
++Help:
++IR-PCI-MSI 49152-edge snd_hda_intel
++
++kernel.percpu.interrupts.line34 [IR-PCI-MSI 442368-edge snd_hda_intel]
++Help:
++IR-PCI-MSI 442368-edge snd_hda_intel
++
++kernel.percpu.interrupts.line33 [IR-PCI-MSI 1572864-edge iwlwifi]
++Help:
++IR-PCI-MSI 1572864-edge iwlwifi
++
++kernel.percpu.interrupts.line32 [IR-PCI-MSI 360448-edge mei_me]
++Help:
++IR-PCI-MSI 360448-edge mei_me
++
++kernel.percpu.interrupts.line31 [IR-PCI-MSI 32768-edge i915]
++Help:
++IR-PCI-MSI 32768-edge i915
++
++kernel.percpu.interrupts.line30 [IR-PCI-MSI 524288-edge nvkm]
++Help:
++IR-PCI-MSI 524288-edge nvkm
++
++kernel.percpu.interrupts.line29 [IR-PCI-MSI 409600-edge enp0s25]
++Help:
++IR-PCI-MSI 409600-edge enp0s25
++
++kernel.percpu.interrupts.line28 [IR-PCI-MSI 327680-edge xhci_hcd]
++Help:
++IR-PCI-MSI 327680-edge xhci_hcd
++
++kernel.percpu.interrupts.line27 [IR-PCI-MSI 512000-edge 0000:00:1f.2]
++Help:
++IR-PCI-MSI 512000-edge 0000:00:1f.2
++
++kernel.percpu.interrupts.line25 [DMAR-MSI 1-edge dmar1]
++Help:
++DMAR-MSI 1-edge dmar1
++
++kernel.percpu.interrupts.line24 [DMAR-MSI 0-edge dmar0]
++Help:
++DMAR-MSI 0-edge dmar0
++
++kernel.percpu.interrupts.line23 [IR-IO-APIC 23-fasteoi ehci_hcd:usb4]
++Help:
++IR-IO-APIC 23-fasteoi ehci_hcd:usb4
++
++kernel.percpu.interrupts.line18 [IR-IO-APIC 18-fasteoi i801_smbus]
++Help:
++IR-IO-APIC 18-fasteoi i801_smbus
++
++kernel.percpu.interrupts.line16 [IR-IO-APIC 16-fasteoi ehci_hcd:usb3, mmc0]
++Help:
++IR-IO-APIC 16-fasteoi ehci_hcd:usb3, mmc0
++
++kernel.percpu.interrupts.line12 [IR-IO-APIC 12-edge i8042]
++Help:
++IR-IO-APIC 12-edge i8042
++
++kernel.percpu.interrupts.line9 [IR-IO-APIC 9-fasteoi acpi]
++Help:
++IR-IO-APIC 9-fasteoi acpi
++
++kernel.percpu.interrupts.line8 [IR-IO-APIC 8-edge rtc0]
++Help:
++IR-IO-APIC 8-edge rtc0
++
++kernel.percpu.interrupts.line1 [IR-IO-APIC 1-edge i8042]
++Help:
++IR-IO-APIC 1-edge i8042
++
++kernel.percpu.interrupts.line0 [IR-IO-APIC 2-edge timer]
++Help:
++IR-IO-APIC 2-edge timer
++
++== done
++
+diff -Naurp pcp-3.10.9-orig/qa/group pcp-3.10.9/qa/group
+--- pcp-3.10.9-orig/qa/group	2015-12-15 05:59:48.000000000 -0500
++++ pcp-3.10.9/qa/group	2016-01-15 10:30:57.761867128 -0500
+@@ -1073,6 +1073,7 @@ cgroups
+ 877 libpcp local
+ 878 pmda.pipe local
+ 879 pmda.pipe local
++886 pmda.linux local
+ 885 pmda.linux local
+ 888 pmda.linux local
+ 892 pmcd libpcp local
+diff -Naurp pcp-3.10.9-orig/qa/linux/GNUmakefile pcp-3.10.9/qa/linux/GNUmakefile
+--- pcp-3.10.9-orig/qa/linux/GNUmakefile	2015-09-03 19:46:51.000000000 -0400
++++ pcp-3.10.9/qa/linux/GNUmakefile	2016-01-15 10:30:45.303793364 -0500
+@@ -4,6 +4,7 @@ include $(TOPDIR)/src/include/builddefs
+ TESTDIR = $(PCP_VAR_DIR)/testsuite/linux
+ ROOTFILES = $(shell echo *-root-*.tgz)
+ CPUINFOFILES = $(shell echo cpuinfo-*)
++PROCIRQFILES = $(shell echo interrupts-*)
+ PROCNETFILES = $(shell echo procnet-*)
+ 
+ default setup default_pcp:
+@@ -12,7 +13,7 @@ install install_pcp: $(ROOTFILES)
+ 	$(INSTALL) -m 755 -d $(TESTDIR)
+ 	$(INSTALL) -m 644 $(ROOTFILES) $(TESTDIR)
+ 	$(INSTALL) -m 644 $(CPUINFOFILES) $(TESTDIR)
+-	$(INSTALL) -m 644 $(PROCNETFILES) $(TESTDIR)
++	$(INSTALL) -m 644 $(PROCIRQFILES) $(PROCNETFILES) $(TESTDIR)
+ 	$(INSTALL) -m 644 GNUmakefile.install $(TESTDIR)/GNUmakefile
+ 
+ include $(BUILDRULES)
+diff -Naurp pcp-3.10.9-orig/qa/linux/interrupts-2cpu-s390x pcp-3.10.9/qa/linux/interrupts-2cpu-s390x
+--- pcp-3.10.9-orig/qa/linux/interrupts-2cpu-s390x	1969-12-31 19:00:00.000000000 -0500
++++ pcp-3.10.9/qa/linux/interrupts-2cpu-s390x	2016-01-15 10:30:45.303793364 -0500
+@@ -0,0 +1,3 @@
++           CPU0       CPU1
++EXT:      31903      57022
++I/O:       6989      33457
+diff -Naurp pcp-3.10.9-orig/qa/linux/interrupts-8cpu-x86_64 pcp-3.10.9/qa/linux/interrupts-8cpu-x86_64
+--- pcp-3.10.9-orig/qa/linux/interrupts-8cpu-x86_64	1969-12-31 19:00:00.000000000 -0500
++++ pcp-3.10.9/qa/linux/interrupts-8cpu-x86_64	2016-01-15 10:30:45.303793364 -0500
+@@ -0,0 +1,39 @@
++           CPU0       CPU1       CPU2       CPU3       CPU4       CPU5       CPU6       CPU7       
++  0:         38          0          0          0          0          0          0          0  IR-IO-APIC   2-edge      timer
++  1:         10         11          7          5          2          7          2          1  IR-IO-APIC   1-edge      i8042
++  8:          0          1          0          0          0          0          0          0  IR-IO-APIC   8-edge      rtc0
++  9:        322         79         14         29        206         65         14         27  IR-IO-APIC   9-fasteoi   acpi
++ 12:        669        204        411        430         64        123         41         45  IR-IO-APIC  12-edge      i8042
++ 16:         13          4          2          3          3          3          2          1  IR-IO-APIC  16-fasteoi   ehci_hcd:usb3, mmc0
++ 18:          0          0          0          0          0          0          0          0  IR-IO-APIC  18-fasteoi   i801_smbus
++ 23:         14          3          0          3          1          4          2          6  IR-IO-APIC  23-fasteoi   ehci_hcd:usb4
++ 24:          0          0          0          0          0          0          0          0  DMAR-MSI   0-edge      dmar0
++ 25:          0          0          0          0          0          0          0          0  DMAR-MSI   1-edge      dmar1
++ 27:     836947     368771      86379      84935      71356      61231      59367      47157  IR-PCI-MSI 512000-edge      0000:00:1f.2
++ 28:    1206282      65009     178349      63472     144415      55875      92424      49796  IR-PCI-MSI 327680-edge      xhci_hcd
++ 29:    3249898     727145     103573     204127      93052     157195      78865     122291  IR-PCI-MSI 409600-edge      enp0s25
++ 30:        249         54         51         42         32         37         40         42  IR-PCI-MSI 524288-edge      nvkm
++ 31:     535491     101812      97997      89277      72963      71434      58086      60455  IR-PCI-MSI 32768-edge      i915
++ 32:          6          0          0          1          1         12          5          0  IR-PCI-MSI 360448-edge      mei_me
++ 33:    1469469     144536      72660      67411      30996      54462      55834      36640  IR-PCI-MSI 1572864-edge      iwlwifi
++ 34:         46        165         28         96          0         18          4         59  IR-PCI-MSI 442368-edge      snd_hda_intel
++ 35:        312        386        570        223         24         51         63        476  IR-PCI-MSI 49152-edge      snd_hda_intel
++NMI:        553        288        586        286        607        216        389        203   Non-maskable interrupts
++LOC:   18017794    5791007   18785621    5656822   18296406    5364275   18002503    5946670   Local timer interrupts
++SPU:          0          0          0          0          0          0          0          0   Spurious interrupts
++PMI:        553        288        586        286        607        216        389        203   Performance monitoring interrupts
++IWI:          1          0          1          1          0          0          0          0   IRQ work interrupts
++RTR:          0          0          0          0          0          0          0          0   APIC ICR read retries
++RES:     448998     206937     333675     153696     325565     143760     326484     145869   Rescheduling interrupts
++CAL:      60497      66829      59929      56784      61385      64420      49034      58256   Function call interrupts
++TLB:     280553     186882     319241     187637     351230     213259     369334     186595   TLB shootdowns
++TRM:          0          0          0          0          0          0          0          0   Thermal event interrupts
++THR:          0          0          0          0          0          0          0          0   Threshold APIC interrupts
++DFR:          0          0          0          0          0          0          0          0   Deferred Error APIC interrupts
++MCE:          0          0          0          0          0          0          0          0   Machine check exceptions
++MCP:       2525       2525       2525       2525       2525       2525       2525       2525   Machine check polls
++HYP:          0          0          0          0          0          0          0          0   Hypervisor callback interrupts
++ERR:          0
++MIS:          0
++PIN:          0          0          0          0          0          0          0          0   Posted-interrupt notification event
++PIW:          0          0          0          0          0          0          0          0   Posted-interrupt wakeup event
+diff -Naurp pcp-3.10.9-orig/src/pmdas/linux/interrupts.c pcp-3.10.9/src/pmdas/linux/interrupts.c
+--- pcp-3.10.9-orig/src/pmdas/linux/interrupts.c	2015-10-21 22:10:07.000000000 -0400
++++ pcp-3.10.9/src/pmdas/linux/interrupts.c	2016-01-15 10:30:45.304793369 -0500
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2012-2014 Red Hat.
++ * Copyright (c) 2012-2014,2016 Red Hat.
+  * Copyright (c) 2011 Aconex.  All Rights Reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify it
+@@ -103,7 +103,7 @@ extract_values(char *buffer, unsigned lo
+ 
+     for (i = 0; i < ncolumns; i++) {
+ 	value = strtoull(s, &end, 10);
+-	if (*end != ' ')
++	if (!isspace(*end))
+ 	    return NULL;
+ 	s = end;
+ 	cpuid = column_to_cpuid(i);
+@@ -139,8 +139,7 @@ initialise_interrupt(interrupt_t *ip, un
+ {
+     ip->id = id;
+     ip->name = strdup(s);
+-    if (end)
+-	ip->text = strdup(oneline_reformat(end));
++    ip->text = end ? strdup(oneline_reformat(end)) : NULL;
+ }
+ 
+ static int
+@@ -172,9 +171,15 @@ extract_interrupt_name(char *buffer, cha
+ 
+     while (isspace((int)*s))		/* find start of name */
+ 	s++;
+-    for (end = s; *end && isalnum((int)*end); end++) { }
+-    *end = '\0';		/* mark end of name */
+-    *suffix = end + 1;		/* mark values start */
++    for (end = s; *end && !isspace((int)*end); end++) {
++	if (!isalnum((int)*end))	/* check valid PMNS entry here; */
++	    *end = '_';			/* e.g. s390x has an "I/O" line */
++    }
++    if (*(end-1) == '_')		/* overwrite final non-name char */
++	*(--end) = '\0';		/* and then mark end of name */
++    else
++	*end = '\0';			/* mark end of name */
++    *suffix = end + 1;			/* mark values start */
+     return s;
+ }
+ 
+@@ -232,14 +237,13 @@ refresh_interrupt_values(void)
+ {
+     FILE *fp;
+     char buf[4096];
+-    int i, ncolumns;
++    int i, j, ncolumns;
+ 
+-    if (cpu_count == 0) {
+-	long ncpus = sysconf(_SC_NPROCESSORS_CONF);
+-	online_cpumap = malloc(ncpus * sizeof(int));
++    if (cpu_count != _pm_ncpus) {
++	online_cpumap = realloc(online_cpumap, _pm_ncpus * sizeof(int));
+ 	if (!online_cpumap)
+ 	    return -oserror();
+-	cpu_count = ncpus;
++	cpu_count = _pm_ncpus;
+     }
+     memset(online_cpumap, 0, cpu_count * sizeof(int));
+ 
+@@ -254,20 +258,17 @@ refresh_interrupt_values(void)
+ 	return -EINVAL;		/* unrecognised file format */
+     }
+ 
+-    /* next we parse each interrupt line row (starting with a digit) */
+-    i = 0;
+-    while (fgets(buf, sizeof(buf), fp))
+-	if (!extract_interrupt_lines(buf, ncolumns, i++))
+-	    break;
+-
+-    /* parse other per-CPU interrupt counter rows (starts non-digit) */
+-    i = 0;
++    i = j = 0;
+     while (fgets(buf, sizeof(buf), fp) != NULL) {
++	/* next we parse each interrupt line row (starting with a digit) */
++	if (extract_interrupt_lines(buf, ncolumns, i++))
++	    continue;
+ 	if (extract_interrupt_errors(buf))
+ 	    continue;
+ 	if (extract_interrupt_misses(buf))
+ 	    continue;
+-	if (!extract_interrupt_other(buf, ncolumns, i++))
++	/* parse other per-CPU interrupt counter rows (starts non-digit) */
++	if (!extract_interrupt_other(buf, ncolumns, j++))
+ 	    break;
+     }
+ 
+@@ -363,21 +364,24 @@ interrupts_text(pmdaExt *pmda, pmID pmid
+ {
+     int item = pmid_item(pmid);
+     int cluster = pmid_cluster(pmid);
++    char *text;
+ 
+     switch (cluster) {
+ 	case CLUSTER_INTERRUPT_LINES:
+ 	    if (item > lines_count)
+ 		return PM_ERR_PMID;
+-	    if (interrupt_lines[item].text == NULL)
++	    text = interrupt_lines[item].text;
++	    if (text == NULL || text[0] == '\0')
+ 		return PM_ERR_TEXT;
+-	    *buf = interrupt_lines[item].text;
++	    *buf = text;
+ 	    return 0;
+ 	case CLUSTER_INTERRUPT_OTHER:
+ 	    if (item > other_count)
+ 		return PM_ERR_PMID;
+-	    if (interrupt_other[item].text == NULL)
++	    text = interrupt_other[item].text;
++	    if (text == NULL || text[0] == '\0')
+ 		return PM_ERR_TEXT;
+-	    *buf = interrupt_other[item].text;
++	    *buf = text;
+ 	    return 0;
+     }
+     return PM_ERR_PMID;
+diff -Naurp pcp-3.10.9-orig/src/pmdas/linux/interrupts.h pcp-3.10.9/src/pmdas/linux/interrupts.h
+--- pcp-3.10.9-orig/src/pmdas/linux/interrupts.h	2014-10-08 01:23:48.000000000 -0400
++++ pcp-3.10.9/src/pmdas/linux/interrupts.h	2016-01-15 10:30:45.304793369 -0500
+@@ -17,3 +17,5 @@ extern unsigned int irq_err_count;
+ extern void interrupts_init(pmdaMetric *, int);
+ extern int refresh_interrupt_values(void);
+ extern int interrupts_fetch(int, int, unsigned int, pmAtomValue *);
++
++extern int _pm_ncpus;
+diff -Naurp pcp-3.10.9-orig/src/pmdas/linux/pmda.c pcp-3.10.9/src/pmdas/linux/pmda.c
+--- pcp-3.10.9-orig/src/pmdas/linux/pmda.c	2015-11-12 02:00:09.000000000 -0500
++++ pcp-3.10.9/src/pmdas/linux/pmda.c	2016-01-15 10:30:45.306793381 -0500
+@@ -1,7 +1,7 @@
+ /*
+  * Linux PMDA
+  *
+- * Copyright (c) 2012-2015 Red Hat.
++ * Copyright (c) 2012-2016 Red Hat.
+  * Copyright (c) 2007-2011 Aconex.  All Rights Reserved.
+  * Copyright (c) 2002 International Business Machines Corp.
+  * Copyright (c) 2000,2004,2007-2008 Silicon Graphics, Inc.  All Rights Reserved.
+@@ -91,6 +91,7 @@ static int		hz;
+ 
+ /* globals */
+ size_t _pm_system_pagesize; /* for hinv.pagesize and used elsewhere */
++int _pm_ncpus; /* number of processors at pmda startup time */
+ int _pm_have_proc_vmstat; /* if /proc/vmstat is available */
+ int _pm_intr_size; /* size in bytes of interrupt sum count metric */
+ int _pm_ctxt_size; /* size in bytes of context switch count metric */
+@@ -6508,6 +6509,10 @@ linux_init(pmdaInterface *dp)
+ 	hz = atoi(envpath);
+     else
+ 	hz = sysconf(_SC_CLK_TCK);
++    if ((envpath = getenv("LINUX_NCPUS")) != NULL)
++	_pm_ncpus = atoi(envpath);
++    else
++	_pm_ncpus = sysconf(_SC_NPROCESSORS_CONF);
+     if ((envpath = getenv("LINUX_PAGESIZE")) != NULL)
+ 	_pm_system_pagesize = atoi(envpath);
+     else
+commit aad4d15b693ce7444d9c393e733d4f74b0116f7f
+Author: Nathan Scott <nathans@redhat.com>
+Date:   Wed Feb 10 14:37:20 2016 +1100
+
+    pmdalinux: fix interrupts data types for big endian hosts
+    
+    In the context of Red Hat BZ 1297822 Miloš discovered that
+    big endian hosts were reporting zero for all interrupts
+    metrics (courtesy of qa/886).  Turned out to be another of
+    those mismatched 32/64-bit variable copies.  Auditing the
+    kernel code confirms the currently-exported metric type is
+    correct, it is the pmdalinux pmAtomValue copying at fault.
+
+diff --git a/src/pmdas/linux/interrupts.c b/src/pmdas/linux/interrupts.c
+index 3d6a3c5..6d3fea6 100644
+--- a/src/pmdas/linux/interrupts.c
++++ b/src/pmdas/linux/interrupts.c
+@@ -30,7 +30,7 @@ typedef struct {
+     unsigned int	id;		/* becomes PMID item number */
+     char		*name;		/* becomes PMNS sub-component */
+     char		*text;		/* one-line metric help text */
+-    unsigned long long	*values;	/* per-CPU values for this counter */
++    unsigned long	*values;	/* per-CPU values for this counter */
+ } interrupt_t;
+ 
+ static unsigned int cpu_count;
+@@ -95,14 +95,13 @@ column_to_cpuid(int column)
+ }
+ 
+ static char *
+-extract_values(char *buffer, unsigned long long *values, int ncolumns)
++extract_values(char *buffer, unsigned long *values, int ncolumns)
+ {
+-    unsigned long i, cpuid;
+-    unsigned long long value;
++    unsigned long i, cpuid, value;
+     char *s = buffer, *end = NULL;
+ 
+     for (i = 0; i < ncolumns; i++) {
+-	value = strtoull(s, &end, 10);
++	value = strtoul(s, &end, 10);
+ 	if (!isspace(*end))
+ 	    return NULL;
+ 	s = end;
+@@ -145,8 +144,8 @@ initialise_interrupt(interrupt_t *ip, unsigned int id, char *s, char *end)
+ static int
+ extend_interrupts(interrupt_t **interp, unsigned int *countp)
+ {
+-    int cnt = cpu_count * sizeof(unsigned long long);
+-    unsigned long long *values = malloc(cnt);
++    int cnt = cpu_count * sizeof(unsigned long);
++    unsigned long *values = malloc(cnt);
+     interrupt_t *interrupt = *interp;
+     int count = *countp + 1;
+ 
+@@ -313,12 +312,12 @@ interrupts_fetch(int cluster, int item, unsigned int inst, pmAtomValue *atom)
+ 	case CLUSTER_INTERRUPT_LINES:
+ 	    if (item > lines_count)
+ 		return PM_ERR_PMID;
+-	    atom->ull = interrupt_lines[item].values[inst];
++	    atom->ul = interrupt_lines[item].values[inst];
+ 	    return 1;
+ 	case CLUSTER_INTERRUPT_OTHER:
+ 	    if (item > other_count)
+ 		return PM_ERR_PMID;
+-	    atom->ull = interrupt_other[item].values[inst];
++	    atom->ul = interrupt_other[item].values[inst];
+ 	    return 1;
+     }
+     return PM_ERR_PMID;

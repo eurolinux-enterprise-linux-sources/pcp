@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, Red Hat.
+ * Copyright (c) 2013-2015, Red Hat.
  * Copyright (c) 2007-2008, Aconex.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -12,9 +12,9 @@
  * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * for more details.
  */
-#include <QtGui/QHeaderView>
-#include <QtGui/QFileDialog>
-#include <QtGui/QMessageBox>
+#include <QHeaderView>
+#include <QFileDialog>
+#include <QMessageBox>
 #include "chartdialog.h"
 #include "qed_colorpicker.h"
 #include "hostdialog.h"
@@ -421,7 +421,7 @@ void ChartDialog::hostButtonClicked()
 	} else {
 	    console->post(PmChart::DebugUi,
 			"ChartDialog::newHost: %s (flags=0x%x)",
-			(const char *)hostspec.toAscii(), flags);
+			(const char *)hostspec.toLatin1(), flags);
 	    setupAvailableMetricsTree(false);
 	}
     }
@@ -831,13 +831,13 @@ void ChartDialog::createChartPlot(Chart *cp, NameSpace *name)
     label = name->label().isEmpty() ? QString::null : name->label();
     pms.isarch = (name->sourceType() == PM_CONTEXT_LOCAL) ? 2 :
 		((name->sourceType() == PM_CONTEXT_ARCHIVE) ? 1 : 0);
-    pms.source = strdup((const char *)name->sourceName().toAscii());
-    pms.metric = strdup((const char *)name->metricName().toAscii());
+    pms.source = strdup((const char *)name->source().toLatin1());
+    pms.metric = strdup((const char *)name->metricName().toLatin1());
     if (!pms.source || !pms.metric)
 	nomem();
     if (name->isInst()) {
 	pms.ninst = 1;
-	pms.inst[0] = strdup((const char *)name->metricInstance().toAscii());
+	pms.inst[0] = strdup((const char *)name->metricInstance().toLatin1());
 	if (!pms.inst[0])
 	    nomem();
     }

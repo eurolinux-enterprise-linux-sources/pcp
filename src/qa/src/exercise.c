@@ -71,12 +71,12 @@ dometric(const char *name)
 	else {
 	    if (result->vset[0]->valfmt == PM_VAL_INSITU) {
 		_insitu++;
-		if (pmDebug && DBG_TRACE_APPL0)
+		if (pmDebug & DBG_TRACE_APPL0)
 		    printf("%s: insitu type=%s\n", name, pmTypeStr(desc.type));
 	    }
 	    else {
 		_ptr++;
-		if (pmDebug && DBG_TRACE_APPL0)
+		if (pmDebug & DBG_TRACE_APPL0)
 		    printf("%s: ptr size=%d valtype=%d descrtype=%s\n",
 			    name,
 			    result->vset[0]->vlist[0].value.pval->vlen,
@@ -98,7 +98,7 @@ char *argv[];
     int		i;
     int		errflag = 0;
     char	*host = "localhost";
-    char	*namespace = NULL;
+    char	*namespace = PM_NS_DEFAULT;
     char	*endnum;
     int		iter = 1;
     unsigned long datasize;
@@ -163,11 +163,11 @@ char *argv[];
 	exit(1);
     }
 
-    if (namespace != NULL) {
+    if (namespace != PM_NS_DEFAULT) {
 	/*
 	 * only explicitly load namespace if -n specified
 	 */
-	if ((sts = pmLoadNameSpace(namespace)) < 0) {
+	if ((sts = pmLoadASCIINameSpace(namespace, 1)) < 0) {
 	    printf("%s: Cannot load namespace from \"%s\": %s\n", pmProgname, namespace, pmErrStr(sts));
 	    exit(1);
 	}

@@ -122,6 +122,10 @@ Generates PCP
 archives of performance metrics suitable for replay by most
 PCP tools.
 .TP
+.B pmrep
+Highly customizable performance metrics reporter with support
+for various different output modes.
+.TP
 .B pmval
 Simple periodic reporting for some or all instances of a performance
 metric, with optional VCR time control.
@@ -256,7 +260,7 @@ option changes the timezone to
 in the format of the environment variable
 .B TZ
 as described in
-.BR environ (5).
+.BR environ (7).
 .SH INTERVAL SPECIFICATION AND ALIGNMENT
 Most PCP tools operate with periodic sampling or
 reporting, and the
@@ -755,9 +759,9 @@ The following are valid hostname specifications that specify connections to
 .B pmcd
 on host
 .I nas1.servers.com
-with/without a list of ports and with/without a
+with/without a list of ports, with/without a
 .BR pmproxy (1)
-connection through a firewall.
+connection through a firewall, and with IPv6 and IPv4 addresses as shown.
 .PP
 .in +0.5i
 .nf
@@ -767,23 +771,29 @@ $ pcp \-h nas1.servers.com:44321@firewall.servers.com:44322
 $ pcp \-h nas1.servers.com:44321@firewall.servers.com
 $ pcp \-h nas1.servers.com@firewall.servers.com
 $ pcp \-h nas1.servers.com:44321
+$ pcp \-h [fe80::2ad2:44ff:fe88:e4f1%p2p1]
+$ pcp \-h 192.168.0.103
 .ft R
 .fi
 .in
 .PP
-In addition, security attributes and credentials can also be specified.
-These include username, an optional password (can be given interactively
-and may depend on the authentication mechanism employed), whether to use
-secure (encrypted) or native (naked) protocol, and so on. The previous
-examples all default to native protocol, and use no authentication.
+In addition, ``connection attributes'' can also be specified.
+These include username, password (can be given interactively
+and may depend on the authentication mechanism employed),
+whether to target a specific running container, whether to use
+secure (encrypted) or native (naked) protocol, and so on.
+The previous examples all default to native protocol, and use
+no authentication.
 This can be altered, as in the following examples.
 .PP
 .in +0.5i
 .nf
 .ft CW
+$ pcp \-h pcps://app2.servers.com?container=cae8e6edc0d5
 $ pcp \-h pcps://nas1.servers.com:44321?username=tanya&method=gssapi
 $ pcp \-h pcps://nas2.servers.com@firewalls.r.us?method=plain
 $ pcp \-h pcp://nas3.servers.com
+$ pcp \-h 192.168.0.103?container=cae8e6edc0d5,method=digest-md5
 $ pcp \-h unix:
 $ pcp \-h local:
 .ft R
@@ -797,6 +807,11 @@ used by each (remote)
 Tutorials are available specifying various aspects of configuring the
 authentication module(s) used, these fine details are outside the scope
 of this document.
+.PP
+In all situations, host names can be used interchangeably with IPv4 or IPv6
+addressing (directly), as shown above.  In the case of an IPv6 address, the
+full address must be enclosed by square brackets and the scope (interface)
+must also be specified.
 .PP
 The final
 .I local:
@@ -838,13 +853,38 @@ This is used in places where console-based tools need to interact
 with the user, and in particular is used when authentication is
 being performed.
 .TP
+.B PCP_DEBUG
+When set, this variable provides an alternate way to initialize
+the value used to control diagnostic and debug output (the default
+value is 0 to suppress this output).
+The value for
+.B $PCP_DEBUG
+should be a decimal integer, see
+.BR pmdbg (1)
+for a description of the supported values.
+.TP
 .B PCP_DERIVED_CONFIG
-When set, this variable defines the path to a file that contains
+When set, this variable defines a colon separated list of
+files and/or directories (the syntax is the same as for the
+.B $PATH
+variable for
+.BR sh (1)).
+The components are expanded into a list of files as follows: 
+if a component of
+.B $PCP_DERIVED_CONFIG
+is a file, then that file is added to the list, else if a component
+is a directory then recursive descent is used to enumerate all
+files below that directory and these are added to the list.
+.RS
+.PP
+Each file in the resulting list is assumed to 
+contain
 definitions of derived metrics as per the syntax described in
-.BR pmLoadDerivedConfig (3).
+.BR pmLoadDerivedConfig (3),
+and these are loaded in order.
+.PP
 Derived metrics may be used to extend the available metrics with
 new (derived) metrics using simple arithmetic expressions.
-.RS
 .PP
 If 
 .B PCP_DERIVED_CONFIG
@@ -853,6 +893,12 @@ as each new source of performance metrics is established (i.e. each
 time a
 .BR pmNewContext (3)
 is called) or when requests are made against the PMNS.
+.PP
+Any component in the
+.B $PCP_DERIVED_CONFIG
+list or the expanded list of files that is not a file, or is not a directory
+or is not accessible (due to permissions or a bad symbolic link) will
+be silently ignored.
 .RE
 .TP
 .B PCP_SECURE_SOCKETS
@@ -1294,6 +1340,7 @@ as described in
 .BR pmlc (1),
 .BR pmlogger (1),
 .BR pmlogger_daily (1),
+.BR pmrep (1),
 .BR pmstat (1),
 .BR pmval (1),
 .BR pcp (1),
@@ -1314,14 +1361,14 @@ and
 If the secure sockets extensions have been enabled, then the
 following references are also relevant:
 .br
-.I "http://www.performancecopilot.org/pcp-gui.git/man/html/index.html"
+.I "http://www.pcp.io/documentation.html"
 .br
 .I "http://www.mozilla.org/projects/security/pki/nss/#documentation"
 .br
 .I "http://www.mozilla.org/projects/security/pki/nss/tools/certutil.html"
 .PP
-Also refer to the books
+Also refer to the books 
 .I "Performance Co-Pilot User's and Administrator's Guide"
 and
 .IR "Performance Co-Pilot Programmer's Guide"
-which can be found at http://www.performancecopilot.org/
+which can be found at http://www.pcp.io/

@@ -15,7 +15,7 @@
 #define OPENVIEWDIALOG_H
 
 #include "ui_openviewdialog.h"
-#include <QtGui/QDirModel>
+#include <QDirModel>
 
 class OpenViewDialog : public QDialog, public Ui::OpenViewDialog
 {
@@ -64,8 +64,8 @@ private:
     void hostAdd();
     void archiveAdd();
 
-    bool useLiveContext(QString);
-    bool useArchiveContext(QString);
+    bool useLiveContext(int);
+    bool useArchiveContext(int);
     bool useComboBoxContext(bool);
     bool openViewFiles(const QStringList &);
 };

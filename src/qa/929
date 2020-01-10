@@ -60,24 +60,24 @@ do
     mkdir -p $tmp.$host
     for ext in 0 meta index
     do
-	cp src/foo.$ext $tmp.$host/$PAST.00.10.$ext
+	cp tmparch/foo.$ext $tmp.$host/$PAST.00.10.$ext
 	touch -t "${PAST}0010" $tmp.$host/$PAST.00.10.$ext
 	if [ "$host" = "two" ]
 	then
-	    cp src/foo.$ext $tmp.$host/$PAST.13.13.$ext
+	    cp tmparch/foo.$ext $tmp.$host/$PAST.13.13.$ext
 	    touch -t "${PAST}1313" $tmp.$host/$PAST.13.13.$ext
 	fi
     done
 done
 
 # real QA test starts here
-$sudo $PCP_BINADM_DIR/pmlogger_daily -V -N -c $tmp.control \
-| _filter
+$sudo $PCP_BINADM_DIR/pmlogger_daily -V -N -c $tmp.control -l $tmp.log
+$sudo cat $tmp.log | _filter
 
 echo
 echo "--- -M case ---"
-$sudo $PCP_BINADM_DIR/pmlogger_daily -M -VN -c $tmp.control \
-| _filter
+$sudo $PCP_BINADM_DIR/pmlogger_daily -M -VN -c $tmp.control -l $tmp.log
+$sudo cat $tmp.log | _filter
 
 # success, all done
 status=0

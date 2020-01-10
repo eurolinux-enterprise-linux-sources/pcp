@@ -1,0 +1,36 @@
+diff --git a/src/include/pcp/config32.h b/src/include/pcp/config32.h
+index 7625557..4d0f29c 100644
+--- a/src/include/pcp/config32.h
++++ b/src/include/pcp/config32.h
+@@ -19,4 +19,7 @@
+ #define HAVE_32BIT_PTR 1
+ /* #undef HAVE_64BIT_PTR */
+ 
++/* printf formatting */
++#define FMT_INT64 "lld"
++
+ #endif /* PCP_CONFIG32_H */
+diff --git a/src/include/pcp/config64.h b/src/include/pcp/config64.h
+index cc0f746..ed0efdc 100644
+--- a/src/include/pcp/config64.h
++++ b/src/include/pcp/config64.h
+@@ -19,4 +19,7 @@
+ /* #undef HAVE_32BIT_PTR */
+ #define HAVE_64BIT_PTR 1
+ 
++/* printf formatting */
++#define FMT_INT64 "ld"
++
+ #endif /* PCP_CONFIG64_H */
+diff --git a/src/include/pcp/platform_defs.h.in b/src/include/pcp/platform_defs.h.in
+index 57512bb..ef54143 100644
+--- a/src/include/pcp/platform_defs.h.in
++++ b/src/include/pcp/platform_defs.h.in
+@@ -8,7 +8,6 @@
+ 
+ /* printf candy ... */
+ #define FMT_PID @fmt_pid@
+-#define FMT_INT64 @fmt_int64@
+ #define FMT_PTHREAD @fmt_pthread@
+ 
+ /* build version macros */

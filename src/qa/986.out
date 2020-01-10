@@ -1,28 +1,61 @@
 QA output created by 986
-Waiting for pmcd to terminate ...
+=== ODS ===
+Note: timezone set to local timezone of host "time.greenwich.com" from archive
 
-=== dmcache agent installation ===
-You will need to choose an appropriate configuration for installation of
-the "dmcache" Performance Metrics Domain Agent (PMDA).
+Log Label (Log Format Version 2)
+Performance metrics from host time.greenwich.com
+  commencing Tue Jan 26 01:02:00.000 2010
+  ending     Tue Jan 26 13:02:00.000 2010
 
-  collector	collect performance statistics on this system
-  monitor	allow this system to monitor local and/or remote systems
-  both		collector and monitor configuration for this system
+Descriptions for Metrics in the Log ...
+PMID: 245.0.5 (metric.e)
+    Data Type: string  InDom: PM_INDOM_NULL 0xffffffff
+    Semantics: instant  Units: none
+PMID: 245.0.4 (metric.d)
+    Data Type: 32-bit int  InDom: PM_INDOM_NULL 0xffffffff
+    Semantics: instant  Units: none
+PMID: 245.0.3 (metric.c)
+    Data Type: float  InDom: PM_INDOM_NULL 0xffffffff
+    Semantics: instant  Units: none
+PMID: 245.0.2 (metric.b)
+    Data Type: float  InDom: PM_INDOM_NULL 0xffffffff
+    Semantics: counter  Units: none
+PMID: 245.0.1 (metric.a)
+    Data Type: float  InDom: PM_INDOM_NULL 0xffffffff
+    Semantics: counter  Units: none
 
-Please enter c(ollector) or m(onitor) or b(oth) [b] Updating the Performance Metrics Name Space (PMNS) ...
-Terminate PMDA if already installed ...
-[...install files, make output...]
-Updating the PMCD control file, and notifying PMCD ...
-Starting pmcd ... 
-Starting pmlogger ... 
-Check dmcache metrics have appeared ... X metrics and Y values
+Instance Domains in the Log ...
 
-=== remove dmcache agent ===
-Culling the Performance Metrics Name Space ...
-dmcache ... done
-Updating the PMCD control file, and notifying PMCD ...
-[...removing files...]
-Check dmcache metrics have gone away ... OK
-Waiting for pmcd to terminate ...
-Starting pmcd ... 
-Starting pmlogger ... 
+Temporal Index
+             Log Vol    end(meta)     end(log)
+01:02:00.000       0          132          132
+01:02:00.000       0          372          132
+13:02:00.000       0          372          788
+
+[164 bytes]
+01:02:00.000  245.0.1 (metric.a): value 100
+              245.0.2 (metric.b): value 200
+              245.0.3 (metric.c): value 300
+              245.0.4 (metric.d): value 1
+              245.0.5 (metric.e): value "foo bar first"
+
+[164 bytes]
+05:02:00.000  245.0.1 (metric.a): value 110
+              245.0.2 (metric.b): value 200
+              245.0.3 (metric.c): value 290
+              245.0.4 (metric.d): value 2
+              245.0.5 (metric.e): value "foo bar second"
+
+[164 bytes]
+09:02:00.000  245.0.1 (metric.a): value 120
+              245.0.2 (metric.b): value 200
+              245.0.3 (metric.c): value 280
+              245.0.4 (metric.d): value 3
+              245.0.5 (metric.e): value "foo bar third"
+
+[164 bytes]
+13:02:00.000  245.0.1 (metric.a): value 130
+              245.0.2 (metric.b): value 200
+              245.0.3 (metric.c): value 270
+              245.0.4 (metric.d): value 4
+              245.0.5 (metric.e): value "foo bar last"

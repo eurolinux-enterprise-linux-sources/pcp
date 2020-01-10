@@ -323,10 +323,7 @@ __pmAddOptArchiveList(pmOptions *opts, char *arg)
 {
     char *start = arg, *end;
 
-    if (!(opts->flags & PM_OPTFLAG_MULTI)) {
-	pmprintf("%s: too many archives requested: %s\n", pmProgname, arg);
-	opts->errors++;
-    } else if (opts->nhosts && !(opts->flags & PM_OPTFLAG_MIXED)) {
+    if (opts->nhosts && !(opts->flags & PM_OPTFLAG_MIXED)) {
 	pmprintf("%s: only one of hosts or archives allowed\n", pmProgname);
 	opts->errors++;
     } else {
@@ -353,6 +350,10 @@ __pmAddOptArchiveList(pmOptions *opts, char *arg)
 	next:
 	    start = (*end == '\0') ? end : end + 1;
 	}
+    }
+    if (opts->narchives > 1 && !(opts->flags & PM_OPTFLAG_MULTI)) {
+	pmprintf("%s: too many archives requested: %s\n", pmProgname, arg);
+	opts->errors++;
     }
 }
 
@@ -473,6 +474,10 @@ __pmAddOptArchiveFolio(pmOptions *opts, char *arg)
 
 	fclose(fp);
     }
+    if (opts->narchives > 1 && !(opts->flags & PM_OPTFLAG_MULTI)) {
+	pmprintf("%s: too many archives requested: %s\n", pmProgname, arg);
+	opts->errors++;
+    }
     return;
 
 badfolio:
@@ -508,9 +513,10 @@ __pmAddOptHostFile(pmOptions *opts, char *arg)
 		    continue;
 		host = p;
 		length = 0;
-		while (*p != '\n' && *p != '#' && !isspace((int)*p))
+		while (*p != '\n' && *p != '#' && !isspace((int)*p)) {
 		    length++;
-		p += length;
+		    p++;
+		}
 		*p = '\0';
 		if ((hosts = realloc(hosts, size)) != NULL) {
 		    if ((host = strndup(host, length)) != NULL) {
@@ -540,10 +546,7 @@ __pmAddOptHostFile(pmOptions *opts, char *arg)
 void
 __pmAddOptHostList(pmOptions *opts, char *arg)
 {
-    if (!(opts->flags & PM_OPTFLAG_MULTI)) {
-	pmprintf("%s: too many hosts requested: %s\n", pmProgname, arg);
-	opts->errors++;
-    } else if (opts->narchives && !(opts->flags & PM_OPTFLAG_MIXED)) {
+    if (opts->narchives && !(opts->flags & PM_OPTFLAG_MIXED)) {
 	pmprintf("%s: only one of hosts or archives allowed\n", pmProgname);
 	opts->errors++;
     } else {
@@ -573,6 +576,10 @@ __pmAddOptHostList(pmOptions *opts, char *arg)
 	    start = (*end == '\0') ? end : end + 1;
 	}
     }
+    if (opts->nhosts > 1 && !(opts->flags & PM_OPTFLAG_MULTI)) {
+	pmprintf("%s: too many hosts requested: %s\n", pmProgname, arg);
+	opts->errors++;
+    }
 }
 
 static void
@@ -583,6 +590,19 @@ __pmAddOptContainer(pmOptions *opts, char *arg)
     (void)opts;
     snprintf(buffer, sizeof(buffer), "%s=%s", "PCP_CONTAINER", arg? arg : "");
     putenv(buffer);
+}
+
+static void
+__pmSetDerivedMetrics(pmOptions *opts, char *arg)
+{
+    char errmsg[PM_MAXERRMSGLEN];
+    int sts;
+
+    if ((sts = pmLoadDerivedConfig(arg)) < 0) {
+	pmprintf("%s: pmLoadDerivedConfig failed: %s\n", pmProgname,
+		pmErrStr_r(sts, errmsg, sizeof(errmsg)));
+	opts->errors++;
+    }
 }
 
 static void
@@ -856,6 +876,8 @@ pmGetOptions(int argc, char *const *argv, pmOptions *opts)
 		__pmAddOptArchiveFolio(opts, opts->optarg);
 	    else if (strcmp(opt->long_opt, PMLONGOPT_CONTAINER) == 0)
 		__pmAddOptContainer(opts, opts->optarg);
+	    else if (strcmp(opt->long_opt, PMLONGOPT_DERIVED) == 0)
+		__pmSetDerivedMetrics(opts, opts->optarg);
 	    else
 		flag = 1;
 	    break;

@@ -18,26 +18,51 @@ echo "QA output created by $seq"
 . ./common.filter
 . ./common.check
 
+# This test is not stable in the vicinity of a timezone change, e.g.
+# daylight saving or summer time transitions.
+# Don't run if this happened in the last 2 days.
+#
+now_hr=`pmdate '%H'`
+now_hr_2=`pmdate -2d '%H'`
+if [ "$now_hr" != "$now_hr_2" ]
+then
+    _notrun "timezone change? now = ${now_hr}H:??M, 2 days ago = ${now_hr_2}H:??M"
+    # NOTREACHED
+fi
+
 _filter()
 {
+    if fmt --help 2>&1 | grep '.-w, ' >/dev/null
+    then
+	# GNU-style fmt(1)
+	cmd="fmt -w 76"
+    elif fmt --help 2>&1 | grep '.-m ' >/dev/null
+    then
+	# NetBSD's version of fmt is different (may apply to other variants) ...
+	cmd="fmt -m 76"
+    else
+	echo "Warning: no clue how to set max line length for fmt(1)"
+	cmd="fmt"
+    fi
     tee -a $seq.full \
     | $PCP_AWK_PROG '
-/^Archive files older than/	{ eatlines=1; longone="   "; print; next; }
+BEGIN				{ cmd = "'"`echo $cmd`"'" }
+/^Archive files older than/	{ eatlines=1; longone="   "; print; next }
 eatlines			{ if ( match ($0, "^    ") ) {
 				    for ( i=1; i <=NF; i++ ) {
-					longone = sprintf ("%s %s",longone,$i);
+					longone = sprintf ("%s %s",longone,$i)
 				    }
 				  } else {
-				    print longone | "fmt -76";
-				    close ("fmt -76"); 
-				    longone = ""; eatlines = 0; 
-				    print;  
+				    print longone | cmd
+				    close (cmd)
+				    longone = ""; eatlines = 0 
+				    print  
 				  }
-				  next;
+				  next
 				}
 END				{ if ( eatlines ) {
-				    print longone | "fmt -76";
-				    close ("fmt -76"); 
+				    print longone | cmd
+				    close (cmd)
 				  }
 				}
 				{ print }' \
@@ -56,14 +81,19 @@ END				{ if ( eatlines ) {
     | _filter_cron_scripts
 }
 
-status=1	# failure is the default!
-trap "cd $here; $sudo rm -rf $tmp; $sudo mv $PCP_LOG_DIR/NOTICES.$$ $PCP_LOG_DIR/NOTICES; exit \$status" 0 1 2 3 15
-$sudo rm -rf $tmp
+_cleanup()
+{
+    cd $here
+    $sudo rm -f $tmp.*
+    $sudo rm -rf $tmp
+    $sudo mv $PCP_LOG_DIR/NOTICES.$$ $PCP_LOG_DIR/NOTICES
+}
 
-# real QA test starts here
+status=1	# failure is the default!
+trap "_cleanup; exit \$status" 0 1 2 3 15
+$sudo rm -rf $tmp $tmp.*
 
 # take explicit control of the umask
-#
 umask 022
 
 $sudo mv $PCP_LOG_DIR/NOTICES $PCP_LOG_DIR/NOTICES.$$
@@ -98,9 +128,9 @@ do
 
 	for ext in 0 index meta
 	do
-	    cp src/arch_a.$ext $tmp/$namea.$ext
+	    cp archives/arch_a.$ext $tmp/$namea.$ext
 	    touch -t $stampa $tmp/$namea.$ext
-	    cp src/arch_b.$ext $tmp/$nameb.$ext
+	    cp archives/arch_b.$ext $tmp/$nameb.$ext
 	    touch -t $stampb $tmp/$nameb.$ext
 	done
     done
@@ -118,8 +148,9 @@ LOCALHOSTNAME	n   n	'"$tmp"'	./config'
     echo
     echo "=== [${verbose+verbose}] regular show ==="
     echo "=== [${verbose+verbose}] regular show ===" >>$seq.full
-    $sudo $PCP_BINADM_DIR/pmlogger_daily -o -c $tmp/control -k 3 $verbose 2>&1 \
-    | _filter
+    $sudo $PCP_BINADM_DIR/pmlogger_daily -o -c $tmp/control -k 3 $verbose -l $tmp.log
+
+    $sudo cat $tmp.log | _filter
     ls -lt $tmp >>$seq.full
     ls $tmp | sed -f $tmp/sed | tee -a $seq.full | LC_COLLATE=POSIX sort
 
@@ -130,8 +161,8 @@ LOCALHOSTNAME	n   n	'"$tmp"'	./config'
     do
 	mv $tmp/$yesterday.$ext $tmp/save.$ext
     done
-    $sudo $PCP_BINADM_DIR/pmlogger_daily -o -c $tmp/control -k 2 $verbose 2>&1 \
-    | _filter
+    $sudo $PCP_BINADM_DIR/pmlogger_daily -o -c $tmp/control -k 2 $verbose -l $tmp.log
+    $sudo cat $tmp.log | _filter
     ls -lt $tmp >>$seq.full
     ls $tmp | sed -f $tmp/sed | tee -a $seq.full | LC_COLLATE=POSIX sort
 
@@ -140,11 +171,11 @@ LOCALHOSTNAME	n   n	'"$tmp"'	./config'
     echo "=== [${verbose+verbose}] error, output already exists ===" >>$seq.full
     for ext in 0 index meta
     do
-	cp src/arch_a.$ext $tmp/$yesterday.17.18.$ext
+	cp archives/arch_a.$ext $tmp/$yesterday.17.18.$ext
 	mv $tmp/save.$ext $tmp/$yesterday.$ext
     done
-    $sudo $PCP_BINADM_DIR/pmlogger_daily -o -c $tmp/control -k 2 $verbose 2>&1 \
-    | _filter
+    $sudo $PCP_BINADM_DIR/pmlogger_daily -o -c $tmp/control -k 2 $verbose -l $tmp.log
+    $sudo cat $tmp.log | _filter
     ls -lt $tmp >>$seq.full
     ls $tmp | sed -f $tmp/sed | tee -a $seq.full | LC_COLLATE=POSIX sort
 

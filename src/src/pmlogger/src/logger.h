@@ -36,7 +36,8 @@ typedef struct task_s {
     fetchctl_t		*t_fetch;
     int			t_afid;
     int			t_alarm;	/* set when log_callback() called for this task */
-    int			t_size;
+    int			t_size;		/* pdu size for -r flag reporting */
+    int			t_dm;		/* 1 if derived metrics included */
 } task_t;
 
 extern task_t		*tasklist;	/* master list of tasks */
@@ -111,6 +112,7 @@ extern int		lineno;
 extern int myFetch(int, pmID *, __pmPDU **);
 extern void yyerror(char *);
 extern void yywarn(char *);
+extern void yylinemarker(char *);
 extern int yylex(void);
 extern int yyparse(void);
 extern void yyend(void);

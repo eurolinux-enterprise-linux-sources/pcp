@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2012-2014 Red Hat.
+# Copyright (c) 2012-2015 Red Hat.
 # Copyright (c) 2000,2003 Silicon Graphics, Inc.  All Rights Reserved.
 # 
 # This program is free software; you can redistribute it and/or modify it
@@ -46,7 +46,7 @@ default :: default_pcp
 pcp : default_pcp
 
 default_pcp : $(CONFIGURE_GENERATED)
-	@for d in `echo $(SUBDIRS)`; do \
+	+for d in `echo $(SUBDIRS)`; do \
 	    if test -d "$$d" ; then \
 		echo === $$d ===; \
 		$(MAKE) -C $$d $@ || exit $$?; \
@@ -60,19 +60,17 @@ pack_pcp : default_pcp
 
 install_pcp :  default_pcp
 	# install the common directories _once_
+	$(INSTALL) -m 755 -d $(PCP_VAR_DIR)
+	$(INSTALL) -m 755 -d $(PCP_SHARE_DIR)
 ifneq "$(findstring $(TARGET_OS),darwin mingw)" ""
-	# for Linux, this one comes from the chkconfig package
 	$(INSTALL) -m 755 -d $(PCP_RC_DIR)
 	$(INSTALL) -m 755 -d $(PCP_SASLCONF_DIR)
-endif
-ifeq ($(TARGET_OS),mingw)
-	# for Linux, this group comes from the filesystem package
 	$(INSTALL) -m 755 -d $(PCP_BIN_DIR)
 	$(INSTALL) -m 755 -d $(PCP_LIB_DIR)
 	$(INSTALL) -m 755 -d $(PCP_MAN_DIR)
-else
-	$(INSTALL) -m 755 -d $(PCP_VAR_DIR)
-	$(INSTALL) -m 755 -d $(PCP_SHARE_DIR)
+	$(INSTALL) -m 755 -d $(PCP_MAN_DIR)/man1
+	$(INSTALL) -m 755 -d $(PCP_MAN_DIR)/man3
+	$(INSTALL) -m 755 -d $(PCP_MAN_DIR)/man5
 endif
 	$(INSTALL) -m 775 -o $(PCP_USER) -g $(PCP_GROUP) -d $(PCP_TMP_DIR)
 ifeq "$(findstring $(PACKAGE_DISTRIBUTION), debian redhat fedora)" ""
@@ -84,6 +82,7 @@ ifeq "$(findstring $(PACKAGE_DISTRIBUTION), debian redhat fedora)" ""
 	#
 	$(INSTALL) -m 775 -o $(PCP_USER) -g $(PCP_GROUP) -d $(PCP_RUN_DIR)
 endif
+	$(INSTALL) -m 755 -d $(PCP_SYSCONFIG_DIR)
 	$(INSTALL) -m 755 -d $(PCP_SYSCONF_DIR)
 	$(INSTALL) -m 755 -d $(PCP_BINADM_DIR)
 	$(INSTALL) -m 755 -d $(PCP_SHARE_DIR)/lib

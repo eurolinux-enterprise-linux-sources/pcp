@@ -2,7 +2,7 @@
  * pmie.c - performance inference engine
  ***********************************************************************
  *
- * Copyright (c) 2013-2014 Red Hat, Inc.
+ * Copyright (c) 2013-2015 Red Hat, Inc.
  * Copyright (c) 1995-2003 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -104,6 +104,7 @@ static pmLongOptions longopts[] = {
     PMAPI_OPTIONS_HEADER("Reporting options"),
     { "buffer", 0, 'b', 0, "one line buffered output stream, stdout on stderr" },
     { "timestamp", 0, 'e', 0, "force timestamps to be reported with -V, -v or -W" },
+    { "quiet", 0, 'q', 0, "quiet mode, default diagnostics suppressed" },
     { "", 0, 'v', 0, "verbose mode, expression values printed" },
     { "verbose", 0, 'V', 0, "verbose mode, annotated expression values printed" },
     { "", 0, 'W', 0, "verbose mode, satisfying expression values printed" },
@@ -114,7 +115,7 @@ static pmLongOptions longopts[] = {
 
 static pmOptions opts = {
     .flags = PM_OPTFLAG_STDOUT_TZ,
-    .short_options = "a:A:bc:CdD:efHh:j:l:n:O:S:t:T:U:vVWXxzZ:?",
+    .short_options = "a:A:bc:CdD:efHh:j:l:n:O:qS:t:T:U:vVWXxzZ:?",
     .long_options = longopts,
     .short_usage = "[options] [filename ...]",
     .override = override,
@@ -374,8 +375,11 @@ startmonitor(void)
     path = (logfile[0] == '\0') ? "<none>" : logfile;
     strncpy(perf->logfile, path, sizeof(perf->logfile));
     perf->logfile[sizeof(perf->logfile)-1] = '\0';
-    strncpy(perf->defaultfqdn, dfltHostName, sizeof(perf->defaultfqdn));
+    /* Don't try to improvise a current fdqn for "the" pmcd. 
+       It'll be filled in periodically by newContext(). */
+    strncpy(perf->defaultfqdn, "(uninitialized)", sizeof(perf->defaultfqdn));
     perf->defaultfqdn[sizeof(perf->defaultfqdn)-1] = '\0';
+
     perf->version = 1;
 }
 
@@ -419,8 +423,8 @@ logRotate(void)
 
     fp = __pmRotateLog(pmProgname, logfile, logfp, &sts);
     if (sts != 0) {
-	fprintf(stderr, "pmie: PID = %" FMT_PID ", default host = %s via %s\n\n",
-                getpid(), dfltHostName, dfltHostConn);
+	fprintf(stderr, "pmie: PID = %" FMT_PID ", via %s\n\n",
+                getpid(), dfltHostConn);
 	remap_stdout_stderr();
 	logfp = fp;
     } else {
@@ -551,7 +555,6 @@ getargs(int argc, char *argv[])
 	    }
 	    dfltConn = opts.context = PM_CONTEXT_HOST;
 	    dfltHostConn = opts.optarg;
-            dfltHostName = ""; /* unknown until newContext */
 	    break;
 
         case 'j':			/* stomp protocol (JMS) config */
@@ -571,6 +574,10 @@ getargs(int argc, char *argv[])
 	case 'U': 			/* run as named user */
 	    username = opts.optarg;
 	    isdaemon = 1;
+	    break;
+
+	case 'q': 			/* suppress default diagnostics */
+	    quiet = 1;
 	    break;
 
 	case 'v': 			/* print values */
@@ -612,6 +619,21 @@ getargs(int argc, char *argv[])
     if (opts.errors) {
     	pmUsageMessage(&opts);
 	exit(1);
+    }
+    /* check if archives/hosts available in the environment */
+    if (!dfltConn && opts.narchives) {
+	dfltConn = opts.context = PM_CONTEXT_ARCHIVE;
+	for (c = 0; c < opts.narchives; c++) {
+	    a = (Archive *)zalloc(sizeof(Archive));
+	    a->fname = opts.archives[c];
+	    if (!initArchive(a))
+		exit(1);
+	}
+	foreground = 1;
+    }
+    if (!dfltConn && opts.nhosts) {
+	dfltConn = opts.context = PM_CONTEXT_HOST;
+	dfltHostConn = opts.hosts[c];
     }
 
     if (foreground)
@@ -669,45 +691,21 @@ getargs(int argc, char *argv[])
 	a = archives;
 	while (a->next)
 	    a = a->next;
-	dfltHostName = a->hname; /* already filled in during initArchive() */
+        dfltHostConn = a->fname;
     } else if (!dfltConn || dfltConn == PM_CONTEXT_HOST) {
 	if (dfltConn == 0)	/* default case, no -a or -h */
 	    dfltHostConn = "local:";
-	sts = pmNewContext(PM_CONTEXT_HOST, dfltHostConn);
-	/* pmcd down locally, try to extract hostname manually */
-	if (sts < 0 && (!dfltConn ||
-			!strcmp(dfltHostConn, "localhost") ||
-			!strcmp(dfltHostConn, "local:") ||
-			!strcmp(dfltHostConn, "unix:")))
-	    sts = pmNewContext(PM_CONTEXT_LOCAL, NULL);
-	if (sts < 0) {
-	    fprintf(stderr, "%s: cannot find host name for %s\n"
-		    "pmNewContext failed: %s\n",
-		    pmProgname, dfltHostConn, pmErrStr(sts));
-	    exit(1);
-	} else {
-	    const char	*tmp = pmGetContextHostName(sts);
-
-	    if (strlen(tmp) == 0) {
-		fprintf(stderr, "%s: pmGetContextHostName(%d) failed\n",
-			pmProgname, sts);
-		exit(1);
-	    }
-	    if ((dfltHostName = strdup(tmp)) == NULL)
-		__pmNoMem("host name copy", strlen(tmp)+1, PM_FATAL_ERR);
-	    pmDestroyContext(sts);
-        }
     }
 
     if (!archives && !interactive) {
 	if (commandlog != NULL)
-            fprintf(stderr, "pmie: PID = %" FMT_PID ", default host = %s via %s\n\n",
-                    getpid(), dfltHostName, dfltHostConn);
+            fprintf(stderr, "pmie: PID = %" FMT_PID ", via %s\n\n",
+                    getpid(), dfltHostConn);
 	startmonitor();
     }
 
     /* initialize time */
-    now = archives ? first : getReal() + 1.0;
+    now = archives ? first : getReal();
     zoneInit();
     reflectTime(dfltDelta);
 
@@ -750,6 +748,12 @@ getargs(int argc, char *argv[])
 	dumpRules();
 #endif
 
+    /* really parse time window */
+    if (!archives) {
+	now = getReal();
+	reflectTime(dfltDelta);
+    }
+
     if (checkFlag)
 	exit(errs == 0 ? 0 : 1);	/* exit 1 for syntax errors ...
 					 * suggestion from 
@@ -773,11 +777,6 @@ getargs(int argc, char *argv[])
     if (agent)
 	agentInit();			/* initialize secret agent stuff */
 
-    /* really parse time window */
-    if (!archives) {
-	now = getReal() + 1.0;
-	reflectTime(dfltDelta);
-    }
     __pmtimevalFromReal(now, &tv1);
     if (archives) {
 	__pmtimevalFromReal(last, &tv2);

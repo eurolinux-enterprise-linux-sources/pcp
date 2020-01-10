@@ -1,76 +1,53 @@
 #!/bin/sh
 # PCP QA Test No. 986
-# Exercise the dmcache PMDA using the running kernel.
+# simple exerciser for sheet2pcp - ODS variant
 #
-# Copyright (c) 2014-2015 Red Hat.
+# Copyright (c) 2010 Ken McDonell.  All Rights Reserved.
 #
 
 seq=`basename $0`
 echo "QA output created by $seq"
 
-. ./common.python
+# get standard environment, filters and checks
+. ./common.product
+. ./common.filter
+. ./common.check
 
-status=1	# failure is the default!
-$sudo rm -f $tmp.* $seq.full
+which sheet2pcp >/dev/null 2>&1
+[ $? -eq 0 ] || _notrun "sheet2pcp not installed"
+perl -e "use XML::TokeParser" >/dev/null 2>&1
+[ $? -eq 0 ] || _notrun "perl XML::TokeParser module not installed"
+perl -e "use Spreadsheet::ReadSXC" >/dev/null 2>&1
+[ $? -eq 0 ] || _notrun "perl Spreadsheet::ReadSXC module not installed"
 
-which dmsetup >/dev/null 2>&1
-test $? -eq 0 || _notrun "Device Mapper 'dmsetup' binary not found"
-$python -c 'from pcp import pmda' 2>/dev/null
-test $? -eq 0 || _notrun "$python pcp pmda module is not installed"
-
-_filter_dmcache()
-{
-    # cull message resulting from no dmcache devices
-    grep -v 'No value(s) available'
-}
-
-pmdadmcache_remove()
-{
-    echo
-    echo "=== remove dmcache agent ==="
-    $sudo ./Remove >$tmp.out 2>&1
-    _filter_pmda_remove <$tmp.out
-}
-
-pmdadmcache_install()
-{
-    # start from known starting points
-    cd $PCP_PMDAS_DIR/dmcache
-    $sudo ./Remove >/dev/null 2>&1
-    $sudo $PCP_RC_DIR/pmcd stop
-    _wait_pmcd_end
-
-    echo
-    echo "=== dmcache agent installation ==="
-    $sudo ./Install </dev/null >$tmp.out 2>&1
-    # Check dmcache metrics have appeared ... X metrics and Y values
-    _filter_pmda_install <$tmp.out \
-    | sed \
-        -e '/^Waiting for pmcd/s/\.\.\.[. ]*$/DOTS/' \
-        -e 's/[0-9][0-9]* warnings, //' \
-    | $PCP_AWK_PROG '
-/Check dmcache metrics have appeared/   { if ($7 >= 16 && $7 <= 20) $7 = "X"
-                                          if ($10 >= 0 && $10 <= 80) $10 = "Y"
-                                        }
-                                        { print }'
-}
-
-_prepare_pmda dmcache
-trap "_cleanup_pmda dmcache; exit \$status" 0 1 2 3 15
+status=0	# success is the default!
+$sudo rm -rf $tmp.* $seq.full
+trap "rm -f $tmp.*; exit \$status" 0 1 2 3 15
 
 # real QA test starts here
-pmdadmcache_install
 
-# pmcd should have been started by the Install process - check
-if pminfo -v dmcache > $tmp.info 2> $tmp.err
-then
-    :
-else
-    echo "... failed! ... here is the Install log ..."
-    cat $tmp.out
-fi
-cat $tmp.info $tmp.err | _filter_dmcache
+cat <<'End-of-File' >$tmp.mapfile
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- For PCP QA 372 -->
+<sheet heading="1" hostname="time.greenwich.com" datefmt="DMY">
+    <metric sem="PM_SEM_COUNTER">metric.a</metric>
+    <metric sem="PM_SEM_COUNTER">metric.b</metric>
+    <metric>metric.c</metric>
+    <metric type="PM_TYPE_32">metric.d</metric>
+    <metric type="PM_TYPE_STRING">metric.e</metric>
+    <datetime></datetime>
+    <data>metric.a</data>
+    <data>metric.b</data>
+    <data>metric.c</data>
+    <data>metric.d</data>
+    <data>metric.e</data>
+</sheet>
+End-of-File
 
-pmdadmcache_remove
-status=0
+echo "=== ODS ==="
+rm -f $tmp.0 $tmp.index $tmp.meta
+sheet2pcp src/simple.ods $tmp.mapfile $tmp 2>&1
+[ -f $tmp.0 ] && pmdumplog -az $tmp
+
+# success, all done
 exit

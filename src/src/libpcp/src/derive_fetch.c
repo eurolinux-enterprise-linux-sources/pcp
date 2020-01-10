@@ -77,8 +77,7 @@ __dmprefetch(__pmContext *ctxp, int numpmid, const pmID *pmidlist, pmID **newlis
     cp->fetch_has_dm = 0;
 
     for (m = 0; m < numpmid; m++) {
-	if (pmid_domain(pmidlist[m]) != DYNAMIC_PMID ||
-	    pmid_item(pmidlist[m]) == 0)
+	if (!IS_DERIVED(pmidlist[m]))
 	    continue;
 	for (i = 0; i < cp->nmetric; i++) {
 	    if (pmidlist[m] == cp->mlist[i].pmid) {
@@ -655,6 +654,18 @@ eval_expr(node_t *np, pmResult *rp, int level)
 	    return np->info->numval;
 	    break;
 
+	case L_INSTANT:
+	    /*
+	     * values are in the left expr
+	     */
+	    np->info->last_stamp = np->info->stamp;
+	    np->info->stamp = rp->timestamp;
+	    np->info->numval = np->left->info->numval;
+	    if (np->info->numval > 0)
+		np->info->ivlist = np->left->info->ivlist;
+	    return np->info->numval;
+	    break;
+
 	case L_AVG:
 	case L_COUNT:
 	case L_SUM:
@@ -1119,8 +1130,7 @@ __dmpostfetch(__pmContext *ctxp, pmResult **result)
 	 * which case m is well-defined
 	 */
 	m = 0;
-	if (pmid_domain(rp->vset[j]->pmid) == DYNAMIC_PMID &&
-	    pmid_item(rp->vset[j]->pmid) != 0) {
+	if (IS_DERIVED(rp->vset[j]->pmid)) {
 	    for (m = 0; m < cp->nmetric; m++) {
 		if (rp->vset[j]->pmid == cp->mlist[m].pmid) {
 		    if (cp->mlist[m].expr == NULL) {

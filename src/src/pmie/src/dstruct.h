@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014 Red Hat.
+ * Copyright (c) 2013-2015 Red Hat.
  * Copyright (c) 1995 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -137,7 +137,8 @@ typedef struct metric {
     struct metric   *next;	/* fetch/wait list forward pointer */
     struct metric   *prev;	/* fetch/wait list backward pointer */
     Symbol	    mname;	/* metric name */
-    Symbol	    hname;	/* host name */
+    Symbol	    hconn;	/* host connection string (hostspec or archive filename) */
+    Symbol	    hname;	/* (derived) host name */
     pmDesc          desc;       /* pmAPI metric description */
     double	    conv;	/* conversion factor into canonical units */
     int		    specinst;	/* count of specific instances in rule and */
@@ -194,6 +195,7 @@ typedef struct host {
     struct host	    *next;	/* Host list forward pointer */
     struct host	    *prev;	/* Host list backward pointer */
     Symbol          name;       /* host machine */
+    Symbol          conn;       /* host machine connection */
     int	    	    down;	/* host is not delivering metrics */
     Metric	    *waits;	/* wait list of Metrics */
     Metric          *duds;	/* bad Metrics discovered during evaluation */
@@ -230,6 +232,7 @@ typedef int Op;
 #define CND_FETCH	1
 #define CND_DELAY	2
 #define CND_RATE	3
+#define CND_INSTANT	9
 /* arithmetic */
 #define CND_NEG		4
 #define CND_ADD		5
@@ -317,12 +320,12 @@ void *alloc(size_t);
 void *zalloc(size_t);
 void *ralloc(void *, size_t);
 void *aalloc(size_t, size_t);
-char *sdup(char *);
+char *sdup(const char *);
 
 Expr *newExpr(int, Expr *, Expr *, int, int, int, int, int);
 Profile *newProfile(Fetch *, pmInDom);
 Fetch *newFetch(Host *);
-Host *newHost(Task *, Symbol);
+Host *newHost(Task *, Symbol, Symbol);
 Task *newTask(RealTime, int);
 void newResult(Task *);
 
@@ -394,12 +397,12 @@ extern char        *pmnsfile;	/* alternate namespace */
 extern Archive	   *archives;	/* archives given on command line */
 extern RealTime	   first;	/* archive starting point */
 extern RealTime	   last;	/* archive end point */
-extern char	   *dfltHostConn;  /* default PM_CONTEXT_HOST parameter  */
-extern char	   *dfltHostName;  /* pmContextGetHostName of host name */
+extern char	   *dfltHostConn;  /* host connspec or archive path  */
 extern RealTime	   dfltDelta;	/* default sample interval */
 extern RealTime    runTime;	/* run time interval */
 extern int	   hostZone;	/* timezone from host? */
 extern char	   *timeZone;	/* timezone from command line */
+extern int	   quiet;	/* suppress default diagnostics */
 extern int	   verbose;	/* verbosity 0, 1 or 2 */
 extern int	   interactive;	/* interactive mode, -d */
 extern int	   isdaemon;	/* run as a daemon */

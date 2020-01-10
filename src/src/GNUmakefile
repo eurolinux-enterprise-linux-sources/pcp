@@ -41,9 +41,8 @@ OTHER_SUBDIRS = \
 	genpmda \
 	newhelp \
 	pcp \
+	pcp2graphite \
 	pmafm \
-	pmatop \
-	pmcollectl \
 	pmfind \
 	pmcpp \
 	pmcd \
@@ -57,14 +56,12 @@ OTHER_SUBDIRS = \
 	pmdumplog \
 	pmdumptext \
 	pmerr \
-	pmevent \
 	pmgenmap \
 	pmgetopt \
 	pmhostname \
 	pmie \
 	pmieconf \
 	pmiestatus \
-	pmiostat \
 	pmlc \
 	pmlock \
 	pmlogextract \
@@ -74,10 +71,12 @@ OTHER_SUBDIRS = \
 	pmloglabel \
 	pmlogrewrite \
 	pmlogsummary \
+	pmlogcheck \
 	pmmgr \
 	pmpost \
 	pmproxy \
 	pmquery \
+	pmrep \
 	pmstat \
 	pmstore \
 	pmsocks \
@@ -85,7 +84,6 @@ OTHER_SUBDIRS = \
 	pmsignal \
 	pmsleep \
 	pmsnap \
-	pmtop \
 	pmtime \
 	pmval \
 	pmwebapi \
@@ -101,7 +99,7 @@ OTHER_SUBDIRS = \
 	sheet2pcp \
 	ganglia2pcp \
 	win32ctl \
-	pcp2graphite \
+	zabbix-agent \
 	#
 
 SUBDIRS = \

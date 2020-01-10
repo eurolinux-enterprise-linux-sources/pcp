@@ -313,15 +313,16 @@ do
 	    ;;
     esac
 
-    reachable_opt='--show-leak-kinds=all'
-    reachable_opt='--show-reachable=yes'
+    # don't want reachable reported ... caused QA failures on
+    # valgrind 3.10.1 (vm12 after upgrade to Fedora 22)
+    # reachable_opt='--show-reachable=yes'
 
     valgrind \
 	--leak-check=full --read-var-info=yes $reachable_opt \
 	--suppressions=$tmp.suppress --log-file=$tmp.valgrind \
 	--gen-suppressions=all \
 	2>$tmp.valgrind.err >$tmp.valgrind.out \
-	src/churnctx $arg -z -s 10 -a src/bug1057 kernel.all.load hinv.ncpu disk.dev.total
+	src/churnctx $arg -z -s 10 -a archives/bug1057 kernel.all.load hinv.ncpu disk.dev.total
 
     echo "=== std out ==="
     cat $tmp.valgrind.out

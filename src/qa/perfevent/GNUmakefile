@@ -14,12 +14,12 @@ ROOTFILES =     config/syntax_error.txt \
 		fakefs.tar.gz
 
 TESTHARNESS = perfevent_test perfevent_coverage
-LSRCFILES = $(ROOTFILES) GNUmakefile.install
+LDIRT += $(TESTHARNESS) fakefs $(OUTDIR)
 
-ifeq "$(ENABLE_PERFEVENT)" "true"
+ifeq "$(PMDA_PERFEVENT)" "true"
 default setup default_pcp: $(TESTHARNESS)
 
-install install_pcp: $(ROOTFILES)
+install install_pcp: default $(ROOTFILES)
 	$(INSTALL) -m 755 -d $(TESTDIR)
 	$(INSTALL) -m 755 -d $(TESTDIR)/config
 	$(INSTALL) -m 644 $(ROOTFILES) $(TESTDIR)

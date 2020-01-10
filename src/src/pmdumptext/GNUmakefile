@@ -6,7 +6,6 @@ include $(TOPDIR)/src/include/builddefs
 QRCFILE = $(COMMAND).qrc
 UIFILES = $(shell echo *.ui)
 SOURCES = pmdumptext.cpp
-LSRCFILES = $(PROJECT) $(SOURCES)
 LDIRT = $(COMMAND)
 
 default: build-me
@@ -15,7 +14,7 @@ include $(BUILDRULES)
 
 ifeq "$(ENABLE_QT)" "true"
 build-me:
-	$(QTMAKE)
+	+$(QTMAKE)
 	$(LNMAKE)
 
 install: default

@@ -1,0 +1,27 @@
+commit 8d42f02a2de9c6a778b8748799ba7cec63c579c4
+Author: Ken McDonell <kenj@internode.on.net>
+Date:   Sun Feb 7 08:44:15 2016 +1100
+
+    src/libpcp/src/pmns.c: fix corner case in load pmns
+    
+    The gfs2 PMDA exposes a case where the PMNS contains more than one
+    dynamic subtree.  A check in the PMDA Install script trips up
+    because libpcp incorrectly classified this as a duplicate PMID in
+    the PMNS.
+
+diff --git a/src/libpcp/src/pmns.c b/src/libpcp/src/pmns.c
+index bd9da87..01b09fe 100644
+--- a/src/libpcp/src/pmns.c
++++ b/src/libpcp/src/pmns.c
+@@ -731,7 +731,10 @@ backlink(__pmnsTree *tree, __pmnsNode *root, int dupok)
+ 	    __pmnsNode	*xp;
+ 	    i = np->pmid % tree->htabsize;
+ 	    for (xp = tree->htab[i]; xp != NULL; xp = xp->hash) {
+-		if (xp->pmid == np->pmid && dupok == NO_DUPS) {
++		if (xp->pmid == np->pmid && dupok == NO_DUPS && !IS_DYNAMIC_ROOT(xp->pmid)) {
++		    /*
++		     * Duplicate PMID and not root of a dynamic subtree
++		     */
+ 		    char	*nn, *xn;
+ 		    char	strbuf[20];
+ 		    backname(np, &nn);

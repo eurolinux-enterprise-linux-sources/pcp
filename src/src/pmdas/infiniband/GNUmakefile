@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013-2014 Red Hat.
+# Copyright (c) 2013-2015 Red Hat.
 # Copyright (c) 2007-2009 Silicon Graphics, Inc.  All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it
@@ -30,14 +30,14 @@ MAN_SECTION = 1
 MAN_PAGES = pmda$(IAM).$(MAN_SECTION)
 MAN_DEST = $(PCP_MAN_DIR)/man$(MAN_SECTION)
 
-default: build-me
+default_pcp default:	build-me
 
 include $(BUILDRULES)
 
 ifeq "$(PMDA_INFINIBAND)" "true"
-build-me: domain.h $(CMDTARGET)
+build-me: $(CMDTARGET)
 
-install: default
+install_pcp install: default
 	$(INSTALL) -m 755 -d $(PMDADIR)
 	$(INSTALL) -S $(PMDADIR) $(PCP_PMDAS_DIR)/$(IAM)
 	$(INSTALL) -m 755 Install Remove $(CMDTARGET) $(PMDADIR)
@@ -45,17 +45,11 @@ install: default
 	@$(INSTALL_MAN)
 else
 build-me:
-install:
+install_pcp install:
+	@$(INSTALL_MAN)
 endif
 
-ib.o:	domain.h
-
-.NOTPARALLEL:
-.ORDER: domain.h $(OBJECTS)
-
-default_pcp : default
-
-install_pcp : install
+$(OBJECTS): domain.h
 
 domain.h: ../../pmns/stdpmid
 	$(DOMAIN_MAKERULE)

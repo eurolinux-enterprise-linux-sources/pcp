@@ -488,3 +488,24 @@ PCP_3.10 {
   global:
     __pmPrintMetricNames;
 } PCP_3.9;
+
+PCP_3.11 {
+  global:
+    pmGetVersion;
+    pmGetOptionalConfig;
+    __pmFetchLocal;
+} PCP_3.10;
+
+PCP_3.12 {
+  global:
+    __pmAFsetup;
+} PCP_3.11;
+
+PCP_3.13 {
+  global:
+    __pmConnectTimeout;
+    __pmRequestTimeout;
+    __pmSetConnectTimeout;
+    __pmSetRequestTimeout;
+    __pmStringValue;
+} PCP_3.12;

@@ -15,9 +15,9 @@
  */
 #include "pmtimearch.h"
 
-#include <QtCore/QTimer>
-#include <QtGui/QValidator>
-#include <QtGui/QMessageBox>
+#include <QTimer>
+#include <QValidator>
+#include <QMessageBox>
 #include <pcp/pmapi.h>
 #include <pcp/impl.h>
 #include "aboutdialog.h"
@@ -335,7 +335,7 @@ void PmTimeArch::displayPositionText()
     QString text;
     char ctimebuf[32], msecbuf[5];
 
-    pmCtime(&my.pmtime.position.tv_sec, ctimebuf);
+    pmCtime((const time_t*)&my.pmtime.position.tv_sec, ctimebuf);
     text = tr(ctimebuf);
     if (my.showYear == false)
 	text.remove(19, 5);
@@ -520,7 +520,7 @@ void PmTimeArch::lineEditCtime_validate()
     }
     if (input[0] != '@')
 	input.prepend("@");
-    if (__pmParseTime(input.toAscii(),
+    if (__pmParseTime(input.toLatin1(),
 			&my.pmtime.start, &my.pmtime.end, &current, &msg) < 0) {
 	error.sprintf("Invalid position date/time:\n\n%s\n", msg);
 	QMessageBox::warning(0, tr("Warning"), error, tr("Quit"));

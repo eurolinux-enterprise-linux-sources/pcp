@@ -660,10 +660,6 @@ disk.dev.read
 disk.dev.read
     Data Type: 64-bit unsigned int  InDom: 1.2 0x400002
     Semantics: counter  Units: count
-
-pmval: pmFetchArchive: End of PCP archive log
-
-pmval: pmFetchArchive: End of PCP archive log
 pmval diffs ...
 --- TMP.in
 +++ TMP.out
@@ -671,7 +667,7 @@ pmval diffs ...
  Note: timezone set to local timezone of host "babylon" from archive
  
  metric:    disk.dev.read
--archive:   src/babylon.pmview_v2
+-archive:   archives/babylon.pmview_v2
 +archive:   TMP.new
  host:      babylon
  start:     Tue Mar 12 11:19:10 1996
@@ -686,10 +682,6 @@ disk.dev.write
 disk.dev.write
     Data Type: 64-bit unsigned int  InDom: 1.2 0x400002
     Semantics: counter  Units: count
-
-pmval: pmFetchArchive: End of PCP archive log
-
-pmval: pmFetchArchive: End of PCP archive log
 pmval diffs ...
 --- TMP.in
 +++ TMP.out
@@ -697,7 +689,7 @@ pmval diffs ...
  Note: timezone set to local timezone of host "babylon" from archive
  
  metric:    disk.dev.write
--archive:   src/babylon.pmview_v2
+-archive:   archives/babylon.pmview_v2
 +archive:   TMP.new
  host:      babylon
  start:     Tue Mar 12 11:19:10 1996
@@ -712,10 +704,6 @@ disk.dev.total
 disk.dev.total
     Data Type: 64-bit unsigned int  InDom: 1.2 0x400002
     Semantics: counter  Units: count
-
-pmval: pmFetchArchive: End of PCP archive log
-
-pmval: pmFetchArchive: End of PCP archive log
 pmval diffs ...
 --- TMP.in
 +++ TMP.out
@@ -723,7 +711,7 @@ pmval diffs ...
  Note: timezone set to local timezone of host "babylon" from archive
  
  metric:    disk.dev.total
--archive:   src/babylon.pmview_v2
+-archive:   archives/babylon.pmview_v2
 +archive:   TMP.new
  host:      babylon
  start:     Tue Mar 12 11:19:10 1996

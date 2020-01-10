@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Red Hat.
+ * Copyright (c) 2012-2013,2015 Red Hat.
  * Copyright (c) 1995-2001,2004 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -112,6 +112,7 @@ AcceptNewClient(int reqfd)
 
     client[i].fd = fd;
     client[i].status.connected = 1;
+    client[i].status.attributes = 0;
     client[i].status.changes = 0;
     memset(&client[i].attrs, 0, sizeof(__pmHashCtl));
 
@@ -166,17 +167,6 @@ NewClient(void)
     return i;
 }
 
-/*
- * Expose ClientInfo struct for client #n
- */
-ClientInfo *
-GetClient(int n)
-{
-    if (0 <= n && n < nClients && client[n].status.connected)
-	return &client[n];
-    return NULL;
-}
-
 void
 DeleteClient(ClientInfo *cp)
 {
@@ -224,6 +214,8 @@ DeleteClient(ClientInfo *cp)
     __pmSockAddrFree(cp->addr);
     cp->addr = NULL;
     cp->status.connected = 0;
+    cp->status.attributes = 0;
+    cp->status.changes = 0;
     cp->fd = -1;
 
     NotifyEndContext(cp-client);

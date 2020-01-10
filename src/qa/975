@@ -14,6 +14,20 @@ echo "QA output created by $seq"
 . ./common.check
 
 which iostat >/dev/null || _notrun "No local iostat binary found"
+which sar >/dev/null 2>&1 || _notrun "sar not installed"
+
+version=`sar -V 2>&1 | sed -n -e '/sysstat version /{
+s/.* //
+p
+}'`
+case "$version"
+in
+    7.0.*)	# too old
+    	_notrun "sysstat version $version too old"
+	;;
+esac
+
+
 
 status=1	# failure is the default!
 $sudo rm -rf $tmp.* $seq.full
@@ -26,7 +40,10 @@ extract_iostat()
 
     f="$2.unsorted"
     $PCP_AWK_PROG < $1 '
-BEGIN		{ cpucount=0; devcount=0 }
+BEGIN		{ cpucount=0; devcount=0; s=1.0 }
+/Blk_read/	{ s=0.5 }
+/kB_read/	{ s=1.0 }
+/MB_read/	{ s=1024 }
 /^avg-cpu:/   	{ cpumode=1; cpucount++; next }
 /^Device: *tps/	{ tpsmode=1; devcount++; next }
 /^Device:/   	{ devices=1; devcount++; next }
@@ -44,7 +61,6 @@ BEGIN		{ cpucount=0; devcount=0 }
 		  if (tpsmode == 1 && devcount > 1) {
 		    sample="'$f.'"devcount-1
 		    instance=$1
-		    s=0.5	# size scale - sectors vs kilobytes
 		    printf "dev.total::%s %f\n", instance, $2		>> sample
 		    printf "dev.read_bytes::%s %f\n", instance, $3*s	>> sample
 		    printf "dev.write_bytes::%s %f\n", instance, $4*s	>> sample
@@ -114,9 +130,24 @@ compare_samples()
 
 	echo Verifying sample $sample
 	$PCP_AWK_PROG <$tmp.both '
-		{ if (($2-$4) > 0.000001 || ($2-$4) < -0.000001)
-		    print "[",NR,"] mismatch:",$1,$2,$4
-		}'
+$2 != 0 && $4 != 0 {
+	    # within 2% is close enough to a match
+	    if ($2/$4 > 1.002 || $2/$4 < 0.992)
+		print "[",NR,"] mismatch:",$1,$2,$4
+	    next
+	}
+$2 == 0	{
+	    # within 0.002 of zero is close enough to a match
+	    if ($4 > 0.002)
+		print "[",NR,"] mismatch:",$1,$2,$4
+	    next
+	}
+$4 == 0	{
+	    # within 0.002 of zero is close enough to a match
+	    if ($2 > 0.002)
+		print "[",NR,"] mismatch:",$1,$2,$4
+	    next
+	}'
     done
 }
 

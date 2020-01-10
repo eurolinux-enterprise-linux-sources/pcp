@@ -133,6 +133,7 @@ pmcd.buf {
 pmcd.client {
     whoami		PMCD:6:0
     start_date		PMCD:6:1
+    container		PMCD:6:2
 }
 
 pmcd.cputime {
@@ -149,6 +150,7 @@ pmcd.feature {
     unix_domain_sockets	PMCD:8:5
     service_discovery	PMCD:8:6
     containers		PMCD:8:7
+    local		PMCD:8:8
 }
 
 #undef PMCD

@@ -39,7 +39,7 @@ sleep 2
 # 518.out expects exactly three evaluation rounds to be complete by the
 # time the following operation is invoked.  If sudo/pmie is too slow,
 # it'll lose the race (actions<5).  If this thread is too slow, pmie
-# will go ahead (actions>5).  So we tolerate values in the range 4,5,6
+# will go ahead (actions>5).  So we tolerate values in the range 4,5,6-9
 # for the true, false and action counts, but the counts for each must
 # be equal.
 
@@ -66,7 +66,7 @@ pcp -P \
     -e '/:/{
 :loop
 N
-s/\n[ 	]*\(([0-9][0-9]* rules\)/ \1/
+s/\n[ 	]*\(.*([0-9][0-9]* rules\)/ \1/
 }' \
 | sed \
     -e '/^  *evaluations / {
@@ -74,18 +74,20 @@ s/=/= /g
 s/)$/ )/
 }' \
     -e 's/rules)$/rule)/' \
+| tee $tmp.dbg.1 \
 | $PCP_AWK_PROG '
 /pmie: .* rule\)/		{ state=1 }
 '$debug' == "true"		{ print "state=" state " want=" want ": " $0 }
 state==1 && /'`echo $tmp.pmie | sed -e s@/@\\\\\\\\/@g`' \(2 rule\)/	{ print; want = 1; next }
 state==1 && / \(actions=/	{ if ($3 == $5 && $5 == $9) {
-				      if ($3 >= 4 && $3 <= 6) $3 = "OK"
-				      if ($5 >= 4 && $5 <= 6) $5 = "OK"
-				      if ($9 >= 4 && $9 <= 6) $9 = "OK"
+				      if ($3 >= 4 && $3 <= 9) $3 = "OK"
+				      if ($5 >= 4 && $5 <= 9) $5 = "OK"
+				      if ($9 >= 4 && $9 <= 9) $9 = "OK"
 				  }
 				}
 state==1 && / rule\)/		{ want = 0 }
 want==1		{ print }' \
+| tee $tmp.dbg.2 \
 | sed \
     -e '/^evaluations / {
 s/= /=/g
@@ -100,8 +102,18 @@ s/.*:/HOST:/
 
 wait
 
+echo >>$seq.full
+echo "=== pmie stdout ===" >>$seq.full
 cat $tmp.out >>$seq.full
+echo >>$seq.full
+echo "=== pmie stderr ===" >>$seq.full
 cat $tmp.err >>$seq.full
+echo >>$seq.full
+echo "=== filter after sed ===" >>$seq.full
+cat $tmp.dbg.1 >>$seq.full
+echo >>$seq.full
+echo "=== filter after awk ===" >>$seq.full
+cat $tmp.dbg.2 >>$seq.full
 
 status=0
 exit

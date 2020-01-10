@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Red Hat.
+ * Copyright (c) 2012-2015 Red Hat.
  * Copyright (c) 2007-2008 Aconex.  All Rights Reserved.
  * Copyright (c) 1995-2002,2004,2006,2008 Silicon Graphics, Inc.  All Rights Reserved.
  * 
@@ -252,30 +252,26 @@ pmWhichContext(void)
 int
 __pmConvertTimeout(int timeo)
 {
-    int tout_msec;
-    const struct timeval *tv;
+    double tout_msec;
 
     switch (timeo) {
     case TIMEOUT_NEVER:
-        tout_msec = -1;
-        break;
+        return -1;
 
     case TIMEOUT_DEFAULT:
-        tv = __pmDefaultRequestTimeout();
-        tout_msec = tv->tv_sec *1000 + tv->tv_usec / 1000;
+        tout_msec = __pmRequestTimeout() * 1000.0;
         break;
 
     case TIMEOUT_CONNECT:
-        tv = __pmConnectTimeout();
-        tout_msec = tv->tv_sec *1000 + tv->tv_usec / 1000;
+        tout_msec = __pmConnectTimeout() * 1000.0;
         break;
 
     default:
-        tout_msec = timeo  * 1000;
+        tout_msec = timeo * 1000.0;
         break;
     }
 
-    return tout_msec;
+    return (int)tout_msec;
 }
 
 #ifdef PM_MULTI_THREAD
@@ -404,6 +400,9 @@ ctxflags(__pmHashCtl *attrs, int *flags)
 	*flags |= PM_CTXFLAG_CONTAINER;
     }
 
+    if (__pmHashSearch(PCP_ATTR_EXCLUSIVE, attrs) != NULL)
+	*flags |= PM_CTXFLAG_EXCLUSIVE;
+
     return 0;
 }
 
@@ -477,7 +476,7 @@ INIT_CONTEXT:
 
     if (new->c_type == PM_CONTEXT_HOST) {
 	__pmHashCtl	*attrs = &new->c_attrs;
-	pmHostSpec	*hosts;
+	pmHostSpec	*hosts = NULL;
 	int		nhosts;
 	char		*errmsg;
 
@@ -488,22 +487,37 @@ INIT_CONTEXT:
 	    pmprintf("pmNewContext: bad host specification\n%s", errmsg);
 	    pmflush();
 	    free(errmsg);
+	    if (hosts != NULL)
+		__pmFreeHostAttrsSpec(hosts, nhosts, attrs);
+	    __pmHashClear(attrs);
 	    goto FAILED;
 	} else if (nhosts == 0) {
+	    if (hosts != NULL)
+		__pmFreeHostAttrsSpec(hosts, nhosts, attrs);
+	    __pmHashClear(attrs);
 	    sts = PM_ERR_NOTHOST;
 	    goto FAILED;
 	} else if ((sts = ctxflags(attrs, &new->c_flags)) < 0) {
+	    if (hosts != NULL)
+		__pmFreeHostAttrsSpec(hosts, nhosts, attrs);
+	    __pmHashClear(attrs);
 	    goto FAILED;
 	}
 
-        /* As an optimization, if there is already a connection to the same PMCD,
-           we try to reuse (share) it. */
+	/*
+	 * As an optimization, if there is already a connection to the
+	 * same PMCD, we try to reuse (share) it.  This is not viable
+	 * in several situations - when pmproxy is in use, or when any
+	 * connection attribute(s) are set, or when exclusion has been
+	 * explicitly requested (i.e. PM_CTXFLAG_EXCLUSIVE in c_flags).
+	 */
 	if (nhosts == 1) { /* not proxied */
 	    for (i = 0; i < contexts_len; i++) {
 		if (i == PM_TPD(curcontext))
 		    continue;
 		if (contexts[i]->c_type == new->c_type &&
 		    contexts[i]->c_flags == new->c_flags &&
+		    contexts[i]->c_flags == 0 &&
 		    strcmp(contexts[i]->c_pmcd->pc_hosts[0].name, hosts[0].name) == 0 &&
                     contexts[i]->c_pmcd->pc_hosts[0].nports == hosts[0].nports) {
                     int j;

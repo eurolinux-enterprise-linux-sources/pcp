@@ -1,0 +1,22 @@
+FILES = \
+	atop \
+	atop-proc \
+	atop-summary \
+	collectl \
+	collectl-summary \
+	free \
+	free-summary \
+	iostat \
+	ip \
+	mpstat \
+	numastat \
+	pcp-summary \
+	pmclient \
+	pmclient-summary \
+	pmstat \
+	sar \
+	sar-summary \
+	uptime \
+	vmstat \
+	vmstat-summary \
+# END

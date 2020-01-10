@@ -1,0 +1,63 @@
+#! /bin/sh
+#
+# Copyright (c) 2009,2012 Aconex.  All Rights Reserved.
+# 
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2 of the License, or (at your
+# option) any later version.
+# 
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+# for more details.
+# 
+# Install the Oracle PMDA
+#
+
+. $PCP_DIR/etc/pcp.env
+. $PCP_SHARE_DIR/lib/pmdaproc.sh
+
+iam=oracle
+user=$iam
+domain=32
+perl_opt=true
+daemon_opt=false
+forced_restart=true
+
+perl -e "use DBI" 2>/dev/null
+if test $? -ne 0; then
+    echo "Perl database interface (DBI) is not installed"
+    exit 1
+fi
+
+perl -e "use DBD::Oracle" 2>/dev/null
+if test $? -ne 0; then
+    echo "Oracle database driver (DBD::Oracle) is not installed"
+    exit 1
+fi
+
+su -c id $user >/dev/null 2>&1
+if test $? -ne 0; then
+    echo "Cannot change user to $user, sorry this is fatal"
+    exit 1
+fi
+
+su -c mkdir -p "$PCP_VAR_DIR/config/pmda" 2>/dev/null
+indoms="0 1 2 3 4 5 6 7 8 9 10"
+for indom in $indoms
+do
+    touch "$PCP_VAR_DIR/config/pmda/$domain.$indom" >/dev/null 2>&1
+    if test $? -ne 0; then
+        echo "Cannot create indom persistance files as user $user"
+        echo "Failed on:  $PCP_VAR_DIR/config/pmda/$domain.$indom"
+        exit 1
+    fi
+done
+
+# TODO: need to ask for user/pass and SIDs, write $PCP_VAR_DIR/config/oracle/oracle.conf
+# (unless it exists)
+
+pmdaSetup
+pmdaInstall
+exit 0

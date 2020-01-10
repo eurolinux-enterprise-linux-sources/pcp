@@ -1,0 +1,111 @@
+#!/bin/sh
+# PCP QA Test No. 709
+# Exercise the python collectl implementation
+#
+# Copyright (c) 2012-2014, Red Hat.
+#
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+# get standard environment, filters and checks
+. ./common.product
+. ./common.filter
+. ./common.check
+
+[ $PCP_PLATFORM = linux ] || _notrun "test uses Linux-specific commands"
+
+status=0	# success is the default!
+$sudo rm -fr $tmp.* $seq.full
+trap "rm -fr $tmp.*; exit \$status" 0 1 2 3 15
+
+remove_extra_whitespace()
+{
+    sed \
+	-e 's/>>>.*<<<//g' \
+	-e 's/[0-9]/9/g' \
+	-e 's/9[9]*/9/g' \
+	-e 's/  *$//' \
+	-e '/^ *$/d' \
+	-e 's/  */ /g' \
+	-e 's/^ *//' \
+	-e 's/RECORD.*$/RECORD/' \
+	-e 's/<-*Int/<-Int/' \
+	-e 's/Int-*>/Int->/' \
+
+}
+
+# sed -e 's/ [a-zA-Z0-9]* *$//'
+remove_extra_columns()
+{
+    sed \
+	-e 's/^ *//' \
+	-e 's/ [a-zA-Z0-9 ]* *$//' \
+	-e 's/^#<-*-/#<--/g' \
+	-e 's/-*->/--->/g' \
+
+}
+
+# real QA test starts here
+mkdir $tmp.$seq
+cd $tmp.$seq
+
+#PYCOLLECTL=pmcollectl.py	# developer version
+PYCOLLECTL=pmcollectl		# installed version
+$PYCOLLECTL -sc -c2 | remove_extra_whitespace | tee -a $tmp.out 2>&1
+$PYCOLLECTL -sd -c2 | remove_extra_whitespace | tee -a $tmp.out 2>&1
+$PYCOLLECTL -sn -c2 | remove_extra_whitespace | tee -a $tmp.out 2>&1
+$PYCOLLECTL -sj -c2 | remove_extra_whitespace | remove_extra_columns | tee -a $tmp.out 2>&1
+$PYCOLLECTL -sm -c2 | remove_extra_whitespace | tee -a $tmp.out 2>&1
+$PYCOLLECTL -sc -c2 --verbose | remove_extra_whitespace | tee -a $tmp.out 2>&1
+$PYCOLLECTL -sd -c2 --verbose | remove_extra_whitespace | tee -a $tmp.out 2>&1
+$PYCOLLECTL -sn -c2 --verbose | remove_extra_whitespace | tee -a $tmp.out 2>&1
+$PYCOLLECTL -sm -c2 --verbose | remove_extra_whitespace | tee -a $tmp.out 2>&1
+
+$PYCOLLECTL -sN -c2 >| /tmp/,$$ 2>&1 
+for i in $(netstat -i | sed -e '/^[A-Z]/d' -e 's/ .*$//') ; do
+    if grep -q $i /tmp/,$$ ; then true ; else NOMATCH=1 ; fi
+done
+if [ ! -z "$NOMATCH" ] ; then
+    echo "No match for -sN";cat /tmp/,$$ >> $tmp.out
+    unset NOMATCH
+else
+    echo "-sN network interface names are okay"
+fi
+$PYCOLLECTL -sD -c2 >| /tmp/,$$ 2>&1 
+for i in $(lsblk -n -io KNAME,TYPE | grep disk | sed 's/ .*$//') ; do
+    if grep -q $i /tmp/,$$ ; then true ; else NOMATCH=1 ; fi
+done
+if [ ! -z "$NOMATCH" ] ; then
+    echo "No match for -sD";cat /tmp/,$$ >> $tmp.out
+else
+    echo "-sD disk names are okay"
+fi
+# need a generic way to test these on any system
+# $PYCOLLECTL -sC -c2 | remove_extra_whitespace | tee -a $tmp.out 2>&1
+# $PYCOLLECTL -sJ -c2 | remove_extra_whitespace | tee -a $tmp.out 2>&1
+# $PYCOLLECTL -sCD -c2 | remove_extra_whitespace | tee -a $tmp.out 2>&1
+$PYCOLLECTL -c2 | remove_extra_whitespace | tee -a $tmp.out 2>&1
+$PYCOLLECTL -c2 --verbose | remove_extra_whitespace | tee -a $tmp.out 2>&1
+$PYCOLLECTL -scd -c2 | remove_extra_whitespace | tee -a $tmp.out 2>&1
+$PYCOLLECTL -scd -c2 --verbose | remove_extra_whitespace | tee -a $tmp.out 2>&1
+# test playback
+$PYCOLLECTL -sdDcCnNjJm -f test.pmcollectl -c10
+$PYCOLLECTL -sd -c2 -p test.pmcollectl | remove_extra_whitespace | tee -a $tmp.out 2>&1
+$PYCOLLECTL -sc -c2 -p test.pmcollectl | remove_extra_whitespace | tee -a $tmp.out 2>&1
+$PYCOLLECTL -sn -c2 -p test.pmcollectl | remove_extra_whitespace | tee -a $tmp.out 2>&1
+$PYCOLLECTL -sm -c2 -p test.pmcollectl | remove_extra_whitespace | tee -a $tmp.out 2>&1
+$PYCOLLECTL -sd -c2 -p test.pmcollectl --verbose | remove_extra_whitespace | tee -a $tmp.out 2>&1
+$PYCOLLECTL -sc -c2 -p test.pmcollectl --verbose | remove_extra_whitespace | tee -a $tmp.out 2>&1
+$PYCOLLECTL -sn -c2 -p test.pmcollectl --verbose | remove_extra_whitespace | tee -a $tmp.out 2>&1
+$PYCOLLECTL -sm -c2 -p test.pmcollectl --verbose | remove_extra_whitespace | tee -a $tmp.out 2>&1
+
+
+cat $tmp.out >>$here/$seq.full
+
+# success, all done
+rm -rf test.pmcollectl
+cd $here
+
+status=0
+exit

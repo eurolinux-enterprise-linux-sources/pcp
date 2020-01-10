@@ -1,0 +1,71 @@
+#!/bin/sh
+# PCP QA Test No. 518
+# pcp -P workout
+#
+# Copyright (c) 2012 Ken McDonell.  All Rights Reserved.
+#
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+# get standard environment, filters and checks
+. ./common.product
+. ./common.filter
+. ./common.check
+
+status=1	# failure is the default!
+signal=$PCP_BINADM_DIR/pmsignal
+$sudo rm -rf $tmp.* $seq.full
+trap "$sudo rm -f $tmp.*; exit \$status" 0 1 2 3 15
+
+cat <<End-of-File >$tmp.pmie
+hinv.ncpu > 0 -> print "we have cpus, no surprise here!";
+hinv.ncpu < 0 -> print "whoa ... no cpus!";
+End-of-File
+
+# real QA test starts here
+$sudo $signal -a pmie >/dev/null 2>&1
+
+# prefer to run as "pcp", must ensure we can write stats files
+# to PCP_TMP_DIR which is no longer a world-writable directory
+#
+user=pcp
+id pcp >/dev/null 2>/dev/null || user=root
+$sudo -u $user pmie -t 1 -c $tmp.pmie 2>$tmp.err >$tmp.out &
+pid=$!
+
+sleep 2	# let stats accumulate via rule firings
+
+# pcp -P output ...
+#     pmie: bozo-vm: /tmp/518-28812.pmie (2 rules)
+#           evaluations true=2 false=2 unknown=0 (actions=2)
+#           expected evaluation rate=2.00 rules/sec
+#           bozo-vm: /var/log/pcp/pmmgr/bozo-vm/config.pmie (12 rules)
+#           evaluations true=0 false=3 unknown=9 (actions=0)
+#           expected evaluation rate=0.10 rules/sec
+#
+# want the our pmie, not any other pmie processes
+#
+pcp -P \
+| tee -a $seq.full \
+| $PCP_AWK_PROG '
+/pmie:/		{ state=1 }
+state==1 && /'`echo $tmp.pmie | sed -e s@/@\\\\\\\\/@g`' \(2 rules\)/	{ print; want = 1; next }
+state==1 && / rules\)/		{ want = 0 }
+want==1		{ print }' \
+| sed \
+    -e "s;$tmp;TMP;" \
+    -e "s;/privateTMP;TMP;g" \
+    -e '/TMP/{
+s/ (.*//
+s/.*:/HOST:/
+}'
+
+$sudo $signal $pid
+wait
+
+cat $tmp.out >>$seq.full
+cat $tmp.err >>$seq.full
+
+status=0
+exit

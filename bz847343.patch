@@ -1,0 +1,926 @@
+commit fc44068f8c50514522a00abb3dce8a0290e7d447
+Author: Nathan Scott <nathans@redhat.com>
+Date:   Tue May 20 17:33:47 2014 +1000
+
+    Fix daemon signal handlers to not make use of unsafe functions
+    
+    It is unsafe to make certain library calls from signal handlers,
+    and in several daemons we do this for several different reasons.
+    
+    Firstly, some daemons trap sigsegv and sigbus to attempt to get
+    a stacktrace in their log files.  This should be deferred to any
+    system daemons that do this, so we now do that - by default.  In
+    certain situations those daemons may not be running or platforms
+    may not have such daemons - thus there are situations where we
+    may still want to attempt to generate a stackdump in a last-ditch
+    attempt at diagnostics.  Thus, these remain as a debug option via
+    DBG_TRACE_DESPERATE for those occassions.
+    
+    Similarly, most daemons printed diagnostics showing which signal#
+    they received before exiting, which is also unsafe - again, move
+    these to desperate-level diagnostics, off-by-default.
+    
+    A third case was pmie, which rotated log files on receipt of USR1.
+    This is reworked to be deferred to outside of the signal handler.
+    
+    The fourth and final case was pmlogger handling of volume switches
+    via HUP - this has been similarly reworked such that its deferred
+    to outside of the signal handler.
+    
+    This resolves Red Hat BZ #847343.
+
+diff --git a/qa/102.out b/qa/102.out
+index 8211d6e..001523c 100644
+--- a/qa/102.out
++++ b/qa/102.out
+@@ -90,7 +90,6 @@ Log for pmlogger on HOST started DATE
+ Config parsed
+ Starting logger for host "HOST"
+ Archive basename: ARCHIVE
+-pmlogger: Signalled (signal=15), exiting
+ 
+ Log finished DATE
+ Logging delta (270000000 msec) cannot be bigger than 268435455 msec
+@@ -124,7 +123,6 @@ Log for pmlogger on HOST started DATE
+ Config parsed
+ Starting logger for host "HOST"
+ Archive basename: ARCHIVE
+-pmlogger: Signalled (signal=15), exiting
+ 
+ Log finished DATE
+ Logging delta (-2138567296 msec) must be positive
+@@ -158,7 +156,6 @@ Log for pmlogger on HOST started DATE
+ Config parsed
+ Starting logger for host "HOST"
+ Archive basename: ARCHIVE
+-pmlogger: Signalled (signal=15), exiting
+ 
+ Log finished DATE
+ Performance Co-Pilot Logger Control (pmlc), Version VERSION
+@@ -196,7 +193,6 @@ DATE
+ pmlc request from HOST: advisory on 25032.7 sec
+   metric: sample.bin
+     instance: bin-100
+-pmlogger: Signalled (signal=15), exiting
+ 
+ Log finished DATE
+ sample.bin currently has no instance number 333
+diff --git a/qa/133.out b/qa/133.out
+index 61c34c3..7258746 100644
+--- a/qa/133.out
++++ b/qa/133.out
+@@ -18,7 +18,6 @@ New log volume 3, via SIGHUP at DATE
+ New log volume 4, via SIGHUP at DATE
+ New log volume 5, via pmlc request at DATE
+ New log volume 6, via pmlc request at DATE
+-pmlogger: Signalled (signal=15), exiting
+ 
+ Log finished DATE
+ Created 9 archive pieces.
+diff --git a/qa/304.out b/qa/304.out
+index cd42a85..3d5cc53 100644
+--- a/qa/304.out
++++ b/qa/304.out
+@@ -85,7 +85,6 @@ The application that launched pmlogger has asked pmlogger to continue independen
+ 
+ At any time this pmlogger process may be terminated with the following command:
+   $ pmsignal -s TERM PID
+-pmlogger: Signalled (signal=15), exiting
+ 
+ Log finished DATE
+ 
+diff --git a/qa/354.out b/qa/354.out
+index ff445ca..5342823 100644
+--- a/qa/354.out
++++ b/qa/354.out
+@@ -132,7 +132,6 @@ The application that launched pmlogger has asked pmlogger to continue independen
+ 
+ At any time this pmlogger process may be terminated with the following command:
+   $ pmsignal -s TERM pmlogger-pid-2
+-pmlogger: Signalled (signal=15), exiting
+ 
+ Log finished DATE
+ 
+@@ -315,7 +314,6 @@ The application that launched pmlogger has asked pmlogger to continue independen
+ 
+ At any time this pmlogger process may be terminated with the following command:
+   $ pmsignal -s TERM pmlogger-pid-2
+-pmlogger: Signalled (signal=15), exiting
+ 
+ Log finished DATE
+ 
+diff --git a/qa/374 b/qa/374
+index 05dc0e6..b897626 100755
+--- a/qa/374
++++ b/qa/374
+@@ -53,7 +53,7 @@ _remote_signal()
+ \$PCP_BINADM_DIR/pmsignal -s TERM $pid
+ sleep 1
+ \$PCP_BINADM_DIR/pmsignal -s KILL $pid
+-test -k \$PCP_TMP_DIR/pmlogger || /usr/bin/sudo chmod o-w \$PCP_TMP_DIR/pmlogger
++test -k \$PCP_TMP_DIR/pmlogger || /usr/bin/sudo chmod o-w \$PCP_TMP_DIR/pmlogger 2>/dev/null
+ rm -f /tmp/$base.*
+ end-of-file
+     scp -q $tmp.cmd pcpqa@$host:$tmp.cmd
+@@ -75,8 +75,8 @@ else
+     exit 1
+ fi
+ rm -f /tmp/$$.*
+-test -k $PCP_TMP_DIR/pmlogger || /usr/bin/sudo chmod o+w $PCP_TMP_DIR/pmlogger
+-( pmlogger -L -c /dev/null -l /tmp/$$.log /tmp/$$ </dev/null >/dev/null 2>&1 ) &
++test -k $PCP_TMP_DIR/pmlogger || /usr/bin/sudo chmod o+w $PCP_TMP_DIR/pmlogger 2>/dev/null
++( pmlogger -T5min -L -c /dev/null -l /tmp/$$.log /tmp/$$ </dev/null >/dev/null 2>&1 ) &
+ echo pid=$! base=$$
+ End-of-File
+ 
+diff --git a/qa/381.out b/qa/381.out
+index 0e39364..f0584d4 100644
+--- a/qa/381.out
++++ b/qa/381.out
+@@ -189,7 +189,6 @@ Log for pmlogger on HOST started DATE
+ Config parsed
+ Starting logger for host "HOST"
+ Archive basename: ARCHIVE
+-pmlogger: Signalled (signal=15), exiting
+ 
+ Log finished DATE
+ 
+diff --git a/qa/538.out b/qa/538.out
+index 66870a2..4344b80 100644
+--- a/qa/538.out
++++ b/qa/538.out
+@@ -18,6 +18,5 @@ Log for pmie on HOST started DATE
+ pmie: PID,HOST
+ 
+ sample.write_me changed 5 != 2
+-[TIMESTAMP] pmie(PID) Info: pmie caught SIGINT or SIGTERM
+ 
+ Log finished DATE
+diff --git a/qa/common.filter b/qa/common.filter
+index 932d9b4..9d5fffd 100644
+--- a/qa/common.filter
++++ b/qa/common.filter
+@@ -120,6 +120,7 @@ _filter_pmlogger_log()
+ 	-e 's/[A-Z][a-z][a-z] [A-Z][a-z][a-z]  *[0-9][0-9]* [0-9][0-9]:[0-9][0-9]:[0-9][0-9] [0-9][0-9][0-9][0-9]$/DATE/' \
+ 	-e 's/[A-Z][a-z][a-z] [A-Z][a-z][a-z]  *[0-9][0-9]* [0-9][0-9]:[0-9][0-9]:[0-9][0-9]/DATE/' \
+ 	-e 's/pmlogger([1-9][0-9]*) Error:/pmlogger(PID) Error:/' \
++	-e '/^pmlogger: Signalled (signal=[1-9][0-9]*).*/d' \
+         -e '/^\(Log for pmlogger on\) [^ ][^ ]*/s//\1 HOST/' \
+ 	-e '/^Starting logger/s/host ".*/host "HOST"/' \
+ 	-e '/^Archive basename: /s/:.*/: ARCHIVE/' \
+@@ -135,6 +136,7 @@ _filter_pmie_log()
+ 	-e 's/[A-Z][a-z][a-z] [A-Z][a-z][a-z]  *[0-9][0-9]* [0-9][0-9]:[0-9][0-9]:[0-9][0-9]/TIMESTAMP/' \
+ 	-e '/^\(Log for pmie on\) [^ ][^ ]*/s//\1 HOST/' \
+ 	-e 's/^pmie: PID = [0-9][0-9]*, default host = .*/pmie: PID,HOST/g' \
++	-e '/pmie(.*) Info: pmie caught SIGINT or SIGTERM/d' \
+ 	-e '/pmie([0-9][0-9]*)/s//pmie(PID)/' \
+ 	-e '/^pmie: /s/- on line/- near line/'
+ }
+diff --git a/src/pmcd/src/pmcd.c b/src/pmcd/src/pmcd.c
+index 317a15b..edbea0e 100644
+--- a/src/pmcd/src/pmcd.c
++++ b/src/pmcd/src/pmcd.c
+@@ -25,6 +25,7 @@
+ #define TO_STRING(s)	STRINGIFY(s)
+ 
+ static char	*FdToString(int);
++static void	ResetBadHosts(void);
+ 
+ int		AgentDied;		/* for updating mapdom[] */
+ static int	timeToDie;		/* For SIGINT handling */
+@@ -484,7 +485,7 @@ SignalShutdown(void)
+     exit(0);
+ }
+ 
+-void
++static void
+ SignalRestart(void)
+ {
+     time_t	now;
+@@ -497,7 +498,7 @@ SignalRestart(void)
+     ParseRestartAgents(configFileName);
+ }
+ 
+-void
++static void
+ SignalReloadPMNS(void)
+ {
+     int sts;
+@@ -741,7 +742,7 @@ ClientLoop(void)
+ }
+ 
+ #ifdef HAVE_SA_SIGINFO
+-void
++static void
+ SigIntProc(int sig, siginfo_t *sip, void *x)
+ {
+     killer_sig = sig;
+@@ -751,30 +752,38 @@ SigIntProc(int sig, siginfo_t *sip, void *x)
+     }
+     timeToDie = 1;
+ }
++#elif IS_MINGW
++static void
++SigIntProc(int sig)
++{
++    SignalShutdown();
++}
+ #else
+-void SigIntProc(int sig)
++static void
++SigIntProc(int sig)
+ {
+     killer_sig = sig;
+-#ifndef IS_MINGW
+     signal(SIGINT, SigIntProc);
+     signal(SIGTERM, SigIntProc);
+     timeToDie = 1;
+-#else
+-    SignalShutdown();
+-#endif
+ }
+ #endif
+ 
+-void SigHupProc(int s)
++#ifdef IS_MINGW
++static void
++SigHupProc(int sig)
+ {
+-#ifndef IS_MINGW
+-    signal(SIGHUP, SigHupProc);
+-    restart = 1;
+-#else
+     SignalRestart();
+     SignalReloadPMNS();
+-#endif
+ }
++#else
++static void
++SigHupProc(int sig)
++{
++    signal(SIGHUP, SigHupProc);
++    restart = 1;
++}
++#endif
+ 
+ #if HAVE_TRACE_BACK_STACK
+ /*
+@@ -798,13 +807,13 @@ do_traceback(FILE *f)
+     for (i = 0; i < MAX_PCS; i++)
+ 	call_fn[i] = names[i];
+     res = trace_back_stack(MAX_PCS, call_addr, call_fn, MAX_PCS, MAX_SIZE);
+-    for (i = 1; i < res; i++)
++    for (i = 1; i < res; i++) {
+ #if defined(HAVE_64BIT_PTR)
+ 	fprintf(f, "  0x%016llx [%s]\n", call_addr[i], call_fn[i]);
+ #else
+ 	fprintf(f, "  0x%08lx [%s]\n", (__uint32_t)call_addr[i], call_fn[i]);
+ #endif
+-    return;
++    }
+ }
+ #endif /* HAVE_TRACE_BACK_STACK */
+ 
+@@ -830,19 +839,18 @@ do_traceback(FILE *f)
+     if (symbols == NULL) {
+ 	fprintf(f, "backtrace_symbols failed!\n");
+ 	return;
+-
+     }
+     for (i = 1; i < nframe; i++)
+ 	fprintf(f, "  " PRINTF_P_PFX "%p [%s]\n", buf[i], symbols[i]);
+-
+-    return;
+ }
+ #endif /* HAVE_BACKTRACE */
+ 
+-void SigBad(int sig)
++static void
++SigBad(int sig)
+ {
+-    __pmNotifyErr(LOG_ERR, "Unexpected signal %d ...\n", sig);
+     if (pmDebug & DBG_TRACE_DESPERATE) {
++	__pmNotifyErr(LOG_ERR, "Unexpected signal %d ...\n", sig);
++
+ 	/* -D desperate on the command line to enable traceback,
+ 	 * if we have platform support for it
+ 	 */
+@@ -852,9 +860,9 @@ void SigBad(int sig)
+ #else
+ 	fprintf(stderr, "\nSorry, no procedure call traceback support ...\n");
+ #endif
++	fprintf(stderr, "\nDumping to core ...\n");
++	fflush(stderr);
+     }
+-    fprintf(stderr, "\nDumping to core ...\n");
+-    fflush(stderr);
+     abort();
+ }
+ 
+@@ -999,7 +1007,7 @@ AddBadHost(struct __pmSockAddr *hostId)
+     return 1;
+ }
+ 
+-void
++static void
+ ResetBadHosts(void)
+ {
+     if (szBadHosts) {
+diff --git a/src/pmcd/src/pmcd.h b/src/pmcd/src/pmcd.h
+index 04e291a..ba8be5e 100644
+--- a/src/pmcd/src/pmcd.h
++++ b/src/pmcd/src/pmcd.h
+@@ -214,7 +214,6 @@ extern void Shutdown(void);
+ extern int  ParseInitAgents(char *);
+ extern void ParseRestartAgents(char *);
+ extern void PrintAgentInfo(FILE *);
+-extern void ResetBadHosts(void);
+ extern void MarkStateChanges(int);
+ extern void CleanupClient(ClientInfo *, int);
+ extern int ClientsAuthentication(AgentInfo *);
+diff --git a/src/pmie/src/dstruct.c b/src/pmie/src/dstruct.c
+index ea65437..5a65b3b 100644
+--- a/src/pmie/src/dstruct.c
++++ b/src/pmie/src/dstruct.c
+@@ -2,7 +2,7 @@
+  * dstruct.c - central data structures and associated operations
+  ***********************************************************************
+  *
+- * Copyright (c) 2013 Red Hat.
++ * Copyright (c) 2013-2014 Red Hat.
+  * Copyright (c) 1995-2003 Silicon Graphics, Inc.  All Rights Reserved.
+  * 
+  * This program is free software; you can redistribute it and/or modify it
+@@ -68,6 +68,7 @@ int		isdaemon;			/* run as a daemon */
+ int		agent;				/* secret agent mode? */
+ int		applet;				/* applet mode? */
+ int		dowrap;				/* counter wrap? default no */
++int		dorotate;			/* is a log rotation pending? */
+ int		noDnsFlag;			/* do a default name lookup? */
+ pmiestats_t	*perf;				/* live performance data */
+ pmiestats_t	instrument;			/* used if no mmap (archive) */
+@@ -276,6 +277,10 @@ sleepTight(Task *t, int type)
+ 		    break;
+ 		}
+ 		sts = nanosleep(&ts, &tleft);
++		if (dorotate) {
++		    logRotate();
++		    dorotate = 0;
++		}
+ 		if (sts == 0 || (sts < 0 && oserror() != EINTR))
+ 		    break;
+ 		ts = tleft;
+diff --git a/src/pmie/src/dstruct.h b/src/pmie/src/dstruct.h
+index 7072f71..3b98edd 100644
+--- a/src/pmie/src/dstruct.h
++++ b/src/pmie/src/dstruct.h
+@@ -363,6 +363,7 @@ void reflectTime(RealTime);		/* update time vars to reflect now */
+ #define SLEEP_EVAL	0
+ #define SLEEP_RETRY	1
+ void sleepTight(Task *, int);		/* sleep until retry or eval time */
++void logRotate(void);			/* close current, start a new log */
+ 
+ /*
+  * diagnostic tracing
+@@ -411,6 +412,7 @@ extern int	   isdaemon;	/* run as a daemon */
+ extern int         agent;	/* secret agent mode? */
+ extern int         applet;	/* applet mode? */
+ extern int	   dowrap;	/* counter wrap? default no */
++extern int	   dorotate;	/* log rotation was requested */
+ extern int         noDnsFlag;	/* hostname DNS lookup needed? */
+ extern pmiestats_t *perf;	/* pmie performance data ptr */
+ extern pmiestats_t instrument;	/* pmie performance data struct */
+@@ -459,5 +461,3 @@ void agentInit(void);		/* initialize evaluation parameters */
+ #define UNITS_UNKNOWN(u) (u.dimCount == -1 && u.scaleCount == 7)
+ 
+ #endif /* DSTRUCT_H */
+-
+-
+diff --git a/src/pmie/src/pmie.c b/src/pmie/src/pmie.c
+index 4019623..61b0873 100644
+--- a/src/pmie/src/pmie.c
++++ b/src/pmie/src/pmie.c
+@@ -382,7 +382,8 @@ sigintproc(int sig)
+ {
+     __pmSetSignalHandler(SIGINT, SIG_IGN);
+     __pmSetSignalHandler(SIGTERM, SIG_IGN);
+-    __pmNotifyErr(LOG_INFO, "%s caught SIGINT or SIGTERM\n", pmProgname);
++    if (pmDebug & DBG_TRACE_DESPERATE)
++	__pmNotifyErr(LOG_INFO, "%s caught SIGINT or SIGTERM\n", pmProgname);
+     exit(1);
+ }
+ 
+@@ -409,8 +410,8 @@ remap_stdout_stderr(void)
+ 			pmProgname, j, i, fileno(stderr));
+ }
+ 
+-static void
+-sighupproc(int sig)
++void
++logRotate(void)
+ {
+     FILE *fp;
+     int sts;
+@@ -426,6 +427,12 @@ sighupproc(int sig)
+     }
+ }
+ 
++static void
++sighupproc(int sig)
++{
++    __pmSetSignalHandler(SIGHUP, sighupproc);
++   dorotate = 1;
++}
+ 
+ static void
+ dotraceback(void)
+@@ -444,16 +451,17 @@ dotraceback(void)
+     for (i = 1; i < res; i++)
+     fprintf(stderr, "  " PRINTF_P_PFX "%p [%s]\n", (void *)call_addr[i], call_fn[i]);
+ #endif
+-    return;
+ }
+ 
+ static void
+ sigbadproc(int sig)
+ {
+-    __pmNotifyErr(LOG_ERR, "Unexpected signal %d ...\n", sig);
+-    dotraceback();
+-    fprintf(stderr, "\nDumping to core ...\n");
+-    fflush(stderr);
++    if (pmDebug & DBG_TRACE_DESPERATE) {
++	__pmNotifyErr(LOG_ERR, "Unexpected signal %d ...\n", sig);
++	dotraceback();
++	fprintf(stderr, "\nDumping to core ...\n");
++	fflush(stderr);
++    }
+     stopmonitor();
+     abort();
+ }
+diff --git a/src/pmlogger/src/logger.h b/src/pmlogger/src/logger.h
+index a67ee17..124bca9 100644
+--- a/src/pmlogger/src/logger.h
++++ b/src/pmlogger/src/logger.h
+@@ -162,6 +162,7 @@ extern int		ctlfds[CFD_NUM];
+ extern int		exit_samples;
+ extern int		vol_switch_samples;
+ extern __int64_t	vol_switch_bytes;
++extern int		vol_switch_flag;
+ extern int		vol_samples_counter;
+ extern int		archive_version; 
+ extern int		parse_done;
+diff --git a/src/pmlogger/src/pmlogger.c b/src/pmlogger/src/pmlogger.c
+index c418bf6..e87048f 100644
+--- a/src/pmlogger/src/pmlogger.c
++++ b/src/pmlogger/src/pmlogger.c
+@@ -29,6 +29,7 @@ __int64_t	vol_switch_bytes = -1;   /* number of bytes 'til vol switch */
+ struct timeval	vol_switch_time;         /* time interval 'til vol switch */
+ int		vol_samples_counter;     /* Counts samples - reset for new vol*/
+ int		vol_switch_afid = -1;    /* afid of event for vol switch */
++int		vol_switch_flag;         /* sighup received - switch vol now */
+ int		parse_done;
+ int		primary;		/* Non-zero for primary pmlogger */
+ char	    	*archBase;		/* base name for log files */
+@@ -916,9 +917,9 @@ main(int argc, char **argv)
+ 	__pmFD_COPY(&readyfds, &fds);
+ 	nready = __pmSelectRead(numfds, &readyfds, NULL);
+ 
++	/* block signals to simplify IO handling */
++	__pmAFblock();
+ 	if (nready > 0) {
+-	    /* block signals to simplify IO handling */
+-	    __pmAFblock();
+ 
+ 	    /* handle request on control port */
+ 	    for (i = 0; i < CFD_NUM; ++i) {
+@@ -1047,13 +1048,16 @@ main(int argc, char **argv)
+ 		    do_dialog('X');
+ 		}
+ 	    }
+-
+-	    __pmAFunblock();
++	}
++	else if (vol_switch_flag) {
++	    newvolume(VOL_SW_SIGHUP);
++	    vol_switch_flag = 0;
+ 	}
+ 	else if (nready < 0 && neterror() != EINTR)
+ 	    fprintf(stderr, "Error: select: %s\n", netstrerror());
+-    }
+ 
++	__pmAFunblock();
++    }
+ }
+ 
+ 
+diff --git a/src/pmlogger/src/ports.c b/src/pmlogger/src/ports.c
+index 12729c6..7f8ea70 100644
+--- a/src/pmlogger/src/ports.c
++++ b/src/pmlogger/src/ports.c
+@@ -36,10 +36,8 @@
+ 
+ static char	*ctlfile;	/* Control directory/portmap name */
+ static char	*linkfile;	/* Link name for primary logger */
+-#if defined(HAVE_STRUCT_SOCKADDR_UN)
+ static const char *socketPath;	/* Path to unix domain sockets. */
+ static const char *linkSocketPath;/* Link to socket for primary logger */
+-#endif
+ 
+ int		ctlfds[CFD_NUM] = {-1, -1, -1};/* fds for control ports: */
+ int		ctlport;	/* pmlogger control port number */
+@@ -51,47 +49,43 @@ cleanup(void)
+ 	unlink(linkfile);
+     if (ctlfile != NULL)
+ 	unlink(ctlfile);
+-#if defined(HAVE_STRUCT_SOCKADDR_UN)
+     if (linkSocketPath != NULL)
+ 	unlink(linkSocketPath);
+     if (socketPath != NULL)
+ 	unlink(socketPath);
+-#endif
+ }
+ 
+ static void
+ sigexit_handler(int sig)
+ {
+ #ifdef PCP_DEBUG
+-    fprintf(stderr, "pmlogger: Signalled (signal=%d), exiting\n", sig);
++    if (pmDebug & DBG_TRACE_DESPERATE)
++	fprintf(stderr, "pmlogger: Signalled (signal=%d), exiting\n", sig);
+ #endif
+     cleanup();
+     exit(1);
+ }
+ 
++static void
++sighup_handler(int sig)
++{
++    __pmSetSignalHandler(SIGHUP, sighup_handler);
++    vol_switch_flag = 1;
++}
++
+ #ifndef IS_MINGW
+ static void
+ sigcore_handler(int sig)
+ {
+ #ifdef PCP_DEBUG
+-    fprintf(stderr, "pmlogger: Signalled (signal=%d), exiting (core dumped)\n", sig);
++    if (pmDebug & DBG_TRACE_DESPERATE)
++	fprintf(stderr, "pmlogger: Signalled (signal=%d), exiting (core dumped)\n", sig);
+ #endif
+     __pmSetSignalHandler(SIGABRT, SIG_DFL);	/* Don't come back here */
+     cleanup();
+     abort();
+ }
+-#endif
+-
+-static void
+-sighup_handler(int sig)
+-{
+-    /* SIGHUP is used to force a log volume change */
+-    __pmSetSignalHandler(SIGHUP, SIG_IGN);
+-    newvolume(VOL_SW_SIGHUP);
+-    __pmSetSignalHandler(SIGHUP, sighup_handler);
+-}
+ 
+-#ifndef IS_MINGW
+ static void
+ sigpipe_handler(int sig)
+ {
+@@ -101,7 +95,6 @@ sigpipe_handler(int sig)
+      */
+     __pmSetSignalHandler(SIGPIPE, sigpipe_handler);
+ }
+-#endif
+ 
+ static void
+ sigusr1_handler(int sig)
+@@ -109,20 +102,7 @@ sigusr1_handler(int sig)
+     /*
+      * no-op now that all archive write I/O is unbuffered
+      */
+-#ifndef IS_MINGW
+     __pmSetSignalHandler(SIGUSR1, sigusr1_handler);
+-#endif
+-}
+-
+-#ifndef IS_MINGW
+-/*
+- * if we are launched from pmRecord*() in libpcp, then we
+- * may end up using popen() to run xconfirm(1), and then there
+- * is a chance of us receiving SIGCHLD ... just ignore this signal
+- */
+-static void
+-sigchld_handler(int sig)
+-{
+ }
+ #endif
+ 
+@@ -154,10 +134,10 @@ static sig_map_t	sig_handler[] = {
+     { SIGALRM,	sigexit_handler },	/* Exit   Alarm Clock */
+ #endif
+     { SIGTERM,	sigexit_handler },	/* Exit   Terminated */
+-    { SIGUSR1,	sigusr1_handler },	/* Exit   User Signal 1 */
+ #ifndef IS_MINGW
++    { SIGUSR1,	sigusr1_handler },	/* NOP    User Signal 1 - [was fflush(3)] */
+     { SIGUSR2,	sigexit_handler },	/* Exit   User Signal 2 */
+-    { SIGCHLD,	sigchld_handler },	/* NOP    Child stopped or terminated */
++    { SIGCHLD,	SIG_IGN },		/* NOP    Child stopped or terminated */
+ #ifdef SIGPWR
+     { SIGPWR,	SIG_DFL },		/* Ignore Power Fail/Restart */
+ #endif
+diff --git a/src/pmproxy/pmproxy.c b/src/pmproxy/pmproxy.c
+index a862e34..77ac997 100644
+--- a/src/pmproxy/pmproxy.c
++++ b/src/pmproxy/pmproxy.c
+@@ -394,24 +394,30 @@ ClientLoop(void)
+     }
+ }
+ 
++#ifdef IS_MINGW
+ static void
+ SigIntProc(int s)
+ {
+-#ifdef IS_MINGW
+     SignalShutdown();
++}
+ #else
++static void
++SigIntProc(int s)
++{
+     signal(SIGINT, SigIntProc);
+     signal(SIGTERM, SigIntProc);
+     timeToDie = 1;
+-#endif
+ }
++#endif
+ 
+ static void
+ SigBad(int sig)
+ {
+-    __pmNotifyErr(LOG_ERR, "Unexpected signal %d ...\n", sig);
+-    fprintf(stderr, "\nDumping to core ...\n");
+-    fflush(stderr);
++    if (pmDebug & DBG_TRACE_DESPERATE) {
++	__pmNotifyErr(LOG_ERR, "Unexpected signal %d ...\n", sig);
++	fprintf(stderr, "\nDumping to core ...\n");
++	fflush(stderr);
++    }
+     abort();
+ }
+ 
+commit 3988c4bc4e7376add818e631587ec13ced7f8490
+Author: Nathan Scott <nathans@redhat.com>
+Date:   Wed May 21 17:17:03 2014 +1000
+
+    Remove remaining non-signal-safe exit/abort calls in daemons
+    
+    Frank spotted a few remaining calls to exit(3) on inappropriate
+    paths, audit once more and convert those to _exit and call any
+    safe cleanup routines by-hand (cannot rely on atexit in a signal
+    handler).  Similarly, some abort calls still remained in places
+    they should not.
+    
+    Introduce a pattern of exiting with the signal number received
+    for the "unexpected" class of signal handlers to aid diagnosis.
+    Daemons return code is always zero or one today, hopefully this
+    will prove to be a generally useful diagnostic addition - it is
+    signal-safe too ;)
+
+diff --git a/src/pmcd/src/pmcd.c b/src/pmcd/src/pmcd.c
+index edbea0e..21203a6 100644
+--- a/src/pmcd/src/pmcd.c
++++ b/src/pmcd/src/pmcd.c
+@@ -863,7 +863,7 @@ SigBad(int sig)
+ 	fprintf(stderr, "\nDumping to core ...\n");
+ 	fflush(stderr);
+     }
+-    abort();
++    _exit(sig);
+ }
+ 
+ int
+diff --git a/src/pmie/src/dstruct.c b/src/pmie/src/dstruct.c
+index 5a65b3b..f22bdca 100644
+--- a/src/pmie/src/dstruct.c
++++ b/src/pmie/src/dstruct.c
+@@ -68,6 +68,7 @@ int		isdaemon;			/* run as a daemon */
+ int		agent;				/* secret agent mode? */
+ int		applet;				/* applet mode? */
+ int		dowrap;				/* counter wrap? default no */
++int		doexit;				/* time to exit stage left? */
+ int		dorotate;			/* is a log rotation pending? */
+ int		noDnsFlag;			/* do a default name lookup? */
+ pmiestats_t	*perf;				/* live performance data */
+@@ -277,6 +278,9 @@ sleepTight(Task *t, int type)
+ 		    break;
+ 		}
+ 		sts = nanosleep(&ts, &tleft);
++		/* deferred signal handling done immediately */
++		if (doexit)
++		    exit(doexit);
+ 		if (dorotate) {
+ 		    logRotate();
+ 		    dorotate = 0;
+diff --git a/src/pmie/src/dstruct.h b/src/pmie/src/dstruct.h
+index 3b98edd..2cf15f4 100644
+--- a/src/pmie/src/dstruct.h
++++ b/src/pmie/src/dstruct.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2013 Red Hat.
++ * Copyright (c) 2013-2014 Red Hat.
+  * Copyright (c) 1995 Silicon Graphics, Inc.  All Rights Reserved.
+  * 
+  * This program is free software; you can redistribute it and/or modify it
+@@ -412,6 +412,7 @@ extern int	   isdaemon;	/* run as a daemon */
+ extern int         agent;	/* secret agent mode? */
+ extern int         applet;	/* applet mode? */
+ extern int	   dowrap;	/* counter wrap? default no */
++extern int	   doexit;	/* signalled its time to exit */
+ extern int	   dorotate;	/* log rotation was requested */
+ extern int         noDnsFlag;	/* hostname DNS lookup needed? */
+ extern pmiestats_t *perf;	/* pmie performance data ptr */
+diff --git a/src/pmie/src/pmie.c b/src/pmie/src/pmie.c
+index 61b0873..2556bfe 100644
+--- a/src/pmie/src/pmie.c
++++ b/src/pmie/src/pmie.c
+@@ -2,7 +2,7 @@
+  * pmie.c - performance inference engine
+  ***********************************************************************
+  *
+- * Copyright (c) 2013 Red Hat, Inc.
++ * Copyright (c) 2013-2014 Red Hat, Inc.
+  * Copyright (c) 1995-2003 Silicon Graphics, Inc.  All Rights Reserved.
+  * 
+  * This program is free software; you can redistribute it and/or modify it
+@@ -384,13 +384,7 @@ sigintproc(int sig)
+     __pmSetSignalHandler(SIGTERM, SIG_IGN);
+     if (pmDebug & DBG_TRACE_DESPERATE)
+ 	__pmNotifyErr(LOG_INFO, "%s caught SIGINT or SIGTERM\n", pmProgname);
+-    exit(1);
+-}
+-
+-static void
+-sigbye(int sig)
+-{
+-    exit(0);
++    doexit = sig;
+ }
+ 
+ static void
+@@ -463,7 +457,7 @@ sigbadproc(int sig)
+ 	fflush(stderr);
+     }
+     stopmonitor();
+-    abort();
++    _exit(sig);
+ }
+ 
+ 
+@@ -722,8 +716,8 @@ getargs(int argc, char *argv[])
+     }
+     else {
+ 	/* need to catch these so the atexit() processing is done */
+-	__pmSetSignalHandler(SIGINT, sigbye);
+-	__pmSetSignalHandler(SIGTERM, sigbye);
++	__pmSetSignalHandler(SIGINT, sigintproc);
++	__pmSetSignalHandler(SIGTERM, sigintproc);
+     }
+ 
+     if (commandlog != NULL) {
+diff --git a/src/pmlogger/src/logger.h b/src/pmlogger/src/logger.h
+index 124bca9..f57b18b 100644
+--- a/src/pmlogger/src/logger.h
++++ b/src/pmlogger/src/logger.h
+@@ -168,6 +168,7 @@ extern int		archive_version;
+ extern int		parse_done;
+ extern __int64_t	exit_bytes;
+ extern __int64_t	vol_bytes;
++extern int		exit_code;
+ 
+ /* event record handling */
+ extern int do_events(pmValueSet *);
+diff --git a/src/pmlogger/src/pmlogger.c b/src/pmlogger/src/pmlogger.c
+index e87048f..5cbddc0 100644
+--- a/src/pmlogger/src/pmlogger.c
++++ b/src/pmlogger/src/pmlogger.c
+@@ -40,6 +40,7 @@ int		archive_version = PM_LOG_VERS02; /* Type of archive to create */
+ int		linger;			/* linger with no tasks/events */
+ int		rflag;			/* report sizes */
+ struct timeval	delta = { 60, 0 };	/* default logging interval */
++int		exit_code;		/* code to pass to exit (zero/signum) */
+ int		qa_case;		/* QA error injection state */
+ char		*note;			/* note for port map file */
+ 
+@@ -1057,10 +1058,13 @@ main(int argc, char **argv)
+ 	    fprintf(stderr, "Error: select: %s\n", netstrerror());
+ 
+ 	__pmAFunblock();
++
++	if (exit_code)
++	    break;
+     }
++    exit(exit_code);
+ }
+ 
+-
+ int
+ newvolume(int vol_switch_type)
+ {
+@@ -1129,7 +1133,6 @@ newvolume(int vol_switch_type)
+ 	return -oserror();
+ }
+ 
+-
+ void
+ disconnect(int sts)
+ {
+@@ -1194,5 +1197,3 @@ reconnect(void)
+     return sts;
+ }
+ #endif
+-
+-
+diff --git a/src/pmlogger/src/ports.c b/src/pmlogger/src/ports.c
+index 7f8ea70..15c1cb1 100644
+--- a/src/pmlogger/src/ports.c
++++ b/src/pmlogger/src/ports.c
+@@ -63,7 +63,14 @@ sigexit_handler(int sig)
+ 	fprintf(stderr, "pmlogger: Signalled (signal=%d), exiting\n", sig);
+ #endif
+     cleanup();
+-    exit(1);
++    _exit(sig);
++}
++
++static void
++sigterm_handler(int sig)
++{
++    /* exit as soon as possible, handler is deferred for log cleanup */
++    exit_code = sig;
+ }
+ 
+ static void
+@@ -83,7 +90,7 @@ sigcore_handler(int sig)
+ #endif
+     __pmSetSignalHandler(SIGABRT, SIG_DFL);	/* Don't come back here */
+     cleanup();
+-    abort();
++    _exit(sig);
+ }
+ 
+ static void
+@@ -116,7 +123,7 @@ typedef struct {
+  */
+ static sig_map_t	sig_handler[] = {
+     { SIGHUP,	sighup_handler },	/* Exit   Hangup [see termio(7)] */
+-    { SIGINT,	sigexit_handler },	/* Exit   Interrupt [see termio(7)] */
++    { SIGINT,	sigterm_handler },	/* Exit   Interrupt [see termio(7)] */
+ #ifndef IS_MINGW
+     { SIGQUIT,	sigcore_handler },	/* Core   Quit [see termio(7)] */
+     { SIGILL,	sigcore_handler },	/* Core   Illegal Instruction */
+@@ -131,9 +138,9 @@ static sig_map_t	sig_handler[] = {
+     { SIGSEGV,	sigcore_handler },	/* Core   Segmentation Fault */
+     { SIGSYS,	sigcore_handler },	/* Core   Bad System Call */
+     { SIGPIPE,	sigpipe_handler },	/* Exit   Broken Pipe */
+-    { SIGALRM,	sigexit_handler },	/* Exit   Alarm Clock */
++    { SIGALRM,	sigterm_handler },	/* Exit   Alarm Clock */
+ #endif
+-    { SIGTERM,	sigexit_handler },	/* Exit   Terminated */
++    { SIGTERM,	sigterm_handler },	/* Exit   Terminated */
+ #ifndef IS_MINGW
+     { SIGUSR1,	sigusr1_handler },	/* NOP    User Signal 1 - [was fflush(3)] */
+     { SIGUSR2,	sigexit_handler },	/* Exit   User Signal 2 */
+@@ -151,9 +158,9 @@ static sig_map_t	sig_handler[] = {
+     { SIGCONT,	SIG_DFL },		/* Ignore Continued */
+     { SIGTTIN,	SIG_DFL },		/* Stop   Stopped (tty input) */
+     { SIGTTOU,	SIG_DFL },		/* Stop   Stopped (tty output) */
+-    { SIGVTALRM, sigexit_handler },	/* Exit   Virtual Timer Expired */
++    { SIGVTALRM, sigterm_handler },	/* Exit   Virtual Timer Expired */
+ 
+-    { SIGPROF,	sigexit_handler },	/* Exit   Profiling Timer Expired */
++    { SIGPROF,	sigterm_handler },	/* Exit   Profiling Timer Expired */
+     { SIGXCPU,	sigcore_handler },	/* Core   CPU time limit exceeded [see getrlimit(2)] */
+     { SIGXFSZ,	sigcore_handler}	/* Core   File size limit exceeded [see getrlimit(2)] */
+ #endif
+diff --git a/src/pmproxy/pmproxy.c b/src/pmproxy/pmproxy.c
+index 77ac997..da23f44 100644
+--- a/src/pmproxy/pmproxy.c
++++ b/src/pmproxy/pmproxy.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2012-2013 Red Hat.
++ * Copyright (c) 2012-2014 Red Hat.
+  * Copyright (c) 2002 Silicon Graphics, Inc.  All Rights Reserved.
+  * 
+  * This program is free software; you can redistribute it and/or modify it
+@@ -418,7 +418,7 @@ SigBad(int sig)
+ 	fprintf(stderr, "\nDumping to core ...\n");
+ 	fflush(stderr);
+     }
+-    abort();
++    _exit(sig);
+ }
+ 
+ /*

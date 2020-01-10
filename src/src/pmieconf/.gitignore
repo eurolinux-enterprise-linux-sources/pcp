@@ -1,0 +1,12 @@
+cpu/GNUmakefile
+filesys/GNUmakefile
+global/GNUmakefile
+local
+memory/GNUmakefile
+percpu/GNUmakefile
+pernetif/GNUmakefile
+pmieconf
+pmlogconf
+pmlogconf.tmp
+rate-syscalls
+rules

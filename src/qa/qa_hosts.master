@@ -1,0 +1,98 @@
+#
+# master version of likely victim hosts for PCP QA
+#
+# entries are fully qualified domain names, in any order
+# the only pre-requisite is that they be running some version of PCP.
+#
+
+# Kenj Section
+bozo.localdomain
+bozo-vm.localdomain
+bozo-laptop.localdomain
+comma.localdomain
+fuji.localdomain
+colleens-imac.local
+vm00.localdomain
+vm01.localdomain
+vm02.localdomain
+vm03.localdomain
+emma.localdomain
+
+# SGI Section
+grundy.sgi.com
+
+# Nathans Section
+smash.scott.net.au
+verge.scott.net.au
+sweet.scott.net.au
+cloud.scott.net.au
+crack.scott.net.au
+crunch.scott.net.au
+bounce.scott.net.au
+splash.scott.net.au
+
+# Mort Section
+opensuse11-1.bork.org
+fedora11.bork.org
+sles11.bork.org
+ubuntu-smp.bork.org
+deb32.bork.org
+
+# sort control lines
+# each line here is a specification that includes the keyword #order and
+# then two or more strings in the style of fgrep
+#
+# the first string is used to attempt a match with the fully qualified
+# domain name of the host host running the QA
+#
+# subsequent strings select entries from the list of hosts above in order
+# of increasing preference ... any unmatched hosts are not included
+
+# tag	QA host?		1st choice		2nd choice	...
+# SGI Section
+#order	.melbourne.sgi		.melbourne.sgi		.engr.sgi.com
+#order	.engr.sgi.com		.engr.sgi.com		.melbourne.sgi
+#order	.americas.sgi.com	.americas.sgi.com	.engr.sgi.com	.melbourne.sgi
+#order	.sgi.com		.sgi.com
+# Nathans Section
+#order	.scott.net.au		.scott.net.au
+# Kenj Section
+#order	bozo			.localdomain
+#order	bozo-vm		.localdomain
+#order	bozo-laptop		.localdomain
+#order	colleens-imac.local	.local
+#order	comma			.localdomain
+#order	emma			.localdomain
+#order	fuji			.localdomain
+#order	vm00			.localdomain
+#order	vm01			.localdomain
+#order	vm02			.localdomain
+#order	vm03			.localdomain
+#order	vm04			.localdomain
+#order	vm05			.localdomain
+#order	vm06			.localdomain
+#order	vm07			.localdomain
+#order	vm08			.localdomain
+#order	vm09			.localdomain
+#order	vm10			.localdomain
+#order	vm11			.localdomain
+#order	vm12			.localdomain
+#order	vm13			.localdomain
+#order	vm14			.localdomain
+#order	vm15			.localdomain
+#order	vm16			.localdomain
+#order	vm17			.localdomain
+#order	vm18			.localdomain
+#order	vm19			.localdomain
+#order	vm20			.localdomain
+#order	vm21			.localdomain
+#order	vm22			.localdomain
+#order	vm23			.localdomain
+#order	vm24			.localdomain
+#order	vm25			.localdomain
+#order	vm26			.localdomain
+#order	vm27			.localdomain
+#order	vm28			.localdomain
+#order	vm29			.localdomain
+# Mort Section
+#order .bork.org .bork.org

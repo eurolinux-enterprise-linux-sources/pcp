@@ -1,0 +1,21 @@
+#pmlogconf-setup 2.0
+ident   per-process metrics used by the atop command
+force	available
+delta   120 seconds
+
+	proc.id.uid_nm
+	proc.memory.datrss
+	proc.memory.librss
+	proc.memory.textrss
+	proc.memory.vmstack
+	proc.psinfo.cmd
+	proc.psinfo.maj_flt
+	proc.psinfo.minflt
+	proc.psinfo.pid
+	proc.psinfo.rss
+	proc.psinfo.sname
+	proc.psinfo.stime
+	proc.psinfo.utime
+	proc.psinfo.vsize
+	proc.psinfo.nswap
+	proc.psinfo.threads

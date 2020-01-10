@@ -1,0 +1,6 @@
+//
+// If total syscall rate exceeds 10000/second times number of CPUs, then
+// display an alarm notifier
+//
+kernel.all.syscall > 10 Kcount/sec * hinv.ncpu
+    -> alarm "high syscall rate";

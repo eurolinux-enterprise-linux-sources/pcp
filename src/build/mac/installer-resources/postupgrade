@@ -1,0 +1,124 @@
+#!/bin/sh
+#
+# Copyright (c) 2003-2004 Silicon Graphics, Inc.  All Rights Reserved.
+# 
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2 of the License, or (at your
+# option) any later version.
+# 
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+# for more details.
+# 
+# Post installation/upgrade script for PCP
+#
+
+prog=`basename $0`
+status=1
+trap "exit \$status" 0 1 2 15
+
+echo "$prog: PCP for MacOSX Upgrade"
+
+echo "$prog: Stopping PCP"
+/Library/StartupItems/pcp/pcp stop
+
+echo "$prog: Writing install log to /var/log/pcp_inst.log"
+
+if [ ! -d $2 ]
+then
+    echo "$prog: Unable to open directory of new files ($2)"
+    exit
+fi
+
+cd $2
+
+if [ -f /usr/share/pcp/bin/idb ]
+then
+    if ./install-pcp -u /usr/share/pcp/bin/idb -l /var/log/pcp_inst.log idb
+    then
+	:
+    else
+	echo "$prog: Upgrade Failed"
+	exit
+    fi
+else
+    echo "$prog: Package detected previous install of pcp but /usr/share/pcp/bin/idb does not exist."
+    echo "$prog: Attempting to remove existing files using new idb."
+    if ./install-pcp -v -r -l /var/log/pcp_inst.log idb
+    then
+	if ./install-pcp -v -i -l /var/log/pcp_inst.log idb
+	then
+	    :
+	else
+	    echo "$prog: Install Failed"
+	    exit
+	fi
+    else
+	echo "$prog: Remove Failed"
+	exit
+    fi
+fi
+
+if [ -f /etc/pcp.conf ]
+then
+    # for all the configuration files we know about, try to keep 
+    # any local modifications, and salt away file with a .orig
+    # suffix for a subsequent upgrade
+    #
+    . /etc/pcp.conf
+    for conf in \
+	$PCP_PMCDCONF_PATH $PCP_PMCDOPTIONS_PATH $PCP_PMCDRCLOCAL_PATH \
+	$PCP_PMIECONTROL_PATH $PCP_PMLOGGERCONTROL_PATH \
+	$PCP_PMPROXYOPTIONS_PATH $PCP_PMWEBDOPTIONS_PATH
+    do
+	if [ -f $conf.pre -a -f $conf ]
+	then
+	    if cmp -s $conf.pre $conf
+	    then
+		cp $conf $conf.orig
+		rm $conf.pre
+	    else
+		# restore local modifications ...
+		cp $conf $conf.orig
+		mv $conf.pre $conf
+	    fi
+	elif [ -f $conf ]
+	then
+	    cp $conf $conf.orig
+	fi
+    done
+fi
+
+# create the user/group account that PCP daemons will use
+#
+userid=432
+groupid=432
+
+if ! dscl . -list /Groups | grep -q '^pcp$' 
+then
+    dscl . -create /Groups/pcp
+    dscl . -create /Groups/pcp PrimaryGroupID $groupid
+    dscl . -create /Groups/pcp Password \*
+fi
+
+if ! dscl . -list /Users | grep -q '^pcp$' 
+then
+    dscl . -create /Users/pcp
+    dscl . -create /Users/pcp UniqueID $userid
+    dscl . -create /Users/pcp UserShell /usr/bin/false
+    dscl . -create /Users/pcp RealName 'Performance Co-Pilot'
+    dscl . -create /Users/pcp NFSHomeDirectory /var/lib/pcp
+    dscl . -create /Users/pcp PrimaryGroupID $groupid
+    dscl . -create /Users/pcp Password \*
+    dscl . append /Groups/pcp GroupMembership pcp
+fi
+
+chown -R pcp:pcp /var/log/pcp/pmcd 2>/dev/null
+chown -R pcp:pcp /var/log/pcp/pmlogger 2>/dev/null
+chown -R pcp:pcp /var/log/pcp/pmie 2>/dev/null
+chown -R pcp:pcp /var/log/pcp/pmwebd 2>/dev/null
+chown -R pcp:pcp /var/log/pcp/pmproxy 2>/dev/null
+
+status=0

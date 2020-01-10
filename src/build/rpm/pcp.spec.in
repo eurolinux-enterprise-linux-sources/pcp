@@ -1,0 +1,801 @@
+Summary: System-level performance monitoring and performance management
+Name: @package_name@
+Version: @package_version@
+Release: @package_release@@package_sgirelease@
+License: GPLv2+ and LGPLv2.1+
+URL: http://www.performancecopilot.org
+Group: Applications/System
+Source: @package_name@-@package_version@.src.tar.gz
+BuildRoot: @build_root@ 
+Distribution: @package_distribution@
+BuildRequires: procps bison flex
+BuildRequires: python-devel
+BuildRequires: ncurses-devel
+BuildRequires: readline-devel
+BuildRequires: perl(ExtUtils::MakeMaker)
+%if "@enable_avahi@" == "true"
+BuildRequires: avahi-devel
+%endif
+%if "@enable_secure@" == "true"
+BuildRequires: nss-devel
+BuildRequires: cyrus-sasl-devel
+%endif
+%if "@enable_probes@" == "true"
+BuildRequires: systemtap-sdt-devel
+%endif
+%if @have_libmicrohttpd@ == 1
+BuildRequires: libmicrohttpd-devel
+%endif
+%if @have_rpmlib@ == 1
+BuildRequires: rpm-devel
+%endif
+%if "@enable_qt@" == "true"
+%if "%{_vendor}" == "suse"
+BuildRequires: qt-devel >= 4.4
+%else
+BuildRequires: qt4-devel >= 4.4
+%endif
+%endif
+%if "%{_vendor}" == "redhat"
+BuildRequires: initscripts man /bin/hostname
+%endif
+%if 0%{?fedora} >= 18 || 0%{?rhel} >= 7
+BuildRequires: systemd-devel
+%endif
+
+Conflicts: pcp-pro < 2.2
+
+# Utilities used indirectly e.g. by scripts we install
+Requires: bash gawk sed grep fileutils findutils perl
+Requires: python
+%if "%{_vendor}" == "redhat" && 0%{?rhel} <= 5
+Requires: python-ctypes
+%endif
+%if "%{_vendor}" == "suse"
+Requires: sysconfig
+%define _rcdir /etc/init.d
+%else
+Requires: initscripts
+%define _rcdir /etc/rc.d/init.d
+%endif
+%define _tmpdir %{_localstatedir}/lib/pcp/tmp
+
+# There is a problem here ... some distros are resisting adding more
+# repackaged perl-Foo-Bar rpms, but the default find-requires script
+# will turn all perl module we use into rpm package Requires clauses.
+#
+# The fix is to over-ride the default find-requires script and strip
+# out the dodgey perl modules that don't have official rpms, based
+# on the distro ... see the filter-requires script in this directory
+#
+# Recipe is a refinement of the one described at
+# http://fedoraproject.org/wiki/PackagingDrafts/FilteringAutomaticDependencies#Disabling_dependency_auto-generation
+#
+# override the default automatic requires/provides generation
+%define _use_internal_dependency_generator 0
+# remember the real find-requires path (%%global avoids recursive %%define)
+# macros below
+%global __find_requires_save %{__find_requires}
+# slip our filter into place
+%define __find_requires %{_builddir}/%{?buildsubdir}/build/rpm/filter-requires -v %{_vendor} -f 0%{?fedora} -r 0%{?rhel} %{__find_requires_save}
+
+Requires: pcp-libs = @package_version@
+Requires: python-pcp = @package_version@
+Requires: perl-PCP-PMDA = @package_version@
+
+%description
+Performance Co-Pilot (PCP) provides a framework and services to support
+system-level performance monitoring and performance management. 
+
+The PCP open source release provides a unifying abstraction for all of
+the interesting performance data in a system, and allows client
+applications to easily retrieve and process any subset of that data. 
+
+#
+# pcp-conf
+#
+%package conf
+License: LGPLv2.1+
+Group: Development/Libraries
+Summary: Performance Co-Pilot run-time configuration
+URL: http://www.performancecopilot.org
+
+# http://fedoraproject.org/wiki/Packaging:Conflicts "Splitting Packages"
+Conflicts: pcp-libs < 3.9
+
+%description conf
+Performance Co-Pilot (PCP) run-time configuration
+
+#
+# pcp-libs
+#
+%package libs
+License: LGPLv2.1+
+Group: Development/Libraries
+Summary: Performance Co-Pilot run-time libraries
+URL: http://www.performancecopilot.org
+
+Requires: pcp-conf = @package_version@
+Obsoletes: pcp < 3.0
+
+%description libs
+Performance Co-Pilot (PCP) run-time libraries
+
+#
+# pcp-libs-devel
+#
+%package libs-devel
+License: GPLv2+ and LGPLv2.1+
+Group: Development/Libraries
+Summary: Performance Co-Pilot (PCP) development headers and documentation
+URL: http://www.performancecopilot.org
+
+Requires: pcp-libs = @package_version@
+
+%description libs-devel
+Performance Co-Pilot (PCP) headers, documentation and tools for development.
+
+#
+# pcp-testsuite
+#
+%package testsuite
+License: GPLv2+
+Group: Development/Libraries
+Summary: Performance Co-Pilot (PCP) test suite
+URL: http://www.performancecopilot.org
+
+Requires: pcp = @package_version@
+Requires: pcp-libs = @package_version@
+Requires: pcp-libs-devel = @package_version@
+# Suggests: valgrind, nmap
+
+%description testsuite
+Quality assurance test suite for Performance Co-Pilot (PCP).
+
+%if "@BUILD_PMMGR@" == "yes"
+#
+# pcp-manager
+#
+%package manager
+License: GPLv2+
+Group: Applications/System
+Summary: Performance Co-Pilot (PCP) manager daemon
+URL: http://www.performancecopilot.org
+
+Requires: pcp = @package_version@
+Requires: pcp-libs = @package_version@
+
+%description manager
+An optional daemon (pmmgr) that manages a collection of pmlogger and
+pmie daemons, for a set of discovered local and remote hosts running
+the performance metrics collection daemon (pmcd).  It ensures these
+daemons are running when appropriate, and manages their log rotation
+needs (which are particularly complex in the case of pmlogger).
+The base PCP package provides comparable functionality through cron
+scripts which predate this daemon but do still provide effective and
+efficient log management services.
+The pcp-manager package aims to aggressively enable new PCP features
+and as a result may not be suited to all production environments.
+%endif
+
+%if @have_libmicrohttpd@ == 1
+#
+# pcp-webapi
+#
+%package webapi
+License: GPLv2+
+Group: Applications/System
+Summary: Performance Co-Pilot (PCP) web API service
+URL: http://www.performancecopilot.org
+
+Requires: pcp = @package_version@
+Requires: pcp-libs = @package_version@
+
+%description webapi
+Provides a daemon (pmwebd) that binds a large subset of the Performance
+Co-Pilot (PCP) client API (PMAPI) to RESTful web applications using the
+HTTP (PMWEBAPI) protocol.
+%endif
+
+#
+# perl-PCP-PMDA. This is the PCP agent perl binding.
+#
+%package -n perl-PCP-PMDA
+License: GPLv2+
+Group: Development/Languages
+Summary: Performance Co-Pilot (PCP) Perl bindings and documentation
+URL: http://www.performancecopilot.org
+Requires: pcp-libs = @package_version@
+
+%description -n perl-PCP-PMDA
+The PCP::PMDA Perl module contains the language bindings for
+building Performance Metric Domain Agents (PMDAs) using Perl.
+Each PMDA exports performance data for one specific domain, for
+example the operating system kernel, Cisco routers, a database,
+an application, etc.
+
+#
+# perl-PCP-MMV
+#
+%package -n perl-PCP-MMV
+License: GPLv2+
+Group: Development/Libraries
+Summary: Performance Co-Pilot (PCP) Perl bindings for PCP Memory Mapped Values
+URL: http://www.performancecopilot.org
+Requires: pcp >= @package_version@
+
+%description -n perl-PCP-MMV
+The PCP::MMV module contains the Perl language bindings for
+building scripts instrumented with the Performance Co-Pilot
+(PCP) Memory Mapped Value (MMV) mechanism.
+This mechanism allows arbitrary values to be exported from an
+instrumented script into the PCP infrastructure for monitoring
+and analysis with pmchart, pmie, pmlogger and other PCP tools.
+
+#
+# perl-PCP-LogImport
+#
+%package -n perl-PCP-LogImport
+License: GPLv2+
+Group: Development/Libraries
+Summary: Performance Co-Pilot (PCP) Perl bindings for importing external data into PCP archives
+URL: http://www.performancecopilot.org
+Requires: pcp >= @package_version@
+
+%description -n perl-PCP-LogImport
+The PCP::LogImport module contains the Perl language bindings for
+importing data in various 3rd party formats into PCP archives so
+they can be replayed with standard PCP monitoring tools.
+
+#
+# perl-PCP-LogSummary
+#
+%package -n perl-PCP-LogSummary
+License: GPLv2+
+Group: Development/Languages
+Summary: Performance Co-Pilot (PCP) Perl bindings for post-processing output of pmlogsummary
+URL: http://www.performancecopilot.org
+Requires: pcp >= @package_version@
+
+%description -n perl-PCP-LogSummary
+The PCP::LogSummary module provides a Perl module for using the
+statistical summary data produced by the Performance Co-Pilot
+pmlogsummary utility.  This utility produces various averages,
+minima, maxima, and other calculations based on the performance
+data stored in a PCP archive.  The Perl interface is ideal for
+exporting this data into third-party tools (e.g. spreadsheets).
+
+#
+# pcp-import-sar2pcp
+#
+%package import-sar2pcp
+License: LGPLv2+
+Group: Applications/System
+Summary: Performance Co-Pilot tools for importing sar data into PCP archive logs
+URL: http://www.performancecopilot.org
+Requires: pcp-libs >= @package_version@ perl-PCP-LogImport >= @package_version@ sysstat
+
+%description import-sar2pcp
+Performance Co-Pilot (PCP) front-end tools for importing sar data
+into standard PCP archive logs for replay with any PCP monitoring tool.
+
+#
+# pcp-import-iostat2pcp
+#
+%package import-iostat2pcp
+License: LGPLv2+
+Group: Applications/System
+Summary: Performance Co-Pilot tools for importing iostat data into PCP archive logs
+URL: http://www.performancecopilot.org
+Requires: pcp-libs >= @package_version@ perl-PCP-LogImport >= @package_version@ sysstat
+
+%description import-iostat2pcp
+Performance Co-Pilot (PCP) front-end tools for importing iostat data
+into standard PCP archive logs for replay with any PCP monitoring tool.
+
+#
+# pcp-import-sheet2pcp
+#
+%package import-sheet2pcp
+License: LGPLv2+
+Group: Applications/System
+Summary: Performance Co-Pilot tools for importing spreadsheet data into PCP archive logs
+URL: http://www.performancecopilot.org
+Requires: pcp-libs >= @package_version@ perl-PCP-LogImport >= @package_version@
+
+%description import-sheet2pcp
+Performance Co-Pilot (PCP) front-end tools for importing spreadsheet data
+into standard PCP archive logs for replay with any PCP monitoring tool.
+
+#
+# pcp-import-mrtg2pcp
+#
+%package import-mrtg2pcp
+License: LGPLv2+
+Group: Applications/System
+Summary: Performance Co-Pilot tools for importing MTRG data into PCP archive logs
+URL: http://www.performancecopilot.org
+Requires: pcp-libs >= @package_version@ perl-PCP-LogImport >= @package_version@
+
+%description import-mrtg2pcp
+Performance Co-Pilot (PCP) front-end tools for importing MTRG data
+into standard PCP archive logs for replay with any PCP monitoring tool.
+
+#
+# pcp-import-collectl2pcp
+#
+%package import-collectl2pcp
+License: LGPLv2+
+Group: Applications/System
+Summary: Performance Co-Pilot tools for importing collectl log files into PCP archive logs
+URL: http://www.performancecopilot.org
+Requires: pcp-libs >= %{version}-%{release}
+
+%description import-collectl2pcp
+Performance Co-Pilot (PCP) front-end tools for importing collectl data
+into standard PCP archive logs for replay with any PCP monitoring tool.
+
+#
+# python-pcp. This is the PCP library bindings for python.
+#
+%package -n python-pcp
+License: GPLv2+
+Group: Development/Libraries
+Summary: Performance Co-Pilot (PCP) Python bindings and documentation
+URL: http://www.performancecopilot.org
+Requires: pcp-libs = @package_version@
+
+%description -n python-pcp
+The python PCP module contains the language bindings for
+building Performance Metric API (PMAPI) tools using Python.
+
+%if "@enable_qt@" == "true"
+#
+# pcp-gui package for Qt tools
+#
+%package -n pcp-gui
+License: GPLv2+ and LGPLv2+ and LGPLv2+ with exceptions
+Group: Applications/System
+Summary: Visualization tools for the Performance Co-Pilot toolkit
+URL: http://www.performancecopilot.org
+Requires: pcp-libs = %{version}-%{release}
+
+%description -n pcp-gui
+Visualization tools for the Performance Co-Pilot toolkit.
+The pcp-gui package primarily includes visualization tools for
+monitoring systems using live and archived Performance Co-Pilot
+(PCP) sources.
+%endif
+
+#
+# pcp-doc package
+#
+%package -n pcp-doc
+Group: Documentation
+BuildArch: noarch
+Summary: Documentation and tutorial for the Performance Co-Pilot
+URL: http://www.performancecopilot.org
+
+%description -n pcp-doc
+Documentation and tutorial for the Performance Co-Pilot
+Performance Co-Pilot (PCP) provides a framework and services to support
+system-level performance monitoring and performance management.
+
+The pcp-doc package provides useful information on using and
+configuring the Performance Co-Pilot (PCP) toolkit for system
+level performance management.  It includes tutorials, HOWTOs,
+and other detailed documentation about the internals of core
+PCP utilities and daemons, and the PCP graphical tools.
+
+%if "@pmda_infiniband@" == "infiniband"
+#
+# pcp-pmda-infiniband
+#
+%package pmda-infiniband
+License: GPLv2+
+Group: Applications/System
+Summary: Performance Co-Pilot (PCP) metrics for Infiniband HCAs and switches
+URL: http://www.performancecopilot.org
+Requires: pcp-libs = @package_version@
+Requires: libibmad >= 1.1.7 libibumad >= 1.1.7
+BuildRequires: libibmad-devel >= 1.1.7 libibumad-devel >= 1.1.7
+
+%description pmda-infiniband
+This package contains the PCP Performance Metrics Domain Agent (PMDA) for
+collecting Infiniband statistics.  By default, it monitors the local HCAs
+but can also be configured to monitor remote GUIDs such as IB switches.
+%endif
+
+%prep
+%setup -q
+
+%clean
+[ ! -z "$DIST_ROOT" ] && rm -rf $DIST_ROOT
+rm -Rf $RPM_BUILD_ROOT
+
+%build
+%configure @package_configure@ --with-rcdir=%{_rcdir}
+@make@ default_pcp
+
+%install
+rm -Rf $RPM_BUILD_ROOT
+NO_CHOWN=true
+BACKDIR=`pwd`;
+DIST_ROOT=$RPM_BUILD_ROOT
+DIST_MANIFEST=`pwd`/install.manifest
+export NO_CHOWN DIST_ROOT DIST_MANIFEST
+rm -f $DIST_MANIFEST
+@make@ install_pcp
+
+PCP_CONF=$BACKDIR/src/include/pcp.conf
+export PCP_CONF
+. $BACKDIR/src/include/pcp.env
+CFGFILELIST=`ls -1 $BACKDIR/debian/pcp-conf.{install,dirs}`
+LIBFILELIST=`ls -1 $BACKDIR/debian/lib*.{install,dirs} | fgrep -v -- -dev.`
+DEVFILELIST=`ls -1 $BACKDIR/debian/lib*-dev.{install,dirs}`
+
+#
+# Package split: pcp{-conf,-libs,-libs-devel,-webapi,-manager,-testsuite,
+# -import-*,-export-*} ...
+# The above list is ordered by file selection; files for each package are
+# removed from a global set, then the base package catches all remaining.
+sed -e 's/^/\//' $CFGFILELIST >cfg_files
+sed -e 's/^/\//' $LIBFILELIST >libs_files
+sed -e 's/^/\//' $DEVFILELIST >devel_files
+%ifarch x86_64 ppc64 s390x
+sed -i -e 's/usr\/lib\//usr\/lib64\//' libs_files
+sed -i -e 's/usr\/lib\//usr\/lib64\//' devel_files
+%endif
+%ifarch ia64
+%if "%{_vendor}" != "suse"
+sed -i -e 's/usr\/lib\//usr\/lib64\//' libs_files
+sed -i -e 's/usr\/lib\//usr\/lib64\//' devel_files
+%endif
+%endif
+
+#
+# some special cases for devel
+awk '{print $NF}' $DIST_MANIFEST |\
+egrep 'pcp\/(examples|demos)|pmdas\/(sample|simple|trivial|txmon)' >>devel_files
+
+#
+# Patterns for files to be marked %config(noreplace).
+# Note: /etc/pcp.conf is %config, but not noreplace
+# and is treated specially below.
+cat >conf_files <<EOF
+etc/pcp.sh
+etc/pcp.env
+etc/cron.d/pcp-pmie
+etc/cron.d/pcp-pmlogger
+pmcd/pmcd.conf
+pmcd/pmcd.options
+pmcd/rc.local
+pmie/control
+pmie/stomp
+pmlogger/control
+pmproxy/pmproxy.options
+bash_completion.d/pcp
+EOF
+%if "@BUILD_PMMGR@" == "yes"
+cat >>conf_files <<MGREOF
+etc/pcp/pmmgr
+MGREOF
+%endif
+%if @have_libmicrohttpd@ == 1
+cat >>conf_files <<WEBEOF
+pmwebd/pmwebd.options
+WEBEOF
+%endif
+%if "@enable_qt@" == "true"
+cat >>conf_files <<GUIEOF
+pmsnap/control
+pmsnap/crontab
+GUIEOF
+%endif
+
+#
+# Files for the various subpackages.  We use these subpackages
+# to isolate the (somewhat exotic) dependencies for these tools.
+# Likewise, for the pcp-pmda and pcp-testsuite subpackages.
+awk '{print $NF}' $DIST_MANIFEST | egrep 'pcp-doc' >docs_files
+awk '{print $NF}' $DIST_MANIFEST | egrep 'tutorials' >>docs_files
+%if "@enable_qt@" == "true"
+PCP_GUI='pmchart|pmconfirm|pmdumptext|pmmessage|pmquery|pmsnap|pmtime'
+awk '{print $NF}' $DIST_MANIFEST | egrep "$PCP_GUI|pixmaps" > gui_files
+%endif
+%if @have_libmicrohttpd@ == 1
+awk '{print $NF}' $DIST_MANIFEST | egrep 'pmweb|PMWEBAPI' >webapi_files
+%endif
+%if "@BUILD_PMMGR@" == "yes"
+awk '{print $NF}' $DIST_MANIFEST | egrep 'pmmgr' >manager_files
+%endif
+awk '{print $NF}' $DIST_MANIFEST | egrep 'testsuite' >testsuite_files
+awk '{print $NF}' $DIST_MANIFEST | egrep 'sar2pcp' >import_sar2pcp_files
+awk '{print $NF}' $DIST_MANIFEST | egrep 'iostat2pcp' >import_iostat2pcp_files
+awk '{print $NF}' $DIST_MANIFEST | egrep 'sheet2pcp' >import_sheet2pcp_files
+awk '{print $NF}' $DIST_MANIFEST | egrep 'mrtg2pcp' >import_mrtg2pcp_files
+awk '{print $NF}' $DIST_MANIFEST | egrep 'collectl2pcp' >import_collectl2pcp_files
+%if "@pmda_infiniband@" == "infiniband"
+awk '{print $NF}' $DIST_MANIFEST | egrep 'infiniband|pmdaib|pmdas/ib' >pmda_infiniband_files
+%endif
+touch webapi_files manager_files pmda_infiniband_files
+
+rm -f *_files.rpm
+sort -u $DIST_MANIFEST | $PCP_AWK_PROG ' 
+BEGIN {
+    while( getline < "cfg_files") cfg[$0]=1;
+    while( getline < "gui_files") gui[$0]=1;
+    while( getline < "docs_files") doc[$0]=1;
+    while( getline < "libs_files") lib[$0]=1;
+    while( getline < "devel_files") dev[$0]=1;
+    while( getline < "webapi_files") webapi[$0]=1;
+    while( getline < "manager_files") manager[$0]=1;
+    while( getline < "testsuite_files") testsuite[$0]=1;
+    while( getline < "pmda_infiniband_files") pmda_infiniband[$0]=1;
+    while( getline < "import_sar2pcp_files") import_sar2pcp[$0]=1;
+    while( getline < "import_iostat2pcp_files") import_iostat2pcp[$0]=1;
+    while( getline < "import_sheet2pcp_files") import_sheet2pcp[$0]=1;
+    while( getline < "import_mrtg2pcp_files") import_mrtg2pcp[$0]=1;
+    while( getline < "import_collectl2pcp_files") import_collectl2pcp[$0]=1;
+    while( getline < "import_collectl2pcp_files") import_collectl2pcp[$0]=1;
+    while( getline < "conf_files") conf[nconf++]=$0;
+}
+{
+    if (cfg[$NF]) f="cfg_files.rpm";
+    else if (gui[$NF]) f="gui_files.rpm";
+    else if (doc[$NF]) f="docs_files.rpm";
+    else if (lib[$NF]) f="libs_files.rpm";
+    else if (dev[$NF]) f="devel_files.rpm";
+    else if (webapi[$NF]) f="webapi_files.rpm";
+    else if (manager[$NF]) f="manager_files.rpm";
+    else if (testsuite[$NF]) f="testsuite_files.rpm";
+    else if (pmda_infiniband[$NF]) f="pmda_infiniband_files.rpm";
+    else if (import_sar2pcp[$NF]) f="import_sar2pcp_files.rpm";
+    else if (import_iostat2pcp[$NF]) f="import_iostat2pcp_files.rpm";
+    else if (import_sheet2pcp[$NF]) f="import_sheet2pcp_files.rpm";
+    else if (import_mrtg2pcp[$NF]) f="import_mrtg2pcp_files.rpm";
+    else if (import_collectl2pcp[$NF]) f="import_collectl2pcp_files.rpm";
+    else f="base_files.rpm"
+}
+$1 == "d" { printf ("%%%%dir %%%%attr(%s,%s,%s) %s\n", $2, $3, $4, $5) >> f } 
+
+$1 == "f" && $6 ~ "etc/pcp.conf" { printf ("%%%%config ") >> f; }
+$1 == "f" {
+	    for (i=0; i < nconf; i++) {
+	    	if ($6 ~ conf[i]) {
+		    printf ("%%%%config(noreplace) ") >> f;
+		    break;
+		}
+	    }
+	    if (match ($6, "'$PCP_MAN_DIR'") || match ($6, "'$PCP_DOC_DIR'")) {
+		printf ("%%%%doc ") >> f;
+	    }
+	    printf ("%%%%attr(%s,%s,%s) %s\n", $2, $3, $4, $6) >> f }
+$1 == "l" { print "%attr(0777,root,root)", $3 >> f }'
+
+%pre testsuite
+test -d @pcp_var_dir@/testsuite || mkdir -p -m 755 @pcp_var_dir@/testsuite
+getent group pcpqa >/dev/null || groupadd -r pcpqa
+getent passwd pcpqa >/dev/null || \
+  useradd -c "PCP Quality Assurance" -g pcpqa -d @pcp_var_dir@/testsuite -M -r -s /bin/bash pcpqa 2>/dev/null
+chown -R pcpqa:pcpqa @pcp_var_dir@/testsuite 2>/dev/null
+exit 0
+
+%post testsuite
+chown -R pcpqa:pcpqa @pcp_var_dir@/testsuite 2>/dev/null
+
+%pre
+getent group pcp >/dev/null || groupadd -r pcp
+getent passwd pcp >/dev/null || \
+    useradd -c "Performance Co-Pilot" -g pcp -d @pcp_var_dir@ -M -r -s /sbin/nologin pcp
+# new directories; they should match /etc/pcp.conf settings after install
+PCP_SYSCONF_DIR=@pcp_sysconf_dir@
+PCP_LOG_DIR=@pcp_log_dir@
+PCP_ETC_DIR=@pcp_etc_dir@
+# rename crontab files to align with current Fedora packaging guidelines
+for crontab in pmlogger pmie
+do
+    test -f "$PCP_ETC_DIR/cron.d/$crontab" || continue
+    mv -f "$PCP_ETC_DIR/cron.d/$crontab" "$PCP_ETC_DIR/cron.d/pcp-$crontab"
+done
+# produce a script to run post-install to move configs to their new homes
+save_configs_script()
+{
+    _new="$1"
+    shift
+    for _dir
+    do
+        [ "$_dir" = "$_new" ] && continue
+        if [ -d "$_dir" ]
+        then
+            ( cd "$_dir" ; find . -type f -print ) | sed -e 's/^\.\///' \
+            | while read _file
+            do
+                _want=true
+                if [ -f "$_new/$_file" ]
+                then
+                    # file exists in both directories, pick the more
+                    # recently modified one
+                    _try=`find "$_dir/$_file" -newer "$_new/$_file" -print`
+                    [ -n "$_try" ] || _want=false
+                fi
+                $_want && echo cp -p "$_dir/$_file" "$_new/$_file"
+            done
+        fi
+    done
+}
+# migrate and clean configs if we have had a previous in-use installation
+[ -d "$PCP_LOG_DIR" ] || exit 0	# no configuration file upgrades required
+rm -f "$PCP_LOG_DIR/configs.sh"
+for daemon in pmcd pmie pmlogger pmproxy
+do
+    save_configs_script >> "$PCP_LOG_DIR/configs.sh" "$PCP_SYSCONF_DIR/$daemon" \
+        /var/lib/pcp/config/$daemon /etc/$daemon /etc/pcp/$daemon /etc/sysconfig/$daemon
+done
+exit 0
+
+%if @have_libmicrohttpd@ == 1
+%preun webapi
+if [ "$1" -eq 0 ]
+then
+    /sbin/service pmwebd stop >/dev/null 2>&1
+    /sbin/chkconfig --del pmwebd >/dev/null 2>&1
+fi
+
+%post webapi
+chown -R pcp:pcp "$PCP_LOG_DIR/pmwebd" 2>/dev/null
+/sbin/chkconfig --add pmwebd >/dev/null 2>&1 && \
+/sbin/service pmwebd condrestart
+%endif
+
+%if "@BUILD_PMMGR@" == "yes"
+%preun manager
+if [ "$1" -eq 0 ]
+then
+    /sbin/service pmmgr stop >/dev/null 2>&1
+    /sbin/chkconfig --del pmmgr >/dev/null 2>&1
+fi
+
+%post manager
+chown -R pcp:pcp "$PCP_LOG_DIR/pmmgr" 2>/dev/null
+/sbin/chkconfig --add pmmgr >/dev/null 2>&1
+/sbin/service pmmgr condrestart
+%endif
+
+%preun
+if [ "$1" -eq 0 ]
+then
+    # stop daemons before erasing the package
+    /sbin/service pmlogger stop >/dev/null 2>&1
+    /sbin/service pmie stop >/dev/null 2>&1
+    /sbin/service pmproxy stop >/dev/null 2>&1
+    /sbin/service pmcd stop >/dev/null 2>&1
+
+    /sbin/chkconfig --del pcp >/dev/null 2>&1
+    /sbin/chkconfig --del pmcd >/dev/null 2>&1
+    /sbin/chkconfig --del pmlogger >/dev/null 2>&1
+    /sbin/chkconfig --del pmie >/dev/null 2>&1
+    /sbin/chkconfig --del pmproxy >/dev/null 2>&1
+
+    # cleanup namespace state/flag, may still exist
+    PCP_PMNS_DIR=@pcp_var_dir@/pmns
+    rm -f "$PCP_PMNS_DIR/.NeedRebuild" >/dev/null 2>&1
+fi
+
+%post
+PCP_PMNS_DIR=@pcp_var_dir@/pmns
+PCP_LOG_DIR=@pcp_log_dir@
+# restore saved configs, if any
+test -s "$PCP_LOG_DIR/configs.sh" && source "$PCP_LOG_DIR/configs.sh"
+rm -f $PCP_LOG_DIR/configs.sh
+
+# migrate old to new temp dir locations within the same filesystem)
+migrate_tempdirs()
+{
+    _sub="$1"
+    _new_tmp_dir=%{_tmpdir}
+    _old_tmp_dir=%{_localstatedir}/tmp
+
+    for d in "$_old_tmp_dir/$_sub" ; do
+	test -d "$d" -a -k "$d" || continue
+	cd "$d" || continue
+	for f in * ; do
+	    [ "$f" != "*" ] || continue
+	    source="$d/$f"
+	    target="$_new_tmp_dir/$_sub/$f"
+            [ "$source" != "$target" ] || continue
+	    [ -f "$target" ] || mv -fu "$source" "$target"
+        done
+        cd && rmdir "$d" 2>/dev/null
+    done
+}
+for daemon in mmv pmdabash pmie pmlogger
+do
+    migrate_tempdirs $daemon
+done
+chown -R pcp:pcp "$PCP_LOG_DIR/pmcd" 2>/dev/null
+chown -R pcp:pcp "$PCP_LOG_DIR/pmlogger" 2>/dev/null
+chown -R pcp:pcp "$PCP_LOG_DIR/pmie" 2>/dev/null
+chown -R pcp:pcp "$PCP_LOG_DIR/pmproxy" 2>/dev/null
+touch "$PCP_PMNS_DIR/.NeedRebuild"
+chmod 644 "$PCP_PMNS_DIR/.NeedRebuild"
+/sbin/chkconfig --add pmcd >/dev/null 2>&1
+/sbin/service pmcd condrestart
+/sbin/chkconfig --add pmlogger >/dev/null 2>&1
+/sbin/service pmlogger condrestart
+/sbin/chkconfig --add pmie >/dev/null 2>&1
+/sbin/service pmie condrestart
+/sbin/chkconfig --add pmproxy >/dev/null 2>&1
+/sbin/service pmproxy condrestart
+
+%post libs -p /sbin/ldconfig
+%postun libs -p /sbin/ldconfig
+
+%files -f base_files.rpm
+%defattr(-,root,root)
+
+%files conf -f cfg_files.rpm
+%defattr(-,root,root)
+
+%files libs -f libs_files.rpm
+%defattr(-,root,root)
+
+%files libs-devel -f devel_files.rpm
+%defattr(-,root,root)
+
+%files doc -f docs_files.rpm
+%defattr(-,root,root)
+
+%if "@enable_qt@" == "true"
+%files gui -f gui_files.rpm
+%defattr(-,root,root)
+%endif
+
+%if @have_libmicrohttpd@ == 1
+%files webapi -f webapi_files.rpm
+%defattr(-,root,root)
+%endif
+
+%if "@BUILD_PMMGR@" == "yes"
+%files manager -f manager_files.rpm
+%defattr(-,root,root)
+%endif
+
+%files testsuite -f testsuite_files.rpm
+%defattr(-,pcpqa,pcpqa)
+
+%if "@pmda_infiniband@" == "infiniband"
+%files pmda-infiniband -f pmda_infiniband_files.rpm
+%defattr(-,root,root)
+%endif
+
+%files import-sar2pcp -f import_sar2pcp_files.rpm
+%defattr(-,root,root)
+
+%files import-iostat2pcp -f import_iostat2pcp_files.rpm
+%defattr(-,root,root)
+
+%files import-sheet2pcp -f import_sheet2pcp_files.rpm
+%defattr(-,root,root)
+
+%files import-mrtg2pcp -f import_mrtg2pcp_files.rpm
+%defattr(-,root,root)
+
+%files import-collectl2pcp -f import_collectl2pcp_files.rpm
+%defattr(-,root,root)
+
+%files -n perl-PCP-PMDA -f perl-pcp-pmda.list
+%defattr(-,root,root)
+
+%files -n perl-PCP-MMV -f perl-pcp-mmv.list
+%defattr(-,root,root)
+
+%files -n perl-PCP-LogImport -f perl-pcp-logimport.list
+%defattr(-,root,root)
+
+%files -n perl-PCP-LogSummary -f perl-pcp-logsummary.list
+%defattr(-,root,root)
+
+%files -n python-pcp -f python-pcp.list.rpm
+%defattr(-,root,root)
+

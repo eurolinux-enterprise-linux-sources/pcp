@@ -1,0 +1,44 @@
+Begin4
+Title:          Performance Co-Pilot
+Version:        @PACKAGE_VERSION@
+Entered-date:   @PACKAGE_BUILD_DATE@
+Description:    A system performance monitoring infrastructure that is
+		distributed and extensible.
+
+		Performance Co-Pilot (PCP) is a framework and services
+		to support system-level performance monitoring and
+		performance management.
+
+		The PCP open source release provides a unifying
+		abstraction for all of the interesting performance data
+		in a system, and allows client applications to easily
+		retrieve and process any subset of that data using a
+		single API.
+
+		A client-server architecture allows multiple clients to
+		monitor the same host, and a single client to monitor
+		multiple hosts (e.g. in a Beowulf cluster).  This
+		enables centralized monitoring of distributed
+		processing.
+
+		Archive logging and replay is integrated so a client
+		application can use the same API to process real-time
+		data from a host or historical data from an archive.
+
+		The framework supports APIs and configuration file
+		formats that enable the scope of performance monitoring
+		to be extended at all levels.
+
+		The architecture and services of the base PCP
+		infrastructure are especially attractive for those
+		tackling the harder system-level performance problems.
+
+Keywords:       performance, monitoring, system, status, distributed
+Author:         pcp@mail.performancecopilot.org (PCP Development Team)
+Maintained-by:  pcp@mail.performancecopilot.org (PCP Development Team)
+Primary-site:   ftp://ftp.performancecopilot.org/download/
+Alternate-site:
+Original-site:  ftp://ftp.performancecopilot.org/download/
+Platforms:      Linux, MacOSX, Solaris, AIX, FreeBSD, Windows
+Copying-policy: GPL (libraries are LGPL)
+End

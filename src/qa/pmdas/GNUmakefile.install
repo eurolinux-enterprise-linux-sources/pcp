@@ -1,0 +1,40 @@
+#!gmake
+#
+# Copyright (c) 2012 Red Hat.
+# Copyright (c) 2010 Aconex.  All Rights Reserved.
+#
+
+ifdef PCP_CONF
+include $(PCP_CONF)
+else
+include $(PCP_DIR)/etc/pcp.conf
+endif
+PATH	= $(shell . $(PCP_DIR)/etc/pcp.env; echo $$PATH)
+include $(PCP_INC_DIR)/builddefs
+
+# special variant of SUBDIRS_MAKERULE for running QA in the tree
+#
+SUBDIRS_MAKERULE = \
+	@for d in `echo $^ `; do \
+	    if test -d "$$d" ; then \
+		$(ECHO) === $$d ===; \
+		if test -f "$$d/GNUmakefile.install"; then \
+		    $(MAKE) -C $$d -f GNUmakefile.install $@ || exit $$?; \
+		else \
+		    $(MAKE) -C $$d $@ || exit $$?; \
+		fi; \
+	    fi; \
+	done
+
+SUBDIRS = broken bigun dynamic slow slow_python
+
+default default_pcp: $(SUBDIRS)
+	$(SUBDIRS_MAKERULE)
+
+setup: $(SUBDIRS)
+	$(SUBDIRS_MAKERULE)
+
+install install_pcp: $(SUBDIRS)
+	$(SUBDIRS_MAKERULE)
+
+include $(BUILDRULES)

@@ -720,11 +720,7 @@ pmdaDesc(pmID pmid, pmDesc *desc, pmdaExt *pmda)
     pmdaMetric		*metric;
     char		strbuf[32];
     int			version;
-
-    if ((pmDebugOptions.libpmda) && (pmDebugOptions.desperate)) {
-	char	dbgbuf[20];
-	fprintf(stderr, "pmdaDesc(%s, ...) called\n", pmIDStr_r(pmid, dbgbuf, sizeof(dbgbuf)));
-    }
+    int			sts;
 
     version = extp->dispatch->comm.pmda_interface;
     if (version >= PMDA_INTERFACE_5)
@@ -739,14 +735,32 @@ pmdaDesc(pmID pmid, pmDesc *desc, pmdaExt *pmda)
 
     if (metric) {
 	*desc = metric->m_desc;
-	return 0;
+	sts = 0;
+    }
+    else {
+	sts = PM_ERR_PMID;
+	/* dynamic name metrics may often vanish, avoid log spam */
+	if (version < PMDA_INTERFACE_4)
+	    pmNotifyErr(LOG_ERR, "pmdaDesc: Requested metric %s is not defined",
+			    pmIDStr_r(pmid, strbuf, sizeof(strbuf)));
     }
 
-    /* dynamic name metrics may often vanish, avoid log spam */
-    if (version < PMDA_INTERFACE_4)
-	pmNotifyErr(LOG_ERR, "pmdaDesc: Requested metric %s is not defined",
-			pmIDStr_r(pmid, strbuf, sizeof(strbuf)));
-    return PM_ERR_PMID;
+    if ((pmDebugOptions.libpmda) && (pmDebugOptions.desperate)) {
+	char	dbgbuf[20];
+	fprintf(stderr, "pmdaDesc(%s, ...) method=", pmIDStr_r(pmid, dbgbuf, sizeof(dbgbuf)));
+	if (pmda->e_flags & PMDA_EXT_FLAG_HASHED)
+	    fprintf(stderr, "hashed");
+	else if (pmda->e_direct)
+	    fprintf(stderr, "direct");
+	else
+	    fprintf(stderr, "linear");
+	if (sts == 0)
+	    fprintf(stderr, " success\n");
+	else
+	    fprintf(stderr, " fail\n");
+    }
+
+    return sts;
 }
 
 /*
@@ -876,11 +890,13 @@ pmdaLabel(int ident, int type, pmLabelSet **lpp, pmdaExt *pmda)
 	    }
 	    memset(lp, 0, sizeof(*lp));
 
-	    if ((sts = (*(pmda->e_labelCallBack))(ident, inst, &lp)) < 0) {
-		pmInDomStr_r(ident, idbuf, sizeof(idbuf));
-		pmErrStr_r(sts, errbuf, sizeof(errbuf));
-		pmNotifyErr(LOG_DEBUG, "pmdaLabel: "
-				"InDom %s[%d]: %s\n", idbuf, inst, errbuf);
+	    if (pmda->e_labelCallBack != NULL) {
+		if ((sts = (*(pmda->e_labelCallBack))(ident, inst, &lp)) < 0) {
+		    pmInDomStr_r(ident, idbuf, sizeof(idbuf));
+		    pmErrStr_r(sts, errbuf, sizeof(errbuf));
+		    pmNotifyErr(LOG_DEBUG, "pmdaLabel: "
+				    "InDom %s[%d]: %s\n", idbuf, inst, errbuf);
+		}
 	    }
 	    if ((lp->nlabels = sts) > 0)
 		pmdaAddLabelFlags(lp, type);

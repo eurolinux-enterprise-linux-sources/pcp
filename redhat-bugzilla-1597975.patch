@@ -12,10 +12,9 @@ corresponding change done in latest RHEL 7 bcc as well.
  src/pmdas/bcc/modules/fs/xfsdist.python  | 8 ++++----
  4 files changed, 10 insertions(+), 8 deletions(-)
 
-diff --git a/src/pmdas/bcc/modules/fs/ext4dist.bpf b/src/pmdas/bcc/modules/fs/ext4dist.bpf
-index 4f41d62..dd57cf3 100644
---- a/src/pmdas/bcc/modules/fs/ext4dist.bpf
-+++ b/src/pmdas/bcc/modules/fs/ext4dist.bpf
+diff -Naurp pcp-4.3.0.orig/src/pmdas/bcc/modules/fs/ext4dist.bpf pcp-4.3.0/src/pmdas/bcc/modules/fs/ext4dist.bpf
+--- pcp-4.3.0.orig/src/pmdas/bcc/modules/fs/ext4dist.bpf	2018-05-28 11:27:04.000000000 +1000
++++ pcp-4.3.0/src/pmdas/bcc/modules/fs/ext4dist.bpf	2019-01-29 13:00:29.057576352 +1100
 @@ -3,6 +3,7 @@
  
  #include <uapi/linux/ptrace.h>
@@ -24,15 +23,18 @@ index 4f41d62..dd57cf3 100644
  #include <linux/sched.h>
  
  #define OP_NAME_LEN 8
-diff --git a/src/pmdas/bcc/modules/fs/ext4dist.python b/src/pmdas/bcc/modules/fs/ext4dist.python
-index 610abd3..961a03c 100644
---- a/src/pmdas/bcc/modules/fs/ext4dist.python
-+++ b/src/pmdas/bcc/modules/fs/ext4dist.python
-@@ -91,12 +91,12 @@ class PCPBCCModule(PCPBCCBase):
-                 self.log("\n" + bpf_text)
- 
+diff -Naurp pcp-4.3.0.orig/src/pmdas/bcc/modules/fs/ext4dist.python pcp-4.3.0/src/pmdas/bcc/modules/fs/ext4dist.python
+--- pcp-4.3.0.orig/src/pmdas/bcc/modules/fs/ext4dist.python	2018-09-18 16:41:15.000000000 +1000
++++ pcp-4.3.0/src/pmdas/bcc/modules/fs/ext4dist.python	2019-01-29 13:03:26.656105696 +1100
+@@ -121,16 +121,12 @@ class PCPBCCModule(PCPBCCBase):
+             self.reset_cache()
              self.bpf = BPF(text=bpf_text)
--            self.bpf.attach_kprobe(event="generic_file_read_iter", fn_name="trace_read_entry")
+             # Compat: bcc < 0.6.0 (first check)
+-            if 'get_kprobe_functions' in dir(self.bpf) and \
+-               self.get_kprobe_functions(b"ext4_file_read_iter"):
+-                self.bpf.attach_kprobe(event="ext4_file_read_iter", fn_name="trace_entry")
+-            else:
+-                self.bpf.attach_kprobe(event="generic_file_read_iter", fn_name="trace_read_entry")
 -            self.bpf.attach_kprobe(event="ext4_file_write_iter", fn_name="trace_entry")
 +            self.bpf.attach_kprobe(event="generic_file_aio_read", fn_name="trace_read_entry")
 +            self.bpf.attach_kprobe(event="ext4_file_write", fn_name="trace_entry")
@@ -45,10 +47,9 @@ index 610abd3..961a03c 100644
              self.bpf.attach_kretprobe(event="ext4_file_open", fn_name="trace_open_return")
              self.bpf.attach_kretprobe(event="ext4_sync_file", fn_name="trace_fsync_return")
              self.log("Compiled.")
-diff --git a/src/pmdas/bcc/modules/fs/xfsdist.bpf b/src/pmdas/bcc/modules/fs/xfsdist.bpf
-index 66aeae5..4c539f9 100644
---- a/src/pmdas/bcc/modules/fs/xfsdist.bpf
-+++ b/src/pmdas/bcc/modules/fs/xfsdist.bpf
+diff -Naurp pcp-4.3.0.orig/src/pmdas/bcc/modules/fs/xfsdist.bpf pcp-4.3.0/src/pmdas/bcc/modules/fs/xfsdist.bpf
+--- pcp-4.3.0.orig/src/pmdas/bcc/modules/fs/xfsdist.bpf	2018-06-19 09:19:05.000000000 +1000
++++ pcp-4.3.0/src/pmdas/bcc/modules/fs/xfsdist.bpf	2019-01-29 13:00:29.060576310 +1100
 @@ -3,6 +3,7 @@
  
  #include <uapi/linux/ptrace.h>
@@ -57,13 +58,12 @@ index 66aeae5..4c539f9 100644
  #include <linux/sched.h>
  
  #define OP_NAME_LEN 8
-diff --git a/src/pmdas/bcc/modules/fs/xfsdist.python b/src/pmdas/bcc/modules/fs/xfsdist.python
-index a1ebc62..d460983 100644
---- a/src/pmdas/bcc/modules/fs/xfsdist.python
-+++ b/src/pmdas/bcc/modules/fs/xfsdist.python
-@@ -73,12 +73,12 @@ class PCPBCCModule(PCPBCCBase):
-                 self.log("\n" + bpf_text)
+diff -Naurp pcp-4.3.0.orig/src/pmdas/bcc/modules/fs/xfsdist.python pcp-4.3.0/src/pmdas/bcc/modules/fs/xfsdist.python
+--- pcp-4.3.0.orig/src/pmdas/bcc/modules/fs/xfsdist.python	2018-09-18 16:41:15.000000000 +1000
++++ pcp-4.3.0/src/pmdas/bcc/modules/fs/xfsdist.python	2019-01-29 13:00:29.061576296 +1100
+@@ -102,12 +102,12 @@ class PCPBCCModule(PCPBCCBase):
  
+             self.reset_cache()
              self.bpf = BPF(text=bpf_text)
 -            self.bpf.attach_kprobe(event="xfs_file_read_iter", fn_name="trace_entry")
 -            self.bpf.attach_kprobe(event="xfs_file_write_iter", fn_name="trace_entry")
@@ -78,6 +78,3 @@ index a1ebc62..d460983 100644
              self.bpf.attach_kretprobe(event="xfs_file_open", fn_name="trace_open_return")
              self.bpf.attach_kretprobe(event="xfs_file_fsync", fn_name="trace_fsync_return")
              self.log("Compiled.")
--- 
-1.8.3.1
-

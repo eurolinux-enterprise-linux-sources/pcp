@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2018, Red Hat.
+ * Copyright (c) 2017-2019, Red Hat.
  * Copyright (c) 2009-2011, Salvatore Sanfilippo <antirez at gmail dot com>
  * Copyright (c) 2010-2014, Pieter Noordhuis <pcnoordhuis at gmail dot com>
  *
@@ -54,9 +54,11 @@
     } while(0);
 
 const char *
-redis_reply(int reply)
+redis_reply_type(redisReply *reply)
 {
-    switch (reply) {
+    if (reply == NULL)
+	return "none";
+    switch (reply->type) {
     case REDIS_REPLY_STRING:
 	return "string";
     case REDIS_REPLY_ARRAY:
@@ -117,7 +119,7 @@ chrtos(char *buf, size_t size, char byte)
     case '\a': len = pmsprintf(buf, size, "\"\\a\""); break;
     case '\b': len = pmsprintf(buf, size, "\"\\b\""); break;
     default:
-        if (isprint(byte))
+        if (isprint((int)byte))
             len = pmsprintf(buf, size, "\"%c\"", byte);
         else
             len = pmsprintf(buf, size, "\"\\x%02x\"", (unsigned char)byte);
@@ -259,7 +261,7 @@ moveToNextTask(redisReader *r)
         } else {
             /* Reset the type because the next item can be anything */
             assert(cur->idx < prv->elements);
-            cur->type = -1;
+            cur->type = REDIS_REPLY_UNKNOWN;
             cur->elements = -1;
             cur->idx++;
             return;
@@ -408,7 +410,7 @@ processMultiBulkItem(redisReader *r)
                 cur->elements = elements;
                 cur->obj = obj;
                 r->ridx++;
-                r->rstack[r->ridx].type = -1;
+                r->rstack[r->ridx].type = REDIS_REPLY_UNKNOWN;
                 r->rstack[r->ridx].elements = -1;
                 r->rstack[r->ridx].idx = 0;
                 r->rstack[r->ridx].obj = NULL;
@@ -436,7 +438,7 @@ processItem(redisReader *r)
 
     /* check if we need to read type */
     if (cur->type < 0) {
-        if ((p = readBytes(r,1)) != NULL) {
+        if ((p = readBytes(r, 1)) != NULL) {
             switch (p[0]) {
             case '-':
                 cur->type = REDIS_REPLY_ERROR;
@@ -558,7 +560,7 @@ redisReaderGetReply(redisReader *r, void **reply)
 
     /* Set first item to process when the stack is empty. */
     if (r->ridx == -1) {
-        r->rstack[0].type = -1;
+        r->rstack[0].type = REDIS_REPLY_UNKNOWN;
         r->rstack[0].elements = -1;
         r->rstack[0].idx = -1;
         r->rstack[0].obj = NULL;
@@ -593,7 +595,7 @@ redisReaderGetReply(redisReader *r, void **reply)
     return REDIS_OK;
 }
 
-static redisReply *createReplyObject(int);
+static redisReply *createReplyObject(enum redisReplyType);
 static void *createStringObject(const redisReadTask *, char *, size_t);
 static void *createArrayObject(const redisReadTask *, int);
 static void *createIntegerObject(const redisReadTask *, long long);
@@ -610,7 +612,7 @@ static redisReplyObjectFunctions defaultFunctions = {
 };
 
 static redisReply *
-createReplyObject(int type)
+createReplyObject(enum redisReplyType type)
 {
     redisReply		*reply;
 
@@ -947,9 +949,9 @@ redisSetTimeout(redisContext *c, const struct timeval tv)
 
 /* Enable connection KeepAlive. */
 int
-redisEnableKeepAlive(redisContext *c)
+redisAsyncEnableKeepAlive(redisAsyncContext *ac)
 {
-    if (redisKeepAlive(c, REDIS_KEEPALIVE_INTERVAL) != REDIS_OK)
+    if (redisKeepAlive(&ac->c, REDIS_KEEPALIVE_INTERVAL) != REDIS_OK)
         return REDIS_ERR;
     return REDIS_OK;
 }
@@ -983,7 +985,7 @@ redisBufferRead(redisContext *c)
         __redisSetError(c, REDIS_ERR_EOF, "Server closed the connection");
         return REDIS_ERR;
     } else {
-        if (redisReaderFeed(c->reader,buf,nread) != REDIS_OK) {
+        if (redisReaderFeed(c->reader, buf, nread) != REDIS_OK) {
             __redisSetError(c, c->reader->err, c->reader->errstr);
             return REDIS_ERR;
         }
@@ -1080,31 +1082,17 @@ redisGetReply(redisContext *c, void **reply)
     return REDIS_OK;
 }
 
-/*
- * Write a formatted command to the output buffer. When this family
- * is used, you need to call redisGetReply yourself to retrieve
- * the reply (or replies in pub/sub).
- */
+/* Write a formatted command to the output buffer. */
 int
-__redisAppendCommand(redisContext *c, const char *cmd, size_t len)
+__redisAppendCommand(redisContext *c, const sds cmd)
 {
     sds			newbuf;
 
-    if ((newbuf = sdscatlen(c->obuf, cmd, len)) == NULL) {
+    if ((newbuf = sdscatsds(c->obuf, cmd)) == NULL) {
 	__redisSetError(c, REDIS_ERR_OOM, "Out of memory");
 	return REDIS_ERR;
     }
     c->obuf = newbuf;
-    return REDIS_OK;
-}
-
-int
-redisAppendFormattedCommand(redisContext *c, const char *cmd, size_t len)
-{
-    if (pmDebugOptions.desperate)
-	fprintf(stderr, "C[%lu]: %s\n", (long)len, cmd);
-    if (__redisAppendCommand(c, cmd, len) != REDIS_OK)
-	return REDIS_ERR;
     return REDIS_OK;
 }
 
@@ -1342,7 +1330,7 @@ __redisRunCallBack(redisAsyncContext *ac, redisCallBack *cb, redisReply *reply)
 
     if (cb->func) {
         c->flags |= REDIS_IN_CALLBACK;
-        cb->func(ac, reply, cb->privdata);
+        cb->func(ac, reply, cb->command, cb->privdata);
         c->flags &= ~REDIS_IN_CALLBACK;
     }
 }
@@ -1473,7 +1461,7 @@ __redisGetSubscribeCallBack(redisAsyncContext *ac, redisReply *reply, redisCallB
         assert(reply->elements >= 2);
         assert(reply->element[0]->type == REDIS_REPLY_STRING);
         stype = reply->element[0]->str;
-        pvariant = (tolower(stype[0]) == 'p') ? 1 : 0;
+        pvariant = (tolower((int)stype[0]) == 'p') ? 1 : 0;
 
         if (pvariant)
             callbacks = ac->sub.patterns;
@@ -1501,11 +1489,10 @@ __redisGetSubscribeCallBack(redisAsyncContext *ac, redisReply *reply, redisCallB
             }
         }
         sdsfree(sname);
-    } else {
-        /* Shift callback for invalid commands. */
-        __redisShiftCallBack(&ac->sub.invalid, dstcb);
+	return REDIS_OK;
     }
-    return REDIS_OK;
+    /* Shift callback for invalid commands. */
+    return __redisShiftCallBack(&ac->sub.invalid, dstcb);
 }
 
 void
@@ -1614,7 +1601,7 @@ __redisAsyncHandleConnect(redisAsyncContext *ac)
             return REDIS_OK;
 
         if (ac->onConnect)
-	    ac->onConnect(ac,REDIS_ERR);
+	    ac->onConnect(ac, REDIS_ERR);
         __redisAsyncDisconnect(ac);
         return REDIS_ERR;
     }
@@ -1622,7 +1609,7 @@ __redisAsyncHandleConnect(redisAsyncContext *ac)
     /* Mark context as connected. */
     c->flags |= REDIS_CONNECTED;
     if (ac->onConnect)
-	ac->onConnect(ac,REDIS_OK);
+	ac->onConnect(ac, REDIS_OK);
     return REDIS_OK;
 }
 
@@ -1668,7 +1655,7 @@ redisAsyncHandleWrite(redisAsyncContext *ac)
             return;
     }
 
-    if (redisBufferWrite(c,&done) == REDIS_ERR) {
+    if (redisBufferWrite(c, &done) == REDIS_ERR) {
         __redisAsyncDisconnect(ac);
     } else {
         /* Continue writing when not done, stop writing otherwise */
@@ -1710,8 +1697,8 @@ nextArgument(const char *start, const char **str, size_t *len)
  * provided callback function with the context.
  */
 static int
-__redisAsyncCommand(redisAsyncContext *ac, redisCallBackFunc *func,
-		void *privdata, const char *cmd, size_t len)
+__redisAsyncCommand(redisAsyncContext *ac, redisAsyncCallBack *func,
+		const sds cmd, void *privdata)
 {
     redisContext	*c = &(ac->c);
     redisCallBack	cb;
@@ -1728,13 +1715,14 @@ __redisAsyncCommand(redisAsyncContext *ac, redisCallBackFunc *func,
 
     /* Setup callback */
     cb.func = func;
+    cb.command = (sds)cmd;
     cb.privdata = privdata;
 
     /* Find out which command will be appended. */
     p = nextArgument(cmd, &cstr, &clen);
     assert(p != NULL);
     hasnext = (p[0] == '$');
-    pvariant = (tolower(cstr[0]) == 'p') ? 1 : 0;
+    pvariant = (tolower((int)cstr[0]) == 'p') ? 1 : 0;
     cstr += pvariant;
     clen -= pvariant;
 
@@ -1743,7 +1731,7 @@ __redisAsyncCommand(redisAsyncContext *ac, redisCallBackFunc *func,
 
 	/* Add every channel/pattern to the list of subscription callbacks. */
 	while ((p = nextArgument(p, &astr, &alen)) != NULL) {
-            sname = sdsnewlen(astr,alen);
+            sname = sdsnewlen(astr, alen);
             if (pvariant)
                 sts = dictReplace(ac->sub.patterns, sname, &cb);
             else
@@ -1779,7 +1767,7 @@ __redisAsyncCommand(redisAsyncContext *ac, redisCallBackFunc *func,
             __redisPushCallBack(&ac->replies, &cb);
     }
 
-    __redisAppendCommand(c, cmd, len);
+    __redisAppendCommand(c, cmd);
 
     /* Always schedule a write when the write buffer is non-empty */
     REDIS_EV_ADD_WRITE(ac);
@@ -1788,8 +1776,8 @@ __redisAsyncCommand(redisAsyncContext *ac, redisCallBackFunc *func,
 }
 
 int
-redisAsyncFormattedCommand(redisAsyncContext *ac, redisCallBackFunc *func,
-		void *data, const char *cmd, size_t len)
+redisAsyncFormattedCommand(redisAsyncContext *ac, redisAsyncCallBack *func,
+		const sds command, void *privdata)
 {
-    return __redisAsyncCommand(ac, func, data, cmd, len);
+    return __redisAsyncCommand(ac, func, command, privdata);
 }

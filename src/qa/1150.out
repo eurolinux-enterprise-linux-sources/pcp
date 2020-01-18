@@ -9,9 +9,9 @@ Info: usdt_hits
 Info: Modules configured.
 Info: Initializing modules:
 Info: usdt_hits
-Info: usdt_hits: Found PMCD.
-Info: usdt_hits: Configured USDTs: ['PCP_BINADM_DIR/pmcd:PMCD', 'PCP_BINADM_DIR/pmcd:PMCD_PDU']
-Info: usdt_hits: Found 2 USDTs: ['PCP_BINADM_DIR/pmcd:PMCD', 'PCP_BINADM_DIR/pmcd:PMCD_PDU'].
+Info: usdt_hits: Tracing PID.
+Info: usdt_hits: Configured USDTs: ['$PCP_BINADM_DIR/pmcd:PMCD', 'PCP_BINADM_DIR/pmcd:PMCD_PDU']
+Info: usdt_hits: Found 2 USDTs: ['$PCP_BINADM_DIR/pmcd:PMCD', 'PCP_BINADM_DIR/pmcd:PMCD_PDU'].
 Info: usdt_hits: Initialized.
 Info: Modules initialized.
 Info: Registering metrics:
@@ -20,7 +20,6 @@ Info: Metrics registered.
 Info: Registering helpers:
 Info: usdt_hits
 Info: Helpers registered.
-Info: Ready to process requests.
 Info: Initializing, currently in 'notready' state.
 Info: Enabled modules:
 Info: ['usdt_hits']
@@ -29,9 +28,9 @@ Info: usdt_hits
 Info: Modules configured.
 Info: Initializing modules:
 Info: usdt_hits
-Info: usdt_hits: Found PMCD.
-Info: usdt_hits: Configured USDTs: ['PCP_BINADM_DIR/pmcd:PMCD', 'PCP_BINADM_DIR/pmcd:PMCD_PDU']
-Info: usdt_hits: Found 2 USDTs: ['PCP_BINADM_DIR/pmcd:PMCD', 'PCP_BINADM_DIR/pmcd:PMCD_PDU'].
+Info: usdt_hits: Tracing PID.
+Info: usdt_hits: Configured USDTs: ['$PCP_BINADM_DIR/pmcd:PMCD', 'PCP_BINADM_DIR/pmcd:PMCD_PDU']
+Info: usdt_hits: Found 2 USDTs: ['$PCP_BINADM_DIR/pmcd:PMCD', 'PCP_BINADM_DIR/pmcd:PMCD_PDU'].
 Info: usdt_hits: Initialized.
 Info: Modules initialized.
 Info: Registering metrics:
@@ -40,7 +39,6 @@ Info: Metrics registered.
 Info: Registering helpers:
 Info: usdt_hits
 Info: Helpers registered.
-Info: Ready to process requests.
 Updating the Performance Metrics Name Space (PMNS) ...
 Terminate PMDA if already installed ...
 [...install files, make output...]
@@ -56,6 +54,3 @@ bcc ... done
 Updating the PMCD control file, and notifying PMCD ...
 [...removing files...]
 Check bcc metrics have gone away ... OK
-Waiting for pmcd to terminate ...
-Starting pmcd ... 
-Starting pmlogger ... 

@@ -2,7 +2,7 @@
 
 - Packages
   1. Linux Installation (rpm, deb)
-  2. Mac OS X Installation (dmg)
+  2. Mac OS X Installation (brew)
   3. AIX Installation
   4. Solaris Installation
   5. Windows Installation
@@ -52,8 +52,27 @@ root filesystem.
 
 ### 2. Mac OS X Installation
 
-Installing PCP from the DMG file is as simple as clicking on the icon
-in a Finder window, and following the prompts from the installer.
+Installing PCP on MacOSX is done via https://brew.sh/ commands.
+From a Terminal run:
+```
+$ brew install qt
+$ brew link qt --force
+$ brew install pcp
+$ brew link pcp
+$ pcp --version
+```
+
+The output for the last command will be something like
+```
+pcp version 4.1.1
+```
+
+Use the version number for creating symlinks (for version 4.1.1)
+```
+$ export version="4.1.1"
+$ sudo ln -s /usr/local/Cellar/pcp/$version/etc/pcp.conf /etc/pcp.conf
+$ sudo ln -s /usr/local/Cellar/pcp/$version/etc/pcp.env /etc/pcp.env
+```
 
 ### 3. AIX Installation
 
@@ -106,10 +125,33 @@ Use 'svcs' command to check the state of the services, e.g.:
 
 ### 5. Windows Installation
 
-Download the native Windows version of PCP from bintray.com/pcp
-which provides a .msi - the system-wide %PATH setting must be
-manually setup to point to the installation location (C:\Glider
-by default).
+There are 3 ways to get PCP working on Windows:
+
+1) Download the native Windows version of PCP from bintray.com/pcp/windows
+
+2) Set up PCP build environment manually. For that you can:
+
+- download Git for Windows SDK (https://github.com/git-for-windows/build-extra/releases)
+- download PCP package from bintray (https://bintray.com/pcp/windows)
+- install PCP package via pacman. (pacman -S mingw-w64-x86_64-pcp-X.Y.Z-any.pkg.tar)
+- set PCP_DIR to C:\git-sdk-64\mingw64
+- add to the system PATH:
+..1. "C:\git-sdk-64\mingw64\bin"
+..2. "C:\git-sdk-64\mingw64\lib"
+..3. "C:\git-sdk-64\mingw64\libexec\pcp\bin"
+- start pmcd
+```
+$PCP_DIR\libexec\pcp\bin\pmcd.exe
+```
+
+3) Same as 2 except building the PCP pacman package from source
+
+- follow https://github.com/git-for-windows/git/wiki/Package-management
+  and get PKGBUILD from https://github.com/Andrii-hotfix/MINGW-packages
+- cd MINGW-packages/mingw-w64-pcp
+- makepkg-mingw -s
+- install pcp package via pacman as above.
+
 
 ## Building from source
 
@@ -140,24 +182,57 @@ It is strongly recommended that you run the script:
 ```
 $ qa/admin/check-vm
 ```
-and review the output before commencing a build.
+and review the output before commencing a build.  It is is generally
+safe to ignore packages marked as "N/A" (not available), "build
+optional" or "QA optional".  Alternatively use:
+```
+$ qa/admin/check-vm -bfp
+```
+(-b for basic packages, -f to **not** try to guess Python, Perl, ...
+version and -p to output just package names) to produce a minimal
+list of packages that should be installed.
 
 ### 1. Configure, build and install the package
 
 The pcp package uses autoconf/configure and expects a GNU build
 environment (your platform must at least have gmake).
 
-If you just want to build a .RPM, .DEB, .DMG, .MSI[*] and/or tar
-file, use the "Makepkgs" script in the top level directory.
-This will configure and build the package for your platform and
-leave binary and src packages in the build/<pkg-type> directory.
-It will also leave binary and source tar file in the build/tar
-directory.
+If you just want to build a .rpm, .deb, .dmg, .msi[*] and/or
+tar file, use the "Makepkgs" script in the top level directory.
+This will configure and build the package for your platform and leave
+binary and src packages in either the build/<pkg-type> directory
+or the pcp-<version>/build/<pkg-type> directory.  It will also
+leave a source tar file in either the build/tar directory or the
+pcp-<version>/build/tar directory.
 ```
 $ ./Makepkgs --verbose
 $ ./Makepkgs --verbose --target mingw64
 ```
+Once "Makepkgs" completes you will have package binaries that will
+need to be installed.  The recipe depends on the packaging flavour,
+but the following should provide guidance:
 
+**dkg install** (Debian and derivative distributions)
+```
+$ cd build/deb
+$ dpkg -i *.deb
+```
+**rpm install** (RedHat, SuSE and their derivative distributions)
+```
+$ cd pcp-<version>/build/rpm
+$ sudo rpm -U `echo *.rpm | sed -e '/\.src\.rpm$/d'`
+```
+**tarball install** (where we don't have native packaging working yet)
+```
+$ cd pcp-<version>/build/tar
+$ here=`pwd`
+$ tarball=$here/pcp-[0-9]*[0-9].tar.gz
+$ sudo ./preinstall
+$ cd /
+$ sudo tar -zxpf $tarball
+$ cd $here
+$ sudo ./postinstall
+```
 [*] Windows builds require https://fedoraproject.org/wiki/MinGW
 cross-compilation.  Currently packaging is no longer performed,
 although previously MSI builds were possible.  Work on tackling
@@ -224,6 +299,7 @@ You will need to start the PCP Collection Daemon (PMCD), as root:
 
 Linux:
 ```
+# systemctl start pmcd  (or...)
 # service pmcd start  (or...)
 # /etc/init.d/pmcd start  (or...)
 # /etc/rc.d/init.d/pmcd start
@@ -345,7 +421,7 @@ pcp "user" as described in section B.2 above), then
 ```
 $ ./configure --prefix=/some/path
 ```
-This will populate /some/path with a full PCP installation.  To use this 
+This will populate /some/path with a full PCP installation.  To use this
 ensure the following are set in the environment:
 ```
 $ export PCP_DIR=/some/path

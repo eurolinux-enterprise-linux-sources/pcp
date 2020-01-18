@@ -1,6 +1,6 @@
 Name:    pcp
 Version: 4.1.0
-Release: 4%{?dist}
+Release: 5%{?dist}
 Summary: System-level performance monitoring and performance management
 License: GPLv2+ and LGPLv2.1+ and CC-BY
 URL:     https://pcp.io
@@ -19,6 +19,8 @@ Source4: %{github}/pcp-webapp-blinkenlights/archive/1.0.0/pcp-webapp-blinkenligh
 Patch1: redhat-bugzilla-1597975.patch
 # selinux rollup patch
 Patch2: redhat-bugzilla-1603596.patch
+# pmdaproc short status read patch
+Patch3: redhat-bugzilla-1600262.patch
 
 %if 0%{?fedora} >= 26 || 0%{?rhel} > 7
 %global __python2 python2
@@ -2177,6 +2179,7 @@ updated policy package.
 %setup -q
 %patch1 -p1
 %patch2 -p1
+%patch3 -p1
 
 %build
 %if !%{disable_python2} && 0%{?default_python} != 3
@@ -3363,6 +3366,9 @@ cd
 %endif
 
 %changelog
+* Tue Oct 09 2018 Nathan Scott <nathans@redhat.com> - 4.1.0-5
+- Missing values from short /proc/*/status file reads (BZ 1600262)
+
 * Wed Sep 05 2018 Nathan Scott <nathans@redhat.com> - 4.1.0-4
 - BPF kernel compatibility fixes (BZ 1597975)
 - Several important selinux fixes (BZ 1603596)

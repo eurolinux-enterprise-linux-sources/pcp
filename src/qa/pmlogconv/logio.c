@@ -22,7 +22,7 @@
 /* pinched from pmlogextract and libpcp */
 
 #include "pcp/pmapi.h"
-#include "pcp/libpcp.h"
+#include "pcp/impl.h"
 
 /*
  * raw read of next log record - largely stolen from __pmLogRead in libpcp
@@ -44,17 +44,21 @@ _pmLogGet(__pmLogCtl *lcp, int vol, __pmPDU **pb)
 	f = lcp->l_mfp;
 
     offset = __pmFtell(f);
-    if (pmDebugOptions.log) {
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_LOG) {
 	fprintf(stderr, "_pmLogGet: fd=%d vol=%d posn=%ld ",
 	    fileno(f), vol, offset);
     }
+#endif
 
 again:
     sts = (int)__pmFread(&head, 1, sizeof(head), f);
     if (sts != sizeof(head)) {
 	if (sts == 0) {
-	    if (pmDebugOptions.log)
+#ifdef PCP_DEBUG
+	    if (pmDebug & DBG_TRACE_LOG)
 		fprintf(stderr, "AFTER end\n");
+#endif
 	    __pmFseek(f, offset, SEEK_SET);
 	    if (vol != PM_LOG_VOL_META) {
 		if (lcp->l_curvol < lcp->l_maxvol) {
@@ -66,8 +70,10 @@ again:
 	    }
 	    return PM_ERR_EOL;
 	}
-	if (pmDebugOptions.log)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_LOG)
 	    fprintf(stderr, "Error: hdr fread=%d %s\n", sts, strerror(errno));
+#endif
 	if (sts > 0)
 	    return PM_ERR_LOGREC;
 	else
@@ -75,17 +81,21 @@ again:
     }
 
     if ((lpb = (__pmPDU *)malloc(ntohl(head))) == NULL) {
-	if (pmDebugOptions.log)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_LOG)
 	    fprintf(stderr, "Error: __pmFindPDUBuf(%d) %s\n",
 		(int)ntohl(head), strerror(errno));
+#endif
 	__pmFseek(f, offset, SEEK_SET);
 	return -errno;
     }
 
     lpb[0] = head;
     if ((sts = (int)__pmFread(&lpb[1], 1, ntohl(head) - sizeof(head), f)) != ntohl(head) - sizeof(head)) {
-	if (pmDebugOptions.log)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_LOG)
 	    fprintf(stderr, "Error: data fread=%d %s\n", sts, strerror(errno));
+#endif
 	if (sts == 0) {
 	    __pmFseek(f, offset, SEEK_SET);
 	    return PM_ERR_EOL;
@@ -100,38 +110,43 @@ again:
     p = (char *)lpb;
     memcpy(&tail, &p[ntohl(head) - sizeof(head)], sizeof(head));
     if (head != tail) {
-	if (pmDebugOptions.log)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_LOG)
 	    fprintf(stderr, "Error: head-tail mismatch (%d-%d)\n",
 		(int)ntohl(head), (int)ntohl(tail));
+#endif
 	return PM_ERR_LOGREC;
     }
 
-    if (pmDebugOptions.log) {
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_LOG) {
 	if (vol != PM_LOG_VOL_META || ntohl(lpb[1]) == TYPE_INDOM) {
 	    fprintf(stderr, "@");
 	    if (sts >= 0) {
 		struct timeval	stamp;
-		pmTimeval		*tvp = (pmTimeval *)&lpb[vol == PM_LOG_VOL_META ? 2 : 1];
+		__pmTimeval		*tvp = (__pmTimeval *)&lpb[vol == PM_LOG_VOL_META ? 2 : 1];
 		stamp.tv_sec = ntohl(tvp->tv_sec);
 		stamp.tv_usec = ntohl(tvp->tv_usec);
-		pmPrintStamp(stderr, &stamp);
+		__pmPrintStamp(stderr, &stamp);
 	    }
 	    else
 		fprintf(stderr, "unknown time");
 	}
 	fprintf(stderr, " len=%d (incl head+tail)\n", (int)ntohl(head));
     }
+#endif
 
-    if (pmDebugOptions.pdu) {
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_PDU) {
 	int		i, j;
 	struct timeval	stamp;
-	pmTimeval	*tvp = (pmTimeval *)&lpb[vol == PM_LOG_VOL_META ? 2 : 1];
+	__pmTimeval	*tvp = (__pmTimeval *)&lpb[vol == PM_LOG_VOL_META ? 2 : 1];
 	fprintf(stderr, "_pmLogGet");
 	if (vol != PM_LOG_VOL_META || ntohl(lpb[1]) == TYPE_INDOM) {
 	    fprintf(stderr, " timestamp=");
 	    stamp.tv_sec = ntohl(tvp->tv_sec);
 	    stamp.tv_usec = ntohl(tvp->tv_usec);
-	    pmPrintStamp(stderr, &stamp);
+	    __pmPrintStamp(stderr, &stamp);
 	}
 	fprintf(stderr, " " PRINTF_P_PFX "%p ... " PRINTF_P_PFX "%p", lpb, &lpb[ntohl(head)/sizeof(__pmPDU) - 1]);
 	fputc('\n', stderr);
@@ -146,6 +161,7 @@ again:
 	}
 	fputc('\n', stderr);
     }
+#endif
 
     *pb = lpb;
     return 0;
@@ -157,14 +173,18 @@ _pmLogPut(FILE *f, __pmPDU *pb)
     int		rlen = ntohl(pb[0]);
     int		sts;
 
-    if (pmDebugOptions.log) {
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_LOG) {
 	fprintf(stderr, "_pmLogPut: fd=%d rlen=%d\n",
 	    fileno(f), rlen);
     }
+#endif
 
     if ((sts = (int)fwrite(pb, 1, rlen, f)) != rlen) {
-	if (pmDebugOptions.log)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_LOG)
 	    fprintf(stderr, "_pmLogPut: fwrite=%d %s\n", sts, strerror(errno));
+#endif
 	return -errno;
     }
     return 0;
@@ -206,7 +226,7 @@ typedef struct {
 typedef struct {
     int			hdr;
     // __pmPDUHdr		hdr;
-    pmTimeval		timestamp;	/* when returned */
+    __pmTimeval		timestamp;	/* when returned */
     int			numpmid;	/* no. of PMIDs to follow */
     __pmPDU		data[1];	/* zero or more */
 } result_t;

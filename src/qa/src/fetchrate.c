@@ -3,6 +3,7 @@
  */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 int
 main(int argc, char **argv)
@@ -22,7 +23,7 @@ main(int argc, char **argv)
     double	delta;
     static char	*usage = "[-h hostname] [-L] [-n namespace] [-i iterations] metric";
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:h:Ln:i:")) != EOF) {
 	switch (c) {
@@ -31,7 +32,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -64,20 +65,20 @@ main(int argc, char **argv)
 
     if (errflag) {
 USAGE:
-	fprintf(stderr, "Usage: %s %s\n", pmGetProgname(), usage);
+	fprintf(stderr, "Usage: %s %s\n", pmProgname, usage);
 	exit(1);
     }
 
     if (namespace != PM_NS_DEFAULT && (sts = pmLoadASCIINameSpace(namespace, 1)) < 0) {
-	printf("%s: Cannot load namespace from \"%s\": %s\n", pmGetProgname(), namespace, pmErrStr(sts));
+	printf("%s: Cannot load namespace from \"%s\": %s\n", pmProgname, namespace, pmErrStr(sts));
 	exit(1);
     }
 
     if ((sts = pmNewContext(type, host)) < 0) {
 	if (type == PM_CONTEXT_HOST)
-	    printf("%s: Cannot connect to PMCD on host \"%s\": %s\n", pmGetProgname(), host, pmErrStr(sts));
+	    printf("%s: Cannot connect to PMCD on host \"%s\": %s\n", pmProgname, host, pmErrStr(sts));
 	else
-	    printf("%s: Cannot make standalone local connection: %s\n", pmGetProgname(), pmErrStr(sts));
+	    printf("%s: Cannot make standalone local connection: %s\n", pmProgname, pmErrStr(sts));
 	exit(1);
     }
 
@@ -87,7 +88,7 @@ USAGE:
 
     metric = argv[optind];
     if ((sts = pmLookupName(1, &metric, &pmid)) < 0) {
-	printf("%s: metric ``%s'' : %s\n", pmGetProgname(), metric, pmErrStr(sts));
+	printf("%s: metric ``%s'' : %s\n", pmProgname, metric, pmErrStr(sts));
 	exit(1);
     }
 
@@ -95,7 +96,7 @@ USAGE:
     for (iter=0; iter < iterations; iter++) {
 	sts = pmFetch(1, &pmid, &result);
 	if (sts < 0) {
-	    printf("%s: iteration %d : %s\n", pmGetProgname(), iter, pmErrStr(sts));
+	    printf("%s: iteration %d : %s\n", pmProgname, iter, pmErrStr(sts));
 	    exit(1);
 	}
 	pmFreeResult(result);
@@ -103,14 +104,14 @@ USAGE:
     gettimeofday(&after, (struct timezone *)0);
 
     if ((sts = pmWhichContext()) < 0) {
-	printf("%s: pmWhichContext: %s\n", pmGetProgname(), pmErrStr(sts));
+	printf("%s: pmWhichContext: %s\n", pmProgname, pmErrStr(sts));
 	exit(1);
     }
     pmDestroyContext(sts);
 
-    delta = pmtimevalSub(&after, &before);
+    delta = __pmtimevalSub(&after, &before);
     printf("%s: metric %s %.2lf fetches/second\n",
-    pmGetProgname(), metric, (double)iterations / delta);
+    pmProgname, metric, (double)iterations / delta);
 
     exit(0);
 }

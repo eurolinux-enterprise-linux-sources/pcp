@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014,2018 Red Hat.
+ * Copyright (c) 2014 Red Hat.
  * Copyright (c) 1995 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This library is free software; you can redistribute it and/or modify it
@@ -14,6 +14,7 @@
  */
 
 #include "pmapi.h"
+#include "impl.h"
 #include <inttypes.h>
 #include <assert.h>
 #include <ctype.h>
@@ -39,12 +40,11 @@
  * for a pmAtomValue pointer by the caller.
  */
 char *
-pmAtomStr_r(const pmAtomValue *avp, int type, char *buf, int buflen)
+pmAtomStr_r(const pmAtomValue * avp, int type, char *buf, int buflen)
 {
     int i;
     int vlen;
     char strbuf[40];
-    const char errmsg[] = "Error: unexpected type";
 
     switch (type) {
 	case PM_TYPE_32:
@@ -93,18 +93,18 @@ pmAtomStr_r(const pmAtomValue *avp, int type, char *buf, int buflen)
 		for (i = 0; i < vlen && i < 12; i++) {
 		    bp = &buf[strlen(buf)];
 		    if ((i % 4) == 0)
-			pmsprintf(bp, buflen - (bp - buf), " %02x", *cp & 0xff);
+			pmsprintf(bp, sizeof(buf) - (bp - buf), " %02x", *cp & 0xff);
 		    else
-			pmsprintf(bp, buflen - (bp - buf), "%02x", *cp & 0xff);
+			pmsprintf(bp, sizeof(buf) - (bp - buf), "%02x", *cp & 0xff);
 		    cp++;
 		}
 		if (vlen > 12) {
 		    bp = &buf[strlen(buf)];
-		    pmsprintf(bp, buflen - (bp - buf), " ...");
+		    pmsprintf(bp, sizeof(buf) - (bp - buf), " ...");
 		}
 	    }
 	    break;
-	case PM_TYPE_EVENT: {
+	case PM_TYPE_EVENT:{
 	    /* have to assume alignment is OK in this case */
 	    pmEventArray *eap = (pmEventArray *) avp->vbp;
 	    if (eap->ea_nrecords == 1)
@@ -113,7 +113,7 @@ pmAtomStr_r(const pmAtomValue *avp, int type, char *buf, int buflen)
 		pmsprintf(buf, buflen, "[%d event records]", eap->ea_nrecords);
 	    break;
 	}
-	case PM_TYPE_HIGHRES_EVENT: {
+	case PM_TYPE_HIGHRES_EVENT:{
 	    /* have to assume alignment is OK in this case */
 	    pmHighResEventArray *hreap = (pmHighResEventArray *) avp->vbp;
 	    if (hreap->ea_nrecords == 1)
@@ -122,15 +122,8 @@ pmAtomStr_r(const pmAtomValue *avp, int type, char *buf, int buflen)
 		pmsprintf(buf, buflen, "[%d event records]", hreap->ea_nrecords);
 	    break;
 	}
-	case PM_TYPE_NOSUPPORT:
-	    pmsprintf(buf, buflen, "%s: Not Supported", errmsg);
-	    break;
-	case PM_TYPE_UNKNOWN:
-	    pmsprintf(buf, buflen, "%s: Unknown", errmsg);
-	    break;
 	default:
-	    pmsprintf(buf, buflen, "%s: Illegal type=%d", errmsg, type);
-	    break;
+	    pmsprintf(buf, buflen, "Error: unexpected type: %s", pmTypeStr_r(type, strbuf, sizeof(strbuf)));
     }
     return buf;
 }
@@ -140,17 +133,47 @@ pmAtomStr_r(const pmAtomValue *avp, int type, char *buf, int buflen)
  * for a pmAtomValue pointer by the caller.
  */
 const char *
-pmAtomStr(const pmAtomValue *avp, int type)
+pmAtomStr(const pmAtomValue * avp, int type)
 {
     static char abuf[80];
-
     pmAtomStr_r(avp, type, abuf, sizeof(abuf));
     return abuf;
 }
 
+/*
+ * must be in agreement with ordinal values for PM_TYPE_* #defines
+ */
+static const char *typename[] = {
+    "32", "U32", "64", "U64", "FLOAT", "DOUBLE", "STRING", "AGGREGATE", "AGGREGATE_STATIC", "EVENT", "HIGHRES_EVENT"
+};
+
+/* PM_TYPE_* -> string, max length is 20 bytes */
+char *
+pmTypeStr_r(int type, char *buf, int buflen)
+{
+    if (type >= 0 && type < sizeof(typename) / sizeof(typename[0]))
+	pmsprintf(buf, buflen, "%s", typename[type]);
+    else if (type == PM_TYPE_NOSUPPORT)
+	pmsprintf(buf, buflen, "%s", "Not Supported");
+    else if (type == PM_TYPE_UNKNOWN)
+	pmsprintf(buf, buflen, "%s", "Unknown");
+    else
+	pmsprintf(buf, buflen, "Illegal type=%d", type);
+
+    return buf;
+}
+
+const char *
+pmTypeStr(int type)
+{
+    static char tbuf[20];
+    pmTypeStr_r(type, tbuf, sizeof(tbuf));
+    return tbuf;
+}
+
 /* scale+units -> string, max length is 60 bytes */
 char *
-pmUnitsStr_r(const pmUnits *pu, char *buf, int buflen)
+pmUnitsStr_r(const pmUnits * pu, char *buf, int buflen)
 {
     char *spacestr = NULL;
     char *timestr = NULL;
@@ -191,12 +214,6 @@ pmUnitsStr_r(const pmUnits *pu, char *buf, int buflen)
 		break;
 	    case PM_SPACE_EBYTE:
 		spacestr = "Ebyte";
-		break;
-	    case PM_SPACE_ZBYTE:
-		spacestr = "Zbyte";
-		break;
-	    case PM_SPACE_YBYTE:
-		spacestr = "Ybyte";
 		break;
 	    default:
 		pmsprintf(sbuf, sizeof(sbuf), "space-%d", pu->scaleSpace);
@@ -328,10 +345,9 @@ pmUnitsStr_r(const pmUnits *pu, char *buf, int buflen)
 }
 
 const char *
-pmUnitsStr(const pmUnits *pu)
+pmUnitsStr(const pmUnits * pu)
 {
     static char ubuf[60];
-
     pmUnitsStr_r(pu, ubuf, sizeof(ubuf));
     return ubuf;
 }
@@ -344,9 +360,9 @@ pmConvScale(int type, const pmAtomValue * ival, const pmUnits * iunit, pmAtomVal
     int k;
     __int64_t div, mult;
     __int64_t d, m;
-    char strbuf[80];
 
     if (pmDebugOptions.value) {
+	char strbuf[80];
 	fprintf(stderr, "pmConvScale: %s", pmAtomStr_r(ival, type, strbuf, sizeof(strbuf)));
 	fprintf(stderr, " [%s]", pmUnitsStr_r(iunit, strbuf, sizeof(strbuf)));
     }
@@ -557,6 +573,7 @@ pmConvScale(int type, const pmAtomValue * ival, const pmUnits * iunit, pmAtomVal
     }
 
     if (pmDebugOptions.value) {
+	char strbuf[80];
 	fprintf(stderr, " -> %s", pmAtomStr_r(oval, type, strbuf, sizeof(strbuf)));
 	fprintf(stderr, " [%s]\n", pmUnitsStr_r(ounit, strbuf, sizeof(strbuf)));
     }
@@ -564,6 +581,7 @@ pmConvScale(int type, const pmAtomValue * ival, const pmUnits * iunit, pmAtomVal
 
 bad:
     if (pmDebugOptions.value) {
+	char strbuf[60];
 	char errmsg[PM_MAXERRMSGLEN];
 	fprintf(stderr, " -> Error: %s", pmErrStr_r(sts, errmsg, sizeof(errmsg)));
 	fprintf(stderr, " [%s]\n", pmUnitsStr_r(ounit, strbuf, sizeof(strbuf)));
@@ -581,7 +599,6 @@ pmExtractValue(int valfmt, const pmValue * ival, int itype, pmAtomValue * oval, 
     int len;
     const char *vp;
     char buf[80];
-    char strbuf[80];
 
     if (pmDebugOptions.value) {
 	fprintf(stderr, "pmExtractValue: ");
@@ -591,8 +608,10 @@ pmExtractValue(int valfmt, const pmValue * ival, int itype, pmAtomValue * oval, 
     oval->ll = 0;
     if (valfmt == PM_VAL_INSITU) {
 	av.l = ival->value.lval;
-	if (pmDebugOptions.value)
+	if (pmDebugOptions.value) {
+	    char strbuf[80];
 	    vp = pmAtomStr_r(&av, itype, strbuf, sizeof(strbuf));
+	}
 	switch (itype) {
 
 	    case PM_TYPE_32:
@@ -738,8 +757,10 @@ pmExtractValue(int valfmt, const pmValue * ival, int itype, pmAtomValue * oval, 
 		}
 		avp = (void *) &ival->value.pval->vbuf;
 		memcpy((void *) &av.ll, avp, sizeof(av.ll));
-		if (pmDebugOptions.value)
+		if (pmDebugOptions.value) {
+		    char strbuf[80];
 		    vp = pmAtomStr_r(&av, itype, strbuf, sizeof(strbuf));
+		}
 		src = av.ll;
 		switch (otype) {
 		    case PM_TYPE_32:
@@ -784,8 +805,10 @@ pmExtractValue(int valfmt, const pmValue * ival, int itype, pmAtomValue * oval, 
 		}
 		avp = (void *) &ival->value.pval->vbuf;
 		memcpy((void *) &av.ull, avp, sizeof(av.ull));
-		if (pmDebugOptions.value)
+		if (pmDebugOptions.value) {
+		    char strbuf[80];
 		    vp = pmAtomStr_r(&av, itype, strbuf, sizeof(strbuf));
+		}
 		usrc = av.ull;
 		switch (otype) {
 		    case PM_TYPE_32:
@@ -847,8 +870,10 @@ pmExtractValue(int valfmt, const pmValue * ival, int itype, pmAtomValue * oval, 
 		}
 		avp = (void *) &ival->value.pval->vbuf;
 		memcpy((void *) &av.d, avp, sizeof(av.d));
-		if (pmDebugOptions.value)
+		if (pmDebugOptions.value) {
+		    char strbuf[80];
 		    vp = pmAtomStr_r(&av, itype, strbuf, sizeof(strbuf));
+		}
 		dsrc = av.d;
 		switch (otype) {
 		    case PM_TYPE_32:
@@ -908,8 +933,10 @@ pmExtractValue(int valfmt, const pmValue * ival, int itype, pmAtomValue * oval, 
 		}
 		avp = (void *) &ival->value.pval->vbuf;
 		memcpy((void *) &av.f, avp, sizeof(av.f));
-		if (pmDebugOptions.value)
+		if (pmDebugOptions.value) {
+		    char strbuf[80];
 		    vp = pmAtomStr_r(&av, itype, strbuf, sizeof(strbuf));
+		}
 		fsrc = av.f;
 		switch (otype) {
 		    case PM_TYPE_32:
@@ -985,7 +1012,7 @@ pmExtractValue(int valfmt, const pmValue * ival, int itype, pmAtomValue * oval, 
 		    break;
 		}
 		if ((oval->cp = (char *) malloc(len + 1)) == NULL) {
-		    pmNoMem("pmExtractValue.string", len + 1, PM_FATAL_ERR);
+		    __pmNoMem("pmExtractValue.string", len + 1, PM_FATAL_ERR);
 		}
 		memcpy(oval->cp, ival->value.pval->vbuf, len);
 		oval->cp[len] = '\0';
@@ -1028,7 +1055,7 @@ pmExtractValue(int valfmt, const pmValue * ival, int itype, pmAtomValue * oval, 
 		    break;
 		}
 		if ((oval->vbp = (pmValueBlock *) malloc(len)) == NULL) {
-		    pmNoMem("pmExtractValue.aggr", len, PM_FATAL_ERR);
+		    __pmNoMem("pmExtractValue.aggr", len, PM_FATAL_ERR);
 		}
 		memcpy(oval->vbp, ival->value.pval, len);
 		break;
@@ -1045,6 +1072,7 @@ pmExtractValue(int valfmt, const pmValue * ival, int itype, pmAtomValue * oval, 
 	sts = PM_ERR_CONV;
 
     if (pmDebugOptions.value) {
+	char strbuf[80];
 	char errmsg[PM_MAXERRMSGLEN];
 	fprintf(stderr, " %s", vp);
 	fprintf(stderr, " [%s]", pmTypeStr_r(itype, strbuf, sizeof(strbuf)));
@@ -1058,36 +1086,36 @@ pmExtractValue(int valfmt, const pmValue * ival, int itype, pmAtomValue * oval, 
     return sts;
 }
 
-/*
- * An internal variant of pmUnits, but without the narrow bitfields.
- * That way, we can tolerate intermediate arithmetic that goes out of
- * range of the 4-bit bitfields.
- */
-typedef struct __pmUnits {
-    int			dimSpace;	/* space dimension */
-    int			dimTime;	/* time dimension */
-    int			dimCount;	/* event dimension */
-    unsigned int	scaleSpace;	/* one of PM_SPACE_* */
-    unsigned int	scaleTime;	/* one of PM_TIME_* */
-    int			scaleCount;	/* one of PM_COUNT_* */
-} __pmUnits;
 
-/*
- * Parse a general "N $units" string into a pmUnits tuple and a multiplier.
- * @units can be a series of SCALE-UNIT^EXPONENT, each unit dimension appearing
- * at most once.
- */
+
+/* Parse a general "N $units" string into a pmUnits tuple and a multiplier. */
+/* $units can be a series of SCALE-UNIT^EXPONENT, each unit dimension appearing */
+/* at most once. */
+
+/* An internal variant of pmUnits, but without the narrow bitfields. */
+/* That way, we can tolerate intermediate arithmetic that goes out of */
+/* range of the 4-bit bitfields. */
+typedef struct pmUnitsBig
+{
+    int dimSpace;		/* space dimension */
+    int dimTime;		/* time dimension */
+    int dimCount;		/* event dimension */
+    unsigned scaleSpace;	/* one of PM_SPACE_* below */
+    unsigned scaleTime;		/* one of PM_TIME_* below */
+    int scaleCount;		/* one of PM_COUNT_* below */
+} pmUnitsBig;
 
 static int
-__pmParseUnitsStrPart(const char *str, const char *str_end, __pmUnits *out, double *multiplier, char **errMsg)
+__pmParseUnitsStrPart(const char *str, const char *str_end, pmUnitsBig * out, double *multiplier, char **errMsg)
 {
     int sts = 0;
     unsigned i;
     const char *ptr;		/* scanning along str */
     enum { d_none, d_space, d_time, d_count } dimension;
-    struct unit_keyword_t {
-	const char	*keyword;
-	int		scale;
+    struct unit_keyword_t
+    {
+	const char *keyword;
+	int scale;
     };
     static const struct unit_keyword_t time_keywords[] = {
 	{"nanoseconds", PM_TIME_NSEC}, {"nanosecond", PM_TIME_NSEC},
@@ -1110,38 +1138,24 @@ __pmParseUnitsStrPart(const char *str, const char *str_end, __pmUnits *out, doub
     const size_t num_time_keywords = sizeof(time_keywords) / sizeof(time_keywords[0]);
     static const struct unit_keyword_t space_keywords[] = {
 	{"bytes", PM_SPACE_BYTE}, {"byte", PM_SPACE_BYTE},
-	{"KB", PM_SPACE_KBYTE}, {"KiB", PM_SPACE_KBYTE},
 	{"Kbytes", PM_SPACE_KBYTE}, {"Kbyte", PM_SPACE_KBYTE},
-	{"Kibibytes", PM_SPACE_KBYTE}, {"Kibibyte", PM_SPACE_KBYTE},
-	{"Kilobytes", PM_SPACE_KBYTE}, {"Kilobyte", PM_SPACE_KBYTE},	/* back-compat */
-	{"MB", PM_SPACE_MBYTE}, {"MiB", PM_SPACE_MBYTE},
+	{"Kilobytes", PM_SPACE_KBYTE}, {"Kilobyte", PM_SPACE_KBYTE},
+	{"KB", PM_SPACE_KBYTE},
 	{"Mbytes", PM_SPACE_MBYTE}, {"Mbyte", PM_SPACE_MBYTE},
-	{"Mebibytes", PM_SPACE_MBYTE}, {"Mebibyte", PM_SPACE_MBYTE},
-	{"Megabytes", PM_SPACE_MBYTE}, {"Megabyte", PM_SPACE_MBYTE},	/* back-compat */
-	{"GB", PM_SPACE_GBYTE}, {"GiB", PM_SPACE_GBYTE},
+	{"Megabytes", PM_SPACE_MBYTE}, {"Megabyte", PM_SPACE_MBYTE},
+	{"MB", PM_SPACE_MBYTE},
 	{"Gbytes", PM_SPACE_GBYTE}, {"Gbyte", PM_SPACE_GBYTE},
-	{"Gibibytes", PM_SPACE_GBYTE}, {"Gibibyte", PM_SPACE_GBYTE},
-	{"Gigabytes", PM_SPACE_GBYTE}, {"Gigabyte", PM_SPACE_GBYTE},	/* back-compat */
-	{"TB", PM_SPACE_TBYTE}, {"TiB", PM_SPACE_TBYTE},
+	{"Gigabytes", PM_SPACE_GBYTE}, {"Gigabyte", PM_SPACE_GBYTE},
+	{"GB", PM_SPACE_GBYTE},
 	{"Tbytes", PM_SPACE_TBYTE}, {"Tbyte", PM_SPACE_TBYTE},
-	{"Tebibytes", PM_SPACE_TBYTE}, {"Tebibyte", PM_SPACE_TBYTE},
-	{"Terabytes", PM_SPACE_TBYTE}, {"Terabyte", PM_SPACE_TBYTE},	/* back-compat */
-	{"PB", PM_SPACE_PBYTE}, {"PiB", PM_SPACE_PBYTE},
+	{"Terabytes", PM_SPACE_TBYTE}, {"Terabyte", PM_SPACE_TBYTE},
+	{"TB", PM_SPACE_TBYTE},
 	{"Pbytes", PM_SPACE_PBYTE}, {"Pbyte", PM_SPACE_PBYTE},
-	{"Pebibytes", PM_SPACE_PBYTE}, {"Pebibyte", PM_SPACE_PBYTE},
-	{"Petabytes", PM_SPACE_PBYTE}, {"Petabyte", PM_SPACE_PBYTE},	/* back-compat */
-	{"EB", PM_SPACE_EBYTE}, {"EiB", PM_SPACE_EBYTE},
+	{"Petabytes", PM_SPACE_PBYTE}, {"Petabyte", PM_SPACE_PBYTE},
+	{"PB", PM_SPACE_PBYTE},
 	{"Ebytes", PM_SPACE_EBYTE}, {"Ebyte", PM_SPACE_EBYTE},
-	{"Exbibytes", PM_SPACE_EBYTE}, {"Exbibyte", PM_SPACE_EBYTE},
-	{"Exabytes", PM_SPACE_EBYTE}, {"Exabyte", PM_SPACE_EBYTE},	/* back-compat */
-	{"ZB", PM_SPACE_ZBYTE}, {"ZiB", PM_SPACE_ZBYTE},
-	{"Zbytes", PM_SPACE_ZBYTE}, {"Zbyte", PM_SPACE_ZBYTE},
-	{"Zebibytes", PM_SPACE_ZBYTE}, {"Zebibyte", PM_SPACE_ZBYTE},
-	{"Zettabytes", PM_SPACE_ZBYTE}, {"Zettabyte", PM_SPACE_ZBYTE},	/* back-compat */
-	{"YB", PM_SPACE_YBYTE}, {"YiB", PM_SPACE_YBYTE},
-	{"Ybytes", PM_SPACE_YBYTE}, {"Ybyte", PM_SPACE_YBYTE},
-	{"Yobibytes", PM_SPACE_YBYTE}, {"Yobibyte", PM_SPACE_YBYTE},
-	{"Yottabytes", PM_SPACE_YBYTE}, {"Yottabyte", PM_SPACE_YBYTE},	/* back-compat */
+	{"Exabytes", PM_SPACE_EBYTE}, {"Exabyte", PM_SPACE_EBYTE},
+	{"EB", PM_SPACE_EBYTE},
 	{"space-0", 0}, /* { "space-1", 1 }, */ {"space-2", 2}, {"space-3", 3},
 	{"space-4", 4}, {"space-5", 5}, {"space-6", 6}, {"space-7", 7},
 	{"space-8", 8}, {"space-9", 9}, {"space-10", 10}, {"space-11", 11},
@@ -1177,12 +1191,9 @@ __pmParseUnitsStrPart(const char *str, const char *str_end, __pmUnits *out, doub
 	{"^-4", -4}, {"^-3", -3}, {"^-2", -2}, {"^-1", -1},
 	{"^0", 0}, /*{ "^1", 1 }, */ {"^2", 2}, {"^3", 3},
 	{"^4", 4}, {"^5", 5}, {"^6", 6}, {"^7", 7},
-	/*
-	 * NB: the following larger exponents are enabled by use of __pmUnits
-	 * above.  They are necessary because pmUnitsStr emits foo-dim=-8 as
-	 * "/ foo^8", * so the denominator can encounter wider-than-bitfield
-	 * exponents.
-	 */
+	/* NB: the following larger exponents are enabled by use of pmUnitsBig above. */
+	/* They happen to be necessary because pmUnitsStr emits foo-dim=-8 as "/ foo^8", */
+	/* so the denominator could encounter wider-than-bitfield exponents. */
 	{"^8", 8}, {"^9", 9}, {"^10", 10}, {"^11", 11},
 	{"^12", 12}, {"^13", 13}, {"^14", 14}, {"^15", 15},
 	{"^1", 1},
@@ -1201,8 +1212,8 @@ __pmParseUnitsStrPart(const char *str, const char *str_end, __pmUnits *out, doub
 	    continue;
 	}
 
-	if (*ptr == '-' || *ptr == '.' || isdigit((int)(*ptr))) {
-	    /* possible floating-point number - parse with strtod(3). */
+	if (*ptr == '-' || *ptr == '.' || isdigit((int)(*ptr))) {	/* possible floating-point number */
+	    /* parse it with strtod(3). */
 	    char *newptr;
 	    errno = 0;
 	    double m = strtod(ptr, &newptr);
@@ -1226,11 +1237,9 @@ __pmParseUnitsStrPart(const char *str, const char *str_end, __pmUnits *out, doub
                         (ptr+strlen(q)==str_end)))          \
                        ? (ptr += strlen(q), 1) : 0)
 
-	/*
-	 * Parse base unit, only once per input string.  We don't support
-	 * "microsec millisec", as that would require arithmetic on the scales.
-	 * We could support "sec sec" (and turn that into sec^2) in the future.
-	 */
+	/* parse base unit, only once per input string.  We don't support */
+	/* "microsec millisec", as that would require arithmetic on the scales. */
+	/* We could support "sec sec" (and turn that into sec^2) in the future. */
 	if (dimension == d_none && out->dimTime == 0)
 	    for (i = 0; i < num_time_keywords; i++)
 		if (streqskip(time_keywords[i].keyword)) {
@@ -1313,8 +1322,13 @@ pmParseUnitsStr(const char *str, pmUnits *out, double *multiplier, char **errMsg
 {
     const char *slash;
     double dividend_mult, divisor_mult;
-    __pmUnits dividend, divisor;
-    int dim, sts;
+    pmUnitsBig dividend, divisor;
+    int sts;
+    int dim;
+
+    assert(str);
+    assert(out);
+    assert(multiplier);
 
     memset(out, 0, sizeof(*out));
 

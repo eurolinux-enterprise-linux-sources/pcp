@@ -17,6 +17,7 @@
  * for more details.
  */
 #include "pmapi.h"
+#include "impl.h"
 #include "pmda.h"
 #include "domain.h"
 #include <dirent.h>
@@ -165,14 +166,14 @@ mounts_config_file_check(void)
 {
     struct stat statbuf;
     static int  last_error;
-    int sep = pmPathSeparator();
+    int sep = __pmPathSeparator();
 
     pmsprintf(mypath, sizeof(mypath), "%s%c" "mounts" "%c" "mounts.conf",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
     if (stat(mypath, &statbuf) == -1) {
 	if (oserror() != last_error) {
 	    last_error = oserror();
-	    pmNotifyErr(LOG_WARNING, "stat failed on %s: %s\n",
+	    __pmNotifyErr(LOG_WARNING, "stat failed on %s: %s\n",
 			mypath, pmErrStr(last_error));
 	}
     } else {
@@ -234,12 +235,12 @@ mounts_grab_config_info(void)
     char *q;
     size_t size;
     int mount_number = 0;
-    int sep = pmPathSeparator();
+    int sep = __pmPathSeparator();
 
     pmsprintf(mypath, sizeof(mypath), "%s%c" "mounts" "%c" "mounts.conf",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
     if ((fp = fopen(mypath, "r")) == NULL) {
-	pmNotifyErr(LOG_ERR, "fopen on %s failed: %s\n",
+	__pmNotifyErr(LOG_ERR, "fopen on %s failed: %s\n",
 			  mypath, pmErrStr(-oserror()));
 	if (mounts) {
 	    free(mounts);
@@ -257,12 +258,12 @@ mounts_grab_config_info(void)
 	    *q = '\0';
 	} else {
 	    /* This means the line was too long */
-	    pmNotifyErr(LOG_WARNING, "line %d in the config file too long\n",
+	    __pmNotifyErr(LOG_WARNING, "line %d in the config file too long\n",
 			mount_number+1);
 	}
 	size = (mount_number + 1) * sizeof(pmdaInstid);
 	if ((mounts = realloc(mounts, size)) == NULL)
-	    pmNoMem("process", size, PM_FATAL_ERR);
+	    __pmNoMem("process", size, PM_FATAL_ERR);
 	mounts[mount_number].i_name = malloc(strlen(mount_name) + 1);
 	strcpy(mounts[mount_number].i_name, mount_name);
 	mounts[mount_number].i_inst = mount_number;
@@ -272,7 +273,7 @@ mounts_grab_config_info(void)
 
 done:
     if (mounts == NULL)
-	pmNotifyErr(LOG_WARNING, "\"mounts\" instance domain is empty");
+	__pmNotifyErr(LOG_WARNING, "\"mounts\" instance domain is empty");
     indomtab[MOUNTS_INDOM].it_set = mounts;
     indomtab[MOUNTS_INDOM].it_numinst = mount_number;
     mount_list = realloc(mount_list, (mount_number)*sizeof(mountinfo));
@@ -364,16 +365,17 @@ mounts_fetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *pmda)
 static int
 mounts_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 {
+    __pmID_int	*idp = (__pmID_int *)&(mdesc->m_desc.pmid);
     __uint64_t	ull, used;
     mountinfo	*mp;
 
-    if (pmID_cluster(mdesc->m_desc.pmid) != MOUNTS_CLUSTER)
+    if (idp->cluster != MOUNTS_CLUSTER)
 	return PM_ERR_PMID;
     if (inst >= indomtab[MOUNTS_INDOM].it_numinst)
 	return PM_ERR_INST;
     mp = &mount_list[inst];
 
-    switch (pmID_item(mdesc->m_desc.pmid)) {
+    switch (idp->item) {
     case MOUNTS_DEVICE:
 	atom->cp = mp->device;
 	break;
@@ -388,65 +390,65 @@ mounts_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	break;
     case MOUNTS_CAPACITY:
 	if ((mp->flags & MOUNTS_FLAG_STAT) == 0)
-	    return PMDA_FETCH_NOVALUES;
+	    return PM_ERR_AGAIN;
 	atom->ull = (__uint64_t)mp->capacity * mp->bsize / 1024;
 	break;
     case MOUNTS_USED:
 	if ((mp->flags & MOUNTS_FLAG_STAT) == 0)
-	    return PMDA_FETCH_NOVALUES;
+	    return PM_ERR_AGAIN;
 	atom->ull = ((__uint64_t)mp->capacity - mp->bfree) * mp->bsize / 1024;
 	break;
     case MOUNTS_FREE:
 	if ((mp->flags & MOUNTS_FLAG_STAT) == 0)
-	    return PMDA_FETCH_NOVALUES;
+	    return PM_ERR_AGAIN;
 	atom->ull = (__uint64_t)mp->bfree * mp->bsize / 1024;
 	break;
     case MOUNTS_MAXFILES:
 	if ((mp->flags & MOUNTS_FLAG_STAT) == 0)
-	    return PMDA_FETCH_NOVALUES;
+	    return PM_ERR_AGAIN;
 	atom->ull = mp->files;
 	break;
     case MOUNTS_USEDFILES:
 	if ((mp->flags & MOUNTS_FLAG_STAT) == 0)
-	    return PMDA_FETCH_NOVALUES;
+	    return PM_ERR_AGAIN;
 	atom->ull = mp->files - mp->ffree;
 	break;
     case MOUNTS_FREEFILES:
 	if ((mp->flags & MOUNTS_FLAG_STAT) == 0)
-	    return PMDA_FETCH_NOVALUES;
+	    return PM_ERR_AGAIN;
 	atom->ull = mp->ffree;
 	break;
     case MOUNTS_FULL:
 	if ((mp->flags & MOUNTS_FLAG_STAT) == 0)
-	    return PMDA_FETCH_NOVALUES;
+	    return PM_ERR_AGAIN;
 	used = (__uint64_t)(mp->capacity - mp->bfree);
 	ull = used + (__uint64_t)mp->bavail;
 	atom->d = (100.0 * (double)used) / (double)ull;
 	break;
     case MOUNTS_BLOCKSIZE:
 	if ((mp->flags & MOUNTS_FLAG_STAT) == 0)
-	    return PMDA_FETCH_NOVALUES;
+	    return PM_ERR_AGAIN;
 	atom->ul = mp->bsize;
 	break;
     case MOUNTS_AVAIL:
 	if ((mp->flags & MOUNTS_FLAG_STAT) == 0)
-	    return PMDA_FETCH_NOVALUES;
+	    return PM_ERR_AGAIN;
 	atom->ull = (__uint64_t)mp->bavail * mp->bsize / 1024;
 	break;
     case MOUNTS_AVAILFILES:
 	if ((mp->flags & MOUNTS_FLAG_STAT) == 0)
-	    return PMDA_FETCH_NOVALUES;
+	    return PM_ERR_AGAIN;
 	atom->ull = mp->favail;
 	break;
     case MOUNTS_READONLY:
 	if ((mp->flags & MOUNTS_FLAG_STAT) == 0)
-	    return PMDA_FETCH_NOVALUES;
+	    return PM_ERR_AGAIN;
 	atom->ul = (mp->flags & MOUNTS_FLAG_RO) ? 1 : 0;
 	break;
     default:
 	return PM_ERR_PMID;
     }
-    return PMDA_FETCH_STATIC;
+    return 0;
 }
 
 /*
@@ -457,18 +459,18 @@ __PMDA_INIT_CALL
 mounts_init(pmdaInterface *dp)
 {
     if (isDSO) {
-	int sep = pmPathSeparator();
+	int sep = __pmPathSeparator();
 	pmsprintf(mypath, sizeof(mypath), "%s%c" "mounts" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-	pmdaDSO(dp, PMDA_INTERFACE_7, "mounts DSO", mypath);
+	pmdaDSO(dp, PMDA_INTERFACE_2, "mounts DSO", mypath);
     } else {
-	pmSetProcessIdentity(username);
+	__pmSetProcessIdentity(username);
     }
 
     if (dp->status != 0)
         return;
 
-    dp->version.seven.fetch = mounts_fetch;
+    dp->version.two.fetch = mounts_fetch;
     pmdaSetFetchCallBack(dp, mounts_fetchCallBack);
 
     pmdaInit(dp, indomtab, sizeof(indomtab)/sizeof(indomtab[0]), 
@@ -499,16 +501,16 @@ static pmdaOptions	opts = {
 int
 main(int argc, char **argv)
 {
-    int			sep = pmPathSeparator();
+    int			sep = __pmPathSeparator();
     pmdaInterface	desc;
 
     isDSO = 0;
-    pmSetProgname(argv[0]);
-    pmGetUsername(&username);
+    __pmSetProgname(argv[0]);
+    __pmGetUsername(&username);
 
     pmsprintf(mypath, sizeof(mypath), "%s%c" "mounts" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-    pmdaDaemon(&desc, PMDA_INTERFACE_7, pmGetProgname(), MOUNTS,
+    pmdaDaemon(&desc, PMDA_INTERFACE_2, pmProgname, MOUNTS,
 		"mounts.log", mypath);
 
     pmdaGetOptions(argc, argv, &opts, &desc);

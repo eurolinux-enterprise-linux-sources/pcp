@@ -80,8 +80,6 @@ sample {
     event
     dupnames
     negative
-    ghosts	SAMPLE:*:*
-    controller
 }
 
 sample.long {
@@ -175,11 +173,6 @@ sample.bad {
     unknown	SAMPLE:0:54
     nosupport	SAMPLE:0:55
     novalues	SAMPLE:0:138
-    fetch
-}
-
-sample.bad.fetch {
-    again	SAMPLE:0:154
 }
 
 sample.wrap {
@@ -323,8 +316,4 @@ sample.negative.discrete {
     m_64		SAMPLE:0:150
     m_float		SAMPLE:0:151
     m_double		SAMPLE:0:152
-}
-
-sample.controller {
-    mirage		SAMPLE:0:155
 }

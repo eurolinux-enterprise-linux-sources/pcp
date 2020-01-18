@@ -10,10 +10,9 @@ echo "QA output created by $seq"
 
 . ./common.webapi
 . ./common.python
-. ./common.containers
+. ./common.docker
 
 _check_containers
-_check_docker_binary
 _check_docker_images busybox
 
 _check_pmwebd

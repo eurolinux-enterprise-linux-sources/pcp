@@ -14,7 +14,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #define SOCKET_INTERNAL
 #include "internal.h"
 #include <assert.h>
@@ -181,7 +181,7 @@ __pmCloseSocket(int fd)
 static char *
 dbpath(char *path, size_t size, char *db_method)
 {
-    int sep = pmPathSeparator();
+    int sep = __pmPathSeparator();
     const char *empty_homedir = "";
     char *homedir = getenv("HOME");
     char *nss_method = getenv("PCP_SECURE_DB_METHOD");
@@ -535,7 +535,7 @@ __pmAuthLogCB(void *context, int priority, const char *message)
 	priority = LOG_INFO;
 	break;
     }
-    pmNotifyErr(priority, "%s", message);
+    __pmNotifyErr(priority, "%s", message);
     return SASL_OK;
 }
 
@@ -652,12 +652,12 @@ __pmGetAttrConsole(const char *prompt, int secret)
 
     input = fopen(console, "r");
     if (input == NULL) {
-	pmNotifyErr(LOG_ERR, "opening input terminal for read\n");
+	__pmNotifyErr(LOG_ERR, "opening input terminal for read\n");
 	return NULL;
     }
     output = fopen(console, "w");
     if (output == NULL) {
-	pmNotifyErr(LOG_ERR, "opening output terminal for write\n");
+	__pmNotifyErr(LOG_ERR, "opening output terminal for write\n");
 	fclose(input);
 	return NULL;
     }
@@ -843,7 +843,7 @@ __pmSecureClientInit(int flags)
     if ((flags & PDU_FLAG_NO_NSS_INIT) == 0) {
 	sts = __pmInitCertificates();
 	if (sts < 0)
-	    pmNotifyErr(LOG_WARNING, "__pmConnectPMCD: "
+	    __pmNotifyErr(LOG_WARNING, "__pmConnectPMCD: "
 			  "certificate database exists, but failed initialization");
     }
     return sts;
@@ -868,7 +868,7 @@ __pmSecureClientIPCFlags(int fd, int flags, const char *hostname, __pmHashCtl *a
 	if (sts < 0)
 	    return __pmSecureSocketsError(PR_GetError());
 	if ((socket.sslFd = SSL_ImportFD(NULL, socket.nsprFd)) == NULL) {
-	    pmNotifyErr(LOG_ERR, "SecureClientIPCFlags: importing socket into SSL");
+	    __pmNotifyErr(LOG_ERR, "SecureClientIPCFlags: importing socket into SSL");
 	    return PM_ERR_IPC;
 	}
 	socket.nsprFd = socket.sslFd;
@@ -1018,8 +1018,8 @@ int
 __pmInitAuthServer(void)
 {
     __pmInitAuthPaths();
-    if (sasl_server_init(common_callbacks, pmGetProgname()) != SASL_OK) {
-	pmNotifyErr(LOG_ERR, "Failed to start authenticating server");
+    if (sasl_server_init(common_callbacks, pmProgname) != SASL_OK) {
+	__pmNotifyErr(LOG_ERR, "Failed to start authenticating server");
 	return -EINVAL;
     }
     return 0;
@@ -1389,7 +1389,7 @@ sockOptValue(const void *option_value, __pmSockLen option_len)
     case sizeof(int):
         return *(int *)option_value;
     default:
-        pmNotifyErr(LOG_ERR, "sockOptValue: invalid option length: %d\n", option_len);
+        __pmNotifyErr(LOG_ERR, "sockOptValue: invalid option length: %d\n", option_len);
 	break;
     }
     return 0;
@@ -1439,7 +1439,7 @@ __pmSetSockOpt(int fd, int level, int option_name, const void *option_value,
 		option_data.value.reuse_addr = sockOptValue(option_value, option_len);
 		break;
 	    default:
-	        pmNotifyErr(LOG_ERR, "%s:__pmSetSockOpt: unimplemented option_name for SOL_SOCKET: %d\n",
+	        __pmNotifyErr(LOG_ERR, "%s:__pmSetSockOpt: unimplemented option_name for SOL_SOCKET: %d\n",
 			      __FILE__, option_name);
 		return -1;
 	    }
@@ -1450,7 +1450,7 @@ __pmSetSockOpt(int fd, int level, int option_name, const void *option_value,
 		option_data.value.no_delay = sockOptValue(option_value, option_len);
 		break;
 	    }
-	    pmNotifyErr(LOG_ERR, "%s:__pmSetSockOpt: unimplemented option_name for IPPROTO_TCP: %d\n",
+	    __pmNotifyErr(LOG_ERR, "%s:__pmSetSockOpt: unimplemented option_name for IPPROTO_TCP: %d\n",
 			  __FILE__, option_name);
 	    return -1;
 	case IPPROTO_IPV6:
@@ -1463,11 +1463,11 @@ __pmSetSockOpt(int fd, int level, int option_name, const void *option_value,
 	        fd = PR_FileDesc2NativeHandle(socket.nsprFd);
 		return setsockopt(fd, level, option_name, option_value, option_len);
 	    }
-	    pmNotifyErr(LOG_ERR, "%s:__pmSetSockOpt: unimplemented option_name for IPPROTO_IPV6: %d\n",
+	    __pmNotifyErr(LOG_ERR, "%s:__pmSetSockOpt: unimplemented option_name for IPPROTO_IPV6: %d\n",
 			  __FILE__, option_name);
 	    return -1;
 	default:
-	    pmNotifyErr(LOG_ERR, "%s:__pmSetSockOpt: unimplemented level: %d\n", __FILE__, level);
+	    __pmNotifyErr(LOG_ERR, "%s:__pmSetSockOpt: unimplemented level: %d\n", __FILE__, level);
 	    return -1;
 	}
 
@@ -1503,7 +1503,7 @@ __pmGetSockOpt(int fd, int level, int option_name, void *option_value,
 	      return getsockopt(fd, level, option_name, option_value, option_len);
 	  }
 	  default:
-	      pmNotifyErr(LOG_ERR,
+	      __pmNotifyErr(LOG_ERR,
 			"%s:__pmGetSockOpt: unimplemented option_name for SOL_SOCKET: %d\n",
 			__FILE__, option_name);
 	      return -1;
@@ -1511,7 +1511,7 @@ __pmGetSockOpt(int fd, int level, int option_name, void *option_value,
 	  break;
 
 	default:
-	    pmNotifyErr(LOG_ERR, "%s:__pmGetSockOpt: unimplemented level: %d\n", __FILE__, level);
+	    __pmNotifyErr(LOG_ERR, "%s:__pmGetSockOpt: unimplemented level: %d\n", __FILE__, level);
 	    break;
 	}
 	return -1;

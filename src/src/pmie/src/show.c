@@ -20,6 +20,7 @@
 #include <ctype.h>
 #include <assert.h>
 #include "show.h"
+#include "impl.h"
 #include "dstruct.h"
 #include "lexicon.h"
 #include "pragmatics.h"
@@ -469,40 +470,6 @@ showNum(Expr *x, int nth, size_t length, char **string)
     return dog - cat;
 }
 
-/*
- * format the ith value from x and append it to *string
- */
-static int
-concatvalue(Expr *x, int i, int length, char **string)
-{
-    if (x->sem == SEM_NUMVAR || x->sem == SEM_NUMCONST || x->sem == SEM_UNKNOWN)
-	length = showNum(x, i, length, string);
-    else if (x->sem == SEM_BOOLEAN)
-	length = showBoolean(x, i, length, string);
-    else if (x->sem == SEM_REGEX)
-	/* regex is compiled, cannot recover original string */
-	length = concat("/<regex>/", length, string);
-    else if (x->sem == SEM_CHAR) {
-	/* only 1st value is defined here (tspan is string length) */
-	if (i == 0)
-	    length = showString(x, length, string);
-    }
-    else if (x->sem == PM_SEM_INSTANT || x->sem == PM_SEM_DISCRETE) {
-	if (x->op == CND_FETCH && x->metrics != NULL && x->metrics->desc.type == PM_TYPE_STRING)
-	    length = showStringValue(x, i, length, string);
-	else
-	    length = showNum(x, i, length, string);
-    }
-    else {
-	/* oops, don't know how to display this type of value */
-	char msgbuf[30];
-	pmsprintf(msgbuf, sizeof(msgbuf), "concatvalue: botch sem=%d", x->sem);
-	length = concat(msgbuf, length, string);
-    }
-
-    return length;
-}
-
 static char *
 showConst(Expr *x)
 {
@@ -518,10 +485,30 @@ showConst(Expr *x)
 		first = 0;
 	    else
 		length = concat(" ", length, &string);
-	    length = concatvalue(x, i, length, &string);
-	    if (x->sem == SEM_CHAR)
+	    if (x->sem == SEM_NUMVAR || x->sem == SEM_NUMCONST || x->sem == SEM_UNKNOWN)
+		length = showNum(x, i, length, &string);
+	    else if (x->sem == SEM_BOOLEAN)
+		length = showBoolean(x, i, length, &string);
+	    else if (x->sem == SEM_REGEX)
+		/* regex is compiled, cannot recover original string */
+		length = concat("/<regex>/", length, &string);
+	    else if (x->sem == SEM_CHAR) {
+		length = showString(x, length, &string);
 		/* tspan is string length, not an iterator in this case */
 		break;
+	    }
+	    else if (x->sem == PM_SEM_INSTANT || x->sem == PM_SEM_DISCRETE) {
+		if (x->metrics != NULL && x->metrics->desc.type == PM_TYPE_STRING)
+		    length = showStringValue(x, i, length, &string);
+		else
+		    length = showNum(x, i, length, &string);
+	    }
+	    else {
+		/* oops, don't know how to display this type of value */
+		char msgbuf[30];
+		pmsprintf(msgbuf, sizeof(msgbuf), "showConst: botch sem=%d", x->sem);
+		length = concat(msgbuf, length, &string);
+	    }
 	}
     }
     return string;
@@ -1097,7 +1084,10 @@ formatSatisfyingValue(char *format, size_t length, char **string)
 			length = concat("<%i undefined>", length, string);
 		    break;
 		case 'v':
-		    length = concatvalue(x2, i, length, string);
+		    if (x2->sem == SEM_BOOLEAN)
+			length = showBoolean(x2, i, length, string);
+		    else	/* numeric value */
+			length = showNum(x2, i, length, string);
 		    break;
 		case 'c':
 		    if (conn)

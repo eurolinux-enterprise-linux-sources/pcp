@@ -29,5 +29,3 @@ install:	$(CMDTARGET)
 default_pcp:	default
 
 install_pcp:	install
-
-pmdumplog.o:	$(TOPDIR)/src/include/pcp/libpcp.h

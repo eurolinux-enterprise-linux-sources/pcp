@@ -19,7 +19,7 @@ _filter()
 	-e "/^sample\.seconds/s/= 1.[0-9][0-9]*/= 1/g" \
 	-e "/^sample\.seconds/s/= 1 /= NUMBER /g" \
 	-e "/^sample\.seconds/s/= 0 /= NUMBER /g" \
-	-e "/::genProfile/s/indom = [0-9.]*,/indom = NN.NN,/" \
+	-e "/::genProfile/s/id = [0-9]*,/id = NNN,/" \
 	-e "s/ptr = 0x[1-9a-f][0-9a-f]*/ptr = 0x########/g" \
 	-e "/lookupDesc:/s/29\.0\.2$/<pmid for sample.seconds>/" \
 	-e "/lookupDesc:/s/29\.0\.127$/<pmid for sample.event.type>/" \
@@ -33,7 +33,7 @@ _filter()
 	-e "/lookupDesc:/s/29\.0\.135$/<pmid for sample.event.param_aggregate>/" \
 	-e "/lookupDesc:/s/29\.0\.136$/<pmid for sample.event.records>/" \
 	-e "/lookupInDom:/s/29\.10$/<indom for sample.event.records>/" \
-	-e 's/^  [0-9][0-9]:[0-9][0-9]:[0-9][0-9]\.[0-9][0-9]*[0-9]/  <timestamp>/' \
+	-e 's/^  [0-9][0-9]:[0-9][0-9]:[0-9][0-9]\.[0-9][0-9][0-9]/  <timestamp>/' \
 
 }
 

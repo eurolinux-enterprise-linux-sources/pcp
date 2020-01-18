@@ -17,9 +17,7 @@ echo "QA output created by $seq"
 
 [ $PCP_PLATFORM = linux ] || _notrun "Device Mapper is Linux-specific (dm)"
 [ -d $PCP_PMDAS_DIR/dm ] || _notrun "dm PMDA directory is not installed"
-[ -x $PCP_PMDAS_DIR/dm/pmdadm ] || _notrun "pcp-pmda-dm package not installed"
-grep -qs "without support for dmstats" $PCP_PMDAS_DIR/dm/pmdadm && _notrun "PMDA not built with dmstats support"
-which dmsetup >/dev/null 2>&1 || _notrun "dmsetup from device-mapper package is not installed"
+which dmsetup >/dev/null 2>&1 || _notrun "dmsetup is not installed"
 
 root=$tmp.root
 export DM_SETUP_CACHE="cat $root/dmcache-caches"
@@ -46,9 +44,8 @@ _install_pmda()
 {
     # install the PMDA
     # Note: warnings from dmstats install are optional, so filter 'em out
-    # Note: VDO stats are exercised via separate tests, so filter 'em out
     #
-    cd $PCP_PMDAS_DIR/dm
+    cd $PCP_PMDAS_DIR/$iam
     $sudo ./Remove < /dev/null >/dev/null 2>&1
     $sudo ./Install < /dev/null >$tmp.out 2>&1
     cat $tmp.out \
@@ -60,16 +57,14 @@ _install_pmda()
 	-e '/Latest.*/d' \
 	-e '/Duplicate.*/d' \
 	-e '/^See also.*/d' \
-	-e '/^Check vdo metrics.*/d' \
 	-e '/^To use the dmstats metrics.*/d' \
 	-e '/^Check dmstats metrics/s/[0-9][0-9]* warnings, //' \
-	-e 's/[0-9]* values/X values/' \
     | tr -s '\n'
 }
 
 _remove_pmda()
 {
-    cd $PCP_PMDAS_DIR/dm
+    cd $PCP_PMDAS_DIR/$iam
     $sudo ./Remove < /dev/null > /dev/null 2>&1
 }
 
@@ -81,8 +76,7 @@ _cleanup()
     else
 	unset PCPQA_SYSTEMD
     fi
-    _restore_pmda_install dm
-    _service pcp restart 2>&1 | _filter_pcp_start
+    _service pcp restart | _filter_pcp_start
     _restore_auto_restart pmcd
     _wait_for_pmcd
     _wait_for_pmlogger
@@ -92,8 +86,9 @@ _cleanup()
     exit $status
 }
 
+iam=dm
 status=1 # failure is the default!
-trap "_cleanup" 0 1 2 3 15
+trap "_cleanup $iam" 0 1 2 3 15
 _stop_auto_restart pmcd
 
 $sudo rm -fr $root
@@ -117,7 +112,7 @@ cd $here
 
 echo
 echo "=== Installing Device Mapper PMDA ==="
-_prepare_pmda_install dm
+_prepare_pmda_install $iam
 _install_pmda
 
 echo

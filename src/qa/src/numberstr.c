@@ -3,6 +3,7 @@
  */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 int
 main(int argc, char *argv[])
@@ -10,9 +11,9 @@ main(int argc, char *argv[])
     double	d;
     char	*endptr;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
     if (argc != 2) {
-	fprintf(stderr, "Usage: %s double\n", pmGetProgname());
+	fprintf(stderr, "Usage: %s double\n", pmProgname);
 	exit(1);
     }
 

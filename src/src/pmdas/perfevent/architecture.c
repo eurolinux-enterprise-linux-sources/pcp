@@ -14,12 +14,11 @@
 
 #include "architecture.h"
 
-#include "pmapi.h"
+#include <pcp/pmapi.h>
 #include <dirent.h>
 #include <limits.h>
 
 #define SYSFS_NODE_PATH "devices/system/node"
-#define SYSFS_ONLINE_CPU_PATH	"devices/system/cpu"
 
 static int numanodefilter(const struct dirent *entry)
 {
@@ -200,43 +199,23 @@ static void retrieve_numainfo(archinfo_t *inst)
 
 static void retrieve_cpuinfo(archinfo_t *inst)
 {
-    int ncpus;
-    FILE *cpulist;
-    char online_cpupath[PATH_MAX], *line = NULL;
-    const char *basepath;
-    size_t len = 0;
+    int i;
+    long ncpus;
    
-    basepath = getenv("SYSFS_MOUNT_POINT");
-    if(NULL == basepath)
-	 basepath = "/sys";
+    ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 
-    pmsprintf(online_cpupath, sizeof(online_cpupath), "%s/" SYSFS_ONLINE_CPU_PATH "/online", basepath);
-    cpulist = fopen(online_cpupath, "r");
-    if(cpulist)
+    if(ncpus < 0 )
     {
-	if(getline(&line, &len, cpulist) > 0)
-	{
-	     ncpus = parse_delimited_list(line, NULL);
-	     if (ncpus > 0)
-	     {
-		init_cpulist(&inst->cpus, ncpus);
-		parse_delimited_list(line, inst->cpus.index);
-		fclose(cpulist);
-		return;
-	     }
-	     else
-	     {
-		fclose(cpulist);
-		goto out;
-	     }
-	}
+        fprintf(stderr, "Unable to determine number of CPUs: assuming 1\n");
+        ncpus = 1;
     }
 
-out:
-    fprintf(stderr, "Unable to determine number of CPUs: assuming 1\n");
-    ncpus = 1;
     init_cpulist(&inst->cpus, ncpus);
-    inst->cpus.index[0] = 0;
+    
+    for(i = 0; i < ncpus; ++i)
+    {
+        inst->cpus.index[i] = i;
+    }
 }
 
 archinfo_t *get_architecture()

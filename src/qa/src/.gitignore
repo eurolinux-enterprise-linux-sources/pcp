@@ -18,14 +18,12 @@ badmmv
 badpmcdpmid
 badpmda
 batch_import.pl
-bcc_profile
 chain
 check_fault_injection
 check_import
 check_import_name
 check_import.pl
 check_pmiend_fdleak
-checkstructs
 chkacc1
 chkacc2
 chkacc3
@@ -48,7 +46,6 @@ clienttimeout
 compare
 context_fd_leak
 context_test
-countmark
 crashpmcd
 defctx
 derived
@@ -74,7 +71,6 @@ fetchrate_lite
 fetchrate_lite.c
 getconfig
 getcontexthost
-getdomainname
 getoptions
 getversion
 github-50
@@ -88,7 +84,6 @@ hrunpack
 httpfetch
 import_limit_test.pl
 indom
-indom2int
 int2indom
 int2pmid
 interp0
@@ -98,22 +93,17 @@ interp3
 interp4
 interp_bug
 interp_bug2
-iohack
 ipc
 json_test
 keycache
 keycache2
 killparent
-labels
-libpcp.h
 loadderived
 loadconfig2
 logcontrol
 lookupnametest
 mark-bug
 matchInstanceName
-mergelabels
-mergelabelsets
 mkfiles
 mmv_genstats
 mmv_instances
@@ -126,11 +116,6 @@ mmv2_genstats
 mmv2_instances
 mmv2_nostats
 mmv2_simple
-mmv3_labels
-mmv3_simple
-mmv3_bad_labels
-mmv3_nostats
-mmv3_genstats
 multictx
 multifetch
 multithread0
@@ -145,7 +130,6 @@ multithread8
 multithread9
 multithread10
 multithread11
-multithread12
 mv-bar.1
 mv-bar.2
 mv-bar.3
@@ -168,7 +152,6 @@ parsehostattrs
 parsehostspec
 parseinterval
 parsemetricspec
-permslist.old
 pcp_lite_crash
 pdubufbounds
 pducheck
@@ -180,7 +163,6 @@ pmconvscale
 pmdacache
 pmdaqueue
 pmdashutdown
-pmid2int
 pmlcmacro
 pmnsinarchives
 pmnsunload
@@ -190,7 +172,6 @@ pmsocks_objstyle
 pmsprintf
 pmtimezone.so
 proc_test
-progname
 pv
 pv64
 pv64.c
@@ -201,12 +182,9 @@ record-setarg
 rootclient
 rtimetest
 scale
-scanmeta
 semstr
-sha1int2ext
 slow_af
 sortinst
-spawn
 statvfs
 store
 storepast
@@ -217,7 +195,6 @@ sum16
 tabort
 template
 t_fetch
-timeshift
 torture_api
 torture_cache
 torture-eol
@@ -225,7 +202,6 @@ torture_indom
 torture_logmeta
 torture_pmns
 torture_trace
-traverse_return_codes
 tstate
 tztest
 unpack

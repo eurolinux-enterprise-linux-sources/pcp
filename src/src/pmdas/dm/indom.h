@@ -18,12 +18,11 @@
 #define INDOM_H
 
 enum {
-    DM_CACHE_INDOM = 0,		/* Caches */
-    DM_THIN_POOL_INDOM = 1,	/* Thin Pools */
-    DM_THIN_VOL_INDOM = 2,	/* Thin Volumes */
-    DM_STATS_INDOM = 3,		/* Dmstats basic counter */
-    DM_HISTOGRAM_INDOM = 4,	/* Dmstats latency histogram */
-    DM_VDODEV_INDOM = 5,	/* VDO devices */
+    DM_CACHE_INDOM = 0,		/* 0 -- Caches */
+    DM_THIN_POOL_INDOM = 1,	/* 1 -- Thin Pools */
+    DM_THIN_VOL_INDOM = 2,	/* 2 -- Thin Volumes */
+    DM_STATS_INDOM = 3,         /* 3 -- Dmstats basic counter */
+    DM_HISTOGRAM_INDOM = 4,     /* 4 -- Dmstats latency histogram */
     NUM_INDOMS
 };
 

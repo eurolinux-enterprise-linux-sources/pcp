@@ -13,6 +13,7 @@
  */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include "txmon.h"

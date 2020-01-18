@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 int
 main(int argc, char **argv)
@@ -30,7 +31,7 @@ main(int argc, char **argv)
     pmResult	*resp;
     char	*endnum;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "a:D:h:l:n:s:t:T:?")) != EOF) {
 	switch (c) {
@@ -50,7 +51,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -113,9 +114,9 @@ Options\n\
     }
 
     if (logfile != (char *)0) {
-	pmOpenLog(cmd, logfile, stderr, &sts);
-	if (sts != 1) {
-	    fprintf(stderr, "%s: Could not open logfile\n", pmGetProgname());
+	__pmOpenLog(cmd, logfile, stderr, &sts);
+	if (sts < 0) {
+	    fprintf(stderr, "%s: Could not open logfile\n", pmProgname);
 	}
     }
 

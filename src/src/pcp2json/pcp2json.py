@@ -1,6 +1,6 @@
 #!/usr/bin/env pmpython
 #
-# Copyright (C) 2015-2019 Marko Myllynen <myllynen@redhat.com>
+# Copyright (C) 2015-2017 Marko Myllynen <myllynen@redhat.com>
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
@@ -19,7 +19,7 @@
 # pylint: disable=too-many-boolean-expressions, too-many-statements
 # pylint: disable=too-many-instance-attributes, too-many-locals
 # pylint: disable=too-many-branches, too-many-nested-blocks, too-many-arguments
-# pylint: disable=broad-except
+# pylint: disable=bare-except, broad-except
 
 """ PCP to JSON Bridge """
 
@@ -30,12 +30,17 @@ import time
 import sys
 
 # Our imports
-import json
+try:
+    import json
+except:
+    import simplejson as json
+import socket
 import os
 
 # PCP Python PMAPI
 from pcp import pmapi, pmconfig
-from cpmapi import PM_CONTEXT_ARCHIVE, PM_IN_NULL, PM_DEBUG_APPL1, PM_TIME_SEC
+from cpmapi import PM_CONTEXT_ARCHIVE, PM_ERR_EOL, PM_IN_NULL, PM_DEBUG_APPL1
+from cpmapi import PM_TIME_SEC
 
 if sys.version_info[0] >= 3:
     long = int # pylint: disable=redefined-builtin
@@ -60,13 +65,9 @@ class PCP2JSON(object):
         # Configuration directives
         self.keys = ('source', 'output', 'derived', 'header', 'globals',
                      'samples', 'interval', 'type', 'precision', 'daemonize',
-                     'timefmt', 'extended', 'everything', 'exact_types',
+                     'timefmt', 'extended', 'everything',
                      'count_scale', 'space_scale', 'time_scale', 'version',
-                     'count_scale_force', 'space_scale_force', 'time_scale_force',
-                     'type_prefer', 'precision_force', 'limit_filter', 'limit_filter_force',
-                     'live_filter', 'rank', 'invert_filter', 'predicate', 'names_change',
-                     'speclocal', 'instances', 'ignore_incompat', 'ignore_unknown',
-                     'omit_flat')
+                     'speclocal', 'instances', 'ignore_incompat', 'omit_flat')
 
         # The order of preference for options (as present):
         # 1 - command line options
@@ -85,35 +86,21 @@ class PCP2JSON(object):
         self.opts.pmSetOptionInterval(str(60)) # 60 sec
         self.delay = 0
         self.type = 0
-        self.type_prefer = self.type
         self.ignore_incompat = 0
-        self.ignore_unknown = 0
-        self.names_change = 0 # ignore
         self.instances = []
-        self.live_filter = 0
-        self.rank = 0
-        self.limit_filter = 0
-        self.limit_filter_force = 0
-        self.invert_filter = 0
-        self.predicate = None
         self.omit_flat = 0
         self.precision = 3 # .3f
-        self.precision_force = None
         self.timefmt = TIMEFMT
         self.interpol = 0
         self.count_scale = None
-        self.count_scale_force = None
         self.space_scale = None
-        self.space_scale_force = None
         self.time_scale = None
-        self.time_scale_force = None
 
         # Not in pcp2json.conf, won't overwrite
         self.outfile = None
 
         self.extended = 0
         self.everything = 0
-        self.exact_types = 0
 
         # Internal
         self.runtime = -1
@@ -124,8 +111,7 @@ class PCP2JSON(object):
 
         # Performance metrics store
         # key - metric name
-        # values - 0:txt label, 1:instance(s), 2:unit/scale, 3:type,
-        #          4:width, 5:pmfg item, 6:precision, 7:limit
+        # values - 0:label, 1:instance(s), 2:unit/scale, 3:type, 4:width, 5:pmfg item
         self.metrics = OrderedDict()
         self.pmfg = None
         self.pmfg_ts = None
@@ -135,14 +121,13 @@ class PCP2JSON(object):
         self.pmconfig.read_options()
         self.pmconfig.read_cmd_line()
         self.pmconfig.prepare_metrics()
-        self.pmconfig.set_signal_handler()
 
     def options(self):
         """ Setup default command line argument option handling """
         opts = pmapi.pmOptions()
         opts.pmSetOptionCallback(self.option)
         opts.pmSetOverrideCallback(self.option_override)
-        opts.pmSetShortOptions("a:h:LK:c:Ce:D:V?HGA:S:T:O:s:t:rRIi:jJ:4:58:9:nN:vP:0:q:b:y:Q:B:Y:F:f:Z:zxXE")
+        opts.pmSetShortOptions("a:h:LK:c:Ce:D:V?HGA:S:T:O:s:t:rIi:vP:q:b:y:F:f:Z:zxX")
         opts.pmSetShortUsage("[option...] metricspec [...]")
 
         opts.pmSetLongOptionHeader("General options")
@@ -156,7 +141,7 @@ class PCP2JSON(object):
         opts.pmSetLongOption("check", 0, "C", "", "check config and metrics and exit")
         opts.pmSetLongOption("output-file", 1, "F", "OUTFILE", "output file")
         opts.pmSetLongOption("derived", 1, "e", "FILE|DFNT", "derived metrics definitions")
-        opts.pmSetLongOption("daemonize", 0, "", "", "daemonize on startup")
+        self.daemonize = opts.pmSetLongOption("daemonize", 0, "", "", "daemonize on startup") # > 1
         opts.pmSetLongOptionDebug()        # -D/--debug
         opts.pmSetLongOptionVersion()      # -V/--version
         opts.pmSetLongOptionHelp()         # -?/--help
@@ -173,49 +158,36 @@ class PCP2JSON(object):
         opts.pmSetLongOptionTimeZone()     # -Z/--timezone
         opts.pmSetLongOptionHostZone()     # -z/--hostzone
         opts.pmSetLongOption("raw", 0, "r", "", "output raw counter values (no rate conversion)")
-        opts.pmSetLongOption("raw-prefer", 0, "R", "", "prefer output raw counter values (no rate conversion)")
         opts.pmSetLongOption("ignore-incompat", 0, "I", "", "ignore incompatible instances (default: abort)")
-        opts.pmSetLongOption("ignore-unknown", 0, "5", "", "ignore unknown metrics (default: abort)")
-        opts.pmSetLongOption("names-change", 1, "4", "ACTION", "update/ignore/abort on PMNS change (default: ignore)")
         opts.pmSetLongOption("instances", 1, "i", "STR", "instances to report (default: all current)")
-        opts.pmSetLongOption("live-filter", 0, "j", "", "perform instance live filtering")
-        opts.pmSetLongOption("rank", 1, "J", "COUNT", "limit results to COUNT highest/lowest valued instances")
-        opts.pmSetLongOption("limit-filter", 1, "8", "LIMIT", "default limit for value filtering")
-        opts.pmSetLongOption("limit-filter-force", 1, "9", "LIMIT", "forced limit for value filtering")
-        opts.pmSetLongOption("invert-filter", 0, "n", "", "perform ranking before live filtering")
-        opts.pmSetLongOption("predicate", 1, "N", "METRIC", "set predicate filter reference metric")
-        opts.pmSetLongOption("omit-flat", 0, "v", "", "omit single-valued metrics")
+        opts.pmSetLongOption("omit-flat", 0, "v", "", "omit single-valued metrics with -i (default: include)")
         opts.pmSetLongOption("timestamp-format", 1, "f", "STR", "strftime string for timestamp format")
-        opts.pmSetLongOption("precision", 1, "P", "N", "prefer N digits after decimal separator (default: 3)")
-        opts.pmSetLongOption("precision-force", 1, "0", "N", "force N digits after decimal separator")
+        opts.pmSetLongOption("precision", 1, "P", "N", "N digits after the decimal separator (default: 3)")
         opts.pmSetLongOption("count-scale", 1, "q", "SCALE", "default count unit")
-        opts.pmSetLongOption("count-scale-force", 1, "Q", "SCALE", "forced count unit")
         opts.pmSetLongOption("space-scale", 1, "b", "SCALE", "default space unit")
-        opts.pmSetLongOption("space-scale-force", 1, "B", "SCALE", "forced space unit")
         opts.pmSetLongOption("time-scale", 1, "y", "SCALE", "default time unit")
-        opts.pmSetLongOption("time-scale-force", 1, "Y", "SCALE", "forced time unit")
 
         opts.pmSetLongOption("with-extended", 0, "x", "", "write extended information about metrics")
         opts.pmSetLongOption("with-everything", 0, "X", "", "write everything, incl. internal IDs")
-        opts.pmSetLongOption("exact-types", 0, "E", "", "output numbers as number data types not strings")
 
         return opts
 
     def option_override(self, opt):
         """ Override standard PCP options """
-        if opt in ('g', 'H', 'K', 'n', 'N', 'p'):
+        if opt == 'H' or opt == 'K':
             return 1
         return 0
 
-    def option(self, opt, optarg, _index):
-        """ Perform setup for individual command line option """
-        if opt == 'daemonize':
+    def option(self, opt, optarg, index):
+        """ Perform setup for an individual command line option """
+        if index == self.daemonize and opt == '':
             self.daemonize = 1
-        elif opt == 'K':
-            if not self.speclocal or not self.speclocal.startswith(";"):
-                self.speclocal = ";" + optarg
+            return
+        if opt == 'K':
+            if not self.speclocal or not self.speclocal.startswith("K:"):
+                self.speclocal = "K:" + optarg
             else:
-                self.speclocal = self.speclocal + ";" + optarg
+                self.speclocal = self.speclocal + "|" + optarg
         elif opt == 'c':
             self.config = optarg
         elif opt == 'C':
@@ -226,77 +198,42 @@ class PCP2JSON(object):
                 sys.exit(1)
             self.outfile = optarg
         elif opt == 'e':
-            if not self.derived or not self.derived.startswith(";"):
-                self.derived = ";" + optarg
-            else:
-                self.derived = self.derived + ";" + optarg
+            self.derived = optarg
         elif opt == 'H':
             self.header = 0
         elif opt == 'G':
             self.globals = 0
         elif opt == 'r':
             self.type = 1
-        elif opt == 'R':
-            self.type_prefer = 1
         elif opt == 'I':
             self.ignore_incompat = 1
-        elif opt == '5':
-            self.ignore_unknown = 1
-        elif opt == '4':
-            if optarg == 'ignore':
-                self.names_change = 0
-            elif optarg == 'abort':
-                self.names_change = 1
-            elif optarg == 'update':
-                self.names_change = 2
-            else:
-                sys.stderr.write("Unknown names-change action '%s' specified.\n" % optarg)
-                sys.exit(1)
         elif opt == 'i':
             self.instances = self.instances + self.pmconfig.parse_instances(optarg)
-        elif opt == 'j':
-            self.live_filter = 1
-        elif opt == 'J':
-            self.rank = optarg
-        elif opt == '8':
-            self.limit_filter = optarg
-        elif opt == '9':
-            self.limit_filter_force = optarg
-        elif opt == 'n':
-            self.invert_filter = 1
-        elif opt == 'N':
-            self.predicate = optarg
         elif opt == 'v':
             self.omit_flat = 1
         elif opt == 'P':
-            self.precision = optarg
-        elif opt == '0':
-            self.precision_force = optarg
+            try:
+                self.precision = int(optarg)
+            except:
+                sys.stderr.write("Error while parsing options: Integer expected.\n")
+                sys.exit(1)
         elif opt == 'f':
             self.timefmt = optarg
         elif opt == 'q':
             self.count_scale = optarg
-        elif opt == 'Q':
-            self.count_scale_force = optarg
         elif opt == 'b':
             self.space_scale = optarg
-        elif opt == 'B':
-            self.space_scale_force = optarg
         elif opt == 'y':
             self.time_scale = optarg
-        elif opt == 'Y':
-            self.time_scale_force = optarg
         elif opt == 'x':
             self.extended = 1
         elif opt == 'X':
             self.everything = 1
-        elif opt == 'E':
-            self.exact_types = 1
         else:
             raise pmapi.pmUsageErr()
 
     def connect(self):
-        """ Establish PMAPI context """
+        """ Establish a PMAPI context """
         context, self.source = pmapi.pmContext.set_connect_options(self.opts, self.source, self.speclocal)
 
         self.pmfg = pmapi.fetchgroup(context, self.source)
@@ -306,18 +243,17 @@ class PCP2JSON(object):
         if pmapi.c_api.pmSetContextOptions(self.context.ctx, self.opts.mode, self.opts.delta):
             raise pmapi.pmUsageErr()
 
+        self.pmconfig.validate_metrics()
+
     def validate_config(self):
         """ Validate configuration options """
         if self.version != CONFVER:
             sys.stderr.write("Incompatible configuration file version (read v%s, need v%d).\n" % (self.version, CONFVER))
             sys.exit(1)
 
-        self.pmconfig.validate_common_options()
-
         if self.everything:
             self.extended = 1
 
-        self.pmconfig.validate_metrics(curr_insts=not self.live_filter)
         self.pmconfig.finalize_options()
 
     def execute(self):
@@ -354,31 +290,33 @@ class PCP2JSON(object):
             time.sleep(align)
 
         # Main loop
-        refresh_metrics = 0
         while self.samples != 0:
-            # Refresh metrics as needed
-            if refresh_metrics:
-                refresh_metrics = 0
-                self.pmconfig.update_metrics(curr_insts=not self.live_filter)
-
             # Fetch values
-            refresh_metrics = self.pmconfig.fetch()
-            if refresh_metrics < 0:
-                break
+            try:
+                self.pmfg.fetch()
+            except pmapi.pmErr as error:
+                if error.args[0] == PM_ERR_EOL:
+                    break
+                raise error
+
+            # Watch for endtime in uninterpolated mode
+            if not self.interpol:
+                if float(self.pmfg_ts().strftime('%s')) > float(self.opts.pmGetOptionFinish()):
+                    break
 
             # Report and prepare for the next round
             self.report(self.pmfg_ts())
             if self.samples and self.samples > 0:
                 self.samples -= 1
             if self.delay and self.interpol and self.samples != 0:
-                self.pmconfig.pause()
+                self.context.pmtimevalSleep(self.interval)
 
         # Allow to flush buffered values / say goodbye
         self.report(None)
 
     def report(self, tstamp):
-        """ Report metric values """
-        if tstamp is not None:
+        """ Report the metric values """
+        if tstamp != None:
             tstamp = tstamp.strftime(self.timefmt)
 
         self.write_json(tstamp)
@@ -470,38 +408,40 @@ class PCP2JSON(object):
                     data[inst_key] = str(inst_id)
             return data
 
-        results = self.pmconfig.get_ranked_results(valid_only=True)
+        for i, metric in enumerate(self.metrics):
+            try:
+                # Install value into outgoing json/dict in key1{key2{key3=value}} style:
+                # foo.bar.baz=value    =>  foo: { bar: { baz: value ...} }
+                # foo.bar.noo[i]=value =>  foo: { bar: { noo: {@instances:[{i: value ...} ... ]}}}
 
-        for metric in results:
-            # Install value into outgoing json/dict in key1{key2{key3=value}} style:
-            # foo.bar.baz=value    =>  foo: { bar: { baz: value ...} }
-            # foo.bar.noo[i]=value =>  foo: { bar: { noo: {@instances:[{i: value ...} ... ]}}}
+                pmns_parts = metric.split(".")
 
-            pmns_parts = metric.split(".")
+                for inst, name, val in self.metrics[metric][5](): # pylint: disable=unused-variable
+                    try:
+                        value = val()
+                        fmt = "." + str(self.precision) + "f"
+                        value = format(value, fmt) if isinstance(value, float) else str(value)
+                    except:
+                        continue
 
-            i = list(self.metrics.keys()).index(metric)
-            fmt = "." + str(self.metrics[metric][6]) + "f"
-            for inst, name, value in results[metric]:
-                if self.exact_types:
-                    value = round(value, self.metrics[metric][6]) if isinstance(value, float) else value
-                else:
-                    value = format(value, fmt) if isinstance(value, float) else str(value)
-                pmns_leaf_dict = self.data['@pcp']['@hosts'][0]['@metrics'][-1]
+                    pmns_leaf_dict = self.data['@pcp']['@hosts'][0]['@metrics'][-1]
 
-                # Find/create the parent dictionary into which to insert the final component
-                for pmns_part in pmns_parts[:-1]:
-                    if pmns_part not in pmns_leaf_dict:
-                        pmns_leaf_dict[pmns_part] = {}
-                    pmns_leaf_dict = pmns_leaf_dict[pmns_part]
-                last_part = pmns_parts[-1]
+                    # Find/create the parent dictionary into which to insert the final component
+                    for pmns_part in pmns_parts[:-1]:
+                        if pmns_part not in pmns_leaf_dict:
+                            pmns_leaf_dict[pmns_part] = {}
+                        pmns_leaf_dict = pmns_leaf_dict[pmns_part]
+                    last_part = pmns_parts[-1]
 
-                if inst == PM_IN_NULL:
-                    pmns_leaf_dict[last_part] = create_attrs(value, None, None, self.metrics[metric][2][0], self.pmconfig.pmids[i], self.pmconfig.descs[i])
-                else:
-                    if last_part not in pmns_leaf_dict:
-                        pmns_leaf_dict[last_part] = {insts_key: []}
-                    insts = pmns_leaf_dict[last_part][insts_key]
-                    insts.append(create_attrs(value, inst, name, self.metrics[metric][2][0], self.pmconfig.pmids[i], self.pmconfig.descs[i]))
+                    if inst == PM_IN_NULL:
+                        pmns_leaf_dict[last_part] = create_attrs(value, None, None, self.metrics[metric][2][0], self.pmconfig.pmids[i], self.pmconfig.descs[i])
+                    else:
+                        if last_part not in pmns_leaf_dict:
+                            pmns_leaf_dict[last_part] = {insts_key: []}
+                        insts = pmns_leaf_dict[last_part][insts_key]
+                        insts.append(create_attrs(value, inst, name, self.metrics[metric][2][0], self.pmconfig.pmids[i], self.pmconfig.descs[i]))
+            except:
+                pass
 
     def finalize(self):
         """ Finalize and clean up """
@@ -514,14 +454,15 @@ class PCP2JSON(object):
                                              separators=(',', ': ')))
                 self.writer.write("\n")
                 self.writer.flush()
-            except IOError as error:
+            except socket.error as error:
                 if error.errno != errno.EPIPE:
                     raise
             try:
                 self.writer.close()
-            except Exception:
+            except:
                 pass
             self.writer = None
+        return
 
 if __name__ == '__main__':
     try:
@@ -530,11 +471,9 @@ if __name__ == '__main__':
         P.validate_config()
         P.execute()
         P.finalize()
+
     except pmapi.pmErr as error:
-        sys.stderr.write("%s: %s" % (error.progname(), error.message()))
-        if error.message() == "Connection refused":
-            sys.stderr.write("; is pmcd running?")
-        sys.stderr.write("\n")
+        sys.stderr.write('%s: %s\n' % (error.progname(), error.message()))
         sys.exit(1)
     except pmapi.pmUsageErr as usage:
         usage.message()

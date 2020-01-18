@@ -1,4 +1,4 @@
-#!/usr/bin/env pmpython
+#!/usr/bin/python
 '''
 Python script that takes a the name of a ceph admin socket and writes
 a PCP JSON PMDA metadata file that describes the ceph perf counters.

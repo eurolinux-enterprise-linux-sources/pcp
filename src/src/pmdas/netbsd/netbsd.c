@@ -16,6 +16,7 @@
  */
 
 #include "pmapi.h"
+#include "impl.h"
 #include "pmda.h"
 
 #include <limits.h>
@@ -23,7 +24,6 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <sys/resource.h>
-#include <sys/sched.h>
 #include <sys/time.h>
 #include <uvm/uvm_param.h>
 #include <sys/utsname.h>
@@ -81,7 +81,7 @@ static pmdaMetric metrictab[] = {
       { PMDA_PMID(CL_SYSCTL,0), PM_TYPE_U32, PM_INDOM_NULL, PM_SEM_DISCRETE,
 	PMDA_PMUNITS(0,0,0,0,0,0) } },
     { (void *)"hinv.physmem",
-      { PMDA_PMID(CL_SYSCTL,1), PM_TYPE_U32, PM_INDOM_NULL, PM_SEM_DISCRETE,
+      { PMDA_PMID(CL_SYSCTL,1), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_DISCRETE,
 	PMDA_PMUNITS(1,0,0,PM_SPACE_MBYTE,0,0) } },
     { NULL,	/* kernel.all.load */
       { PMDA_PMID(CL_SPECIAL,2), PM_TYPE_FLOAT, LOADAV_INDOM, PM_SEM_INSTANT,
@@ -221,13 +221,13 @@ static pmdaMetric metrictab[] = {
 	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
     { NULL,	/* disk.dev.read_bytes */
       { PMDA_PMID(CL_DISK,3), PM_TYPE_U64, DISK_INDOM, PM_SEM_COUNTER,
-	PMDA_PMUNITS(1,0,0,PM_SPACE_KBYTE,0,0) } },
+	PMDA_PMUNITS(1,0,0,PM_SPACE_BYTE,0,0) } },
     { NULL,	/* disk.dev.write_bytes */
       { PMDA_PMID(CL_DISK,4), PM_TYPE_U64, DISK_INDOM, PM_SEM_COUNTER,
-	PMDA_PMUNITS(1,0,0,PM_SPACE_KBYTE,0,0) } },
+	PMDA_PMUNITS(1,0,0,PM_SPACE_BYTE,0,0) } },
     { NULL,	/* disk.dev.total_bytes */
       { PMDA_PMID(CL_DISK,5), PM_TYPE_U64, DISK_INDOM, PM_SEM_COUNTER,
-	PMDA_PMUNITS(1,0,0,PM_SPACE_KBYTE,0,0) } },
+	PMDA_PMUNITS(1,0,0,PM_SPACE_BYTE,0,0) } },
     { NULL,	/* disk.all.read */
       { PMDA_PMID(CL_DISK,6), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
 	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
@@ -239,13 +239,13 @@ static pmdaMetric metrictab[] = {
 	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
     { NULL,	/* disk.all.read_bytes */
       { PMDA_PMID(CL_DISK,9), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
-	PMDA_PMUNITS(1,0,0,PM_SPACE_KBYTE,0,0) } },
+	PMDA_PMUNITS(1,0,0,PM_SPACE_BYTE,0,0) } },
     { NULL,	/* disk.all.write_bytes */
       { PMDA_PMID(CL_DISK,10), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
-	PMDA_PMUNITS(1,0,0,PM_SPACE_KBYTE,0,0) } },
+	PMDA_PMUNITS(1,0,0,PM_SPACE_BYTE,0,0) } },
     { NULL,	/* disk.all.total_bytes */
       { PMDA_PMID(CL_DISK,11), PM_TYPE_U64, PM_INDOM_NULL, PM_SEM_COUNTER,
-	PMDA_PMUNITS(1,0,0,PM_SPACE_KBYTE,0,0) } },
+	PMDA_PMUNITS(1,0,0,PM_SPACE_BYTE,0,0) } },
 
     { NULL,	/* network.interface.mtu */
       { PMDA_PMID(CL_NETIF,0), PM_TYPE_U64, NETIF_INDOM, PM_SEM_INSTANT,
@@ -354,9 +354,6 @@ static pmdaMetric metrictab[] = {
     { NULL,	/* kernel.uname.nodename */
       { PMDA_PMID(CL_SPECIAL,18), PM_TYPE_STRING, PM_INDOM_NULL, PM_SEM_DISCRETE, 
       PMDA_PMUNITS(0,0,0,0,0,0) } },
-    { NULL,	/* kernel.all.uptime */
-      { PMDA_PMID(CL_SPECIAL,19), PM_TYPE_U32, PM_INDOM_NULL, PM_SEM_INSTANT, 
-      PMDA_PMUNITS(0,1,0,0,PM_TIME_SEC,0) } },
     { NULL,	/* pmda.uname */
       { PMDA_PMID(CL_SPECIAL,20), PM_TYPE_STRING, PM_INDOM_NULL, PM_SEM_DISCRETE, 
       PMDA_PMUNITS(0,0,0,0,0,0) } },
@@ -408,7 +405,7 @@ int	ncpu;			/* number of cpus in kern.cp_times.* data */
  * Fetch values from sysctl()
  *
  * Expect the result to be xpect bytes to match the PCP data size or
- * anticipated structure size, unless xpect is == 0 in which case the
+ * anticipated structure size, unless xpect is ==0 in which case the
  * size test is skipped.
  */
 static int
@@ -432,7 +429,7 @@ do_sysctl(mib_t *mp, size_t xpect)
 	    mp->m_data = realloc(mp->m_data, mp->m_datalen);
 	    if (mp->m_data == NULL) {
 		fprintf(stderr, "Error: %s: buffer alloc failed for sysctl metric \"%s\"\n", mp->m_pcpname, mp->m_name);
-		pmNoMem("do_sysctl", mp->m_datalen, PM_FATAL_ERR);
+		__pmNoMem("do_sysctl", mp->m_datalen, PM_FATAL_ERR);
 		/*NOTREACHED*/
 	    }
 	}
@@ -441,33 +438,55 @@ do_sysctl(mib_t *mp, size_t xpect)
     }
     if (xpect > 0 && mp->m_datalen != xpect) {
 	fprintf(stderr, "Error: %s: sysctl(%s) datalen=%d not %d!\n", mp->m_pcpname, mp->m_name, (int)mp->m_datalen, (int)xpect);
-	return -1;
+	return 0;
     }
     return mp->m_datalen;
 }
 
-static unsigned long
-uptime(void)
-{
-    static struct timespec	boottime = { 0, 0};
-    int				mib[2];
-    size_t			len;
+/*
+ * kernel memory reader setup
+ */
+struct nlist	symbols[] = {
+	{ .n_name = "_ifnet" },
+	{ .n_name = NULL }
+};
+kvm_t	*kvmp;
 
-    if (boottime.tv_sec == 0 && boottime.tv_nsec == 0) {
-	/* one trip */
-	mib[0] = CTL_KERN;
-	mib[1] = KERN_BOOTTIME;
-	len = sizeof(boottime);
-	if (sysctl(mib, 2, &boottime, &len, NULL, 0) == -1) {
-	    /* failed ... not expected */
-	    fprintf(stderr, "Warning: uptime: sysctl failed: %s\n", pmErrStr(-errno));
-	    boottime.tv_nsec = 1;
+static void
+kmemread_init(void)
+{
+    int		sts;
+    int		i;
+    char	errmsg[_POSIX2_LINE_MAX];
+
+    /*
+     * If we're running as a daemon PMDA, assume we're setgid kmem,
+     * so we can open /dev/kmem, and downgrade privileges after the
+     * kvm_open().
+     * For a DSO PMDA, we have to assume pmcd has the required
+     * privileges and don't dink with them.
+     */
+    kvmp = kvm_openfiles(NULL, NULL, NULL, O_RDONLY, errmsg);
+    if (!isDSO)
+	setgid(getgid());
+    if (kvmp == NULL) {
+	fprintf(stderr, "kmemread_init: kvm_openfiles failed: %s\n", errmsg);
+	return;
+    }
+
+    sts = kvm_nlist(kvmp, symbols);
+    if (sts < 0) {
+	fprintf(stderr, "kmemread_init: kvm_nlist failed: %s\n", pmErrStr(-errno));
+	for (i = 0; i < sizeof(symbols)/sizeof(symbols[0])-1; i++)
+	    symbols[i].n_value = 0;
+	return;
+    }
+    if (pmDebugOptions.appl0) {
+	for (i = 0; i < sizeof(symbols)/sizeof(symbols[0])-1; i++) {
+	    fprintf(stderr, "Info: kernel symbol %s found at 0x%08lx\n", symbols[i].n_name, symbols[i].n_value);
 	}
     }
-    if (boottime.tv_sec == 0 && boottime.tv_nsec == 1)
-	return 0;
-    else
-	return (unsigned long)(time(NULL) - boottime.tv_sec);
+
 }
 
 /*
@@ -478,15 +497,14 @@ static int
 netbsd_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 {
     int			sts = PM_ERR_PMID;
-    unsigned int	cluster = pmID_cluster(mdesc->m_desc.pmid);
-    unsigned int	item = pmID_item(mdesc->m_desc.pmid);
+    __pmID_int		*idp = (__pmID_int *)&(mdesc->m_desc.pmid);
     mib_t		*mp;
     int			i;
 
     mp = (mib_t *)mdesc->m_user;
-    if (cluster == CL_SYSCTL) {
+    if (idp->cluster == CL_SYSCTL) {
 	/* sysctl() simple cases */
-	switch (item) {
+	switch (idp->item) {
 	    /* 32-bit integer values */
 	    case 0:		/* hinv.ncpu */
 		sts = do_sysctl(mp, sizeof(atom->ul));
@@ -496,25 +514,13 @@ netbsd_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 		}
 		break;
 
-	    /* 32-bit or 64-bit integer values, depends on kernel */
+	    /* 64-bit integer values */
 	    case 1:		/* hinv.physmem */
-		sts = do_sysctl(mp, 0);
-		/* sysctl returns bytes, convert to Mbytes */
-		if (sts == sizeof(__uint64_t)) {
-		    /* 64-bit values from sysctl() */
-		    atom->ull = (__uint64_t)((__uint64_t *)mp->m_data)[0]/(1024*1024);
+		sts = do_sysctl(mp, sizeof(atom->ull));
+		if (sts > 0) {
+		    atom->ull = *((__uint64_t *)mp->m_data);
+		    atom->ull /= 1024*1024;
 		    sts = 1;
-		}
-		else if (sts == CPUSTATES*sizeof(__uint32_t)) {
-		    /* 32-bit values from sysctl() */
-		    atom->ull = (__uint64_t)((__uint32_t *)mp->m_data)[0]/(1024*1024);
-		    sts = 1;
-		}
-		else {
-		    fprintf(stderr, "Error: %s: sysctl(%s) datalen=%d not %d (long) or %d (int)!\n",
-			mp->m_pcpname, mp->m_name, sts, (int)sizeof(__uint64_t), 
-			(int)sizeof(__uint32_t)); 
-		    sts = 0;
 		}
 		break;
 
@@ -535,29 +541,17 @@ netbsd_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    case 5:		/* kernel.all.cpu.sys */
 	    case 6:		/* kernel.all.cpu.intr */
 	    case 7:		/* kernel.all.cpu.idle */
-		/*
-		 * PMID assignment is important in the "-3" below so
-		 * that metrics map to consecutive elements of the
-		 * returned value in the order defined for CPUSTATES,
-		 * i.e. CP_USER, CP_NICE, CP_SYS, CP_INTR and
-		 * CP_IDLE
-		 */
-		sts = do_sysctl(mp, 0);
-		if (sts == CPUSTATES*sizeof(__uint64_t)) {
-		    /* 64-bit values from sysctl() */
-		    atom->ull = 1000*((__uint64_t)((__uint64_t *)mp->m_data)[item-3])/cpuhz;
+		sts = do_sysctl(mp, CPUSTATES*sizeof(atom->ull));
+		if (sts > 0) {
+		    /*
+		     * PMID assignment is important in the "-3" below so
+		     * that metrics map to consecutive elements of the
+		     * returned value in the order defined for CPUSTATES,
+		     * i.e. CP_USER, CP_NICE, CP_SYS, CP_INTR and
+		     * CP_IDLE
+		     */
+		    atom->ull = 1000*((__uint64_t *)mp->m_data)[idp->item-3]/cpuhz;
 		    sts = 1;
-		}
-		else if (sts == CPUSTATES*sizeof(__uint32_t)) {
-		    /* 32-bit values from sysctl() */
-		    atom->ull = 1000*((__uint64_t)((__uint32_t *)mp->m_data)[item-3])/cpuhz;
-		    sts = 1;
-		}
-		else {
-		    fprintf(stderr, "Error: %s: sysctl(%s) datalen=%d not %d (long) or %d (int)!\n",
-			mp->m_pcpname, mp->m_name, sts, (int)(CPUSTATES*sizeof(__uint64_t)), 
-			(int)(CPUSTATES*sizeof(__uint32_t))); 
-		    sts = 0;
 		}
 		break;
 
@@ -572,12 +566,12 @@ netbsd_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 
 	}
     }
-    else if (cluster == CL_SPECIAL) {
+    else if (idp->cluster == CL_SPECIAL) {
 	/* special cases */
-	double		loadavg[3];
-	static char 	uname_string[sizeof(kernel_uname)];
+	double	loadavg[3];
+	char 	uname_string[sizeof(kernel_uname)];
 
-	switch (item) {
+	switch (idp->item) {
 	    case 0:	/* hinv.ndisk */
 		refresh_disk_metrics();
 		atom->ul = pmdaCacheOp(indomtab[DISK_INDOM].it_indom, PMDA_CACHE_SIZE_ACTIVE);
@@ -632,11 +626,6 @@ netbsd_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 		sts = 1;
 		break;
 
-	    case 19:	/* kernel.all.uptime */
-		atom->ul = uptime();
-		sts = 1;
-		break;
-
 	    case 20: /* pmda.uname */
 		pmsprintf(uname_string, sizeof(uname_string), "%s %s %s %s %s",
 		    kernel_uname.sysname, 
@@ -655,22 +644,22 @@ netbsd_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 
 	}
     }
-    else if (cluster == CL_DISK) {
+    else if (idp->cluster == CL_DISK) {
 	sts = do_disk_metrics(mdesc, inst, atom);
     }
-    else if (cluster == CL_CPUTIME) {
+    else if (idp->cluster == CL_CPUTIME) {
 	sts = do_percpu_metrics(mdesc, inst, atom);
     }
-    else if (cluster == CL_NETIF) {
+    else if (idp->cluster == CL_NETIF) {
 	sts = do_netif_metrics(mdesc, inst, atom);
     }
-    else if (cluster == CL_FILESYS) {
+    else if (idp->cluster == CL_FILESYS) {
 	sts = do_filesys_metrics(mdesc, inst, atom);
     }
-    else if (cluster == CL_SWAP) {
+    else if (idp->cluster == CL_SWAP) {
 	sts = do_swap_metrics(mdesc, inst, atom);
     }
-    else if (cluster == CL_VM_UVMEXP) {
+    else if (idp->cluster == CL_VM_UVMEXP) {
 	/* vm.uvmexp sysctl metrics */
 	sts = do_vm_uvmexp_metrics(mdesc, inst, atom);
     }
@@ -702,37 +691,37 @@ netbsd_fetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *pmda)
      * they have changed
      */
     for (i = 0; i < numpmid; i++) {
-	if (pmID_cluster(pmidlist[i]) == CL_DISK) {
+	if (pmid_cluster(pmidlist[i]) == CL_DISK) {
 	    if (!done_disk) {
 		refresh_disk_metrics();
 		done_disk = 1;
 	    }
 	}
-	else if (pmID_cluster(pmidlist[i]) == CL_CPUTIME) {
+	else if (pmid_cluster(pmidlist[i]) == CL_CPUTIME) {
 	    if (!done_percpu) {
 		refresh_percpu_metrics();
 		done_percpu = 1;
 	    }
 	}
-	else if (pmID_cluster(pmidlist[i]) == CL_NETIF) {
+	else if (pmid_cluster(pmidlist[i]) == CL_NETIF) {
 	    if (!done_netif) {
 		refresh_netif_metrics();
 		done_netif = 1;
 	    }
 	}
-	else if (pmID_cluster(pmidlist[i]) == CL_FILESYS) {
+	else if (pmid_cluster(pmidlist[i]) == CL_FILESYS) {
 	    if (!done_filesys) {
 		refresh_filesys_metrics();
 		done_netif = 1;
 	    }
 	}
-	else if (pmID_cluster(pmidlist[i]) == CL_SWAP) {
+	else if (pmid_cluster(pmidlist[i]) == CL_SWAP) {
 	    if (!done_swap) {
 		refresh_swap_metrics();
 		done_swap = 1;
 	    }
 	}
-	else if (pmID_cluster(pmidlist[i]) == CL_VM_UVMEXP) {
+	else if (pmid_cluster(pmidlist[i]) == CL_VM_UVMEXP) {
 	    if (!done_vm_uvmexp) {
 		refresh_vm_uvmexp_metrics();
 		done_vm_uvmexp = 1;
@@ -747,7 +736,7 @@ netbsd_fetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *pmda)
  * wrapper for pmdaInstance ... refresh required instance domain first
  */
 static int
-netbsd_instance(pmInDom indom, int inst, char *name, pmInResult **result, pmdaExt *pmda)
+netbsd_instance(pmInDom indom, int inst, char *name, __pmInResult **result, pmdaExt *pmda)
 {
     /*
      * indomtab[] instance names and ids are not used for some indoms,
@@ -811,12 +800,12 @@ netbsd_init(pmdaInterface *dp)
 
     if (isDSO) {
 	char	mypath[MAXPATHLEN];
-	int sep = pmPathSeparator();
+	int sep = __pmPathSeparator();
 	pmsprintf(mypath, sizeof(mypath), "%s%c" "netbsd" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
 	pmdaDSO(dp, PMDA_INTERFACE_5, "netbsd DSO", mypath);
     } else {
-	pmSetProcessIdentity(username);
+	__pmSetProcessIdentity(username);
     }
 
     if (dp->status != 0)
@@ -836,7 +825,7 @@ netbsd_init(pmdaInterface *dp)
      * also translate the sysctl(3) name to a mib
      */
     for (m = 0; m < metrictablen; m++) {
-	if (pmID_cluster(metrictab[m].m_desc.pmid) != CL_SYSCTL) {
+	if (pmid_cluster(metrictab[m].m_desc.pmid) != CL_SYSCTL) {
 	    /* not using sysctl(3) */
 	    continue;
 	}
@@ -854,7 +843,7 @@ netbsd_init(pmdaInterface *dp)
 			map[i].m_mib = (int *)malloc(map[i].m_miblen*sizeof(map[i].m_mib[0]));
 			if (map[i].m_mib == NULL) {
 			    fprintf(stderr, "Error: %s (%s): failed mib alloc for sysctl metric \"%s\"\n", map[i].m_pcpname, pmIDStr(metrictab[m].m_desc.pmid), map[i].m_name);
-			    pmNoMem("netbsd_init: mib", map[i].m_miblen*sizeof(map[i].m_mib[0]), PM_FATAL_ERR);
+			    __pmNoMem("netbsd_init: mib", map[i].m_miblen*sizeof(map[i].m_mib[0]), PM_FATAL_ERR);
 			    /*NOTREACHED*/
 			}
 			memcpy(map[i].m_mib, mib, map[i].m_miblen*sizeof(map[i].m_mib[0]));
@@ -866,12 +855,12 @@ netbsd_init(pmdaInterface *dp)
 		}
 		if (pmDebugOptions.appl0) {
 		    int	p;
-		    fprintf(stderr, "Info: %s (%s): sysctl metric \"%s\" -> mib ", (char *)metrictab[m].m_user, pmIDStr(metrictab[m].m_desc.pmid), map[i].m_name);
+		    fprintf(stderr, "Info: %s (%s): sysctl metric \"%s\" -> ", (char *)metrictab[m].m_user, pmIDStr(metrictab[m].m_desc.pmid), map[i].m_name);
 		    for (p = 0; p < map[i].m_miblen; p++) {
 			if (p > 0) fputc('.', stderr);
 			fprintf(stderr, "%d", map[i].m_mib[p]);
 		    }
-		    fprintf(stderr, " (len=%d)\n", (int)map[i].m_miblen);
+		    fputc('\n', stderr);
 		}
 		metrictab[m].m_user = (void *)&map[i];
 		break;
@@ -920,7 +909,7 @@ netbsd_init(pmdaInterface *dp)
     indomtab[CPU_INDOM].it_numinst = ncpu;
     indomtab[CPU_INDOM].it_set = (pmdaInstid *)malloc(ncpu * sizeof(pmdaInstid));
     if (indomtab[CPU_INDOM].it_set == NULL) {
-	pmNoMem("netbsd_init: CPU_INDOM it_set", ncpu * sizeof(pmdaInstid), PM_FATAL_ERR);
+	__pmNoMem("netbsd_init: CPU_INDOM it_set", ncpu * sizeof(pmdaInstid), PM_FATAL_ERR);
 	/*NOTREACHED*/
     }
     for (i = 0; i < ncpu; i++) {
@@ -928,16 +917,18 @@ netbsd_init(pmdaInterface *dp)
 	pmsprintf(iname, sizeof(iname), "cpu%d", i);
 	indomtab[CPU_INDOM].it_set[i].i_name = strdup(iname);
 	if (indomtab[CPU_INDOM].it_set[i].i_name == NULL) {
-	    pmNoMem("netbsd_init: CPU_INDOM strdup iname", strlen(iname), PM_FATAL_ERR);
+	    __pmNoMem("netbsd_init: CPU_INDOM strdup iname", strlen(iname), PM_FATAL_ERR);
 	    /*NOTREACHED*/
 	}
     }
+
+    kmemread_init();
 }
 
 static void
 usage(void)
 {
-    fprintf(stderr, "Usage: %s [options]\n\n", pmGetProgname());
+    fprintf(stderr, "Usage: %s [options]\n\n", pmProgname);
     fputs("Options:\n"
 	  "  -d domain    use domain (numeric) for metrics domain of PMDA\n"
 	  "  -l logfile   write log into logfile rather than using default log name\n"
@@ -958,17 +949,17 @@ int
 main(int argc, char **argv)
 {
     int			c, err = 0;
-    int			sep = pmPathSeparator();
+    int			sep = __pmPathSeparator();
     pmdaInterface	dispatch;
     char		mypath[MAXPATHLEN];
 
     isDSO = 0;
-    pmSetProgname(argv[0]);
-    pmGetUsername(&username);
+    __pmSetProgname(argv[0]);
+    __pmGetUsername(&username);
 
     pmsprintf(mypath, sizeof(mypath), "%s%c" "netbsd" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-    pmdaDaemon(&dispatch, PMDA_INTERFACE_5, pmGetProgname(), NETBSD,
+    pmdaDaemon(&dispatch, PMDA_INTERFACE_5, pmProgname, NETBSD,
 		"netbsd.log", mypath);
 
     while ((c = pmdaGetOpt(argc, argv, "D:d:i:l:pu:U:6:?", &dispatch, &err)) != EOF) {

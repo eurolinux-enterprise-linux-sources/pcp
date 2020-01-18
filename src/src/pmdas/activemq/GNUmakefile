@@ -32,27 +32,24 @@ MAN_DEST = $(PCP_MAN_DIR)/man$(MAN_SECTION)
 
 LDIRT = domain.h root pmns *.log
 
-default_pcp default:	build-me
+default: check_domain
 
 include $(BUILDRULES)
 
-ifeq "$(PMDA_ACTIVEMQ)" "true"
-build-me: check_domain
-install install_pcp: default
+install: default
 	$(INSTALL) -m 755 -d $(PMDADIR)
 	$(INSTALL) -m 755 Install Remove $(PMDADIR)
 	$(INSTALL) -m 644 pmda$(IAM).pl $(MODULES) $(PMDADIR)
 	@$(INSTALL_MAN)
-else
-build-me:
-install_pcp install:
-	@$(INSTALL_MAN)
-endif
+
+default_pcp : default
+
+install_pcp : install
 
 check_domain:	../../pmns/stdpmid
 	$(DOMAIN_PERLRULE)
 
-ifeq "$(PMDA_ACTIVEMQ)" "true"
-test:
+check:
 	for test in $(TESTS); do perl $$test || exit 1; done
-endif
+
+test : check

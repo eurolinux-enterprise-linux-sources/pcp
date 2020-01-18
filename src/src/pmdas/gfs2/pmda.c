@@ -15,7 +15,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "pmda.h"
 #include "domain.h"
 
@@ -58,126 +58,6 @@ pmdaMetric metrictable[] = {
 	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
     { .m_desc = {
 	PMDA_PMID(CLUSTER_GLOCKS, GLOCKS_EXCLUSIVE),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, GLOCKS_FLAGS_LOCKED),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, GLOCKS_FLAGS_DEMOTE),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, GLOCKS_FLAGS_DEMOTE_PENDING),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, GLOCKS_FLAGS_DEMOTE_PROGRESS),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, GLOCKS_FLAGS_DIRTY),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, GLOCKS_FLAGS_LOG_FLUSH),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, GLOCKS_FLAGS_INVALIDATE),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, GLOCKS_FLAGS_REPLY_PENDING),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, GLOCKS_FLAGS_INITIAL),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, GLOCKS_FLAGS_FROZEN),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, GLOCKS_FLAGS_QUEUED),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, GLOCKS_FLAGS_OBJECT_ATTACHED),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, GLOCKS_FLAGS_BLOCKING_REQUEST),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, GLOCKS_FLAGS_LRU),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, HOLDERS_TOTAL),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, HOLDERS_SHARED),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, HOLDERS_UNLOCKED),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, HOLDERS_DEFERRED),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, HOLDERS_EXCLUSIVE),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, HOLDERS_FLAGS_ASYNC),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, HOLDERS_FLAGS_ANY),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, HOLDERS_FLAGS_NO_CACHE),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, HOLDERS_FLAGS_NO_EXPIRE),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, HOLDERS_FLAGS_EXACT),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, HOLDERS_FLAGS_FIRST),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, HOLDERS_FLAGS_HOLDER),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, HOLDERS_FLAGS_PRIORITY),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, HOLDERS_FLAGS_TRY),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, HOLDERS_FLAGS_TRY_1CB),
-	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
-	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
-    { .m_desc = {
-	PMDA_PMID(CLUSTER_GLOCKS, HOLDERS_FLAGS_WAIT),
 	PM_TYPE_U64, GFS_FS_INDOM, PM_SEM_INSTANT,
 	PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
     /* SBSTATS */
@@ -884,7 +764,7 @@ gfs2_instance_refresh(void)
 }
 
 static int
-gfs2_instance(pmInDom indom, int inst, char *name, pmInResult **result, pmdaExt *pmda)
+gfs2_instance(pmInDom indom, int inst, char *name, __pmInResult **result, pmdaExt *pmda)
 {
     gfs2_instance_refresh();
     return pmdaInstance(indom, inst, name, result, pmda);
@@ -926,9 +806,9 @@ gfs2_fetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *pmda)
     int		i, sts, need_refresh[NUM_CLUSTERS] = { 0 };
 
     for (i = 0; i < numpmid; i++) {
-	unsigned int	cluster = pmID_cluster(pmidlist[i]);
-	if (cluster < NUM_CLUSTERS)
-	    need_refresh[cluster]++;
+	__pmID_int *idp = (__pmID_int *)&(pmidlist[i]);
+	if (idp->cluster < NUM_CLUSTERS)
+	    need_refresh[idp->cluster]++;
     }
 
     if ((sts = gfs2_fetch_refresh(pmda, need_refresh)) < 0)
@@ -942,49 +822,49 @@ gfs2_fetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *pmda)
 static int
 gfs2_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 {
-    unsigned int	item = pmID_item(mdesc->m_desc.pmid);
+    __pmID_int		*idp = (__pmID_int *)&(mdesc->m_desc.pmid);
     struct gfs2_fs	*fs;
     int			sts;
 
-    switch (pmID_cluster(mdesc->m_desc.pmid)) {
+    switch (idp->cluster) {
     case CLUSTER_GLOCKS:
 	sts = pmdaCacheLookup(INDOM(GFS_FS_INDOM), inst, NULL, (void **)&fs);
 	if (sts < 0)
 	    return sts;
-	return gfs2_glocks_fetch(item, &fs->glocks, atom);
+	return gfs2_glocks_fetch(idp->item, &fs->glocks, atom);
 
     case CLUSTER_SBSTATS:
 	sts = pmdaCacheLookup(INDOM(GFS_FS_INDOM), inst, NULL, (void **)&fs);
 	if (sts < 0)
 	    return sts;
-	return gfs2_sbstats_fetch(item, &fs->sbstats, atom);
+	return gfs2_sbstats_fetch(idp->item, &fs->sbstats, atom);
 
     case CLUSTER_GLSTATS:
         sts = pmdaCacheLookup(INDOM(GFS_FS_INDOM), inst, NULL, (void **)&fs);
 	if (sts < 0)
 	    return sts;
-	return gfs2_glstats_fetch(item, &fs->glstats, atom);
+	return gfs2_glstats_fetch(idp->item, &fs->glstats, atom);
 
     case CLUSTER_TRACEPOINTS:
         sts = pmdaCacheLookup(INDOM(GFS_FS_INDOM), inst, NULL, (void **)&fs);
 	if (sts < 0)
 	    return sts;
-        return gfs2_ftrace_fetch(item, &fs->ftrace, atom);
+        return gfs2_ftrace_fetch(idp->item, &fs->ftrace, atom);
 
     case CLUSTER_WORSTGLOCK:
         sts = pmdaCacheLookup(INDOM(GFS_FS_INDOM), inst, NULL, (void**)&fs);
         if (sts < 0)
             return sts;
-        return gfs2_worst_glock_fetch(item, &fs->worst_glock, atom);
+        return gfs2_worst_glock_fetch(idp->item, &fs->worst_glock, atom);
 
     case CLUSTER_LATENCY:
         sts = pmdaCacheLookup(INDOM(GFS_FS_INDOM), inst, NULL, (void**)&fs);
         if (sts < 0)
             return sts;
-        return gfs2_latency_fetch(item, &fs->latency, atom);
+        return gfs2_latency_fetch(idp->item, &fs->latency, atom);
 
     case CLUSTER_CONTROL:
-        return gfs2_control_fetch(item, atom);
+        return gfs2_control_fetch(idp->item, atom);
 
     default: /* unknown cluster */
 	return PM_ERR_PMID;
@@ -1050,29 +930,26 @@ gfs2_store(pmResult *result, pmdaExt *pmda)
 {
     int		i;
     int		sts = 0;
+    pmValueSet	*vsp;
+    __pmID_int	*pmidp;
 
     for (i = 0; i < result->numpmid && !sts; i++) {
-	unsigned int	cluster;
-	unsigned int	item;
-	pmValueSet	*vsp;
-
 	vsp = result->vset[i];
-	cluster = pmID_cluster(vsp->pmid);
-	item = pmID_item(vsp->pmid);
+	pmidp = (__pmID_int *)&vsp->pmid;
 
-	if (cluster == CLUSTER_CONTROL && item <= CONTROL_BUFFER_SIZE_KB) {
-            sts = gfs2_control_set_value(control_locations[item], vsp);
+	if (pmidp->cluster == CLUSTER_CONTROL && pmidp->item <= CONTROL_BUFFER_SIZE_KB) {
+            sts = gfs2_control_set_value(control_locations[pmidp->item], vsp);
         }
 
-        if (cluster == CLUSTER_CONTROL && item == CONTROL_WORSTGLOCK) {
+        if (pmidp->cluster == CLUSTER_CONTROL && pmidp->item == CONTROL_WORSTGLOCK) {
             sts = worst_glock_set_state(vsp);
         }
 
-        if (cluster == CLUSTER_CONTROL && item == CONTROL_LATENCY) {
+        if (pmidp->cluster == CLUSTER_CONTROL && pmidp->item == CONTROL_LATENCY) {
             sts = latency_set_state(vsp);
         }
 
-        if (cluster == CLUSTER_CONTROL && item == CONTROL_FTRACE_GLOCK_THRESHOLD) {
+        if (pmidp->cluster == CLUSTER_CONTROL && pmidp->item == CONTROL_FTRACE_GLOCK_THRESHOLD) {
             sts = ftrace_set_threshold(vsp);
         }
     }
@@ -1093,21 +970,21 @@ gfs2_text(int ident, int type, char **buf, pmdaExt *pmda)
 static int
 gfs2_pmid(const char *name, pmID *pmid, pmdaExt *pmda)
 {
-    pmdaNameSpace *tree = pmdaDynamicLookupName(pmda, name);
+    __pmnsTree *tree = pmdaDynamicLookupName(pmda, name);
     return pmdaTreePMID(tree, name, pmid);
 }
 
 static int
 gfs2_name(pmID pmid, char ***nameset, pmdaExt *pmda)
 {
-    pmdaNameSpace *tree = pmdaDynamicLookupPMID(pmda, pmid);
+    __pmnsTree *tree = pmdaDynamicLookupPMID(pmda, pmid);
     return pmdaTreeName(tree, pmid, nameset);
 }
 
 static int
 gfs2_children(const char *name, int flag, char ***kids, int **sts, pmdaExt *pmda)
 {
-    pmdaNameSpace *tree = pmdaDynamicLookupName(pmda, name);
+    __pmnsTree *tree = pmdaDynamicLookupName(pmda, name);
     return pmdaTreeChildren(tree, name, flag, kids, sts);
 }
 
@@ -1132,8 +1009,8 @@ gfs2_init(pmdaInterface *dp)
     dp->version.four.children = gfs2_children;
     pmdaSetFetchCallBack(dp, gfs2_fetchCallBack);
 
-    gfs2_sbstats_init(dp->version.any.ext, metrictable, nmetrics);
-    gfs2_worst_glock_init(dp->version.any.ext, metrictable, nmetrics);
+    gfs2_sbstats_init(metrictable, nmetrics);
+    gfs2_worst_glock_init(metrictable, nmetrics);
 
     pmdaSetFlags(dp, PMDA_EXT_FLAG_HASHED);
     pmdaInit(dp, indomtable, nindoms, metrictable, nmetrics);
@@ -1164,14 +1041,14 @@ static pmdaOptions opts = {
 int
 main(int argc, char **argv)
 {
-    int			sep = pmPathSeparator();
+    int			sep = __pmPathSeparator();
     pmdaInterface	dispatch;
     char		helppath[MAXPATHLEN];
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
     pmsprintf(helppath, sizeof(helppath), "%s%c" "gfs2" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-    pmdaDaemon(&dispatch, PMDA_INTERFACE_4, pmGetProgname(), GFS2, "gfs2.log", helppath);
+    pmdaDaemon(&dispatch, PMDA_INTERFACE_4, pmProgname, GFS2, "gfs2.log", helppath);
 
     pmdaGetOptions(argc, argv, &opts, &dispatch);
     if (opts.errors) {

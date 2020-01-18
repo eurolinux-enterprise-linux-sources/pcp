@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2015-2017,2019 Red Hat.
+** Copyright (C) 2015-2017 Red Hat.
 **
 ** This program is free software; you can redistribute it and/or modify it
 ** under the terms of the GNU General Public License as published by the
@@ -13,6 +13,7 @@
 */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 #include <ctype.h>
 
 #include "atop.h"
@@ -32,15 +33,10 @@ update_task(struct tstat *task, int pid, char *name, pmResult *rp, pmDesc *dp)
 	strncpy(task->gen.cmdline, nametail ? nametail : name, CMDLEN);
 	task->gen.cmdline[CMDLEN] = '\0';
 	task->gen.isproc = 1;		/* thread/process marker */
+	task->gen.nthr = 1;		/* for compat with 2.4 */
 
 	/* accumulate Pss from smaps (optional, relatively expensive) */
 	task->mem.pmem = (unsigned long long)-1LL;
-
-	/* /proc/pid/cgroup */
-	extract_string_inst(rp, dp, TASK_GEN_CONTAINER, &task->gen.container[0],
-				sizeof(task->gen.container), pid);
-        if (task->gen.container[0] != '\0')
-		supportflags |= DOCKSTAT;
 
 	/* /proc/pid/stat */
 	extract_string_inst(rp, dp, TASK_GEN_NAME, &task->gen.name[0],
@@ -120,16 +116,15 @@ update_task(struct tstat *task, int pid, char *name, pmResult *rp, pmDesc *dp)
 	task->dsk.cwsz /= 512;		    /* sectors */
 }
 
-unsigned long
-photoproc(struct tstat **tasks, unsigned int *taskslen)
+int
+photoproc(struct tstat **tasks, int *taskslen)
 {
 	static int	setup;
 	static pmID	pmids[TASK_NMETRICS];
 	static pmDesc	descs[TASK_NMETRICS];
 	pmResult	*result;
 	char		**insts;
-	int		*pids;
-	unsigned long	count, i;
+	int		*pids, count, i;
 
 	if (!setup)
 	{
@@ -146,24 +141,27 @@ photoproc(struct tstat **tasks, unsigned int *taskslen)
 	count = get_instances("task", TASK_GEN_NAME, descs, &pids, &insts);
 	if (count > *taskslen)
 	{
-		size_t	size = count * sizeof(struct tstat);
+		size_t	size;
+		int	ents = (*taskslen + PROCCHUNK);
 
+		if (count > ents)
+			ents = count;
+		size = ents * sizeof(struct tstat);
 		*tasks = (struct tstat *)realloc(*tasks, size);
 		ptrverify(*tasks, "photoproc [%ld]\n", (long)size);
-		*taskslen = count;
-	}
 
-	supportflags &= ~DOCKSTAT;
+		*taskslen = ents;
+	}
 
 	for (i=0; i < count; i++)
 	{
 		if (pmDebugOptions.appl0)
 			fprintf(stderr, "%s: updating process %d: %s\n",
-				pmGetProgname(), pids[i], insts[i]);
+				pmProgname, pids[i], insts[i]);
 		update_task(&(*tasks)[i], pids[i], insts[i], result, descs);
 	}
 	if (pmDebugOptions.appl0)
-		fprintf(stderr, "%s: done %lu processes\n", pmGetProgname(), count);
+		fprintf(stderr, "%s: done %d processes\n", pmProgname, count);
 
 	pmFreeResult(result);
 	free(insts);

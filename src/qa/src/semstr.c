@@ -7,6 +7,7 @@
 
 #include <ctype.h>
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 #include <pcp/pmda.h>
 
 int
@@ -18,7 +19,7 @@ main(int argc, char **argv)
     int		max, min;
     static char	*usage = "[-D debugspec]";
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:")) != EOF) {
 	switch (c) {
@@ -27,7 +28,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -40,7 +41,7 @@ main(int argc, char **argv)
     }
 
     if (errflag || optind != argc) {
-	printf("Usage: %s %s\n", pmGetProgname(), usage);
+	printf("Usage: %s %s\n", pmProgname, usage);
 	exit(1);
     }
 

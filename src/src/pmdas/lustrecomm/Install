@@ -15,10 +15,11 @@
 # for more details.
 # 
 
-. $PCP_DIR/etc/pcp.env
+. /etc/pcp.env
 . $PCP_SHARE_DIR/lib/pmdaproc.sh
 
 iam=lustrecomm
+pmda_interface=2
 
 pmdaSetup
 pmdaInstall

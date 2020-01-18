@@ -6,9 +6,7 @@
  */
 
 #include <pcp/pmapi.h>
-#include <pcp/deprecated.h>
-
-#include "libpcp.h"
+#include <pcp/impl.h>
 
 int
 main(int argc, char **argv)
@@ -18,7 +16,7 @@ main(int argc, char **argv)
     int		errflag = 0;
 
     /* trim cmd name of leading directory components */
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:?")) != EOF) {
 	switch (c) {
@@ -27,7 +25,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -45,13 +43,13 @@ main(int argc, char **argv)
 \n\
 Options:\n\
   -D debug[,...] set PCP debug options\n",
-                pmGetProgname());
+                pmProgname);
         exit(1);
     }
 
     if ((sts = pmNewContext(PM_CONTEXT_HOST, "localhost")) < 0) {
 	fprintf(stderr, "%s: Cannot connect to PMCD on localhost: %s\n",
-		pmGetProgname(), pmErrStr(sts));
+		pmProgname, pmErrStr(sts));
 	exit(1);
     }
 

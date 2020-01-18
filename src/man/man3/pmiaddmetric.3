@@ -1,7 +1,6 @@
 '\"macro stdmacro
 .\"
 .\" Copyright (c) 2010 Ken McDonell.  All Rights Reserved.
-.\" Copyright (c) 2018 Red Hat.
 .\" 
 .\" This program is free software; you can redistribute it and/or modify it
 .\" under the terms of the GNU General Public License as published by the
@@ -20,6 +19,8 @@
 .SH "C SYNOPSIS"
 .ft 3
 #include <pcp/pmapi.h>
+.br
+#include <pcp/impl.h>
 .br
 #include <pcp/import.h>
 .sp
@@ -66,8 +67,8 @@ argument and must be unique for each LOGIMPORT context.
 The value for
 .I pmid
 which would typically be constructed using the
-.B pmID_build
-macro, e.g. pmID_build(PMI_DOMAIN, 0, 3) for the fourth metric in
+.B pmid_build
+macro, e.g. pmid_build(PMI_DOMAIN, 0, 3) for the fourth metric in
 first ``cluster'' of metrics in the Performance Metrics Domain PMI_DOMAIN
 (which is the default for all meta data created by the LOGIMPORT library).
 Alternatively,
@@ -127,8 +128,6 @@ error message by calling
 .BR pmiPutResult (3),
 .BR pmiPutValue (3),
 .BR pmiPutValueHandle (3),
-.BR pmiPutText (3),
-.BR pmiPutLabel (3),
 .BR pmiUnits (3)
 and
 .BR pmLookupDesc (3).

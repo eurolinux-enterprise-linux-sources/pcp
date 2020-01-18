@@ -22,6 +22,9 @@
 #include "modlist.h"
 #include "launch.h"
 
+#include <iostream>
+using namespace std;
+
 //
 // Use debug flag LIBPMDA to trace Bar refreshes
 //
@@ -134,9 +137,11 @@ BarMod::generate(SoNode *obj, float xSpace, float zSpace)
 	_infoValue = numValues;
 	    
 	add();
-        if (pmDebugOptions.appl2)
+#ifdef PCP_DEBUG
+        if (pmDebug & DBG_TRACE_APPL2)
             cerr << "BarMod::generate: Added " << numValues << " in " << _cols
 		 << " cols and " << _rows << " rows." << endl;
+#endif
 
     }
 
@@ -223,8 +228,10 @@ BarMod::selectAll()
 
     theModList->selectAllId(_root, _blocks.size());
 
-    if (pmDebugOptions.appl2)
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_APPL2)
 	cerr << "BarMod::selectAll" << endl;
+#endif
 
     for (i = 0; i < _blocks.size(); i++) {
 	if (_blocks[i]._selected == false) {
@@ -245,9 +252,11 @@ BarMod::select(SoPath *path)
 	_blocks[value]._selected = true;
 	_selectCount++;
 
-	if (pmDebugOptions.appl2)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_APPL2)
 	    cerr << "BarMod::select: value = " << value
 		 << ", count = " << _selectCount << endl;
+#endif
     }
     return _selectCount;
 }
@@ -262,14 +271,19 @@ BarMod::remove(SoPath *path)
 	_blocks[value]._selected = false;
 	_selectCount--;
 
-	if (pmDebugOptions.appl2)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_APPL2)
 	    cerr << "BarMod::remove: value = " << value
 		 << ", count = " << _selectCount << endl;
+#endif
+
     }
 
-    else if (pmDebugOptions.appl2)
+#ifdef PCP_DEBUG
+    else if (pmDebug & DBG_TRACE_APPL2)
 	cerr << "BarMod::remove: did not remove " << value 
 	     << ", count = " << _selectCount << endl;
+#endif
 
     return _selectCount;
 }
@@ -295,9 +309,11 @@ void BarMod::infoText(QString &str, bool selected) const
     }
 
     if (v >= _blocks.size()) {
-	if (pmDebugOptions.appl2)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_APPL2)
 	    cerr << "BarMod::infoText: infoText requested but nothing selected"
 		 << endl;
+#endif
 	str = "";
     }
     else {
@@ -473,8 +489,10 @@ BarMod::findBlock(SoPath *path, int &metric, int &inst,
 
     if (i >= 0) {
 
-	if (pmDebugOptions.appl2)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_APPL2) 
 	    cerr << "BarMod::findBlock: Bar id = " << str << endl;
+#endif
 
 	sscanf(str, "%c%d", &c, &value);
 	
@@ -504,9 +522,12 @@ BarMod::findBlock(SoPath *path, int &metric, int &inst,
 	metric = inst = 0;
     }
 
-    if (pmDebugOptions.appl2)
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_APPL2) {
 	cerr << "BarMod::findBlock: metric = " << metric
 	     << ", inst = " << inst << ", value = " << value << endl;
+    }
+#endif
 
     return;
 }

@@ -19,6 +19,7 @@
  */
 
 #include "pmapi.h"
+#include "impl.h"
 #include "pmda.h"
 #include "openbsd.h"
 #include <sys/param.h>
@@ -59,7 +60,7 @@ do_vm_uvmexp_metrics(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 
 	sts = 1;
 	/* cluster and domain already checked, just need item ... */
-	switch (pmID_item(mdesc->m_desc.pmid)) {
+	switch (pmid_item(mdesc->m_desc.pmid)) {
 	    case 1:		/* kernel.all.pswitch */
 		atom->ull = stats.swtch;
 		break;
@@ -118,12 +119,7 @@ do_vm_uvmexp_metrics(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 		break;
 
 	    case 15:		/* mem.util.anonpages */
-		/*
-		 * as of (at least) OpenBD 6.4, anonpages is no longer
-		 * available in the struct ... it has become unused01
-		 * (formerly anonpages) according to <uvm/uvmexp.h>
-		 */
-		sts = 0;
+		atom->ul = ((int64_t)stats.anonpages*stats.pagesize+512)/1024;
 		break;
 
 	    case 16:		/* mem.util.vnodepages */

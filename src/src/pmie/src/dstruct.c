@@ -16,6 +16,7 @@
  * for more details.
  */
 #include "pmapi.h"
+#include "impl.h"
 #include <math.h>
 #include <ctype.h>
 #include <limits.h>
@@ -123,8 +124,8 @@ getReal(void)
 {
     struct timeval t;
 
-    pmtimevalNow(&t);
-    return pmtimevalToReal(&t);
+    __pmtimevalNow(&t);
+    return __pmtimevalToReal(&t);
 }
 
 
@@ -217,7 +218,7 @@ sleepTight(Task *t)
 	delay = sched - cur;
 	if (delay < 0) {
 	    int		show_detail = 0;
-	    if (delay <= -1 && !quiet) {
+	    if (delay <= -1) {
 		fprintf(stderr, "sleepTight: negative delay (%f). sched=%f, cur=%f\n",
 			    delay, sched, cur);
 		show_detail = 1;
@@ -359,7 +360,7 @@ alloc(size_t size)
     void *p;
 
     if ((p = malloc(size)) == NULL) {
-	pmNoMem("pmie.alloc", size, PM_FATAL_ERR);
+	__pmNoMem("pmie.alloc", size, PM_FATAL_ERR);
     }
     return p;
 }
@@ -371,7 +372,7 @@ zalloc(size_t size)
     void *p;
 
     if ((p = calloc(1, size)) == NULL) {
-	pmNoMem("pmie.zalloc", size, PM_FATAL_ERR);
+	__pmNoMem("pmie.zalloc", size, PM_FATAL_ERR);
     }
     return p;
 }
@@ -394,7 +395,7 @@ aalloc(size_t align, size_t size)
 #endif
 #endif
     if (sts != 0) {
-	pmNoMem("pmie.aalloc", size, PM_FATAL_ERR);
+	__pmNoMem("pmie.aalloc", size, PM_FATAL_ERR);
     }
     return p;
 }
@@ -406,7 +407,7 @@ ralloc(void *p, size_t size)
     void *q;
 
     if ((q = realloc(p, size)) == NULL) {
-	pmNoMem("pmie.ralloc", size, PM_FATAL_ERR);
+	__pmNoMem("pmie.ralloc", size, PM_FATAL_ERR);
     }
     return q;
 }
@@ -417,7 +418,7 @@ sdup(const char *p)
     char *q;
 
     if ((q = strdup(p)) == NULL) {
-	pmNoMem("pmie.sdup", strlen(p), PM_FATAL_ERR);
+	__pmNoMem("pmie.sdup", strlen(p), PM_FATAL_ERR);
     }
     return q;
 }
@@ -512,7 +513,7 @@ agentId(char *name)
 
     if ((sts = pmLookupName(1, &name, &pmid)) < 0) {
 	fprintf(stderr, "%s: agentId: metric %s not found in namespace: %s\n",
-		pmGetProgname(), name, pmErrStr(sts));
+		pmProgname, name, pmErrStr(sts));
 	exit(1);
     }
     return pmid;
@@ -982,7 +983,7 @@ agentInit(void)
     /* Only load PMNS if it's default and hence not already loaded */
     if (pmnsfile == PM_NS_DEFAULT && (sts = pmLoadNameSpace(pmnsfile)) < 0) {
 	fprintf(stderr, "%s: agentInit: cannot load metric namespace: %s\n",
-		pmGetProgname(), pmErrStr(sts));
+		pmProgname, pmErrStr(sts));
 	exit(1);
     }
 
@@ -1200,7 +1201,7 @@ __dumpExpr(int level, Expr *x)
 			if (k == 0)
 			    fprintf(stderr, "\"%s\"", (char *)x->smpls[j].ptr);
 		    }
-		    else if (x->op == CND_FETCH && x->metrics != NULL && x->metrics->desc.type == PM_TYPE_STRING) {
+		    else if (x->metrics != NULL && x->metrics->desc.type == PM_TYPE_STRING) {
 			/* string-valued metric */
 			fprintf(stderr, "\"%s\"", getStringValue(x, k));
 		    }
@@ -1319,9 +1320,6 @@ void
 dumpTask(Task *t)
 {
     int	i;
-    Host	*h;
-
-    h = t->hosts;
     fprintf(stderr, "Task dump @ " PRINTF_P_PFX "%p\n", t);
     fprintf(stderr, "  nth=%d delta=%.3f tick=%d next=" PRINTF_P_PFX "%p prev=" PRINTF_P_PFX "%p\n", t->nth, t->delta, t->tick, t->next, t->prev);
     fprintf(stderr, "  eval time: ");
@@ -1331,11 +1329,7 @@ dumpTask(Task *t)
     if (t->retry == 0)
 	fprintf(stderr, "N/A");
     else
-	fprintf(stderr, "%.3f", t->retry);
-    if (h->down)
-	fprintf(stderr, " host %s down", symName(h->name));
-    else if (h->waits)
-	fprintf(stderr, " metric/instances missing");
+	fprintf(stderr, "%d", t->retry);
     fputc('\n', stderr);
     if (t->hosts == NULL)
 	fprintf(stderr, "  host=<null>\n");

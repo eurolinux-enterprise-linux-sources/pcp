@@ -3,7 +3,7 @@
  */
 
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
 
 static fetchctl_t	*root;
 
@@ -18,15 +18,22 @@ setup(int i, int pmid_d, int pmid_i, int indom_d, int indom_s, int loinst, int h
 {
     int			j;
     int			numinst;
-    static pmID		pmid;
-    static pmInDom	indom;
+    static int		pmid = 0;
+    static int		indom = 0;
+    static __pmID_int	*pmidp = (__pmID_int *)&pmid;
+    static __pmInDom_int	*indomp = (__pmInDom_int *)&indom;
 
-    pmid = pmID_build(pmid_d, 0, pmid_i);
-    indom = pmInDom_build(indom_d, indom_s);
+    pmidp->flag = 0;
+    pmidp->domain = pmid_d;
+    pmidp->cluster = 0;
+    pmidp->item = pmid_i;
+    indomp->flag = 0;
+    indomp->domain = indom_d;
+    indomp->serial = indom_s;
 
     desc = (pmDesc *)realloc(desc, (i+1) * sizeof(desc[0]));
     if (desc == (pmDesc *)0) {
-	pmNoMem("setup.desc", (i+1) * sizeof(desc[0]), PM_FATAL_ERR);
+	__pmNoMem("setup.desc", (i+1) * sizeof(desc[0]), PM_FATAL_ERR);
     }
     desc[i].pmid = pmid;
     desc[i].type = PM_TYPE_32;
@@ -36,13 +43,13 @@ setup(int i, int pmid_d, int pmid_i, int indom_d, int indom_s, int loinst, int h
 
     req = (optreq_t *)realloc(req, (i+1) * sizeof(req[0]));
     if (req == (optreq_t *)0) {
-	pmNoMem("setup.req", (i+1) * sizeof(req[0]), PM_FATAL_ERR);
+	__pmNoMem("setup.req", (i+1) * sizeof(req[0]), PM_FATAL_ERR);
     }
     if (loinst != -1) {
 	req[i].r_numinst = numinst = (hiinst - loinst + 1);
 	req[i].r_instlist = (int *)malloc(numinst * sizeof(req[i].r_instlist[0]));
 	if (req[i].r_instlist == (int *)0) {
-	    pmNoMem("setup.instlist", numinst * sizeof(req[i].r_instlist[0]), PM_FATAL_ERR);
+	    __pmNoMem("setup.instlist", numinst * sizeof(req[i].r_instlist[0]), PM_FATAL_ERR);
 	}
 	for (j = 0; j < numinst; j++)
 	    req[i].r_instlist[j] = loinst + j;
@@ -55,11 +62,11 @@ setup(int i, int pmid_d, int pmid_i, int indom_d, int indom_s, int loinst, int h
 
     cost = (int *)realloc(cost, (i+1) * sizeof(cost[0]));
     if (cost == (int *)0) {
-	pmNoMem("setup.cost", (i+1) * sizeof(cost[0]), PM_FATAL_ERR);
+	__pmNoMem("setup.cost", (i+1) * sizeof(cost[0]), PM_FATAL_ERR);
     }
     nfetch = (int *)realloc(nfetch, (i+1) * sizeof(nfetch[0]));
     if (nfetch == (int *)0) {
-	pmNoMem("setup.nfetch", (i+1) * sizeof(nfetch[0]), PM_FATAL_ERR);
+	__pmNoMem("setup.nfetch", (i+1) * sizeof(nfetch[0]), PM_FATAL_ERR);
     }
 }
 
@@ -79,7 +86,7 @@ main(int argc, char **argv)
     optcost_t		ocp = { 4, 1, 15, 10, 2, 0 };	/* my costs */
     fetchctl_t		*fp;
 
-    pmSetProgname(pmGetProgname());
+    __pmSetProgname(pmProgname);
 
     while ((c = getopt(argc, argv, "D:")) != EOF) {
 	switch (c) {
@@ -89,7 +96,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -102,7 +109,7 @@ main(int argc, char **argv)
     }
 
     if (errflag) {
-	fprintf(stderr, "Usage: %s %s\n", pmGetProgname(), usage);
+	fprintf(stderr, "Usage: %s %s\n", pmProgname, usage);
 	exit(1);
     }
 

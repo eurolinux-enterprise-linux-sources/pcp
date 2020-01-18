@@ -17,6 +17,7 @@
 #define _EVENT_H
 
 #include "pmapi.h"
+#include "impl.h"
 #include "pmda.h"
 #include <tdh.h>
 #include <evntrace.h>

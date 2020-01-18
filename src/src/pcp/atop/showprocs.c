@@ -7,9 +7,9 @@
 ** This source-file contains the Linux-specific functions to calculate
 ** figures to be visualized.
 **
-** Copyright (C) 2015,2019 Red Hat.
 ** Copyright (C) 2009 JC van Winkel
 ** Copyright (C) 2000-2010 Gerlof Langeveld
+** Copyright (C) 2015 Red Hat.
 **
 ** This program is free software; you can redistribute it and/or modify it
 ** under the terms of the GNU General Public License as published by the
@@ -23,14 +23,11 @@
 */
 
 #include <pcp/pmapi.h>
-#ifdef HAVE_NCURSES_CURSES_H
-#include <ncurses/curses.h>
-#else
+#include <pcp/impl.h>
 #include <curses.h>
-#endif
+#include <regex.h>
 #include <pwd.h>
 #include <grp.h>
-#include <regex.h>
 
 #include "atop.h"
 #include "photoproc.h"
@@ -43,7 +40,6 @@ static void	format_bandw(char *, size_t, count_t);
 static char     *columnhead[] = {
 	[MSORTCPU]= "CPU", [MSORTMEM]= "MEM",
 	[MSORTDSK]= "DSK", [MSORTNET]= "NET",
-	[MSORTGPU]= "GPU",
 };
 
 
@@ -395,94 +391,74 @@ procprt_NOTAVAIL_7(struct tstat *curstat, int avgval, int nsecs)
 {
         return "      ?";
 }
+
 /***************************************************************/
 char *
 procprt_TID_ae(struct tstat *curstat, int avgval, int nsecs)
 {
-        static char buf[64];
+        static char buf[10];
 
 	if (curstat->gen.isproc)
-        	pmsprintf(buf, sizeof buf, "%*s", procprt_TID.width, "-");
+        	pmsprintf(buf, sizeof buf, "     -");
 	else
-        	pmsprintf(buf, sizeof buf, "%*d", procprt_TID.width, curstat->gen.pid);
+        	pmsprintf(buf, sizeof buf, "%6d", curstat->gen.pid);
         return buf;
 }
 
 proc_printdef procprt_TID = 
-   { "TID", "TID", procprt_TID_ae, procprt_TID_ae, 5}; //DYNAMIC WIDTH!
+   { "   TID", "TID", procprt_TID_ae, procprt_TID_ae, 6 };
 /***************************************************************/
 char *
 procprt_PID_a(struct tstat *curstat, int avgval, int nsecs)
 {
-        static char buf[64];
+        static char buf[10];
 
-        pmsprintf(buf, sizeof buf, "%*d", procprt_PID.width, curstat->gen.tgid);
+        pmsprintf(buf, sizeof buf, "%6d", curstat->gen.tgid);
         return buf;
 }
 
 char *
 procprt_PID_e(struct tstat *curstat, int avgval, int nsecs)
 {
-        static char buf[64];
+        static char buf[10];
 
         if (curstat->gen.pid == 0)
-        	pmsprintf(buf, sizeof buf, "%*s", procprt_PID.width, "?");
-	else
-        	pmsprintf(buf, sizeof buf, "%*d", procprt_PID.width, curstat->gen.tgid);
+                return "     ?";
+
+        pmsprintf(buf, sizeof buf, "%6d", curstat->gen.tgid);
         return buf;
 }
 
 proc_printdef procprt_PID = 
-   { "PID", "PID", procprt_PID_a, procprt_PID_e, 5}; //DYNAMIC WIDTH!
+   { "   PID", "PID", procprt_PID_a, procprt_PID_e, 6 };
+
 /***************************************************************/
 char *
 procprt_PPID_a(struct tstat *curstat, int avgval, int nsecs)
 {
-        static char buf[64];
+        static char buf[10];
 
-        pmsprintf(buf, sizeof buf, "%*d", procprt_PPID.width, curstat->gen.ppid);
+        pmsprintf(buf, sizeof buf, "%6d", curstat->gen.ppid);
         return buf;
 }
+
 
 char *
 procprt_PPID_e(struct tstat *curstat, int avgval, int nsecs)
 {
-        static char buf[64];
-
-	pmsprintf(buf, sizeof buf, "%*s", procprt_PPID.width, "-");
-        return buf;
+        return "     -";
 }
 
 proc_printdef procprt_PPID = 
-   { "PPID", "PPID", procprt_PPID_a, procprt_PPID_e, 5 }; //DYNAMIC WIDTH!
-/***************************************************************/
-char *
-procprt_VPID_a(struct tstat *curstat, int avgval, int nsecs)
-{
-        static char buf[64];
+   { "  PPID", "PPID", procprt_PPID_a, procprt_PPID_e, 6 };
 
-        pmsprintf(buf, sizeof buf, "%*d", procprt_VPID.width, curstat->gen.vpid);
-        return buf;
-}
-
-char *
-procprt_VPID_e(struct tstat *curstat, int avgval, int nsecs)
-{
-        static char buf[64];
-
-	pmsprintf(buf, sizeof buf, "%*s", procprt_VPID.width, "-");
-        return buf;
-}
-
-proc_printdef procprt_VPID = 
-   { "VPID", "VPID", procprt_VPID_a, procprt_VPID_e, 5 }; //DYNAMIC WIDTH!
 /***************************************************************/
 char *
 procprt_CTID_a(struct tstat *curstat, int avgval, int nsecs)
 {
         static char buf[32];
 
-        pmsprintf(buf, sizeof buf, "%5d", curstat->gen.ctid);
+        pmsprintf(buf, sizeof buf-1, "%5d", curstat->gen.ctid);
         return buf;
 }
 
@@ -496,33 +472,22 @@ proc_printdef procprt_CTID =
    { " CTID", "CTID", procprt_CTID_a, procprt_CTID_e, 5 };
 /***************************************************************/
 char *
-procprt_CID_a(struct tstat *curstat, int avgval, int nsecs)
+procprt_VPID_a(struct tstat *curstat, int avgval, int nsecs)
 {
-        static char buf[64];
+	static char buf[32];
 
-	if (curstat->gen.container[0])
-        	pmsprintf(buf, sizeof buf, "%-12s", curstat->gen.container);
-	else
-        	pmsprintf(buf, sizeof buf, "%-12s", "host--------");
-
-        return buf;
+	pmsprintf(buf, sizeof buf-1, "%6d", curstat->gen.vpid);
+	return buf;
 }
 
 char *
-procprt_CID_e(struct tstat *curstat, int avgval, int nsecs)
+procprt_VPID_e(struct tstat *curstat, int avgval, int nsecs)
 {
-        static char buf[64];
-
-	if (curstat->gen.container[0])
-        	pmsprintf(buf, sizeof buf, "%-12s", curstat->gen.container);
-	else
-        	pmsprintf(buf, sizeof buf, "%-12s", "?");
-
-        return buf;
+	return "     -";
 }
 
-proc_printdef procprt_CID = 
-   { "CID         ", "CID", procprt_CID_a, procprt_CID_e, 12};
+proc_printdef procprt_VPID = 
+   { "  VPID", "VPID", procprt_VPID_a, procprt_VPID_e, 6 };
 /***************************************************************/
 char *
 procprt_SYSCPU_ae(struct tstat *curstat, int avgval, int nsecs)
@@ -1142,7 +1107,6 @@ proc_printdef procprt_TSLPU =
 #define SCHED_BATCH	3
 #define SCHED_ISO	4
 #define SCHED_IDLE	5
-#define SCHED_DEADLINE	6
 
 char *
 procprt_POLI_a(struct tstat *curstat, int avgval, int nsecs)
@@ -1166,9 +1130,6 @@ procprt_POLI_a(struct tstat *curstat, int avgval, int nsecs)
                         break;
                 case SCHED_IDLE:
                         return "idle";
-                        break;
-                case SCHED_DEADLINE:
-                        return "dead";
                         break;
         }
         return "?   ";
@@ -1576,6 +1537,7 @@ procprt_TCPSASZ_e(struct tstat *curstat, int avgval, int nsecs)
         	return "      -";
 }
 
+
 proc_printdef procprt_TCPSASZ = 
    { "TCPSASZ", "TCPSASZ", procprt_TCPSASZ_a, procprt_TCPSASZ_e, 7 };
 /***************************************************************/
@@ -1761,7 +1723,7 @@ proc_printdef procprt_SNET =
    { " SNET", "SNET", procprt_SNET_a, procprt_SNET_e, 5 };
 /***************************************************************/
 char *
-procprt_BANDWI_a(struct tstat *curstat, int avgval, int nsecs)
+procprt_RNETBW_a(struct tstat *curstat, int avgval, int nsecs)
 {
         static char buf[16];
 	count_t     rkbps = (curstat->net.tcprsz+curstat->net.udprsz)/125/nsecs;
@@ -1771,7 +1733,7 @@ procprt_BANDWI_a(struct tstat *curstat, int avgval, int nsecs)
 }
 
 char *
-procprt_BANDWI_e(struct tstat *curstat, int avgval, int nsecs)
+procprt_RNETBW_e(struct tstat *curstat, int avgval, int nsecs)
 {
 	if (supportflags & NETATOPD)
 	{
@@ -1786,11 +1748,11 @@ procprt_BANDWI_e(struct tstat *curstat, int avgval, int nsecs)
         	return "        -";
 }
 
-proc_printdef procprt_BANDWI = 
-   { "   BANDWI", "BANDWI", procprt_BANDWI_a, procprt_BANDWI_e, 9};
+proc_printdef procprt_RNETBW = 
+   { "   BANDWI", "RNETBW", procprt_RNETBW_a, procprt_RNETBW_e, 9};
 /***************************************************************/
 char *
-procprt_BANDWO_a(struct tstat *curstat, int avgval, int nsecs)
+procprt_SNETBW_a(struct tstat *curstat, int avgval, int nsecs)
 {
         static char buf[16];
 	count_t     skbps = (curstat->net.tcpssz+curstat->net.udpssz)/125/nsecs;
@@ -1800,7 +1762,7 @@ procprt_BANDWO_a(struct tstat *curstat, int avgval, int nsecs)
 }
 
 char *
-procprt_BANDWO_e(struct tstat *curstat, int avgval, int nsecs)
+procprt_SNETBW_e(struct tstat *curstat, int avgval, int nsecs)
 {
 	if (supportflags & NETATOPD)
 	{
@@ -1815,8 +1777,8 @@ procprt_BANDWO_e(struct tstat *curstat, int avgval, int nsecs)
         	return "        -";
 }
 
-proc_printdef procprt_BANDWO = 
-   { "   BANDWO", "BANDWO", procprt_BANDWO_a, procprt_BANDWO_e, 9};
+proc_printdef procprt_SNETBW = 
+   { "   BANDWO", "SNETBW", procprt_SNETBW_a, procprt_SNETBW_e, 9};
 /***************************************************************/
 static void
 format_bandw(char *buf, size_t buflen, count_t kbps)
@@ -1845,114 +1807,6 @@ format_bandw(char *buf, size_t buflen, count_t kbps)
 
         pmsprintf(buf, buflen-1, "%4lld %cbps", kbps, c);
 }
-/***************************************************************/
-char *
-procprt_GPULIST_ae(struct tstat *curstat, int avgval, int nsecs)
-{
-        static char	buf[64];
-        char		tmp[64], *p=tmp;
-	int		i;
-
-	if (!curstat->gpu.state)
-		return "       -";
-
-	if (!curstat->gpu.gpulist)
-		return "       -";
-
-	for (i=0; i < hinv_nrgpus; i++)
-	{
-		if (curstat->gpu.gpulist & 1<<i)
-		{
-			if (tmp == p)	// first?
-				p += pmsprintf(p, sizeof tmp, "%d", i);
-			else
-				p += pmsprintf(p, sizeof tmp - (p-tmp), ",%d", i);
-
-			if (p - tmp > 8)
-			{
-				pmsprintf(tmp, sizeof tmp, "0x%06x",
-						curstat->gpu.gpulist);
-				break;
-			}
-		}
-	}
-
-	pmsprintf(buf, sizeof buf, "%8.8s", tmp);
-        return buf;
-}
-
-proc_printdef procprt_GPULIST = 
-   { " GPUNUMS", "GPULIST", procprt_GPULIST_ae, procprt_GPULIST_ae, 8};
-/***************************************************************/
-char *
-procprt_GPUMEMNOW_ae(struct tstat *curstat, int avgval, int nsecs)
-{
-        static char buf[10];
-
-	if (!curstat->gpu.state)
-		return "     -";
-
-        val2memstr(curstat->gpu.memnow*1024, buf, sizeof buf, KBFORMAT, 0, 0);
-        return buf;
-}
-
-proc_printdef procprt_GPUMEMNOW = 
-   { "MEMNOW", "GPUMEM", procprt_GPUMEMNOW_ae, procprt_GPUMEMNOW_ae, 6};
-/***************************************************************/
-char *
-procprt_GPUMEMAVG_ae(struct tstat *curstat, int avgval, int nsecs)
-{
-        static char buf[10];
-
-	if (!curstat->gpu.state)
-		return "     -";
-
-	if (curstat->gpu.sample == 0)
-		return("    0K");
-
-       	val2memstr(curstat->gpu.nrgpus * curstat->gpu.memcum /
-	           curstat->gpu.sample*1024, buf, sizeof buf, KBFORMAT, 0, 0);
-       	return buf;
-}
-
-proc_printdef procprt_GPUMEMAVG = 
-   { "MEMAVG", "GPUMEMAVG", procprt_GPUMEMAVG_ae, procprt_GPUMEMAVG_ae, 6};
-/***************************************************************/
-char *
-procprt_GPUGPUBUSY_ae(struct tstat *curstat, int avgval, int nsecs)
-{
-        static char 	buf[16];
-
-	if (!curstat->gpu.state)
-		return "      -";
-
-	if (curstat->gpu.gpubusy == -1)
-		return "    N/A";
-
-       	pmsprintf(buf, sizeof buf, "%6d%%", curstat->gpu.gpubusy);
-       	return buf;
-}
-
-proc_printdef procprt_GPUGPUBUSY = 
-   { "GPUBUSY", "GPUGPUBUSY", procprt_GPUGPUBUSY_ae, procprt_GPUGPUBUSY_ae, 7};
-/***************************************************************/
-char *
-procprt_GPUMEMBUSY_ae(struct tstat *curstat, int avgval, int nsecs)
-{
-        static char 	buf[16];
-
-	if (!curstat->gpu.state)
-		return "      -";
-
-	if (curstat->gpu.membusy == -1)
-		return "    N/A";
-
-        pmsprintf(buf, sizeof buf, "%6d%%", curstat->gpu.membusy);
-        return buf;
-}
-
-proc_printdef procprt_GPUMEMBUSY = 
-   { "MEMBUSY", "GPUMEMBUSY", procprt_GPUMEMBUSY_ae, procprt_GPUMEMBUSY_ae, 7};
 /***************************************************************/
 char *
 procprt_SORTITEM_ae(struct tstat *curstat, int avgval, int nsecs)

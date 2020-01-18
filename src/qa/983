@@ -17,9 +17,9 @@ which socat >/dev/null 2>&1 || _notrun "socat binary not installed"
 
 port2=55432 # just some random port
 port1=55431 # just some random port
-$PCP_BINADM_DIR/telnet-probe -c localhost $port1 \
+echo | $PCP_BINADM_DIR/telnet-probe localhost $port1 \
     && _notrun "Someone already listening on port $port1"
-$PCP_BINADM_DIR/telnet-probe -c localhost $port2 \
+echo | $PCP_BINADM_DIR/telnet-probe localhost $port2 \
     && _notrun "Someone already listening on port $port2"
 # (technically, this is a TOCTTOU race condition)
 
@@ -31,10 +31,10 @@ signal=$PCP_BINADM_DIR/pmsignal
 
 _cleanup()
 {
-    [ -z "$pmcd_pid" ] || $sudo $signal $pmcd_pid
-    [ -z "$socat_pid" ] || $sudo $signal $socat_pid
+    [ -z "$pmcd_pid" ] || sudo $signal $pmcd_pid
+    [ -z "$socat_pid" ] || sudo $signal $socat_pid
     _wait_pmcd_end
-    _service pcp restart 2>&1 \
+    _service pcp restart \
     | _filter_pcp_start \
     | sed -e '/Waiting for pmcd to terminate/d'
     _restore_auto_restart pmcd
@@ -43,7 +43,7 @@ _cleanup()
     $sudo rm -f $tmp.*
 }
 trap "_cleanup; exit \$status" 0 1 2 3 15
-_stop_auto_restart pmcd
+_restore_auto_restart pmcd
 
 # ditch timestamps and exact hostnames 
 _filter_pmie()
@@ -114,4 +114,5 @@ cat $tmp.socat >> $seq.full
 
 # success, all done
 status=0
+
 exit

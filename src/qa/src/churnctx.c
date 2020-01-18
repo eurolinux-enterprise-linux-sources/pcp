@@ -7,10 +7,7 @@
  */
 
 #include <pcp/pmapi.h>
-#include "libpcp.h"
-#ifdef HAVE_STRINGS_H
-#include <strings.h>
-#endif
+#include <pcp/impl.h>
 
 static int	nmetric;		/* for metric ... args */
 static char	**name = NULL;
@@ -57,13 +54,13 @@ dometric(const char *new_name)
 	indom = desc[nmetric-1].indom;
 	inst = (int *)malloc(ninst*sizeof(inst[0]));
 	if (instname == NULL) {
-	    pmNoMem("inst", ninst*sizeof(inst[0]), PM_FATAL_ERR);
+	    __pmNoMem("inst", ninst*sizeof(inst[0]), PM_FATAL_ERR);
 	    /* NOTREACHED */
 	}
 	for (j = 0; j < ninst; j++) {
 	    inst[j] = pmLookupInDom(indom, instname[j]);
 	    if (inst[j] < 0) {
-		fprintf(stderr, "Warning: pmLookupInDom(%s, \"%s\") [j=%d] failed for metric %s: %s\n", pmInDomStr(indom), instname[j], j, new_name, pmErrStr(inst[j]));
+		fprintf(stderr, "Warning: pmLookupInDom(%s, \"%s\") failed for metric %s: %s\n", pmInDomStr(indom), instname[j], new_name, pmErrStr(inst[j]));
 		inst[j] = PM_IN_NULL;
 	    }
 	}
@@ -100,7 +97,7 @@ main(int argc, char **argv)
     int		fetch_samples = 1;
     char	*endnum;
     pmResult	*rp;
-    unsigned long	highwater = 0;
+    char	*highwater = NULL;
     char	*q;
     struct timeval delta = { 15, 0 };
     struct timeval startTime;
@@ -108,12 +105,9 @@ main(int argc, char **argv)
     struct timeval appStart;
     struct timeval appEnd;
     struct timeval appOffset;
-#ifdef IS_MINGW
-    MEMORYSTATUSEX	winmemstats;
-#endif
 
     /* trim cmd name of leading directory components */
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
@@ -123,7 +117,7 @@ main(int argc, char **argv)
 
 	case 'a':	/* archive name */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmProgname);
 		errflag++;
 	    }
 	    type = PM_CONTEXT_ARCHIVE;
@@ -136,7 +130,7 @@ main(int argc, char **argv)
 
 	case 'c':	/* configfile */
 	    if (configfile != NULL) {
-		fprintf(stderr, "%s: at most one -c option allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one -c option allowed\n", pmProgname);
 		errflag++;
 	    }
 	    configfile = optarg;
@@ -146,7 +140,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -158,14 +152,14 @@ main(int argc, char **argv)
 	case 'f':	/* pmFetch sample count */
 	    fetch_samples = (int)strtol(optarg, &endnum, 10);
 	    if (*endnum != '\0' || fetch_samples < 0) {
-		fprintf(stderr, "%s: -f requires numeric argument\n", pmGetProgname());
+		fprintf(stderr, "%s: -f requires numeric argument\n", pmProgname);
 		errflag++;
 	    }
 	    break;
 
 	case 'h':	/* contact PMCD on this hostname */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmProgname);
 		errflag++;
 	    }
 	    host = optarg;
@@ -176,9 +170,9 @@ main(int argc, char **argv)
 	    q = optarg;
 	    while ((q = index(optarg, ',')) != NULL) {
 		ninst++;
-		instname = (char **)realloc(instname, (ninst+1)*sizeof(instname[0]));
+		instname = (char **)realloc(instname, ninst*sizeof(instname[0]));
 		if (instname == NULL) {
-		    pmNoMem("instname", (ninst+1)*sizeof(instname[0]), PM_FATAL_ERR);
+		    __pmNoMem("instname", ninst*sizeof(instname[0]), PM_FATAL_ERR);
 		    /* NOTREACHED */
 		}
 		*q = '\0';
@@ -187,7 +181,7 @@ main(int argc, char **argv)
 	    }
 	    ninst++;
 	    if (instname == NULL) {
-		pmNoMem("instname", ninst*sizeof(instname[0]), PM_FATAL_ERR);
+		__pmNoMem("instname", ninst*sizeof(instname[0]), PM_FATAL_ERR);
 		/* NOTREACHED */
 	    }
 	    instname[ninst-1] = strdup(optarg);
@@ -195,7 +189,7 @@ main(int argc, char **argv)
 
 	case 'L':	/* LOCAL, no PMCD */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmProgname);
 		errflag++;
 	    }
 	    host = NULL;
@@ -219,7 +213,7 @@ main(int argc, char **argv)
 	case 's':	/* sample count */
 	    samples = (int)strtol(optarg, &endnum, 10);
 	    if (*endnum != '\0' || samples < 0) {
-		fprintf(stderr, "%s: -s requires numeric argument\n", pmGetProgname());
+		fprintf(stderr, "%s: -s requires numeric argument\n", pmProgname);
 		errflag++;
 	    }
 	    break;
@@ -230,7 +224,7 @@ main(int argc, char **argv)
 
 	case 't':	/* change update interval */
 	    if (pmParseInterval(optarg, &delta, &endnum) < 0) {
-		fprintf(stderr, "%s: illegal -t argument\n", pmGetProgname());
+		fprintf(stderr, "%s: illegal -t argument\n", pmProgname);
 		fputs(endnum, stderr);
 		free(endnum);
 		errflag++;
@@ -243,7 +237,7 @@ main(int argc, char **argv)
 
 	case 'U':	/* uninterpolated archive log */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmProgname);
 		errflag++;
 	    }
 	    type = PM_CONTEXT_ARCHIVE;
@@ -257,7 +251,7 @@ main(int argc, char **argv)
 
 	case 'z':	/* timezone from host */
 	    if (tz != NULL) {
-		fprintf(stderr, "%s: at most one of -Z and/or -z allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -Z and/or -z allowed\n", pmProgname);
 		errflag++;
 	    }
 	    zflag++;
@@ -265,7 +259,7 @@ main(int argc, char **argv)
 
 	case 'Z':	/* $TZ timezone */
 	    if (zflag) {
-		fprintf(stderr, "%s: at most one of -Z and/or -z allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -Z and/or -z allowed\n", pmProgname);
 		errflag++;
 	    }
 	    tz = optarg;
@@ -279,7 +273,7 @@ main(int argc, char **argv)
     }
 
     if (zflag && type == 0) {
-	fprintf(stderr, "%s: -z requires an explicit -a, -h or -U option\n", pmGetProgname());
+	fprintf(stderr, "%s: -z requires an explicit -a, -h or -U option\n", pmProgname);
 	errflag++;
     }
 
@@ -307,19 +301,19 @@ Options:\n\
   -v             report values\n\
   -z             set reporting timezone to local time of metrics source\n\
   -Z timezone    set reporting timezone\n",
-                pmGetProgname());
+                pmProgname);
         exit(1);
     }
 
     if (logfile != NULL) {
-	pmOpenLog(pmGetProgname(), logfile, stderr, &sts);
-	if (sts != 1) {
-	    fprintf(stderr, "%s: Could not open logfile \"%s\"\n", pmGetProgname(), logfile);
+	__pmOpenLog(pmProgname, logfile, stderr, &sts);
+	if (sts < 0) {
+	    fprintf(stderr, "%s: Could not open logfile \"%s\"\n", pmProgname, logfile);
 	}
     }
 
     if (pmnsfile != PM_NS_DEFAULT && (sts = pmLoadASCIINameSpace(pmnsfile, 1)) < 0) {
-	printf("%s: Cannot load namespace from \"%s\": %s\n", pmGetProgname(), 
+	printf("%s: Cannot load namespace from \"%s\": %s\n", pmProgname, 
 	       pmnsfile, pmErrStr(sts));
 	exit(1);
     }
@@ -333,17 +327,17 @@ Options:\n\
     if ((ctx = pmNewContext(type, host)) < 0) {
 	if (type == PM_CONTEXT_HOST)
 	    fprintf(stderr, "%s: Cannot connect to PMCD on host \"%s\": %s\n",
-		pmGetProgname(), host, pmErrStr(ctx));
+		pmProgname, host, pmErrStr(ctx));
 	else
 	    fprintf(stderr, "%s: Cannot open archive \"%s\": %s\n",
-		pmGetProgname(), host, pmErrStr(ctx));
+		pmProgname, host, pmErrStr(ctx));
 	exit(1);
     }
 
     if (type == PM_CONTEXT_ARCHIVE) {
 	if ((sts = pmGetArchiveLabel(&label)) < 0) {
 	    fprintf(stderr, "%s: Cannot get archive label record: %s\n",
-		pmGetProgname(), pmErrStr(sts));
+		pmProgname, pmErrStr(sts));
 	    exit(1);
 	}
   	startTime = label.ll_start;
@@ -352,7 +346,7 @@ Options:\n\
 	    endTime.tv_usec = 0;
 	    fflush(stdout);
 	    fprintf(stderr, "%s: Cannot locate end of archive: %s\n",
-		pmGetProgname(), pmErrStr(sts));
+		pmProgname, pmErrStr(sts));
 	    fprintf(stderr, "\nWARNING: This archive is sufficiently damaged that it may not be possible to\n");
 	    fprintf(stderr, "         produce complete information.  Continuing and hoping for the best.\n\n");
 	    fflush(stderr);
@@ -367,7 +361,7 @@ Options:\n\
     if (zflag) {
 	if ((tzh = pmNewContextZone()) < 0) {
 	    fprintf(stderr, "%s: Cannot set context timezone: %s\n",
-		pmGetProgname(), pmErrStr(tzh));
+		pmProgname, pmErrStr(tzh));
 	    exit(1);
 	}
 	if (type == PM_CONTEXT_ARCHIVE)
@@ -379,7 +373,7 @@ Options:\n\
     else if (tz != NULL) {
 	if ((tzh = pmNewZone(tz)) < 0) {
 	    fprintf(stderr, "%s: Cannot set timezone to \"%s\": %s\n",
-		pmGetProgname(), tz, pmErrStr(tzh));
+		pmProgname, tz, pmErrStr(tzh));
 	    exit(1);
 	}
 	printf("Note: timezone set to \"TZ=%s\"\n\n", tz);
@@ -394,7 +388,7 @@ Options:\n\
 
     if (align != NULL && type != PM_CONTEXT_ARCHIVE) {
 	fprintf(stderr, "%s: -A option only supported for PCP archives, alignment request ignored\n",
-		pmGetProgname());
+		pmProgname);
 	align = NULL;
     }
 
@@ -402,37 +396,37 @@ Options:\n\
 			    &endTime, &appStart, &appEnd, &appOffset,
 			    &endnum);
     if (sts < 0) {
-	fprintf(stderr, "%s: illegal time window specification\n%s", pmGetProgname(), endnum);
+	fprintf(stderr, "%s: illegal time window specification\n%s", pmProgname, endnum);
 	exit(1);
     }
 
     iter = 1;
     while (samples == -1 || samples-- > 0) {
-	int		new_ctx;
-	unsigned long	check;
+	int	new_ctx;
+	char	*check;
 
 	if (iter == 1 || (iter % fetch_samples) == 0) {
 	    if (dupctx) {
 		if ((new_ctx = pmDupContext()) < 0) {
-		    fprintf(stderr, "%s: pmDupContext failed: %s\n", pmGetProgname(), pmErrStr(new_ctx));
+		    fprintf(stderr, "%s: pmDupContext failed: %s\n", pmProgname, pmErrStr(new_ctx));
 		    exit(1);
 		}
 	    }
 	    else {
 		if ((new_ctx = pmNewContext(type, host)) < 0) {
-		    fprintf(stderr, "%s: pmNewContext failed: %s\n", pmGetProgname(), pmErrStr(new_ctx));
+		    fprintf(stderr, "%s: pmNewContext failed: %s\n", pmProgname, pmErrStr(new_ctx));
 		    exit(1);
 		}
 
 	    }
 
 	    if ((sts = pmDestroyContext(ctx)) < 0) {
-		fprintf(stderr, "%s: pmDestroyContex failed: %s\n", pmGetProgname(), pmErrStr(sts));
+		fprintf(stderr, "%s: pmDestroyContex failed: %s\n", pmProgname, pmErrStr(sts));
 		exit(1);
 	    }
 
 	    if ((sts = pmUseContext(new_ctx)) < 0) {
-		fprintf(stderr, "%s: pmUseContext(%d) failed: %s\n", pmGetProgname(), new_ctx, pmErrStr(sts));
+		fprintf(stderr, "%s: pmUseContext(%d) failed: %s\n", pmProgname, new_ctx, pmErrStr(sts));
 		exit(1);
 	    }
 	    ctx = new_ctx;
@@ -442,15 +436,9 @@ Options:\n\
 	__pmFindPDUBuf(-1);
 
 	/* check for outrageous memory leaks */
-	__pmProcessDataSize(&check);
-	if (highwater != 0) {
-	    /*
-	     * check and highwater are signed, values from
-	     * __pmProcessDataSize() are not monotonic increasing, so
-	     * need to check that it has gone up and gone up by more than
-	     * 512K
-	     */
-	    if (check > highwater && check - highwater > 512*1024) {
+	check = (char *)sbrk(0);
+	if (highwater != NULL) {
+	    if (check - highwater > 512*1024) {
 		/* use first 2 iterations to get stable */
 		if (iter > 2)
 		    printf("Memory growth (iteration %d): %ld\n", iter, (long)(check - highwater));
@@ -465,11 +453,11 @@ Options:\n\
 		int		delta_msec;
 		delta_msec = delta.tv_sec*1000 + delta.tv_usec/1000;
 		if ((sts = pmSetMode(mode, &appStart, delta_msec)) < 0) {
-		    fprintf(stderr, "%s: pmSetMode: %s\n", pmGetProgname(), pmErrStr(sts));
+		    fprintf(stderr, "%s: pmSetMode: %s\n", pmProgname, pmErrStr(sts));
 		    exit(1);
 		}
 	    }
-	    pmtimevalInc(&appStart, &delta);
+	    __pmtimevalInc(&appStart, &delta);
 	}
 
 	if (nmetric > 0) {
@@ -479,7 +467,7 @@ Options:\n\
 		}
 	    }
 	    if ((sts = pmFetch(nmetric, pmid, &rp)) < 0) {
-		fprintf(stderr, "%s: pmFetch failed: %s\n", pmGetProgname(), pmErrStr(sts));
+		fprintf(stderr, "%s: pmFetch failed: %s\n", pmProgname, pmErrStr(sts));
 		exit(1);
 	    }
 	    else {
@@ -522,7 +510,7 @@ Options:\n\
     }
 
     if ((sts = pmDestroyContext(ctx)) < 0) {
-	fprintf(stderr, "%s: final pmDestroyContex failed: %s\n", pmGetProgname(), pmErrStr(sts));
+	fprintf(stderr, "%s: final pmDestroyContex failed: %s\n", pmProgname, pmErrStr(sts));
 	exit(1);
     }
 

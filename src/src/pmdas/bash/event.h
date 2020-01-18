@@ -19,7 +19,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 
 typedef struct bash_process {
     int			fd;

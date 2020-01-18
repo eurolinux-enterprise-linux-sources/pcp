@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 Red Hat.
+ * Copyright (c) 2012-2017 Red Hat.
  * Copyright (c) 1995-2001,2003 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -21,7 +21,6 @@
 
 char		*configfile;		/* current config filename, must be *alloc()d */
 __pmLogCtl	logctl;
-__pmArchCtl	archctl;
 int		exit_samples = -1;       /* number of samples 'til exit */
 __int64_t	exit_bytes = -1;         /* number of bytes 'til exit */
 __int64_t	vol_bytes;		 /* total in earlier volumes */
@@ -72,7 +71,7 @@ run_done(int sts, char *msg)
     if (pmDebugOptions.log && pmDebugOptions.desperate) {
 	fprintf(stderr, "run_done(%d, %s) last_log_offset=%d last_stamp=",
 		sts, msg, last_log_offset);
-	pmPrintStamp(stderr, &last_stamp);
+	__pmPrintStamp(stderr, &last_stamp);
 	fputc('\n', stderr);
     }
 
@@ -86,19 +85,16 @@ run_done(int sts, char *msg)
     	fprintf(stderr, "pmlogger: End of run time, exiting\n");
 
     /*
-     * write the last last temporal index entry with the time stamp
+     * write the last last temportal index entry with the time stamp
      * of the last pmResult and the seek pointer set to the offset
      * _before_ the last log record
      */
     if (last_stamp.tv_sec != 0) {
-	pmTimeval	tmp;
+	__pmTimeval	tmp;
 	tmp.tv_sec = (__int32_t)last_stamp.tv_sec;
 	tmp.tv_usec = (__int32_t)last_stamp.tv_usec;
-	if (last_log_offset < sizeof(__pmLogLabel)+2*sizeof(int)) {
-	    fprintf(stderr, "run_done: Botch: last_log_offset = %ld\n", (long)last_log_offset);
-	}
-	__pmFseek(archctl.ac_mfp, last_log_offset, SEEK_SET);
-	__pmLogPutIndex(&archctl, &tmp);
+	__pmFseek(logctl.l_mfp, last_log_offset, SEEK_SET);
+	__pmLogPutIndex(&logctl, &tmp);
     }
 
     exit(sts);
@@ -161,8 +157,8 @@ tolower_str(char *str)
  * The size can be in one of the following forms:
  *   "40"    = sample counter of 40
  *   "40b"   = byte size of 40
- *   "40Kb"  = byte size of 40*1024 bytes = 40 kilobytes (kibibytes)
- *   "40Mb"  = byte size of 40*1024*1024 bytes = 40 megabytes (mebibytes)
+ *   "40Kb"  = byte size of 40*1024 bytes = 40 kilobytes
+ *   "40Mb"  = byte size of 40*1024*1024 bytes = 40 megabytes
  *   time-format = time delta in seconds
  *
  */
@@ -211,12 +207,8 @@ ParseSize(char *size_arg, int *sample_counter, __int64_t *byte_size,
 	}  
 
 	/* if kilobytes */
-	if (strcmp(ptr, "k") == 0 ||
-	    strcmp(ptr, "kb") == 0 ||
-	    strcmp(ptr, "kib") == 0 ||
-	    strcmp(ptr, "kbyte") == 0 ||
-	    strcmp(ptr, "kibibyte") == 0 ||
-	    strcmp(ptr, "kilobyte") == 0) {
+	if (strcmp(ptr, "k") == 0 || strcmp(ptr, "kb") == 0 ||
+	    strcmp(ptr, "kbyte") == 0 || strcmp(ptr, "kilobyte") == 0) {
 	    *byte_size = x*1024;
 	    return 1;
 	}
@@ -224,9 +216,7 @@ ParseSize(char *size_arg, int *sample_counter, __int64_t *byte_size,
 	/* if megabytes */
 	if (strcmp(ptr, "m") == 0 ||
 	    strcmp(ptr, "mb") == 0 ||
-	    strcmp(ptr, "mib") == 0 ||
 	    strcmp(ptr, "mbyte") == 0 ||
-	    strcmp(ptr, "mebibyte") == 0 ||
 	    strcmp(ptr, "megabyte") == 0) {
 	    *byte_size = x*1024*1024;
 	    return 1;
@@ -235,9 +225,7 @@ ParseSize(char *size_arg, int *sample_counter, __int64_t *byte_size,
 	/* if gigabytes */
 	if (strcmp(ptr, "g") == 0 ||
 	    strcmp(ptr, "gb") == 0 ||
-	    strcmp(ptr, "gib") == 0 ||
 	    strcmp(ptr, "gbyte") == 0 ||
-	    strcmp(ptr, "gibibyte") == 0 ||
 	    strcmp(ptr, "gigabyte") == 0) {
 	    *byte_size = ((__int64_t)x)*1024*1024*1024;
 	    return 1;
@@ -258,7 +246,7 @@ ParseSize(char *size_arg, int *sample_counter, __int64_t *byte_size,
 static void
 tsub(struct timeval *a, struct timeval *b)
 {
-    pmtimevalDec(a, b);
+    __pmtimevalDec(a, b);
     if (a->tv_sec < 0) {
         /* clip negative values at zero */
         a->tv_sec = 0;
@@ -291,7 +279,6 @@ static int
 add_msg(char **bp, int nchar, char *p)
 {
     int		add_len;
-    char	*tmp_bp;
 
     if (nchar < 0 || p == NULL)
 	return nchar;
@@ -299,12 +286,8 @@ add_msg(char **bp, int nchar, char *p)
     add_len = (int)strlen(p);
     if (nchar == 0)
 	add_len++;
-    if ((tmp_bp = (char *)realloc(*bp, nchar+add_len)) == NULL) {
-	free(*bp);
-	*bp = NULL;
+    if ((*bp = realloc(*bp, nchar+add_len)) == NULL)
 	return -1;
-    }
-    *bp = tmp_bp;
     if (nchar == 0)
 	strcpy(*bp, p);
     else
@@ -348,7 +331,7 @@ do_dialog(char cmd)
 	/* hack is close enough! */
 	now = 1;
 
-    archsize = vol_bytes + __pmFtell(archctl.ac_mfp);
+    archsize = vol_bytes + __pmFtell(logctl.l_mfp);
 
     nchar = add_msg(&p, 0, "");
     p[0] = '\0';
@@ -414,17 +397,11 @@ do_dialog(char cmd)
 	nchar = add_msg(&p, nchar, "\n\nTerminate this PCP recording session now?");
 
     if (nchar > 0) {
-	char *xconfirm = strdup(pmGetConfig("PCP_XCONFIRM_PROG"));
-	if (xconfirm == NULL) {
-	    pmNoMem("do_dialog", strlen(pmGetConfig("PCP_XCONFIRM_PROG"))+1, PM_FATAL_ERR);
-	    /* NOTREACHED */
-	}
-	/* THREADSAFE - no locks acquired in __pmNativePath() */
-	xconfirm = __pmNativePath(xconfirm);
+	char * xconfirm = __pmNativePath(pmGetConfig("PCP_XCONFIRM_PROG"));
 	int fd = -1;
 
 #if HAVE_MKSTEMP
-	pmsprintf(tmp, sizeof(tmp), "%s%cmsgXXXXXX", pmGetConfig("PCP_TMPFILE_DIR"), pmPathSeparator());
+	pmsprintf(tmp, sizeof(tmp), "%s%cmsgXXXXXX", pmGetConfig("PCP_TMPFILE_DIR"), __pmPathSeparator());
 	msg = tmp;
 	fd = mkstemp(tmp);
 #else
@@ -438,7 +415,6 @@ do_dialog(char cmd)
 	    fprintf(stderr, "Reason? %s\n", osstrerror());
 	    if (fd != -1)
 		close(fd);
-	    free(xconfirm);
 	    goto failed;
 	}
 	fputs(p, msgf);
@@ -459,13 +435,11 @@ do_dialog(char cmd)
 	    fprintf(stderr, "\nError: __pmProcessUnpickArgs failed for recording session dialog\n");
 	    fprintf(stderr, "Command: \"%s\"\n", lbuf);
 	    fprintf(stderr, "Error: %s\n", pmErrStr(sts));
-	    free(xconfirm);
 	    goto failed;
 	}
 	if ((sts = __pmProcessPipe(&argp, "r", PM_EXEC_TOSS_NONE, &msgf)) < 0) {
 	    fprintf(stderr, "\nError: failed to start command for recording session dialog\n");
 	    fprintf(stderr, "Command: \"%s\"\n", lbuf);
-	    free(xconfirm);
 	    goto failed;
 	}
 
@@ -487,7 +461,6 @@ failed:
 	if (msgf != NULL)
 	    __pmProcessPipeClose(msgf);
 	unlink(msg);
-	free(xconfirm);
     }
     else {
 	fprintf(stderr, "Error: failed to create recording session dialog message!\n");
@@ -558,7 +531,7 @@ do_pmcpp(char *configfile)
     if (configfile != NULL) {
 	if ((f = fopen(configfile, "r")) == NULL) {
 	    fprintf(stderr, "%s: Cannot open config file \"%s\": %s\n",
-		pmGetProgname(), configfile, osstrerror());
+		pmProgname, configfile, osstrerror());
 	    exit(1);
 	}
 	fclose(f);
@@ -566,12 +539,12 @@ do_pmcpp(char *configfile)
 
     if (bin_dir == NULL) {
 	fprintf(stderr, "%s: pmGetConfig: cannot get $PCP_BINADM_DIR value\n",
-		pmGetProgname());
+		pmProgname);
 	exit(1);
     }
     if (lib_dir == NULL) {
 	fprintf(stderr, "%s: pmGetConfig: cannot get $PCP_VAR_DIR value\n",
-		pmGetProgname());
+		pmProgname);
 	exit(1);
     }
 
@@ -581,13 +554,13 @@ do_pmcpp(char *configfile)
 
     if ((sts = __pmProcessUnpickArgs(&argp, cmd)) < 0) {
 	fprintf(stderr, "%s: __pmProcessUnpickArgs(..., \"%s\") failed: %s\n",
-		pmGetProgname(), cmd, pmErrStr(sts));
+		pmProgname, cmd, pmErrStr(sts));
 	exit(1);
     }
 
     if ((sts = __pmProcessPipe(&argp, "r", PM_EXEC_TOSS_NONE, &f)) < 0) {
 	fprintf(stderr, "%s: __pmProcessPipe for \"%s\" failed: %s\n",
-		pmGetProgname(), cmd, pmErrStr(sts));
+		pmProgname, cmd, pmErrStr(sts));
 	exit(1);
     }
 
@@ -619,8 +592,8 @@ main(int argc, char **argv)
     int			exit_code = 0;
     char		*exit_msg;
 
-    pmGetUsername(&username);
-    sep = pmPathSeparator();
+    __pmGetUsername(&username);
+    sep = __pmPathSeparator();
     if ((endnum = getenv("PMLOGGER_INTERVAL")) != NULL)
 	delta.tv_sec = atoi(endnum);
 
@@ -641,7 +614,7 @@ main(int argc, char **argv)
 		char *sysconf = pmGetConfig("PCP_VAR_DIR");
 		int sz = strlen(sysconf)+strlen("/config/pmlogger/")+strlen(opts.optarg)+1;
 		if ((configfile = (char *)malloc(sz)) == NULL)
-		    pmNoMem("config file name", sz, PM_FATAL_ERR);
+		    __pmNoMem("config file name", sz, PM_FATAL_ERR);
 		pmsprintf(configfile, sz,
 			"%s%c" "config%c" "pmlogger%c" "%s",
 			sysconf, sep, sep, sep, opts.optarg);
@@ -661,7 +634,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(opts.optarg);
 	    if (sts < 0) {
 		pmprintf("%s: unrecognized debug flag specification (%s)\n",
-			pmGetProgname(), opts.optarg);
+			pmProgname, opts.optarg);
 		opts.errors++;
 	    }
 	    break;
@@ -679,9 +652,9 @@ main(int argc, char **argv)
 	    break;
 
 	case 'K':
-	    if ((endnum = pmSpecLocalPMDA(opts.optarg)) != NULL) {
-		pmprintf("%s: pmSpecLocalPMDA failed: %s\n",
-			pmGetProgname(), endnum);
+	    if ((endnum = __pmSpecLocalPMDA(opts.optarg)) != NULL) {
+		pmprintf("%s: __pmSpecLocalPMDA failed: %s\n",
+			pmProgname, endnum);
 		opts.errors++;
 	    }
 	    break;
@@ -715,11 +688,11 @@ main(int argc, char **argv)
 	    target_pid = (int)strtol(opts.optarg, &endnum, 10);
 	    if (*endnum != '\0') {
 		pmprintf("%s: invalid process identifier (%s)\n",
-			 pmGetProgname(), opts.optarg);
+			 pmProgname, opts.optarg);
 		opts.errors++;
 	    } else if (!__pmProcessExists(target_pid)) {
-		pmprintf("%s: PID error - no such process (%" FMT_PID ")\n",
-			 pmGetProgname(), target_pid);
+		pmprintf("%s: PID error - no such process (%d)\n",
+			 pmProgname, target_pid);
 		opts.errors++;
 	    }
 	    break;
@@ -737,7 +710,7 @@ main(int argc, char **argv)
 	    sts = ParseSize(opts.optarg, &exit_samples, &exit_bytes, &exit_time);
 	    if (sts < 0) {
 		pmprintf("%s: illegal size argument '%s' for exit size\n",
-			pmGetProgname(), opts.optarg);
+			pmProgname, opts.optarg);
 		opts.errors++;
 	    }
 	    else if (exit_time.tv_sec > 0) {
@@ -751,7 +724,7 @@ main(int argc, char **argv)
 
 	case 't':		/* change default logging interval */
 	    if (pmParseInterval(opts.optarg, &delta, &p) < 0) {
-		pmprintf("%s: illegal -t argument\n%s", pmGetProgname(), p);
+		pmprintf("%s: illegal -t argument\n%s", pmProgname, p);
 		free(p);
 		opts.errors++;
 	    }
@@ -774,7 +747,7 @@ main(int argc, char **argv)
 			    &vol_switch_time);
 	    if (sts < 0) {
 		pmprintf("%s: illegal size argument '%s' for volume size\n", 
-			pmGetProgname(), opts.optarg);
+			pmProgname, opts.optarg);
 		opts.errors++;
 	    }
 	    else if (vol_switch_time.tv_sec > 0) {
@@ -787,7 +760,7 @@ main(int argc, char **argv)
 	    archive_version = (int)strtol(opts.optarg, &endnum, 10);
 	    if (*endnum != '\0' || archive_version != PM_LOG_VERS02) {
 		pmprintf("%s: -V requires a version number of %d\n",
-			 pmGetProgname(), PM_LOG_VERS02); 
+			 pmProgname, PM_LOG_VERS02); 
 		opts.errors++;
 	    }
 	    break;
@@ -795,7 +768,7 @@ main(int argc, char **argv)
 	case 'x':		/* recording session control fd */
 	    rsc_fd = (int)strtol(opts.optarg, &endnum, 10);
 	    if (*endnum != '\0' || rsc_fd < 0) {
-		pmprintf("%s: -x requires a non-negative numeric argument\n", pmGetProgname());
+		pmprintf("%s: -x requires a non-negative numeric argument\n", pmProgname);
 		opts.errors++;
 	    }
 	    else {
@@ -818,7 +791,7 @@ main(int argc, char **argv)
 	pmprintf(
 	    "%s: -P and -h are mutually exclusive; use -P only when running\n"
 	    "%s on the same (local) host as the PMCD to which it connects.\n",
-		pmGetProgname(), pmGetProgname());
+		pmProgname, pmProgname);
 	opts.errors++;
     }
 
@@ -826,19 +799,12 @@ main(int argc, char **argv)
 	pmprintf(
 	    "%s: -o and -h are mutually exclusive; use -o only when running\n"
 	    "%s on the same (local) host as the DSO PMDA(s) being used.\n",
-		pmGetProgname(), pmGetProgname());
+		pmProgname, pmProgname);
 	opts.errors++;
     }
 
-    if (!opts.errors && ((Cflag == 0 && opts.optind > argc - 1) ||
-			 (Cflag == 1 && opts.optind > argc))) {
-	pmprintf("%s: insufficient arguments\n", pmGetProgname());
-	opts.errors++;
-    }
-
-    if (!opts.errors && ((Cflag == 0 && opts.optind < argc - 1) ||
-			 (Cflag == 1 && opts.optind < argc))) {
-	pmprintf("%s: too many arguments\n", pmGetProgname());
+    if (!opts.errors && opts.optind != argc - 1) {
+	pmprintf("%s: insufficient arguments\n", pmProgname);
 	opts.errors++;
     }
 
@@ -856,34 +822,30 @@ main(int argc, char **argv)
 
     /* if we are running as a daemon, change user early */
     if (isdaemon)
-	pmSetProcessIdentity(username);
+	__pmSetProcessIdentity(username);
 
     if (Cflag == 0) {
-	pmOpenLog("pmlogger", logfile, stderr, &sts);
+	__pmOpenLog("pmlogger", logfile, stderr, &sts);
 	if (sts != 1) {
-	    fprintf(stderr, "%s: Warning: log file (%s) creation failed\n", pmGetProgname(), logfile);
+	    fprintf(stderr, "%s: Warning: log file (%s) creation failed\n", pmProgname, logfile);
 	    /* continue on ... writing to stderr */
 	}
-
-	/* base name for archive is here ... */
-	archBase = strdup(argv[opts.optind]);
-	if (archBase == NULL) {
-	    pmNoMem("main", strlen(argv[opts.optind])+1, PM_FATAL_ERR);
-	    /* NOTREACHED */
-	}
     }
+
+    /* base name for archive is here ... */
+    archBase = argv[opts.optind];
 
     /* initialise access control */
     if (__pmAccAddOp(PM_OP_LOG_ADV) < 0 ||
 	__pmAccAddOp(PM_OP_LOG_MAND) < 0 ||
 	__pmAccAddOp(PM_OP_LOG_ENQ) < 0) {
-	fprintf(stderr, "%s: access control initialisation failed\n", pmGetProgname());
+	fprintf(stderr, "%s: access control initialisation failed\n", pmProgname);
 	exit(1);
     }
 
     if (pmnsfile != PM_NS_DEFAULT) {
 	if ((sts = pmLoadASCIINameSpace(pmnsfile, 1)) < 0) {
-	    fprintf(stderr, "%s: Cannot load namespace from \"%s\": %s\n", pmGetProgname(), pmnsfile, pmErrStr(sts));
+	    fprintf(stderr, "%s: Cannot load namespace from \"%s\": %s\n", pmProgname, pmnsfile, pmErrStr(sts));
 	    exit(1);
 	}
     }
@@ -894,13 +856,13 @@ main(int argc, char **argv)
 	pmcd_host_conn = "local:";
 
     if ((ctx = pmNewContext(host_context, pmcd_host_conn)) < 0) {
-	fprintf(stderr, "%s: Cannot connect to PMCD on host \"%s\": %s\n", pmGetProgname(), pmcd_host_conn, pmErrStr(ctx));
+	fprintf(stderr, "%s: Cannot connect to PMCD on host \"%s\": %s\n", pmProgname, pmcd_host_conn, pmErrStr(ctx));
 	exit(1);
     }
     pmcd_host = (char *)pmGetContextHostName(ctx);
     if (strlen(pmcd_host) == 0) {
 	fprintf(stderr, "%s: pmGetContextHostName(%d) failed\n",
-	    pmGetProgname(), ctx);
+	    pmProgname, ctx);
 	exit(1);
     }
 
@@ -914,7 +876,7 @@ main(int argc, char **argv)
      */
     if (host_context != PM_CONTEXT_LOCAL) {
 	if ((ctxp = __pmHandleToPtr(ctx)) == NULL) {
-	    fprintf(stderr, "%s: botch: __pmHandleToPtr(%d) returns NULL!\n", pmGetProgname(), ctx);
+	    fprintf(stderr, "%s: botch: __pmHandleToPtr(%d) returns NULL!\n", pmProgname, ctx);
 	    exit(1);
 	}
 	pmcdfd = ctxp->c_pmcd->pc_fd;
@@ -962,21 +924,6 @@ main(int argc, char **argv)
 	    __pmOptFetchDump(stderr, tp->t_fetch);
 	}
     }
-    if (pmDebugOptions.optfetch) {
-	int	j = 0;
-	for (tp = tasklist; tp != NULL; tp = tp->t_next) {
-	    fetchctl_t	*fcp = tp->t_fetch;
-	    int		fg = 0;
-	    fprintf(stderr, "Fetch task[%d] delta: %ld usec numpmid: %d\n",
-		j, (long)(1000000 * tp->t_delta.tv_sec + tp->t_delta.tv_usec),
-		tp->t_numpmid);
-	    while (fcp != NULL) {
-		fprintf(stderr, "  Fetch group[%d][%d] %d metrics\n", j, fg++, fcp->f_numpmid);
-		fcp = fcp->f_next;
-	    }
-	    j++;
-	}
-    }
 
     if (Cflag)
 	exit(0);
@@ -993,8 +940,7 @@ main(int argc, char **argv)
 	pmcd_host=pmcd_host_label;
     }
 
-    archctl.ac_log = &logctl;
-    if ((sts = __pmLogCreate(pmcd_host, archBase, archive_version, &archctl)) < 0) {
+    if ((sts = __pmLogCreate(pmcd_host, archBase, archive_version, &logctl)) < 0) {
 	fprintf(stderr, "__pmLogCreate: %s\n", pmErrStr(sts));
 	exit(1);
     }
@@ -1007,7 +953,7 @@ main(int argc, char **argv)
 	pmID		pmid;
 	pmResult	*resp;
 
-	pmtimevalNow(&epoch);
+	__pmtimevalNow(&epoch);
 	sts = pmUseContext(ctx);
 
 	if (sts >= 0)
@@ -1050,7 +996,7 @@ main(int argc, char **argv)
         end.tv_usec = INT_MAX;
         sts = __pmParseTime(runtime, &start, &end, &res_end, &err_msg);
         if (sts < 0) {
-	    fprintf(stderr, "%s: illegal -T argument\n%s", pmGetProgname(), err_msg);
+	    fprintf(stderr, "%s: illegal -T argument\n%s", pmProgname, err_msg);
             exit(1);
         }
 
@@ -1063,13 +1009,11 @@ main(int argc, char **argv)
 
     fprintf(stderr, "Archive basename: %s\n", archBase);
 
-    if (isdaemon) {
 #ifndef IS_MINGW
-	/* detach yourself from the launching process */
+    /* detach yourself from the launching process */
+    if (isdaemon)
         setpgid(getpid(), 0);
 #endif
-	__pmServerCreatePIDFile(pmGetProgname(), 0);
-    }
 
     /* set up control port */
     init_ports();
@@ -1165,7 +1109,6 @@ main(int argc, char **argv)
 		    __pmFD_CLR(fd, &fds);
 		    __pmCloseSocket(clientfd);
 		    clientfd = -1;
-		    pmlc_host[0] = '\0';
 		    numfds = maxfd() + 1;
 		    qa_case = 0;
 		}
@@ -1299,7 +1242,7 @@ int
 newvolume(int vol_switch_type)
 {
     __pmFILE	*newfp;
-    int		nextvol = archctl.ac_curvol + 1;
+    int		nextvol = logctl.l_curvol + 1;
     time_t	now;
     static char *vol_sw_strs[] = {
        "SIGHUP", "pmlc request", "sample counter",
@@ -1307,7 +1250,7 @@ newvolume(int vol_switch_type)
     };
 
     vol_samples_counter = 0;
-    vol_bytes += __pmFtell(archctl.ac_mfp);
+    vol_bytes += __pmFtell(logctl.l_mfp);
     if (exit_bytes != -1) {
         if (vol_bytes >= exit_bytes) 
 	    run_done(0, "Byte limit reached");
@@ -1331,7 +1274,7 @@ newvolume(int vol_switch_type)
 	    /*
 	     * nothing has been logged as yet, force out the label records
 	     */
-	    pmtimevalNow(&last_stamp);
+	    __pmtimevalNow(&last_stamp);
 	    logctl.l_label.ill_start.tv_sec = (__int32_t)last_stamp.tv_sec;
 	    logctl.l_label.ill_start.tv_usec = (__int32_t)last_stamp.tv_usec;
 	    logctl.l_label.ill_vol = PM_LOG_VOL_TI;
@@ -1339,7 +1282,7 @@ newvolume(int vol_switch_type)
 	    logctl.l_label.ill_vol = PM_LOG_VOL_META;
 	    __pmLogWriteLabel(logctl.l_mdfp, &logctl.l_label);
 	    logctl.l_label.ill_vol = 0;
-	    __pmLogWriteLabel(archctl.ac_mfp, &logctl.l_label);
+	    __pmLogWriteLabel(logctl.l_mfp, &logctl.l_label);
 	    logctl.l_state = PM_LOG_STATE_INIT;
 	}
 
@@ -1352,10 +1295,10 @@ newvolume(int vol_switch_type)
 	 *	this happens in do_work() over in callback.c
 	 */
 
-	__pmFclose(archctl.ac_mfp);
-	archctl.ac_mfp = newfp;
-	logctl.l_label.ill_vol = archctl.ac_curvol = nextvol;
-	__pmLogWriteLabel(archctl.ac_mfp, &logctl.l_label);
+	__pmFclose(logctl.l_mfp);
+	logctl.l_mfp = newfp;
+	logctl.l_label.ill_vol = logctl.l_curvol = nextvol;
+	__pmLogWriteLabel(logctl.l_mfp, &logctl.l_label);
 	time(&now);
 	fprintf(stderr, "New log volume %d, via %s at %s",
 		nextvol, vol_sw_strs[vol_switch_type], ctime(&now));
@@ -1370,12 +1313,12 @@ disconnect(int sts)
 {
     time_t  		now;
     int			ctx;
-    __pmContext		*ctxp = NULL;	/* pander to cppcheck */
+    __pmContext		*ctxp;
 
     if ((ctx = pmWhichContext()) >= 0)
 	ctxp = __pmHandleToPtr(ctx);
     if (ctx < 0 || ctxp == NULL) {
-	fprintf(stderr, "%s: disconnect botch: cannot get context: %s\n", pmGetProgname(), pmErrStr(ctx));
+	fprintf(stderr, "%s: disconnect botch: cannot get context: %s\n", pmProgname, pmErrStr(ctx));
 	exit(1);
     }
     /*
@@ -1397,9 +1340,9 @@ disconnect(int sts)
 	if (sts != -EINTR) {
 	    time(&now);
 	    if (sts != 0)
-		fprintf(stderr, "%s: Error: %s\n", pmGetProgname(), pmErrStr(sts));
+		fprintf(stderr, "%s: Error: %s\n", pmProgname, pmErrStr(sts));
 	    fprintf(stderr, "%s: Lost connection to PMCD on \"%s\" at %s",
-		pmGetProgname(), pmcd_host, ctime(&now));
+		pmProgname, pmcd_host, ctime(&now));
 	}
 	if (pmcdfd != -1) {
 	    close(pmcdfd);
@@ -1417,13 +1360,13 @@ reconnect(void)
     int	    		sts;
     int			ctx;
     time_t		now;
-    __pmContext		*ctxp = NULL;	/* pander to cppcheck */
+    __pmContext		*ctxp;
 
     if ((ctx = pmWhichContext()) >= 0)
 	ctxp = __pmHandleToPtr(ctx);
     if (ctx < 0 || ctxp == NULL) {
 	fprintf(stderr, "%s: reconnect botch: cannot get context: %s\n",
-		pmGetProgname(), pmErrStr(ctx));
+		pmProgname, pmErrStr(ctx));
 	exit(1);
     }
     /*
@@ -1445,7 +1388,7 @@ reconnect(void)
 
     time(&now);
     fprintf(stderr, "%s: re-established connection to PMCD on \"%s\" at %s",
-	    pmGetProgname(), pmcd_host, ctime(&now));
+	    pmProgname, pmcd_host, ctime(&now));
 
     /*
      * Metrics may have changed while PMCD was unreachable, so we

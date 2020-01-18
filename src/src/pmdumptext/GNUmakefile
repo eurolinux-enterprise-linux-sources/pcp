@@ -19,6 +19,7 @@ build-me:
 
 install: default
 ifeq ($(WINDOW),mac)
+	$(call INSTALL_QT_FRAMEWORKS,$(BINARY))
 	$(INSTALL) -m 755 $(BINARY) $(PCP_BIN_DIR)/$(COMMAND)
 	rm $(BINARY)
 else
@@ -32,5 +33,3 @@ endif
 default_pcp:	default
 
 install_pcp:	install
-
-pmdumptext.o:	$(TOPDIR)/src/include/pcp/libpcp.h

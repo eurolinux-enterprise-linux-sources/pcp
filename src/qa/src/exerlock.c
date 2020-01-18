@@ -5,7 +5,7 @@
  */
 
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
 
 static void
 timeout(int i, void *j)

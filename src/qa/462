@@ -49,11 +49,7 @@ _filter()
 
 _wait_filter()
 {
-    sed \
-	-e "s/$host/LOCALHOST/g" \
-	-e "s/unix:/LOCALHOST/g" \
-	-e "s/local:/LOCALHOST/g" \
-    #end
+    sed -e "s/$host/LOCALHOST/g" -e "s/local:/LOCALHOST/g"
 }
 
 _start()

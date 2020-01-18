@@ -13,6 +13,7 @@
  */
 
 #include "pmapi.h"
+#include "impl.h"
 
 /*
  * test program to calibrate system call rates ... just compile
@@ -40,52 +41,52 @@ main()
     struct linger	noLinger = {1, 0};
     int			scale = 2;
 
-    pmtimevalNow(&then);
+    __pmtimevalNow(&then);
     n = 600000 * scale;
     for (i = 0; i < n; i++)
 	getpid();
-    pmtimevalNow(&now);
-    delta = pmtimevalSub(&now, &then);
+    __pmtimevalNow(&now);
+    delta = __pmtimevalSub(&now, &then);
     printf("getpid()\t\t\t- %9d syscalls/sec [%.2f sec]\n",
 	(int)(0.5 + n / delta), delta);
 
-    pmtimevalNow(&then);
+    __pmtimevalNow(&then);
     n = 300000 * scale;
     for (i = 0; i < n; i++)
-	pmtimevalNow(&eek);
-    pmtimevalNow(&now);
-    delta = pmtimevalSub(&now, &then);
+	__pmtimevalNow(&eek);
+    __pmtimevalNow(&now);
+    delta = __pmtimevalSub(&now, &then);
     printf("gettimeofday()\t\t\t- %9d syscalls/sec [%.2f sec]\n",
 	(int)(0.5 + n / delta), delta);
 
     fd = open("/dev/null", 0);
     n = 150000 * scale;
-    pmtimevalNow(&then);
+    __pmtimevalNow(&then);
     for (i = 0; i < n; i++) {
 	/* expect EOF */
 	read(fd, &c, 1);
     }
-    pmtimevalNow(&now);
-    delta = pmtimevalSub(&now, &then);
+    __pmtimevalNow(&now);
+    delta = __pmtimevalSub(&now, &then);
     printf("read() at end of file\t\t- %9d syscalls/sec [%.2f sec]\n",
 	(int)(0.5 + n / delta), delta);
     close(fd);
 
     fd = open("/dev/null", 0);
     n = 400000 * scale;
-    pmtimevalNow(&then);
+    __pmtimevalNow(&then);
     for (i = 0; i < n; i++) {
 	lseek(fd, 0L, 0);
     }
-    pmtimevalNow(&now);
-    delta = pmtimevalSub(&now, &then);
+    __pmtimevalNow(&now);
+    delta = __pmtimevalSub(&now, &then);
     printf("lseek() to start of file\t- %9d syscalls/sec [%.2f sec]\n",
 	(int)(0.5 + n / delta), delta);
     close(fd);
 
     unlink("/tmp/creat-clo");
     n = 20000 * scale;
-    pmtimevalNow(&then);
+    __pmtimevalNow(&then);
     for (i = 0; i < n; i++) {
 	if ((fd = creat("/tmp/creat-clo", 0644)) < 0) {
 	    fprintf(stderr, "creat: %s\n", osstrerror());
@@ -93,8 +94,8 @@ main()
 	}
 	close(fd);
     }
-    pmtimevalNow(&now);
-    delta = pmtimevalSub(&now, &then);
+    __pmtimevalNow(&now);
+    delta = __pmtimevalSub(&now, &then);
     printf("file creat() and close()\t- %9d syscalls/sec [%.2f sec]\n",
 	(int)(0.5 + 2*n / delta), delta);
     unlink("/tmp/creat-clo");
@@ -105,7 +106,7 @@ main()
     memcpy(&myAddr.sin_addr, servInfo->h_addr, servInfo->h_length);
     myAddr.sin_port = htons(80);
     n = 4000 * scale;
-    pmtimevalNow(&then);
+    __pmtimevalNow(&then);
     for (i = 0; i < n; i++) {
 
 	if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -124,8 +125,8 @@ main()
 	}
 	close(s);
     }
-    pmtimevalNow(&now);
-    delta = pmtimevalSub(&now, &then);
+    __pmtimevalNow(&now);
+    delta = __pmtimevalSub(&now, &then);
     printf("socket(), connect() and close()\t- %9d syscalls/sec [%.2f sec]\n",
 	(int)(0.5 + 3*n / delta), delta);
 

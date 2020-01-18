@@ -6,12 +6,12 @@
  */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 #ifdef HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>
 #endif
 
 #include "localconfig.h"
-#include "libpcp.h"
 
 #if PCP_VER < 2200
 #define PRINTF_P_PFX ""
@@ -35,10 +35,10 @@ main(int argc, char **argv)
     char	buf[100];
     char	lbuf[100];
     struct rlimit	top;
-    unsigned long	start = 0;
-    unsigned long	end;
+    char	*start = NULL;
+    char	*end;
 
-    pmSetProgname(pmGetProgname());
+    __pmSetProgname(pmProgname);
 
     while ((c = getopt(argc, argv, "D:?")) != EOF) {
 	switch (c) {
@@ -47,7 +47,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -122,18 +122,18 @@ main(int argc, char **argv)
 	for (i = 0; i <= last_ctx; i++)
 	    pmDestroyContext(i);
 
-	if (start == 0) {
-	    __pmProcessDataSize(&start);
+	if (start == NULL) {
+	    start = sbrk(0);
 	    numopen = 0;
 	}
     }
 
-    __pmProcessDataSize(&end);
+    end = sbrk(0);
 
     if (end - start > 16*1024) {
 	printf("Memory leak? after first pass, %ld bytes per archive open-close\n",
 	    (long)((end - start) / numopen));
-	printf("start: " PRINTF_P_PFX "%p end: " PRINTF_P_PFX "%p diff: %ld numopen: %d\n", (void *)start, (void *)end,
+	printf("start: " PRINTF_P_PFX "%p end: " PRINTF_P_PFX "%p diff: %ld numopen: %d\n", start, end,
 		(long)(end - start), numopen);
     }
     

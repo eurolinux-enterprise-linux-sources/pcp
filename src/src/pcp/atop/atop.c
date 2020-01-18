@@ -11,8 +11,8 @@
 ** process-level counters and the deviations are calculated and
 ** visualized for the user.
 ** 
-** Copyright (C) 2000-2018 Gerlof Langeveld
-** Copyright (C) 2015-2019 Red Hat.
+** Copyright (C) 2000-2012 Gerlof Langeveld
+** Copyright (C) 2015-2017 Red Hat.
 **
 ** This program is free software; you can redistribute it and/or modify it
 ** under the terms of the GNU General Public License as published by the
@@ -107,8 +107,9 @@
 */
 
 #include <pcp/pmapi.h>
-#include <pcp/libpcp.h>
+#include <pcp/impl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <sys/resource.h>
 #include <regex.h>
 
@@ -118,7 +119,6 @@
 #include "photosyst.h"
 #include "showgeneric.h"
 #include "parseable.h"
-#include "gpucom.h"
 
 #define	allflags  "ab:cde:fghijklmnopqr:stuvw:xyz1ABCDEFGHIJKL:MNOP:QRSTUVWXYZ?"
 #define	MAXFL	64      /* maximum number of command-line flags  */
@@ -133,7 +133,6 @@ struct timeval	pretime;	/* timing info				*/
 struct timeval	curtime;	/* timing info				*/
 struct timeval	interval = { 10, 0 };
 unsigned long 	sampcnt;
-unsigned long 	sampflags;
 int		linelen  = 80;
 char		screen;
 char		acctreason;	/* accounting not active (return val) 	*/
@@ -148,11 +147,9 @@ char		threadview = 0;	 /* boolean: show individual threads     */
 char      	calcpss    = 0;  /* boolean: read/calculate process PSS  */
 
 unsigned short	hertz;
-unsigned int	pidmax;
 unsigned int	pagesize;
 unsigned int	hinv_nrcpus;
 unsigned int	hinv_nrdisk;
-unsigned int	hinv_nrgpus;
 unsigned int	hinv_nrintf;
 int 		osrel;
 int 		osvers;
@@ -166,8 +163,7 @@ int		fetchstep;
 
 
 struct visualize vis = {generic_samp, generic_error,
-			generic_end,  generic_usage,
-                       generic_prep, generic_next};
+			generic_end,  generic_usage};
 
 /*
 ** argument values
@@ -187,11 +183,9 @@ void do_linelength(char *, char *);
 void do_username(char *, char *);
 void do_procname(char *, char *);
 void do_maxcpu(char *, char *);
-void do_maxgpu(char *, char *);
 void do_maxdisk(char *, char *);
 void do_maxmdd(char *, char *);
 void do_maxlvm(char *, char *);
-void do_maxifb(char *, char *);
 void do_maxintf(char *, char *);
 void do_maxnfsm(char *, char *);
 void do_maxcont(char *, char *);
@@ -210,10 +204,8 @@ void do_owndskline(char *, char *);
 void do_ownnettransportline(char *, char *);
 void do_ownnetnetline(char *, char *);
 void do_ownnetinterfaceline(char *, char *);
-void do_owninfinibandline(char *, char *);
 void do_ownprocline(char *, char *);
 void do_cpucritperc(char *, char *);
-void do_gpucritperc(char *, char *);
 void do_memcritperc(char *, char *);
 void do_swpcritperc(char *, char *);
 void do_dskcritperc(char *, char *);
@@ -234,12 +226,10 @@ static struct {
 	{	"username",		do_username,		0, },
 	{	"procname",		do_procname,		0, },
 	{	"maxlinecpu",		do_maxcpu,		0, },
-	{	"maxlinegpu",		do_maxgpu,		0, },
 	{	"maxlinedisk",		do_maxdisk,		0, },
 	{	"maxlinemdd",		do_maxmdd,		0, },
 	{	"maxlinelvm",		do_maxlvm,		0, },
 	{	"maxlineintf",		do_maxintf,		0, },
-	{	"maxlineifb",		do_maxifb,		0, },
 	{	"maxlinenfsm",		do_maxnfsm,		0, },
 	{	"maxlinecont",		do_maxcont,		0, },
 	{	"colorinfo",		do_colinfo,		0, },
@@ -256,12 +246,10 @@ static struct {
 	{	"ownnettrline",		do_ownnettransportline,	0, },
 	{	"ownnetnetline",	do_ownnetnetline,	0, },
 	{	"ownnetifline",	        do_ownnetinterfaceline,	0, },
-	{	"ownifbline",	        do_owninfinibandline,	0, },
 	{	"ownprocline",		do_ownprocline,		0, },
 	{	"ownsysprcline",	do_ownsysprcline,	0, },
 	{	"owndskline",	        do_owndskline,		0, },
 	{	"cpucritperc",		do_cpucritperc,		0, },
-	{	"gpucritperc",		do_gpucritperc,		0, },
 	{	"memcritperc",		do_memcritperc,		0, },
 	{	"swpcritperc",		do_swpcritperc,		0, },
 	{	"dskcritperc",		do_dskcritperc,		0, },
@@ -308,7 +296,7 @@ main(int argc, char *argv[])
 	** check if we are supposed to behave as 'atopsar'
 	** i.e. system statistics only
 	*/
-	if (strcmp(pmGetProgname(), "pcp-atopsar") == 0)
+	if (strcmp(pmProgname, "pcp-atopsar") == 0)
 		return atopsar(argc, argv);
 
 	/* 
@@ -337,7 +325,7 @@ main(int argc, char *argv[])
 			switch (c)
 			{
 			   case '?':		/* usage wanted ?             */
-				prusage(pmGetProgname(), &opts);
+				prusage(pmProgname, &opts);
 				break;
 
 			   case 'V':		/* version wanted ?           */
@@ -376,14 +364,14 @@ main(int argc, char *argv[])
 
                            case 'P':		/* parseable output?          */
 				if ( !parsedef(opts.optarg) )
-					prusage(pmGetProgname(), &opts);
+					prusage(pmProgname, &opts);
 
 				vis.show_samp = parseout;
 				break;
 
                            case 'L':		/* line length                */
 				if ( !numeric(opts.optarg) )
-					prusage(pmGetProgname(), &opts);
+					prusage(pmProgname, &opts);
 
 				linelen = atoi(opts.optarg);
 				break;
@@ -405,7 +393,7 @@ main(int argc, char *argv[])
 			{
 				pmprintf(
 			"%s: %s option not in pmParseInterval(3) format:\n%s\n",
-					pmGetProgname(), arg, endnum);
+					pmProgname, arg, endnum);
 				free(endnum);
 				opts.errors++;
 			}
@@ -414,9 +402,9 @@ main(int argc, char *argv[])
 			{
 				arg = argv[opts.optind];
 				if (!numeric(arg))
-					prusage(pmGetProgname(), &opts);
+					prusage(pmProgname, &opts);
 				if ((opts.samples = atoi(arg)) < 1)
-					prusage(pmGetProgname(), &opts);
+					prusage(pmProgname, &opts);
 			}
 		}
 	}
@@ -427,7 +415,7 @@ main(int argc, char *argv[])
 	__pmEndOptions(&opts);
 
 	if (opts.errors)
-		prusage(pmGetProgname(), &opts);
+		prusage(pmProgname, &opts);
 
 	if (opts.samples)
 		nsamples = opts.samples;
@@ -487,6 +475,7 @@ main(int argc, char *argv[])
 void
 engine(void)
 {
+	int 			i, j;
 	struct sigaction 	sigact;
 	double 			timed, delta;
 	void			getusr1(int), getusr2(int);
@@ -503,20 +492,22 @@ engine(void)
 	** reserve space for task-level statistics
 	*/
 	static struct tstat	*curtpres;	/* current present list      */
-	static unsigned int	curtlen;	/* size of present list      */
+	static int		 curtlen;	/* size of present list      */
+
 	struct tstat		*curpexit;	/* exited process list	     */
+	struct tstat		*devtstat;	/* deviation list	     */
+	struct tstat		**devpstat;	/* pointers to processes     */
+						/* in deviation list         */
 
-	static struct devtstat	devtstat;	/* deviation info	     */
-
-	unsigned long		ntaskpres;	/* number of tasks present   */
-	unsigned long		nprocexit;	/* number of exited procs    */
-	unsigned long		nprocexitnet;	/* number of exited procs    */
+	unsigned int		ntaskpres;	/* number of tasks present   */
+	unsigned int		nprocexit;	/* number of exited procs    */
+	unsigned int		nprocexitnet;	/* number of exited procs    */
 						/* via netatopd daemon       */
-
-	unsigned long		noverflow;
-
-	unsigned int		nrgpuproc = 0;	/* number of GPU processes   */
-	struct gpupidstat	*gp = NULL;
+	unsigned int		ntaskdev;       /* nr of tasks deviated      */
+	unsigned int		nprocdev;       /* nr of procs deviated      */
+	int			nprocpres;	/* nr of procs present       */
+	int			totrun, totslpi, totslpu, totzombie;
+	unsigned int		noverflow;
 
 	/*
 	** initialization: allocate required memory dynamically
@@ -525,9 +516,13 @@ engine(void)
 	presstat = sstat_alloc("prev    sysstats");
 	devsstat = sstat_alloc("deviate sysstats");
 
+	curtlen  = PROCMIN * 3 / 2;	/* add 50% for threads */
+	curtpres = calloc(curtlen, sizeof(struct tstat));
+	ptrverify(curtpres, "Malloc failed for %d procstats\n", curtlen);
+
 	/*
 	** install the signal-handler for ALARM, USR1 and USR2 (triggers
-	* for the next sample)
+	** for the next sample)
 	*/
 	memset(&sigact, 0, sizeof sigact);
 	sigact.sa_handler = getusr1;
@@ -543,9 +538,6 @@ engine(void)
 
 	if (interval.tv_sec || interval.tv_usec)
 		setalarm(&interval);
-
-	if (hinv_nrgpus > 0)
-		supportflags |= GPUSTAT;
 
 	/*
 	** MAIN-LOOP:
@@ -581,14 +573,7 @@ engine(void)
 		cursstat = presstat;
 		presstat = hlpsstat;
 
-		lastcmd = photosyst(cursstat);	/* obtain new counters     */
-		if (lastcmd == 'r')
-		{
-			/* reset to zero */
-			if ((*vis.next)() < 0)
-				cleanstop(1);
-			goto reset;
-               }
+		photosyst(cursstat);	/* obtain new counters     */
 
 		/*
 		** take a snapshot of the current task-level statistics 
@@ -598,6 +583,7 @@ engine(void)
 		**      only extended when needed
 		*/
 		memset(curtpres, 0, curtlen * sizeof(struct tstat));
+
 		ntaskpres = photoproc(&curtpres, &curtlen);
 
 		/*
@@ -635,7 +621,7 @@ engine(void)
 			curpexit = malloc(nprocexit * sizeof(struct tstat));
 
 			ptrverify(curpexit,
-			          "Malloc failed for %lu exited processes\n",
+			          "Malloc failed for %d exited processes\n",
 			          nprocexit);
 
 			memset(curpexit, 0, nprocexit * sizeof(struct tstat));
@@ -663,21 +649,36 @@ engine(void)
 		*/
 		pretime  = curtime;	/* timestamp for previous sample */
 		curtime  = cursstat->stamp; /* timestamp for this sample */
-		timed = pmtimevalToReal(&curtime);
-		delta = timed - pmtimevalToReal(&pretime);
+		timed = __pmtimevalToReal(&curtime);
+		delta = timed - __pmtimevalToReal(&pretime);
 
 		deviatsyst(cursstat, presstat, devsstat, delta);
 
-		if (hinv_nrgpus && nrgpuproc)
-			gpumergeproc(curtpres, ntaskpres,
-				     curpexit, nprocexit,
-				     gp,       nrgpuproc);
+		devtstat = malloc((ntaskpres+nprocexit) * sizeof(struct tstat));
 
-		deviattask(curtpres, ntaskpres, curpexit,  nprocexit,
-		           	     &devtstat, devsstat);
+		ptrverify(devtstat, "Malloc failed for %d modified tasks\n",
+			          			ntaskpres+nprocexit);
 
-		if (sampcnt==0)
-			sampflags |= RRBOOT;
+		ntaskdev = deviattask(curtpres,  ntaskpres,
+		                      curpexit,  nprocexit, deviatonly,
+		                      devtstat,  devsstat,
+		                      &nprocdev, &nprocpres,
+		                      &totrun, &totslpi, &totslpu, &totzombie);
+
+  	      	/*
+ 		** create list of pointers specifically to the process entries
+		** in the task list
+		*/
+       		devpstat = malloc(sizeof (struct tstat *) * nprocdev);
+
+		ptrverify(devpstat, "Malloc failed for %d process ptrs\n",
+			          				nprocdev);
+
+		for (i=0, j=0; i < ntaskdev; i++)
+		{
+			if ( (devtstat+i)->gen.isproc)
+				devpstat[j++] = devtstat+i;
+		}
 
 		/*
 		** activate the installed print-function to visualize
@@ -685,14 +686,13 @@ engine(void)
 		*/
 		lastcmd = (vis.show_samp)(timed,
 				     delta > 1.0 ? delta : 1.0,
-		           	     &devtstat, devsstat,
-		                     nprocexit, noverflow, sampflags);
-                /*
-                 */
-                (*vis.prep)();
+		           	     devsstat,  devtstat, devpstat,
+		                     ntaskdev,  ntaskpres, nprocdev, nprocpres, 
+		                     totrun, totslpi, totslpu, totzombie, 
+		                     nprocexit, noverflow, sampcnt==0);
 
 		if (rawreadflag)
-			pmtimevalInc(&curtime, &interval);
+			__pmtimevalInc(&curtime, &interval);
 
 		/*
 		** release dynamically allocated memory
@@ -703,10 +703,9 @@ engine(void)
 		if (nprocexitnet > 0)
 			netatop_exiterase();
 
-		if (gp)
-			free(gp);
+		free(devtstat);
+		free(devpstat);
 
-reset:
 		if (lastcmd == 'r')	/* reset requested ? */
 		{
 			sampcnt = -1;
@@ -714,14 +713,13 @@ reset:
 			curtime = origin;
 
 			/* set current (will be 'previous') counters to 0 */
+			memset(curtpres, 0, curtlen * sizeof(struct tstat));
 			sstat_reset(cursstat);
 
 			/* remove all tasks in database */
 			pdb_makeresidue();
 			pdb_cleanresidue();
 		}
-
-		sampflags = 0;
 	} /* end of main-loop */
 }
 
@@ -740,10 +738,9 @@ prusage(char *myname, pmOptions *opts)
 					myname);
 	printf("\n");
 	printf("\tgeneric flags:\n");
-	printf("\t  -%c  show version information\n", MVERSION);
 	printf("\t  -%c  show or log all processes (i.s.o. active processes "
 	                "only)\n", MALLPROC);
-	printf("\t  -%c  calculate proportional set size (PSS) per process\n",
+	printf("\t  -%c  calculate proportional set size (PSS) per process\n", 
 	                MCALCPSS);
 	printf("\t  -P  generate parseable output for specified label(s)\n");
 	printf("\t  -L  alternate line length (default 80) in case of "
@@ -763,7 +760,7 @@ prusage(char *myname, pmOptions *opts)
 	printf("\t  -w  write raw data to PCP archive folio\n");
 	printf("\t  -r  read  raw data from PCP archive folio\n");
 	printf("\t  -S  finish %s automatically before midnight "
-	                "(i.s.o. #samples)\n", pmGetProgname());
+	                "(i.s.o. #samples)\n", pmProgname);
 	printf("\t  -b  begin showing data from specified time\n");
 	printf("\t  -e  finish showing data after specified time\n");
 	printf("\n");
@@ -772,10 +769,10 @@ prusage(char *myname, pmOptions *opts)
 	printf("\n");
 	printf("If the interval-value is zero, a new sample can be\n");
 	printf("forced manually by sending signal USR1"
-			" (kill -USR1 %s-pid)\n", pmGetProgname());
+			" (kill -USR1 %s-pid)\n", pmProgname);
 	printf("or with the keystroke '%c' in interactive mode.\n", MSAMPNEXT);
 	printf("\n");
-	printf("Please refer to the man-page of '%s' for more details.\n", pmGetProgname());
+	printf("Please refer to the man-page of '%s' for more details.\n", pmProgname);
 
 	cleanstop(1);
 }

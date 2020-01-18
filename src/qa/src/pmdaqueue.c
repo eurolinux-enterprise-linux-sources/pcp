@@ -1,4 +1,5 @@
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 #include <pcp/pmda.h>
 
 /*
@@ -46,9 +47,9 @@ void queue_statistics(int q)
     pmdaEventQueueClients(q, &clients);
     pmdaEventQueueMemory(q, &memory);
 
-    fprintf(stderr, "event queue#%d count=%d, bytes=%d, clients=%d, mem=%" FMT_INT64 "\n",
+    fprintf(stderr, "event queue#%d count=%d, bytes=%d, clients=%d, mem=%lld\n",
 	    q, (int)count.ul, (int)bytes.ull, (int)clients.ul,
-	    memory.ull);
+	    (long long)memory.ull);
 }
 
 /*
@@ -95,7 +96,7 @@ main(int argc, char **argv)
     char *s, *name;
     void *event;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "A:a:C:c:D:E:e:F:f:q:s:S:")) != EOF) {
 	switch (c) {
@@ -106,7 +107,7 @@ main(int argc, char **argv)
 	    name = strsep(&s, ",");
 	    if (!s) {
 		fprintf(stderr, "%s: invalid client queue access specification (%s)\n",
-			pmGetProgname(), optarg);
+			pmProgname, optarg);
 		errflag++;
 		break;
 	    }
@@ -140,7 +141,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -150,7 +151,7 @@ main(int argc, char **argv)
 	    name = strsep(&s, ",");
 	    if (!s) {
 		fprintf(stderr, "%s: invalid event size specification (%s)\n",
-			pmGetProgname(), optarg);
+			pmProgname, optarg);
 		errflag++;
 		break;
 	    }
@@ -158,7 +159,7 @@ main(int argc, char **argv)
 	    queueid = pmdaEventQueueHandle(name);
 	    if (queueid < 0) {
 		fprintf(stderr, "%s: invalid event queue specification (%s)\n",
-			pmGetProgname(), name);
+			pmProgname, name);
 		errflag++;
 		break;
 	    }
@@ -166,7 +167,7 @@ main(int argc, char **argv)
 	    sts = pmdaEventQueueAppend(queueid, event, size, &tv);
 	    fprintf(stderr, "add event(%s,%d) -> %d ", name, (int)size, sts);
 	    if (sts < 0) fprintf(stderr, "%s", pmErrStr(sts));
-	    else pmPrintStamp(stderr, &tv);
+	    else __pmPrintStamp(stderr, &tv);
 	    fputc('\n', stderr);
 	    break;
 
@@ -175,7 +176,7 @@ main(int argc, char **argv)
 	    name = strsep(&s, ",");
 	    if (!s) {
 		fprintf(stderr, "%s: invalid event size specification (%s)\n",
-			pmGetProgname(), optarg);
+			pmProgname, optarg);
 		errflag++;
 		break;
 	    }
@@ -186,7 +187,7 @@ main(int argc, char **argv)
 	    fprintf(stderr, "add queue#%d event(%s,%d) -> %d ",
 		    queueid, name, (int)size, sts);
 	    if (sts < 0) fprintf(stderr, "%s", pmErrStr(sts));
-	    else pmPrintStamp(stderr, &tv);
+	    else __pmPrintStamp(stderr, &tv);
 	    fputc('\n', stderr);
 	    break;
 
@@ -195,7 +196,7 @@ main(int argc, char **argv)
 	    name = strsep(&s, ",");
 	    if (!s) {
 		fprintf(stderr, "%s: invalid queue memory specification (%s)\n",
-			pmGetProgname(), optarg);
+			pmProgname, optarg);
 		errflag++;
 		break;
 	    }
@@ -211,7 +212,7 @@ main(int argc, char **argv)
 	    name = strsep(&s, ",");
 	    if (!s) {
 		fprintf(stderr, "%s: invalid client filter queue specification (%s)\n",
-			pmGetProgname(), optarg);
+			pmProgname, optarg);
 		errflag++;
 		break;
 	    }
@@ -219,7 +220,7 @@ main(int argc, char **argv)
 	    name = strsep(&s, ",");
 	    if (!s) {
 		fprintf(stderr, "%s: invalid client filter size specification (%s)\n",
-			pmGetProgname(), optarg);
+			pmProgname, optarg);
 		errflag++;
 		break;
 	    }
@@ -238,7 +239,7 @@ main(int argc, char **argv)
 	    name = strsep(&s, ",");
 	    if (!s) {
 		fprintf(stderr, "%s: invalid client filter queue specification (%s)\n",
-			pmGetProgname(), optarg);
+			pmProgname, optarg);
 		errflag++;
 		break;
 	    }
@@ -256,7 +257,7 @@ main(int argc, char **argv)
 	    queueid = pmdaEventQueueHandle(name);
 	    if (queueid < 0) {
 		fprintf(stderr, "%s: invalid queue specification (%s)\n",
-			pmGetProgname(), name);
+			pmProgname, name);
 		errflag++;
 		break;
 	    }
@@ -268,7 +269,7 @@ main(int argc, char **argv)
 	    name = strsep(&s, ",");
 	    if (!s) {
 		fprintf(stderr, "%s: invalid client filter queue specification (%s)\n",
-			pmGetProgname(), optarg);
+			pmProgname, optarg);
 		errflag++;
 		break;
 	    }
@@ -285,7 +286,7 @@ main(int argc, char **argv)
     }
 
     if (errflag) {
-	fprintf(stderr, "Usage: %s ...\n", pmGetProgname());
+	fprintf(stderr, "Usage: %s ...\n", pmProgname);
 	fprintf(stderr, "Options:\n");
 	fprintf(stderr, "  -a id,name     disable a clients access\n");
 	fprintf(stderr, "  -A id,name     enable a clients access\n");

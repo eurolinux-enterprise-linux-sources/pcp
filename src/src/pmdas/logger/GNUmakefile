@@ -59,5 +59,3 @@ $(OBJECTS): domain.h
 
 domain.h: ../../pmns/stdpmid
 	$(DOMAIN_MAKERULE)
-
-event.o logger.o:	$(TOPDIR)/src/include/pcp/libpcp.h

@@ -396,7 +396,9 @@ void
 init_data(int domain)
 {
     int			i;
-    pmID		pmid;
+    int			serial;
+    __pmID_int		*ip;
+    __pmInDom_int	*iip;
 
     /*
      * Create the PMDA's metrictab[] version of the per-metric table.
@@ -413,10 +415,14 @@ init_data(int domain)
     for (i = 0; i < metrictab_sz; i++) {
 	metrictab[i].m_user = &metricdesc[i];
 	metrictab[i].m_desc = metricdesc[i].md_desc;
-	pmid = metricdesc[i].md_desc.pmid;
-	metricdesc[i].md_desc.pmid = pmID_build(domain, pmID_cluster(pmid), pmID_item(pmid));
+	ip = (__pmID_int *)&metricdesc[i].md_desc.pmid;
+	ip->domain = domain;
 	if (metricdesc[i].md_desc.indom != PM_INDOM_NULL) {
-	    metricdesc[i].md_desc.indom = pmInDom_build(domain, metricdesc[i].md_desc.indom);
+	    serial = metricdesc[i].md_desc.indom;
+	    iip = (__pmInDom_int *)&metricdesc[i].md_desc.indom;
+	    iip->serial = serial;
+	    iip->pad = 0;
+	    iip->domain = domain;
 	}
     }
 

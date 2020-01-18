@@ -1,25 +1,13 @@
 #!/bin/sh -e
 #DEBHELPER#
 
-# must match src/pmwebd/GNUmakefile
+# must match src/pmwebapi/GNUmakefile
 chown pcp:pcp /var/log/pcp/pmwebd
 chmod 775 /var/log/pcp/pmwebd
 
-do_systemd=true
-which deb-systemd-helper >/dev/null 2>&1 || do_systemd=false
-[ -f /lib/systemd/system/pmwebd ] || do_systemd=false
+update-rc.d pmwebd defaults >/dev/null
 
-if $do_systemd
-then
-    deb-systemd-helper enable pmwebd.service >/dev/null
-elif which update-rc.d >/dev/null 2>&1
-then
-    update-rc.d -f pmwebd remove >/dev/null
-    update-rc.d pmwebd defaults >/dev/null
-fi
-
-if which invoke-rc.d >/dev/null 2>&1
-then
+if which invoke-rc.d >/dev/null 2>&1; then
     invoke-rc.d pmwebd start
 else
     /etc/init.d/pmwebd start

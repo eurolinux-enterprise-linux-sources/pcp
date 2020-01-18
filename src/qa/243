@@ -13,8 +13,6 @@ echo "QA output created by $seq"
 . ./common.filter
 . ./common.check
 
-[ $PCP_PLATFORM = darwin ] && _notrun "Who knows what the darwin networking code is doing, don't bother with this test"
-
 rm -f $seq.out
 _get_libpcp_config
 if $ipv6 ; then
@@ -32,7 +30,6 @@ _filter_err()
 	-e '/Log for pmcd/,/INADDR_ANY/c\
 ... boring stuff deleted' \
 	-e '/ok FD 44321 ipv6 INADDR_ANY/d' \
-	-e '/PMNS file "DEFAULT" is unchanged/d' \
 	-e '/OpenRequestSocket.*unix.*bind: Address already in use/{
 N
 d
@@ -59,7 +56,7 @@ cleanup()
 	pmsleep 1.5
 	unset PMCD_SOCKET
 	echo "Restart and ping pmcd ..."
-	_service pcp restart 2>&1 | _filter_pcp_start
+	_service pcp restart | _filter_pcp_start
 	_restore_auto_restart pmcd
 	_wait_for_pmcd
 	_wait_for_pmlogger

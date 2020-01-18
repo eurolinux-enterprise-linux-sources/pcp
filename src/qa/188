@@ -53,16 +53,7 @@ if [ $PCP_PLATFORM = linux ] ; then
     elif [ -f /etc/arch-release ]
     then
 	ln $seq.linux $seq.out
-    elif [ -f /etc/os-release ]
-    then
-	if grep 'openSUSE Leap 15.0' /etc/os-release >/dev/null
-	then
-	    ln $seq.opensuse.15 $seq.out
-	fi
     fi
-
-    # if any of the rules above matched we have $seq.out, otherwise ...
-    #
     if [ ! -f $seq.out ]
     then
 	# this is some old folklore ... better to handle in the explicit
@@ -81,7 +72,7 @@ if [ $PCP_PLATFORM = linux ] ; then
 	    esac
 	elif which emerge >/dev/null 2>&1
 	then
-	    # Gentoo ... looking for a line like ...
+	    # looking for a line like ...
 	    # sys-libs/glibc-2.12.2 was built with the following:
 	    version="`emerge --info glibc | sed -n -e '/was built with/{
 s/ was built with.*//
@@ -90,9 +81,7 @@ p
 }'`"
 	    case "$version"
 	    in
-		# only have the glibc versions we have verified the output
-		# for
-		glibc-2\.1[23][-.]*|glibc-2\.2[016][-.]*)
+		glibc-2\.1[23][-.]*|glibc-2\.2[01][-.]*)
 		    ln $seq.linux $seq.out
 		    ;;
 		*)
@@ -105,7 +94,7 @@ p
 	    exit 1
 	fi
     fi
-elif [ $PCP_PLATFORM = darwin -o $PCP_PLATFORM = freebsd -o $PCP_PLATFORM = netbsd -o $PCP_PLATFORM = openbsd ]
+elif [ $PCP_PLATFORM = darwin -o $PCP_PLATFORM = freebsd ]
 then
     ln $seq.darwin $seq.out
 elif [ $PCP_PLATFORM = solaris ]

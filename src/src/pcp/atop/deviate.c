@@ -7,7 +7,7 @@
 ** This source-file contains functions to calculate the differences for
 ** the system-level and process-level counters since the previous sample.
 **
-** Copyright (C) 2015,2017,2019 Red Hat.
+** Copyright (C) 2015,2017 Red Hat.
 ** Copyright (C) 2000-2010 Gerlof Langeveld
 **
 ** This program is free software; you can redistribute it and/or modify it
@@ -22,6 +22,7 @@
 */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 #include "atop.h"
 #include "ifprop.h"
@@ -36,20 +37,19 @@ static void calcdiff(struct tstat *, struct tstat *, struct tstat *,
 /*
 ** calculate the process-activity during the last sample
 */
-void
-deviattask(struct tstat    *curtpres, unsigned long ntaskpres,
-           struct tstat    *curpexit, unsigned long nprocexit,
-	   struct devtstat *devtstat,
-	   struct sstat    *devsstat)
+int
+deviattask(struct tstat *curtpres, int ntaskpres,
+           struct tstat *curpexit, int nprocexit, int deviatonly,
+	   struct tstat *devtstat, struct sstat *devsstat,
+           unsigned int *nprocdev, int *nprocpres,
+           int *totrun, int *totslpi, int *totslpu, int *totzombie)
 {
-	register int		c, d, pall=0, pact=0;
-	register struct tstat	*curstat, *devstat, *thisproc;
+	register int		c, d;
+	register struct tstat	*curstat, *devstat, *procstat = 0;
 	struct tstat		prestat;
 	struct pinfo		*pinfo;
 	count_t			totusedcpu;
-	char			hashtype = 'p';
-
-	memset(&prestat, 0, sizeof prestat);
+	char			procsaved = 1, hashtype = 'p';
 
 	/*
 	** needed for sanity check later on...
@@ -60,60 +60,36 @@ deviattask(struct tstat    *curtpres, unsigned long ntaskpres,
 			  devsstat->cpu.all.Stime + devsstat->cpu.all.steal;
 
 	/*
-	** make new list of all tasks in the task-database;
-	** after handling all task, the left-overs are tasks
+	** make new list of all tasks in the process-database;
+	** after handling all processes, the left-overs are processes
 	** that have disappeared since the previous sample
 	*/
 	pdb_makeresidue();
 
 	/*
- 	** remove allocated lists of previous sample and initialize counters
+	** calculate deviations per present process
 	*/
-	if (devtstat->taskall)
-		free(devtstat->taskall);
+	*nprocpres = *totrun = *totslpi = *totslpu = *totzombie = 0;
 
-	if (devtstat->procall)
-		free(devtstat->procall);
-
-	if (devtstat->procactive)
-		free(devtstat->procactive);
-
-	memset(devtstat, 0, sizeof *devtstat);
-
-	/*
-	** create list for the sample deviations of all tasks
-	*/
- 	devtstat->ntaskall = ntaskpres + nprocexit;
-	devtstat->taskall  = malloc(devtstat->ntaskall * sizeof(struct tstat));
-
-	ptrverify(devtstat->taskall, "Malloc failed for %lu deviated tasks\n",
-                                  devtstat->ntaskall);
-
-	/*
-	** calculate deviations per present task
-	*/
-	for (c=0, thisproc = devtstat->taskall; c < ntaskpres; c++)
+	for (c=0, d=0, *nprocdev=0; c < ntaskpres; c++)
 	{
 		char	newtask = 0;
 
 		curstat = curtpres+c;
-		devstat = devtstat->taskall+c;
 
 		if (curstat->gen.isproc)
 		{
-			thisproc = devstat;	// remember last process seen
-
-			devtstat->nprocall++;
+			(*nprocpres)++;
 
 			if (curstat->gen.state == 'Z')
 			{
-				devtstat->totzombie++;
+				(*totzombie)++;
 			}
 			else
 			{
-				devtstat->totrun   += curstat->gen.nthrrun;
-				devtstat->totslpi  += curstat->gen.nthrslpi;
-				devtstat->totslpu  += curstat->gen.nthrslpu;
+				*totrun		+= curstat->gen.nthrrun;
+				*totslpi	+= curstat->gen.nthrslpi;
+				*totslpu	+= curstat->gen.nthrslpu;
 			}
 		}
 
@@ -124,48 +100,36 @@ deviattask(struct tstat    *curtpres, unsigned long ntaskpres,
 		                 curstat->gen.btime, &pinfo))
 		{
 			/*
-			** task already present in the previous sample
+			** task already present during the previous sample;
+			** if no differences with previous sample, skip task
+			** unless all tasks have to be shown
 			**
+			** it might be that a process appears to have no
+			** differences while one its threads has differences;
+			** than the process will be inserted as well
+			*/
+			if (deviatonly && memcmp(curstat, &pinfo->tstat, 
+					           sizeof(struct tstat)) == EQ)
+			{
+				/* remember last unsaved process */
+				if (curstat->gen.isproc)
+				{
+					procstat  = curstat;
+					procsaved = 0;
+				}
+
+				continue;
+			}
+
+			/*
+			** differences detected, so the task was active,
+		        ** or its status or memory-occupation has changed;
 			** save stats from previous sample (to use for
 			** further calculations) and store new statistics
 			** in task-database
 			*/
-			if (memcmp(curstat, &pinfo->tstat, 
-					           sizeof(struct tstat)) == EQ)
-			{
-				/*
- 				** no activity for task
-				*/
-				curstat->gen.wasinactive = 1;
-			}
- 			else
-			{
-				/*
- 				** save the values of the previous sample
-				** and overwrite the previous sample in
-				** the database with the current sample
-				*/
-				prestat 	= pinfo->tstat;
-				pinfo->tstat 	= *curstat;
-
-				curstat->gen.wasinactive = 0;
-
-				devtstat->ntaskactive++;
-
-				if (curstat->gen.isproc)
-				{
-					devtstat->nprocactive++;
-				}
-				else
-				{
-					if (thisproc->gen.wasinactive)
-					{
-						thisproc->gen.wasinactive = 0;
-						devtstat->ntaskactive++;
-						devtstat->nprocactive++;
-					}
-				}
-			}
+			prestat 	= pinfo->tstat;	/* save old	*/
+			pinfo->tstat 	= *curstat;	/* overwrite	*/
 		}
 		else
 		{
@@ -174,23 +138,6 @@ deviattask(struct tstat    *curtpres, unsigned long ntaskpres,
 			** last interval
 			*/
 			memset(&prestat, 0, sizeof(prestat));
-
-			curstat->gen.wasinactive = 0;
-			devtstat->ntaskactive++;
-
-			if (curstat->gen.isproc)
-			{
-				devtstat->nprocactive++;
-			}
-			else
-			{
-				if (thisproc->gen.wasinactive)
-				{
-					thisproc->gen.wasinactive = 0;
-					devtstat->ntaskactive++;
-					devtstat->nprocactive++;
-				}
-			}
 
 			/*
 			** create new task struct
@@ -210,9 +157,33 @@ deviattask(struct tstat    *curtpres, unsigned long ntaskpres,
 		}
 
 		/*
-		** do the difference calculations
+		** active task found; do the difference calculations
 		*/
+		if (curstat->gen.isproc)
+		{
+			procsaved = 1;
+			(*nprocdev)++;
+		}
+		else
+		{
+			/*
+			** active thread: check if related process registered
+			*/
+			if (!procsaved)
+			{
+				devstat = devtstat+d;
+				calcdiff(devstat, procstat, procstat, 0,
+								totusedcpu);
+				procsaved = 1;
+				(*nprocdev)++;
+				d++;
+			}
+		}
+
+		devstat = devtstat+d;
+
 		calcdiff(devstat, curstat, &prestat, newtask, totusedcpu);
+		d++;
 	}
 
 	/*
@@ -228,7 +199,7 @@ deviattask(struct tstat    *curtpres, unsigned long ntaskpres,
 		netatop_exithash(hashtype);
 	}
 
-	for (d=c, c=0; c < nprocexit; c++)
+	for (c=0; c < nprocexit; c++)
 	{
 		/*
 		** check if this process has been started AND
@@ -237,11 +208,6 @@ deviattask(struct tstat    *curtpres, unsigned long ntaskpres,
 		** existing info present in the process-database
 		*/
 		curstat = curpexit+c;
-		curstat->gen.wasinactive = 0;
-
-		devtstat->nprocall++;
-		devtstat->nprocactive++;
-		devtstat->ntaskactive++;
 
 		if (curstat->gen.pid)	/* acctrecord contains pid? */
 		{
@@ -277,10 +243,10 @@ deviattask(struct tstat    *curtpres, unsigned long ntaskpres,
 		/*
 		** now do the calculations
 		*/
-		devstat = devtstat->taskall+d;
+		devstat = devtstat+d;
 		memset(devstat, 0, sizeof *devstat);
 
-		devstat->gen = curstat->gen;
+		devstat->gen        = curstat->gen;
 
 		if ( curstat->gen.pid == 0 )
 			devstat->gen.pid    = prestat.gen.pid;
@@ -329,38 +295,11 @@ deviattask(struct tstat    *curtpres, unsigned long ntaskpres,
 
 			netatop_exitfind(val, devstat, &prestat);
 		}
-
-		/*
-		** handle the gpu counters
-		*/
-		if (curstat->gpu.state || prestat.gpu.state) // GPU use?
-		{
-			if (curstat->gpu.state)
-				devstat->gpu.state = curstat->gpu.state;
-			else
-				devstat->gpu.state = prestat.gpu.state;
-
-			devstat->gpu.nrgpus	= curstat->gpu.nrgpus;
-			devstat->gpu.gpulist	= curstat->gpu.gpulist;
-			devstat->gpu.gpubusy 	= curstat->gpu.gpubusy;
-			devstat->gpu.membusy	= curstat->gpu.membusy;
-			devstat->gpu.timems	= curstat->gpu.timems;
-
-			devstat->gpu.memnow	= curstat->gpu.memnow;
-			devstat->gpu.memcum	= curstat->gpu.memcum -
-						  prestat.gpu.memcum;
-			devstat->gpu.sample	= curstat->gpu.sample -
-						  prestat.gpu.sample;
-		}
-		else
-		{
-			devstat->gpu.state = '\0';
-		}
+		d++;
+		(*nprocdev)++;
 
 		if (prestat.gen.pid > 0)
 			pdb_deltask(prestat.gen.pid, prestat.gen.isproc);
-
-		d++;
 	}
 
 	/*
@@ -368,32 +307,7 @@ deviattask(struct tstat    *curtpres, unsigned long ntaskpres,
 	*/
 	pdb_cleanresidue();
 
-	/*
-	** create and fill other pointer lists
-	*/
-	devtstat->procall    = malloc(devtstat->nprocall *
-						sizeof(struct tstat *));
-	devtstat->procactive = malloc(devtstat->nprocactive *
-						sizeof(struct tstat *));
-
-	ptrverify(devtstat->procall, "Malloc failed for %d processes\n",
-                                  devtstat->nprocall);
-
-	ptrverify(devtstat->procactive, "Malloc failed for %d active procs\n",
-                                  devtstat->nprocactive);
-
-
-        for (c=0, thisproc=devstat=devtstat->taskall; c < devtstat->ntaskall;
-								c++, devstat++)
-        {
-        	if (devstat->gen.isproc)
-		{
-        		devtstat->procall[pall++] = devstat;
-
-			if (! devstat->gen.wasinactive)
-       				devtstat->procactive[pact++] = devstat;
-		}
-        }
+	return d;
 }
 
 /*
@@ -404,15 +318,6 @@ static void
 calcdiff(struct tstat *devstat, struct tstat *curstat, struct tstat *prestat,
 	                                      char newtask, count_t totusedcpu)
 {
-	/*
- 	** for inactive tasks, set all counters to zero
-	*/
-	if (curstat->gen.wasinactive)
-		memset(devstat, 0, sizeof *devstat);
-
-	/*
-	** copy all static values from the current task settings
-	*/
 	devstat->gen          = curstat->gen;
 
 	if (newtask)
@@ -423,42 +328,6 @@ calcdiff(struct tstat *devstat, struct tstat *curstat, struct tstat *prestat,
 	devstat->cpu.rtprio   = curstat->cpu.rtprio;
 	devstat->cpu.policy   = curstat->cpu.policy;
 	devstat->cpu.curcpu   = curstat->cpu.curcpu;
-	devstat->cpu.sleepavg = curstat->cpu.sleepavg;
-
-	devstat->mem.vexec    = curstat->mem.vexec;
-	devstat->mem.vmem     = curstat->mem.vmem;
-	devstat->mem.rmem     = curstat->mem.rmem;
-	devstat->mem.pmem     = curstat->mem.pmem;
-	devstat->mem.vdata    = curstat->mem.vdata;
-	devstat->mem.vstack   = curstat->mem.vstack;
-	devstat->mem.vlibs    = curstat->mem.vlibs;
-	devstat->mem.vswap    = curstat->mem.vswap;
-
-	if (curstat->gpu.state || prestat->gpu.state) // GPU use?
-	{
-		if (curstat->gpu.state)
-			devstat->gpu.state = curstat->gpu.state;
-		else
-			devstat->gpu.state = prestat->gpu.state;
-
-		devstat->gpu.nrgpus  = curstat->gpu.nrgpus;
-		devstat->gpu.gpulist = curstat->gpu.gpulist;
-		devstat->gpu.gpubusy = curstat->gpu.gpubusy;
-		devstat->gpu.membusy = curstat->gpu.membusy;
-		devstat->gpu.memnow  = curstat->gpu.memnow;
-		devstat->gpu.timems  = curstat->gpu.timems;
-	}
-	else
-	{
-		devstat->gpu.state = '\0';
-	}
-
-	/*
- 	** for inactive tasks, only the static values had to be copied, while
-	** all use counters have been set to zero
-	*/
-	if (curstat->gen.wasinactive)
-		return;
 
 	devstat->cpu.stime  = 
 		subcount(curstat->cpu.stime, prestat->cpu.stime);
@@ -491,8 +360,16 @@ calcdiff(struct tstat *devstat, struct tstat *curstat, struct tstat *prestat,
 	devstat->dsk.cwsz   =
 		subcount(curstat->dsk.cwsz, prestat->dsk.cwsz);
 
+	devstat->mem.vexec  = curstat->mem.vexec;
+	devstat->mem.vmem   = curstat->mem.vmem;
+	devstat->mem.rmem   = curstat->mem.rmem;
+	devstat->mem.pmem   = curstat->mem.pmem;
 	devstat->mem.vgrow  = curstat->mem.vmem   - prestat->mem.vmem;
 	devstat->mem.rgrow  = curstat->mem.rmem   - prestat->mem.rmem;
+	devstat->mem.vdata  = curstat->mem.vdata;
+	devstat->mem.vstack = curstat->mem.vstack;
+	devstat->mem.vlibs  = curstat->mem.vlibs;
+	devstat->mem.vswap  = curstat->mem.vswap;
 
 	devstat->mem.minflt = 
 		subcount(curstat->mem.minflt, prestat->mem.minflt);
@@ -550,13 +427,6 @@ calcdiff(struct tstat *devstat, struct tstat *curstat, struct tstat *prestat,
 			subcount(curstat->net.udprsz, prestat->net.udprsz);
 	else
 		devstat->net.udprsz = curstat->net.udprsz;
-
-
-	if (curstat->gpu.state)
-	{
-		devstat->gpu.memcum = curstat->gpu.memcum - prestat->gpu.memcum;
-		devstat->gpu.sample = curstat->gpu.sample - prestat->gpu.sample;
-	}
 }
 
 /*
@@ -600,9 +470,6 @@ deviatsyst(struct sstat *cur, struct sstat *pre, struct sstat *dev, double inter
 	dev->cpu.all.steal = subcount(cur->cpu.all.steal, pre->cpu.all.steal);
 	dev->cpu.all.guest = subcount(cur->cpu.all.guest, pre->cpu.all.guest);
 
-	dev->cpu.all.instr = subcount(cur->cpu.all.instr, pre->cpu.all.instr);
-	dev->cpu.all.cycle = subcount(cur->cpu.all.cycle, pre->cpu.all.cycle);
-
 	for (i=0; i < dev->cpu.nrcpu; i++)
 	{
 		count_t 	ticks;
@@ -627,11 +494,6 @@ deviatsyst(struct sstat *cur, struct sstat *pre, struct sstat *dev, double inter
 					         pre->cpu.cpu[i].steal);
 		dev->cpu.cpu[i].guest = subcount(cur->cpu.cpu[i].guest,
 					         pre->cpu.cpu[i].guest);
-
-		dev->cpu.cpu[i].instr = subcount(cur->cpu.cpu[i].instr,
-						 pre->cpu.cpu[i].instr);
-		dev->cpu.cpu[i].cycle = subcount(cur->cpu.cpu[i].cycle,
-						 pre->cpu.cpu[i].cycle);
 
 		ticks 		      = cur->cpu.cpu[i].freqcnt.ticks;
 
@@ -680,22 +542,6 @@ deviatsyst(struct sstat *cur, struct sstat *pre, struct sstat *dev, double inter
 	dev->mem.pgsteal	= subcount(cur->mem.pgsteal, pre->mem.pgsteal);
 	dev->mem.allocstall	= subcount(cur->mem.allocstall,
 				                         pre->mem.allocstall);
-
-	dev->psi          	= cur->psi;
-
-	if (cur->psi.present)
-	{
-		dev->psi.cpusome.total 	= cur->psi.cpusome.total -
-					  pre->psi.cpusome.total;
-		dev->psi.memsome.total 	= cur->psi.memsome.total -
-					  pre->psi.memsome.total;
-		dev->psi.memfull.total 	= cur->psi.memfull.total -
-					  pre->psi.memfull.total;
-		dev->psi.iosome.total 	= cur->psi.iosome.total -
-					  pre->psi.iosome.total;
-		dev->psi.iofull.total 	= cur->psi.iofull.total -
-					  pre->psi.iofull.total;
-	}
 
 	/*
 	** structures with network-related counters are considered
@@ -791,7 +637,6 @@ deviatsyst(struct sstat *cur, struct sstat *pre, struct sstat *dev, double inter
 
 		getifprop(&ifprop);
 
-		cur->intf.intf[i].type   = ifprop.type;
 		cur->intf.intf[i].speed  = ifprop.speed;
 		cur->intf.intf[i].speedp = ifprop.speed;
 		cur->intf.intf[i].duplex = ifprop.fullduplex;
@@ -815,7 +660,6 @@ deviatsyst(struct sstat *cur, struct sstat *pre, struct sstat *dev, double inter
 		{
 			strcpy(pre->intf.intf[i].name, cur->intf.intf[i].name);
 
-			pre->intf.intf[i].type   = cur->intf.intf[i].type;
 			pre->intf.intf[i].speed  = cur->intf.intf[i].speed;
 			pre->intf.intf[i].speedp = cur->intf.intf[i].speedp;
 			pre->intf.intf[i].duplex = cur->intf.intf[i].duplex;
@@ -836,7 +680,7 @@ deviatsyst(struct sstat *cur, struct sstat *pre, struct sstat *dev, double inter
 			for (j=0; pre->intf.intf[j].name[0]; j++)
 			{
 				if (strcmp(cur->intf.intf[i].name,
-				           pre->intf.intf[j].name) == 0)
+					   pre->intf.intf[j].name) == 0)
 					break;
 			}
 
@@ -891,12 +735,11 @@ deviatsyst(struct sstat *cur, struct sstat *pre, struct sstat *dev, double inter
 		dev->intf.intf[i].scompr= subcount(cur->intf.intf[i].scompr,
 		                                   pre->intf.intf[j].scompr);
 
-		dev->intf.intf[i].type  	= cur->intf.intf[i].type;
-		dev->intf.intf[i].duplex	= cur->intf.intf[i].duplex;
+		dev->intf.intf[i].duplex	= cur->intf.intf[j].duplex;
 		dev->intf.intf[i].speed 	= cur->intf.intf[i].speed;
-		dev->intf.intf[i].speedp 	= pre->intf.intf[j].speed;
+		dev->intf.intf[i].speedp 	= pre->intf.intf[i].speed;
 
-		cur->intf.intf[i].speedp 	= pre->intf.intf[j].speed;
+		cur->intf.intf[i].speedp	= pre->intf.intf[j].speed;
 	}
 
 	dev->intf.intf[i].name[0] = '\0';
@@ -1139,26 +982,26 @@ deviatsyst(struct sstat *cur, struct sstat *pre, struct sstat *dev, double inter
 	dev->nfs.client.rpcautrefresh = subcount(cur->nfs.client.rpcautrefresh,
 	                                         pre->nfs.client.rpcautrefresh);
 
-	if (cur->nfs.nfsmounts.nrmounts != dev->nfs.nfsmounts.nrmounts)
+	if (cur->nfs.nrmounts != dev->nfs.nrmounts)
 	{
-		size = (cur->nfs.nfsmounts.nrmounts + 1) * sizeof(struct pernfsmount);
-		dev->nfs.nfsmounts.nfsmnt = (struct pernfsmount *)realloc(dev->nfs.nfsmounts.nfsmnt, size);
-		ptrverify(dev->nfs.nfsmounts.nfsmnt, "deviatsyst nfs [%ld]\n", (long)size);
+		size = (cur->nfs.nrmounts + 1) * sizeof(struct pernfsmount);
+		dev->nfs.nfsmnt = (struct pernfsmount *)realloc(dev->nfs.nfsmnt, size);
+		ptrverify(dev->nfs.nfsmnt, "deviatsyst nfs [%ld]\n", (long)size);
 	}
-	for (i=j=0; i < cur->nfs.nfsmounts.nrmounts; i++, j++)
+	for (i=j=0; i < cur->nfs.nrmounts; i++, j++)
 	{
 		/*
  		** check if nfsmounts have been added or removed since
 		** previous interval
 		*/
-		if (j >= pre->nfs.nfsmounts.nrmounts ||
-		    strcmp( cur->nfs.nfsmounts.nfsmnt[i].mountdev,
-		            pre->nfs.nfsmounts.nfsmnt[j].mountdev) != 0)
+		if (j >= pre->nfs.nrmounts ||
+		    strcmp( cur->nfs.nfsmnt[i].mountdev,
+		            pre->nfs.nfsmnt[j].mountdev) != 0)
 		{
-			for (j=0; j < pre->nfs.nfsmounts.nrmounts; j++)
+			for (j=0; j < pre->nfs.nrmounts; j++)
 			{
-			    if ( strcmp(cur->nfs.nfsmounts.nfsmnt[i].mountdev,
-		                        pre->nfs.nfsmounts.nfsmnt[j].mountdev) == 0)
+			    if ( strcmp(cur->nfs.nfsmnt[i].mountdev,
+		                        pre->nfs.nfsmnt[j].mountdev) == 0)
 					break;
 			}
 
@@ -1171,56 +1014,56 @@ deviatsyst(struct sstat *cur, struct sstat *pre, struct sstat *dev, double inter
 			*/
 		}
 
-		if (j >= pre->nfs.nfsmounts.nrmounts)
-			memset(&(dev->nfs.nfsmounts.nfsmnt[i]), 0,
+		if (j >= pre->nfs.nrmounts)
+			memset(&(dev->nfs.nfsmnt[i]), 0,
 					sizeof(struct pernfsmount));
 
-		strcpy(dev->nfs.nfsmounts.nfsmnt[i].mountdev,
-		       cur->nfs.nfsmounts.nfsmnt[i].mountdev);
+		strcpy(dev->nfs.nfsmnt[i].mountdev,
+		       cur->nfs.nfsmnt[i].mountdev);
 
-                dev->nfs.nfsmounts.nfsmnt[i].age = 
-                                    cur->nfs.nfsmounts.nfsmnt[i].age;
-		if (j >= pre->nfs.nfsmounts.nrmounts)
+                dev->nfs.nfsmnt[i].age = cur->nfs.nfsmnt[i].age;
+
+		if (j >= pre->nfs.nrmounts)
 			continue;
 
-		if (dev->nfs.nfsmounts.nfsmnt[i].age <= interval)
-			memset(&(pre->nfs.nfsmounts.nfsmnt[j]), 0, 
+		if (dev->nfs.nfsmnt[i].age <= interval)
+			memset(&(pre->nfs.nfsmnt[j]), 0, 
 					sizeof(struct pernfsmount));
 
-                dev->nfs.nfsmounts.nfsmnt[i].bytesread = 
-                          subcount(cur->nfs.nfsmounts.nfsmnt[i].bytesread,
-                                   pre->nfs.nfsmounts.nfsmnt[j].bytesread);
+                dev->nfs.nfsmnt[i].bytesread = 
+                          subcount(cur->nfs.nfsmnt[i].bytesread,
+                                   pre->nfs.nfsmnt[j].bytesread);
 
-                dev->nfs.nfsmounts.nfsmnt[i].byteswrite = 
-                          subcount(cur->nfs.nfsmounts.nfsmnt[i].byteswrite,
-                                   pre->nfs.nfsmounts.nfsmnt[j].byteswrite);
+                dev->nfs.nfsmnt[i].byteswrite = 
+                          subcount(cur->nfs.nfsmnt[i].byteswrite,
+                                   pre->nfs.nfsmnt[j].byteswrite);
 
-                dev->nfs.nfsmounts.nfsmnt[i].bytesdread = 
-                          subcount(cur->nfs.nfsmounts.nfsmnt[i].bytesdread,
-                                   pre->nfs.nfsmounts.nfsmnt[j].bytesdread);
+                dev->nfs.nfsmnt[i].bytesdread = 
+                          subcount(cur->nfs.nfsmnt[i].bytesdread,
+                                   pre->nfs.nfsmnt[j].bytesdread);
 
-                dev->nfs.nfsmounts.nfsmnt[i].bytesdwrite = 
-                          subcount(cur->nfs.nfsmounts.nfsmnt[i].bytesdwrite,
-                                   pre->nfs.nfsmounts.nfsmnt[j].bytesdwrite);
+                dev->nfs.nfsmnt[i].bytesdwrite = 
+                          subcount(cur->nfs.nfsmnt[i].bytesdwrite,
+                                   pre->nfs.nfsmnt[j].bytesdwrite);
 
-                dev->nfs.nfsmounts.nfsmnt[i].bytestotread = 
-                          subcount(cur->nfs.nfsmounts.nfsmnt[i].bytestotread,
-                                   pre->nfs.nfsmounts.nfsmnt[j].bytestotread);
+                dev->nfs.nfsmnt[i].bytestotread = 
+                          subcount(cur->nfs.nfsmnt[i].bytestotread,
+                                   pre->nfs.nfsmnt[j].bytestotread);
 
-                dev->nfs.nfsmounts.nfsmnt[i].bytestotwrite = 
-                          subcount(cur->nfs.nfsmounts.nfsmnt[i].bytestotwrite,
-                                   pre->nfs.nfsmounts.nfsmnt[j].bytestotwrite);
+                dev->nfs.nfsmnt[i].bytestotwrite = 
+                          subcount(cur->nfs.nfsmnt[i].bytestotwrite,
+                                   pre->nfs.nfsmnt[j].bytestotwrite);
 
-                dev->nfs.nfsmounts.nfsmnt[i].pagesmread = 
-                          subcount(cur->nfs.nfsmounts.nfsmnt[i].pagesmread,
-                                   pre->nfs.nfsmounts.nfsmnt[j].pagesmread);
+                dev->nfs.nfsmnt[i].pagesmread = 
+                          subcount(cur->nfs.nfsmnt[i].pagesmread,
+                                   pre->nfs.nfsmnt[j].pagesmread);
 
-                dev->nfs.nfsmounts.nfsmnt[i].pagesmwrite = 
-                          subcount(cur->nfs.nfsmounts.nfsmnt[i].pagesmwrite,
-                                   pre->nfs.nfsmounts.nfsmnt[j].pagesmwrite);
+                dev->nfs.nfsmnt[i].pagesmwrite = 
+                          subcount(cur->nfs.nfsmnt[i].pagesmwrite,
+                                   pre->nfs.nfsmnt[j].pagesmwrite);
 	}
 
-	dev->nfs.nfsmounts.nrmounts = cur->nfs.nfsmounts.nrmounts;
+	dev->nfs.nrmounts = cur->nfs.nrmounts;
 
 	/*
 	** calculate deviations for containers
@@ -1278,72 +1121,6 @@ deviatsyst(struct sstat *cur, struct sstat *pre, struct sstat *dev, double inter
 	}
 
 	dev->cfs.nrcontainer = cur->cfs.nrcontainer;
-
- 	/*
-	** application-specific counters
-	** calculate deviations for GPUs
-	*/
-	for (i=0; i < cur->gpu.nrgpus; i++)
-	{
-	    dev->gpu.gpu[i].gpunr      = i;
-
-	    strcpy(dev->gpu.gpu[i].type,  cur->gpu.gpu[i].type);
-	    strcpy(dev->gpu.gpu[i].busid, cur->gpu.gpu[i].busid);
-
-	    dev->gpu.gpu[i].taskstats  = cur->gpu.gpu[i].taskstats;
-	    dev->gpu.gpu[i].nrprocs    = cur->gpu.gpu[i].nrprocs;
-
-	    dev->gpu.gpu[i].gpupercnow = cur->gpu.gpu[i].gpupercnow;
-	    dev->gpu.gpu[i].mempercnow = cur->gpu.gpu[i].mempercnow;
-	    dev->gpu.gpu[i].memtotnow  = cur->gpu.gpu[i].memtotnow;
-	    dev->gpu.gpu[i].memusenow  = cur->gpu.gpu[i].memusenow;
-
-	    dev->gpu.gpu[i].samples    = subcount(cur->gpu.gpu[i].samples,
-	                                          pre->gpu.gpu[i].samples);
-
-	    if (cur->gpu.gpu[i].gpuperccum >= 0)
-	     dev->gpu.gpu[i].gpuperccum = subcount(cur->gpu.gpu[i].gpuperccum,
-	                                           pre->gpu.gpu[i].gpuperccum);
-	    else
-	     dev->gpu.gpu[i].gpuperccum = -1;
-
-	    if (cur->gpu.gpu[i].memusecum >= 0)
-	     dev->gpu.gpu[i].memusecum  = subcount(cur->gpu.gpu[i].memusecum,
-	                                           pre->gpu.gpu[i].memusecum);
-	    else
-	     dev->gpu.gpu[i].memusecum  = -1;
-
-	    if (cur->gpu.gpu[i].memperccum >= 0)
-	     dev->gpu.gpu[i].memperccum = subcount(cur->gpu.gpu[i].memperccum,
-	                                           pre->gpu.gpu[i].memperccum);
-	    else
-	     dev->gpu.gpu[i].memperccum = -1;
-	}
-
-	dev->gpu.nrgpus = cur->gpu.nrgpus;
-
-	/*
-	** calculate deviations for InfiniBand
-	*/
-	for (i=0; i < cur->ifb.nrports; i++)
-	{
-		strcpy(dev->ifb.ifb[i].ibname, cur->ifb.ifb[i].ibname);
-
-		dev->ifb.ifb[i].portnr = cur->ifb.ifb[i].portnr;
-		dev->ifb.ifb[i].lanes  = cur->ifb.ifb[i].lanes;
-		dev->ifb.ifb[i].rate   = cur->ifb.ifb[i].rate;
-
-		dev->ifb.ifb[i].rcvb   = cur->ifb.ifb[i].rcvb -
-		                         pre->ifb.ifb[i].rcvb;
-		dev->ifb.ifb[i].sndb   = cur->ifb.ifb[i].sndb -
-		                         pre->ifb.ifb[i].sndb;
-		dev->ifb.ifb[i].rcvp   = cur->ifb.ifb[i].rcvp -
-		                         pre->ifb.ifb[i].rcvp;
-		dev->ifb.ifb[i].sndp   = cur->ifb.ifb[i].sndp -
-		                         pre->ifb.ifb[i].sndp;
-	}
-
-	dev->ifb.nrports = cur->ifb.nrports;
 
 	/*
 	** application-specific counters
@@ -1588,7 +1365,6 @@ totalsyst(char category, struct sstat *new, struct sstat *tot)
 			tot->intf.intf[i].scarrier+= new->intf.intf[i].scarrier;
 			tot->intf.intf[i].scompr  += new->intf.intf[i].scompr;
 	
-			tot->intf.intf[i].type     = new->intf.intf[i].type;
 			tot->intf.intf[i].speed    = new->intf.intf[i].speed;
 			tot->intf.intf[i].duplex   = new->intf.intf[i].duplex;
 		}

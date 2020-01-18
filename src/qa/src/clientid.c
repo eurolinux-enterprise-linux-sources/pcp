@@ -6,7 +6,7 @@
 
 #include <ctype.h>
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
 
 #define TAG "QA-clientid "
 
@@ -21,7 +21,7 @@ main(int argc, char *argv[])
     int		errflag = 0;
     static char	*usage = "[-l] [-D debugopts]";
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:l")) != EOF) {
 	switch (c) {
@@ -30,17 +30,13 @@ main(int argc, char *argv[])
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
 
 	case 'l':	/* linger when done */
 	    lflag = 1;
-#ifdef IS_MINGW
-	    fprintf(stderr, "Botch: no -l on Windows, we don't have pause()\n");
-	    exit(1);
-#endif
 	    break;
 
 	case '?':
@@ -51,7 +47,7 @@ main(int argc, char *argv[])
     }
 
     if (errflag) {
-	printf("Usage: %s %s\n", pmGetProgname(), usage);
+	printf("Usage: %s %s\n", pmProgname, usage);
 	exit(1);
     }
 
@@ -84,10 +80,8 @@ main(int argc, char *argv[])
 	free(cp);
     }
 
-#ifndef IS_MINGW
     if (lflag)
 	pause();
-#endif
 
     exit(0);
 }

@@ -17,6 +17,9 @@
 #include <sys/stat.h>
 #include "pmjson.h"
 
+#define JSONMETRICS_SZ	5
+extern json_metric_desc json_metrics[JSONMETRICS_SZ];
+
 enum {
     CONTAINERS_INDOM,
     NUM_INDOMS
@@ -58,13 +61,17 @@ typedef int (*container_match_t)(struct container_engine *,
 typedef struct container_engine {
     char		*name;		/* docker, lxc, rkt, etc. */
     int			state;		/* external driver states */
-    char		*path;		/* suffix for cgroup path */
+    char		path[60];	/* suffix for cgroup path */
     container_setup_t	setup;
     container_changed_t	indom_changed;
     container_insts_t	insts_refresh;
     container_values_t	value_refresh;
     container_match_t	name_matching;
 } container_engine_t;
+
+enum {
+    CONTAINER_STATE_SYSTEMD	= (1<<0),
+};
 
 typedef struct container {
     int			pid;

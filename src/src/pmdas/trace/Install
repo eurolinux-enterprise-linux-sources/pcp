@@ -19,6 +19,15 @@
 . $PCP_SHARE_DIR/lib/pmdaproc.sh
 
 iam=trace
+pmda_interface=2
+
+# Override interactive dialog from pmdaSetup in pmdaproc.sh
+#
+__choose_mode()
+{
+    echo "Installing the \"$iam\" Performance Metrics Domain Agent (PMDA) ..."
+    echo
+}
 
 numeric=0
 
@@ -191,7 +200,8 @@ echo
 if [ $goforit = false ]
 then
     :
-else
+elif $do_pmda
+then
     args=""
     value=""
 

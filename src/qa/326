@@ -33,8 +33,7 @@ _cleanup()
 	    rm -f $tmp.pmcd.conf
 	fi
 	_restore_primary_logger
-	_service pcp restart 2>&1 | _filter_pcp_start
-	_restore_auto_restart pmcd
+	_service pcp restart | _filter_pcp_start
 	_wait_for_pmcd
 	_wait_for_pmlogger
 	rm -f $tmp.*
@@ -59,7 +58,7 @@ _filter_pmval()
 {
     sed \
 	-e '1,/^interval:/d' \
-	-e 's/[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\.[0-9][0-9]*[0-9]/TIMESTAMP/g' \
+	-e 's/[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\.[0-9][0-9][0-9]/TIMESTAMP/g' \
     | $PCP_AWK_PROG '
 /No values available/	{ print; next }
 0 <= $2 && $2 < 1.1	{ $2 = "non-negative number, less than 1.1" }
@@ -68,7 +67,6 @@ _filter_pmval()
 }
 
 trap "_cleanup" 0 1 2 3 15
-_stop_auto_restart pmcd
 
 rm -f $seq.full
 
@@ -82,14 +80,14 @@ cp $PCP_PMCDCONF_PATH $tmp.pmcd.conf
 _service pcp stop >/dev/null 2>&1
 
 cat <<End-of-File >$tmp.tmp
-# Installed by PCP QA test $seq on `date`
+# temporary for qa/$seq
 pmcd	2	dso	pmcd_init	$PMDA_PMCD_PATH
 sample	29	pipe	binary 		$PCP_PMDAS_DIR/sample/pmdasample -d 29 
 End-of-File
 $sudo cp $tmp.tmp $PCP_PMCDCONF_PATH
 
 _writable_primary_logger
-_service pcp restart 2>&1 | _filter_pcp_start
+_service pcp restart | _filter_pcp_start
 _wait_for_pmcd
 if [ -d $PCP_LOG_DIR/pmlogger ]
 then
@@ -103,14 +101,14 @@ echo 'connect primary
 log mandatory on 500 msec { pmcd.numagents sample.milliseconds }' \
 | pmlc
 
-# run for 25 seconds
-pmval -s 50 -t 0.5 -Z "$timezone" -D fetch pmcd.numagents >$tmp.pmval 2>&1 &
+# run for 20 seconds
+pmval -s 40 -t 0.5 -Z "$timezone" -D fetch pmcd.numagents >$tmp.pmval 2>&1 &
 
 sleep 3
 
 echo "=== kill sample PMDA process ==="
 $sudo $signal -a -s TERM pmdasample
-sleep 3 # enough time for pmcd to restart it - once only
+sleep 2 # enough time for pmcd to restart it - once only
 $sudo $signal -a -s TERM pmdasample
 pminfo -v sample >/dev/null 2>&1
 sleep 3
@@ -121,7 +119,7 @@ sleep 3
 
 echo "=== drop sample PMDA, like Remove ==="
 cat <<End-of-File >$tmp.tmp
-# Installed by PCP QA test $seq on `date`
+# temporary for qa/$seq
 pmcd	2	dso	pmcd_init	$PMDA_PMCD_PATH
 End-of-File
 $sudo cp $tmp.tmp $PCP_PMCDCONF_PATH
@@ -130,7 +128,7 @@ sleep 3
 
 echo "=== add sample PMDA, like Install ==="
 cat <<End-of-File >$tmp.tmp
-# Installed by PCP QA test $seq on `date`
+# temporary for qa/$seq
 pmcd	2	dso	pmcd_init	$PMDA_PMCD_PATH
 sample	29	pipe	binary 		$PCP_PMDAS_DIR/sample/pmdasample -d 29 
 End-of-File

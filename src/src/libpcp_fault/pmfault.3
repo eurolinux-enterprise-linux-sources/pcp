@@ -25,6 +25,8 @@
 .ft 3
 #include <pcp/pmapi.h>
 .br
+#include <pcp/impl.h>
+.br
 #include <pcp/fault.h>
 .sp
 void __pmFaultInject(const char *\fIident\fP, int \fIclass\fP);
@@ -226,8 +228,8 @@ by
 .PP
 Additional tracing (via
 .B \-Dfault
-or
-.BR pmDebugOptions.fault )
+and
+.BR DBG_TRACE_FAULT )
 and a new
 PMAPI error code (\c
 .BR PM_ERR_FAULT )
@@ -235,7 +237,7 @@ are also defined, although
 these will only ever be seen or used in
 .IR libpcp_fault .
 If
-.B pmDebugOptions.fault
+.B DBG_TRACE_FAULT
 is set the first time
 .B __pmFaultInject
 is called, then

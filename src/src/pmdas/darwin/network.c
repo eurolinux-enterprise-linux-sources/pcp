@@ -21,9 +21,11 @@
 #include <net/route.h>
 #include <mach/mach.h>
 #include "pmapi.h"
+#include "impl.h"
 #include "pmda.h"
 #include "network.h"
 
+extern char *pmProgname;
 extern mach_port_t mach_master_port;
 
 void
@@ -96,13 +98,13 @@ refresh_network(struct netstats *stats, pmdaIndom *indom)
 
    if( sysctl( mib, 6, NULL, &n, NULL, 0 ) < 0 ) {
       /* unable to query buffer size */
-      fprintf( stderr, "%s: get net mib buf len failed\n", pmGetProgname() );
+      fprintf( stderr, "%s: get net mib buf len failed\n", pmProgname );
       return -ENXIO;
    }
    if( n > buf_len ) {
       if( (new_buf = malloc(n)) == NULL ) {
          /* unable to malloc buf */
-         fprintf( stderr, "%s: net mib buf malloc failed\n", pmGetProgname() );
+         fprintf( stderr, "%s: net mib buf malloc failed\n", pmProgname );
          return -ENXIO;
       } else {
          if( buf != NULL ) free( buf );
@@ -112,7 +114,7 @@ refresh_network(struct netstats *stats, pmdaIndom *indom)
    }
    if( sysctl( mib, 6, buf, &n, NULL, 0 ) < 0 ) {
       /* unable to copy-in buffer */
-      fprintf( stderr, "%s: net mib buf read failed\n", pmGetProgname() );
+      fprintf( stderr, "%s: net mib buf read failed\n", pmProgname );
       return -ENXIO;
    }
 

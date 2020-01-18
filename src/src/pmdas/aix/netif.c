@@ -79,10 +79,11 @@ static __uint64_t
 netif_derived(pmdaMetric *mdesc, int inst)
 {
     pmID        pmid;
+    __pmID_int  *ip = (__pmID_int *)&pmid;
     __uint64_t  val;
                                                                                 
     pmid = mdesc->m_desc.pmid;
-    pmID_build(0, pmID_cluster(pmid), pmID_item(pmid));
+    ip->domain = 0;
 
     switch (pmid) {
 	case PMDA_PMID(0,58):	/* hinv.nnetif */

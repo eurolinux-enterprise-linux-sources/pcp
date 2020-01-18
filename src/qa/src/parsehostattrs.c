@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
 
 static __pmHashWalkState
 print_attribute(const __pmHashNode *tp, void *cp)

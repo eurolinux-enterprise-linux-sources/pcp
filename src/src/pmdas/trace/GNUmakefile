@@ -32,7 +32,7 @@ LCFLAGS = -I.
 LLDFLAGS= -L$(TOPDIR)/src/libpcp/src -L$(TOPDIR)/src/libpcp_trace/src
 LLDLIBS = $(PCP_TRACELIB)
 
-LDIRT	= *.log *.dir *.pag *.o $(APPS) \
+LDIRT	= *.log *.dir *.pag *.o $(APPS) tmp.c \
 	  pmtrace.c Makefile.demos Makefile.stub
 
 LSRCFILES= $(SCRIPTS) $(OTHERS) $(DEMOS) $(DEMOFILES) $(DFILES)
@@ -66,19 +66,25 @@ endif
 demos:	$(APPS) pmtrace.c
 
 pmtrace.c:	$(TOPDIR)/src/pmtrace/pmtrace.c
-	rm -f $@
-	sed <$< >$@ \
-	    -e 's@"pmapi.h"@<pcp/pmapi.h>@' \
-	    -e 's@"trace.h"@<pcp/trace.h>@'
+	rm -f $@ && cp $< $@
 
 app1.o:	app1.c $(TOPDIR)/src/include/pcp/pmapi.h
-	$(CCF) -c -o $@ app1.c
+	@rm -f tmp.c
+	sed -e 's;<pcp/\(.*\)>;"\1";' app1.c >tmp.c
+	$(CCF) -c -o $@ tmp.c
+	@rm -f tmp.c
 
 app2.o:	app2.c $(TOPDIR)/src/include/pcp/pmapi.h
-	$(CCF) -c -o $@ app2.c
+	@rm -f tmp.c
+	sed -e 's;<pcp/\(.*\)>;"\1";' app2.c >tmp.c
+	$(CCF) -c -o $@ tmp.c
+	@rm -f tmp.c
 
 app3.o:	app3.c $(TOPDIR)/src/include/pcp/pmapi.h
-	$(CCF) -c -o $@ app3.c
+	@rm -f tmp.c
+	sed -e 's;<pcp/\(.*\)>;"\1";' app3.c >tmp.c
+	$(CCF) -c -o $@ tmp.c
+	@rm -f tmp.c
 
 app1$(EXECSUFFIX):	app1.o
 	$(CCF) -o $@ $(LDFLAGS) app1.o $(LDLIBS)
@@ -97,21 +103,14 @@ install_pcp:	install
 Makefile.demos:	Makefile.proto
 	rm -f $@
 	sed \
-		-e 's@PTHREAD_LIB@$(LIB_FOR_PTHREADS)@' \
-		-e 's@DLOPEN_LIB@$(LIB_FOR_DLOPEN)@' \
-		-e 's@MATH_LIB@$(LIB_FOR_MATH)@' \
+		-e 's@PCP_INC_DIR@$(PCP_INC_DIR)@' \
+		-e 's/PTHREAD_LIB/$(LIB_FOR_PTHREADS)/' \
+		-e 's/DLOPEN_LIB/$(LIB_FOR_DLOPEN)/' \
+		-e 's/MATH_LIB/$(LIB_FOR_MATH)/' \
 		<$^ >$@
 
 Makefile.stub:	GNUmakefile.stub
 	rm -f $@
-ifeq "$(TARGET_OS)" "netbsd"
 	sed \
-		-e 's@PCP_INC_DIR@$(subst /pcp,,$(PCP_INC_DIR))@' \
-		-e 's@$$(PCP_ETC_DIR)@/etc@' \
+		-e 's@\$$(PCP_ETC_DIR)@$(PCP_ETC_DIR)@' \
 		<$^ >$@
-else
-	sed \
-		-e 's@PCP_INC_DIR@$(subst /pcp,,$(PCP_INC_DIR))@' \
-		-e 's@$$(PCP_ETC_DIR)@$(PCP_ETC_DIR)@' \
-		<$^ >$@
-endif

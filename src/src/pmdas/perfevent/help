@@ -13,6 +13,7 @@
 # 
 # perfevent PMDA help file in ASCII format
 #
+@ PERFEVENT.0 Instance domain for hardware performance counter metrics
 
 @ perfevent.version The version number of the pmda.
 @ perfevent.active The number of active counters.

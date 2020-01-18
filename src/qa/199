@@ -109,7 +109,8 @@ $sudo ./Remove >/dev/null 2>&1
 echo
 echo "=== pipe daemon agent ==="
 $sudo ./Remove >$tmp.out 2>&1
-echo 'daemon
+echo 'both
+daemon
 pipe' | $sudo ./Install >>$tmp.out 2>&1
 
 _filter <$tmp.out
@@ -125,11 +126,13 @@ fi
 echo
 echo "=== Unix socket daemon agent ==="
 $sudo ./Remove >$tmp.out 2>&1
-echo 'daemon
+echo 'both
+daemon
 socket
 Unix
 '"$tmp.fifo" | $sudo ./Install >>$tmp.out 2>&1
-echo 'daemon
+echo 'both
+daemon
 socket
 Unix
 '"$tmp.fifo" | $sudo ./Install >>$tmp.out 2>&1
@@ -157,7 +160,8 @@ then
     exit 1
 fi
 
-echo 'daemon
+echo 'both
+daemon
 socket
 Internet
 '$port | $sudo ./Install >>$tmp.out 2>&1
@@ -165,7 +169,8 @@ Internet
 # use next port this time
 port=`expr $port + 1`
 
-echo 'daemon
+echo 'both
+daemon
 socket
 Internet
 '$port | $sudo ./Install >>$tmp.out 2>&1
@@ -183,8 +188,10 @@ fi
 echo
 echo "=== dso agent ==="
 $sudo ./Remove >$tmp.out 2>&1
-echo dso | $sudo ./Install >>$tmp.out 2>&1
-echo dso | $sudo ./Install >>$tmp.out 2>&1
+echo 'both
+dso' | $sudo ./Install >>$tmp.out 2>&1
+echo 'both
+dso' | $sudo ./Install >>$tmp.out 2>&1
 
 _filter <$tmp.out
 

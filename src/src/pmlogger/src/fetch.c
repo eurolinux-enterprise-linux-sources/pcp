@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2018 Red Hat.
+ * Copyright (c) 2013-2016 Red Hat.
  * Copyright (c) 1995 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -56,7 +56,6 @@ int
 myFetch(int numpmid, pmID pmidlist[], __pmPDU **pdup)
 {
     int			n = 0;
-    int			changed = 0;
     int			ctx;
     __pmPDU		*pb;
     __pmContext		*ctxp;
@@ -120,7 +119,8 @@ myFetch(int numpmid, pmID pmidlist[], __pmPDU **pdup)
 	}
 
 	n = __pmSendFetch(ctxp->c_pmcd->pc_fd, FROM_ANON, ctx, &ctxp->c_origin, numpmid, pmidlist);
-	if (n >= 0) {
+	if (n >= 0){
+	    int		changed = 0;
 	    do {
 		n = __pmGetPDU(ctxp->c_pmcd->pc_fd, ANY_SIZE, TIMEOUT_DEFAULT, &pb);
 		/*
@@ -158,7 +158,6 @@ myFetch(int numpmid, pmID pmidlist[], __pmPDU **pdup)
 				/* using PDU with derived metrics */
 				__pmUnpinPDUBuf(pb);
 				*pdup = npb;
-				pmFreeResult(result);
 			    }
 			}
 		    }
@@ -199,13 +198,6 @@ myFetch(int numpmid, pmID pmidlist[], __pmPDU **pdup)
 		}
 	    } while (n == 0);
 
-	    if (changed & PMCD_NAMES_CHANGE) {
-		/*
-		 * Fetch has returned with the PMCD_NAMES_CHANGE flag set.
-		 */
-		check_dynamic_metrics();
-	    }
-
 	    if (changed & PMCD_ADD_AGENT) {
 		int	sts;
 		/*
@@ -227,16 +219,14 @@ myFetch(int numpmid, pmID pmidlist[], __pmPDU **pdup)
 		 */
 		validate_metrics();
 
-		if (changed & PMCD_ADD_AGENT) {
-		     /*
-		      * All metrics have been validated, however, the state change
-		      * PMCD_ADD_AGENT represents a potential gap in the stream of
-		      * metrics. So we generate a <mark> record for this case.
-		      */
-		    if ((sts = putmark()) < 0) {
-			fprintf(stderr, "putmark: %s\n", pmErrStr(sts));
-			exit(1);
-		    }
+		/*
+		 * All metrics have been validated, however, this state change
+		 * represents a potential gap in the stream of metrics. Generate
+		 * a <mark> record.
+		 */
+		if ((sts = putmark()) < 0) {
+		    fprintf(stderr, "putmark: %s\n", pmErrStr(sts));
+		    exit(1);
 		}
 	    }
 	}
@@ -244,11 +234,9 @@ myFetch(int numpmid, pmID pmidlist[], __pmPDU **pdup)
 	    free(newlist);
     }
 
-    if (n < 0) {
-	if (ctxp->c_pmcd->pc_fd != -1)
-	    disconnect(n);
-	return n;
+    if (n < 0 && ctxp->c_pmcd->pc_fd != -1) {
+	disconnect(n);
     }
 
-    return changed;
+    return n;
 }

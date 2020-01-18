@@ -61,5 +61,3 @@ domain.h: ../../pmns/stdpmid
 
 pmda.o:			pmdacifs.h
 pmda.o stats.o:		stats.h
-
-pmda.o:	$(TOPDIR)/src/include/pcp/libpcp.h

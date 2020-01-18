@@ -19,7 +19,7 @@
 #define PMVAL_H
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "pmtime.h"
 
 /* instance id - instance name association */

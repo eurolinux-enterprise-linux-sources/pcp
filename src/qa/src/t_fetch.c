@@ -6,8 +6,9 @@
 */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
-#define StuffDom(metric, newdom) pmID_build(newdom, pmID_cluster(metric), pmID_item(metric))
+#define StuffDom(metric, newdom) (((__pmID_int *)&(metric))->domain = (newdom))
 
 #define NMETRICS 3
 
@@ -22,10 +23,10 @@ main(int argc, char *argv[])
     long	dom;
     char	*end;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     if (argc < 2) {
-	fprintf(stderr, "Usage: %s domain ...\n", pmGetProgname());
+	fprintf(stderr, "Usage: %s domain ...\n", pmProgname);
 	exit(1);
     }
     if ((ids = (pmID *)malloc((argc - 1) * NMETRICS * sizeof(pmID))) == (pmID *)0) {

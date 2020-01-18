@@ -28,6 +28,7 @@ $sudo rm -rf $tmp.*
 # for QA the default install for mmv PMDA is as a dso, not a daemon
 #
 cat <<End-of-File >$tmp.input
+b
 dso
 End-of-File
 
@@ -39,7 +40,7 @@ _cleanup()
     else
 	_restore_config $PCP_PMCDCONF_PATH
 	[ -d $MMV_STATS_DIR.$seq ] && _restore_config $MMV_STATS_DIR
-	_service pcp restart 2>&1 | _filter_pcp_start
+	_service pcp restart | _filter_pcp_start
 	_wait_for_pmcd
 	_wait_for_pmlogger
 	_restore_auto_restart pmcd

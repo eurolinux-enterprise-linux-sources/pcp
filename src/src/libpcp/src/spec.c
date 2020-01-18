@@ -20,7 +20,7 @@
 
 #include <ctype.h>
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "internal.h"
 #ifdef HAVE_STRINGS_H
 #include <strings.h>
@@ -32,7 +32,7 @@ parseAlloc(const char *func, size_t need)
     void    *tmp;
 
     if ((tmp = malloc(need)) == NULL)
-	pmNoMem(func, need, PM_FATAL_ERR);
+	__pmNoMem(func, need, PM_FATAL_ERR);
     return tmp;
 }
 
@@ -141,6 +141,7 @@ pmParseMetricSpec(
 
     while (isspace((int)*scan))
 	scan++;
+    mark = scan;
 
     /* delimit metric name */
     m_start = scan;
@@ -545,8 +546,8 @@ parseSocketPath(
      * Make sure that the path is absolute. parseProtocolSpec() removes the
      * (optional) "//" from "local://some/path".
      */
-    if (*path != pmPathSeparator()) {
-	absolute_path[0] = pmPathSeparator();
+    if (*path != __pmPathSeparator()) {
+	absolute_path[0] = __pmPathSeparator();
 	strncpy(absolute_path + 1, path, len);
 	if (len < sizeof(absolute_path)-1)
 	    absolute_path[++len] = '\0';

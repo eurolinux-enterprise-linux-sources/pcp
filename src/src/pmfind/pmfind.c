@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016,2018 Red Hat.
+ * Copyright (c) 2013-2016 Red Hat.
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -13,7 +13,7 @@
  */
 #include <signal.h>
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 
 static int	quiet;
 static char	*mechanism;
@@ -65,9 +65,9 @@ static const char *services[] = {
 static pmLongOptions longopts[] = {
     PMAPI_OPTIONS_HEADER("Discovery options"),
     PMOPT_DEBUG,
-    { "mechanism", 1, 'm', "NAME", "set the discovery method to use [avahi|shell|probe=<subnet>|all]" },
+    { "mechanism", 1, 'm', "NAME", "set the discovery method to use [avahi|probe=<subnet>|all]" },
     { "resolve", 0, 'r', 0, "resolve addresses" },
-    { "service", 1, 's', "NAME", "discover services [pmcd|pmproxy|pmwebd|all]" },
+    { "service", 1, 's', "NAME", "discover services [pmcd|pmproxy|pmwebd|...|all]" },
     { "timeout", 1, 't', "N.N", "timeout in seconds" },
     PMAPI_OPTIONS_HEADER("Reporting options"),
     { "quiet", 0, 'q', 0, "quiet mode, do not write to stdout" },
@@ -92,9 +92,8 @@ override(int opt, pmOptions *opts)
 static int
 addOption(const char *option, const char *arg)
 {
-    size_t	existingLen, optionLen, argLen;
-    size_t	commaLen, equalLen, allocLen;
-    char	*opts;
+    size_t existingLen, optionLen, argLen;
+    size_t commaLen, equalLen, allocLen;
 
     /* The existing length and space for a comma. */
     if (options == NULL) {
@@ -123,9 +122,8 @@ addOption(const char *option, const char *arg)
 
     /* Make room for the existing options plus the new option */
     allocLen = existingLen + commaLen + optionLen + equalLen + argLen;
-    if ((opts = realloc(options, allocLen)) == NULL)
+    if ((options = realloc(options, allocLen)) == NULL)
 	return -ENOMEM;
-    options = opts;
 
     /* Add the new option. */
     pmsprintf(options + existingLen, allocLen - existingLen, "%s%s%s%s",
@@ -146,7 +144,7 @@ discovery(const char *spec)
 					  &discoveryFlags, &urls);
     if (sts < 0) {
 	fprintf(stderr, "%s: service %s discovery failure: %s\n",
-		pmGetProgname(), spec, pmErrStr(sts));
+		pmProgname, spec, pmErrStr(sts));
 	return 2;
     }
     if (sts == 0) {

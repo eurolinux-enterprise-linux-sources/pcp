@@ -26,7 +26,7 @@
 
 #include <ctype.h>
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "internal.h"
 
 /*

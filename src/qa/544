@@ -187,13 +187,15 @@ _checksums()
     echo "=== Process metrics ==="
     pminfo -f -a $TA `cat $tmp.procs` | tee $tmp.out.procs
 
-    SUM="cksum"
-    [ $PCP_PLATFORM = something ] && SUM=something-else
+    SUM="sum -r"
+    [ $PCP_PLATFORM = darwin ] && SUM=sum
     $SUM $tmp.out.* \
-    | while read chksum blks path
-    do
-	echo "$chksum $path" | sed -e "s,$tmp,TMP,g"
-    done
+        | sed -e 's/[ ][ ]*[0-9]*[ ]/ /' \
+	| sed -e 's/^00*//' \
+	| while read chksum path
+	do
+	    printf "%05d %s\n" $chksum $path | sed -e "s,$tmp,TMP,g"
+	done
 }
 
 # value_checker ... needs control file ($tmp.control) and

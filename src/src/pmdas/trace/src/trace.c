@@ -13,8 +13,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
-#include "deprecated.h"
+#include "impl.h"
 #include "pmda.h"
 #include "domain.h"
 #include "data.h"
@@ -157,14 +156,14 @@ updateValueUnits(const char *str, int offset)
     for (i = 0; i < 6; i++) {
 	if ((s = strtok((i==0 ? sptr : NULL), ",")) == NULL) {
 	    fprintf(stderr, "%s: token parse error in string \"%s\"\n",
-		    pmGetProgname(), str);
+		    pmProgname, str);
 	    sts = -1;
 	    goto leaving;
 	}
 	units[i] = (int)strtol(s, &endp, 10);
 	if (*endp) {
 	    fprintf(stderr, "%s: integer parse error for substring \"%s\"\n",
-		    pmGetProgname(), s);
+		    pmProgname, s);
 	    sts = -1;
 	    goto leaving;
 	}
@@ -181,7 +180,7 @@ updateValueUnits(const char *str, int offset)
     if (pmDebugOptions.appl0) {
 	fprintf(stderr, "%s: value metric units updated using \"%s\"\n"
 		"dimSpace=%d, dimTime=%d, dimCount=%d, scaleSpace=%d, "
-		"scaleTime=%d, scaleCount=%d\n", pmGetProgname(), str,
+		"scaleTime=%d, scaleCount=%d\n", pmProgname, str,
 		units[0], units[1], units[2], units[3], units[4], units[5]);
     }
 
@@ -241,7 +240,7 @@ indomSortCheck(void)
  * _sorted_ contents of the instance domain.
  */
 static int
-traceInstance(pmInDom indom, int foo, char *bar, pmInResult **iresp, pmdaExt
+traceInstance(pmInDom indom, int foo, char *bar, __pmInResult **iresp, pmdaExt
  *pmda)
 {
     indomSortCheck();
@@ -262,7 +261,7 @@ summarydel(void *a)
     check.instid = k->id;
     if (__pmhashlookup(&history, check.tag, &check) == NULL) {
 	if (__pmhashinsert(&history, check.tag, &check) < 0)
-	    pmNotifyErr(LOG_ERR, "history table insert failure - '%s' "
+	    __pmNotifyErr(LOG_ERR, "history table insert failure - '%s' "
 		"instance will not maintain its instance number.", check.tag);
     }
     if (k != NULL)
@@ -288,7 +287,7 @@ readData(int clientfd, int *protocol)
     int			freeflag=0;
 
     if ((sts = __pmtracegetPDU(clientfd, TRACE_TIMEOUT_NEVER, &result)) < 0) {
-	pmNotifyErr(LOG_ERR, "bogus PDU read - %s", pmtraceerrstr(sts));
+	__pmNotifyErr(LOG_ERR, "bogus PDU read - %s", pmtraceerrstr(sts));
 	return -1;
     }
     else if (sts == TRACE_PDU_DATA) {
@@ -296,7 +295,7 @@ readData(int clientfd, int *protocol)
 						&type, protocol, &data)) < 0)
 	    return -1;
 	if (type < TRACE_FIRST_TYPE || type > TRACE_LAST_TYPE) {
-	    pmNotifyErr(LOG_ERR, "unknown trace type for '%s' (%d)", tag, type);
+	    __pmNotifyErr(LOG_ERR, "unknown trace type for '%s' (%d)", tag, type);
 	    free(tag);
 	    return -1;
 	}
@@ -308,7 +307,7 @@ readData(int clientfd, int *protocol)
 	return -1;
     }
     else {	/* unknown PDU type - bail & later kill connection */
-	pmNotifyErr(LOG_ERR, "unknown PDU - expected data PDU"
+	__pmNotifyErr(LOG_ERR, "unknown PDU - expected data PDU"
 		" (not type #%d)", sts);
 	return -1;
     }
@@ -346,10 +345,10 @@ readData(int clientfd, int *protocol)
 	newhash.txsum = data;
 	hptr = &newhash;
 	if (pmDebugOptions.appl0)
-	    pmNotifyErr(LOG_DEBUG, "'%s' is new to the summary table!",
+	    __pmNotifyErr(LOG_DEBUG, "'%s' is new to the summary table!",
 		    hptr->tag);
 	if (__pmhashinsert(&summary, hptr->tag, hptr) < 0) {
-	    pmNotifyErr(LOG_ERR, "summary table insert failure - '%s' "
+	    __pmNotifyErr(LOG_ERR, "summary table insert failure - '%s' "
 		"data ignored", hptr->tag);
 	    free(hptr->tag);
 	    return -1;
@@ -381,7 +380,7 @@ readData(int clientfd, int *protocol)
 	size = (index+1)*(int)sizeof(pmdaInstid);
 	if ((indomtab[indom].it_set = (pmdaInstid *)
 			realloc(indomtab[indom].it_set, size)) == NULL) {
-	    pmNotifyErr(LOG_ERR, "dropping instance '%s': %s", hptr->tag,
+	    __pmNotifyErr(LOG_ERR, "dropping instance '%s': %s", hptr->tag,
 							osstrerror());
 	    free(hptr->tag);
 	    return -1;
@@ -400,7 +399,7 @@ readData(int clientfd, int *protocol)
     else {	/* update an existing entry */
 	freeflag++;	/* wont need tag afterwards, so mark for deletion */
 	if (hptr->taglength != newhash.taglength) {
-	    pmNotifyErr(LOG_ERR, "hash table update failure - '%s' "
+	    __pmNotifyErr(LOG_ERR, "hash table update failure - '%s' "
 		"data ignored (bad tag length)", tag);
 	    free(newhash.tag);
 	    return -1;
@@ -417,7 +416,7 @@ readData(int clientfd, int *protocol)
 		hptr->txsum = data;
 		/* observations are 'permanent' and immediately available */
 	    if (pmDebugOptions.appl0)
-		pmNotifyErr(LOG_DEBUG, "'%s' real count updated (%d)",
+		__pmNotifyErr(LOG_DEBUG, "'%s' real count updated (%d)",
 			hptr->tag, (int)hptr->realcount);
 	}
     }
@@ -440,11 +439,11 @@ readData(int clientfd, int *protocol)
 	hash.txsum = data;
 	hptr = &hash;
 	if (pmDebugOptions.appl0)
-	    pmNotifyErr(LOG_DEBUG, "fresh interval data on fd=%d rpos=%d "
+	    __pmNotifyErr(LOG_DEBUG, "fresh interval data on fd=%d rpos=%d "
 		    "('%s': len=%d type=%d value=%d)", clientfd, rpos,
 		    hash.tag, taglen, type, (int)data);
 	if (__pmhashinsert(ringbuf.ring[rpos].stats, hash.tag, hptr) < 0) {
-	    pmNotifyErr(LOG_ERR, "ring buffer insert failure - '%s' "
+	    __pmNotifyErr(LOG_ERR, "ring buffer insert failure - '%s' "
 		"data ignored", hash.tag);
 	    free(hash.tag);
 	    return -1;
@@ -460,7 +459,7 @@ readData(int clientfd, int *protocol)
 	    hptr->txsum += data;
 	}
 	if (pmDebugOptions.appl0)
-	    pmNotifyErr(LOG_DEBUG, "Updating data on fd=%d ('%s': type=%d "
+	    __pmNotifyErr(LOG_DEBUG, "Updating data on fd=%d ('%s': type=%d "
 		    "count=%d min=%f max=%f sum=%f)",
 		    clientfd, hptr->tag, hptr->tracetype,
 		    hptr->txcount, hptr->txmin, hptr->txmax, hptr->txsum);
@@ -495,7 +494,7 @@ timerUpdate(void)
     }
 
     if (ringbuf.ring[rpos].working == 0) {
-	pmNotifyErr(LOG_ERR, "buffered I/O error - ignoring timer event");
+	__pmNotifyErr(LOG_ERR, "buffered I/O error - ignoring timer event");
 	return;
     }
 
@@ -508,7 +507,7 @@ timerUpdate(void)
     ringbuf.ring[rpos].working = 1;
 
     if (pmDebugOptions.appl0)
-	pmNotifyErr(LOG_DEBUG, "Alarm - working buffer is now %d/%d",
+	__pmNotifyErr(LOG_DEBUG, "Alarm - working buffer is now %d/%d",
 		rpos+1, rbufsize);
 }
 
@@ -519,10 +518,10 @@ summariseDataAux(hashtable_t *t, void *entry)
     hashdata_t	*base = (hashdata_t *)entry;
 
     if (pmDebugOptions.appl0)
-	pmNotifyErr(LOG_DEBUG, "summariseDataAux: looking up '%s'", base->tag);
+	__pmNotifyErr(LOG_DEBUG, "summariseDataAux: looking up '%s'", base->tag);
     /* update summary hash table */
     if ((hptr = __pmhashlookup(&summary, base->tag, base)) == NULL)
-	pmNotifyErr(LOG_ERR, "summariseDataAux: entry in ring buffer, "
+	__pmNotifyErr(LOG_ERR, "summariseDataAux: entry in ring buffer, "
 		"but not summary ('%s')", base->tag);
     else {	/* update an existing summary */
 	if (hptr->tracetype == TRACE_TYPE_TRANSACT) {
@@ -551,7 +550,7 @@ summariseDataAux(hashtable_t *t, void *entry)
 		else if (hptr->tracetype == TRACE_TYPE_OBSERVE)
 		    oindomsize++;
 		else {
-		    pmNotifyErr(LOG_ERR,
+		    __pmNotifyErr(LOG_ERR,
 				"bogus trace type - skipping '%s'", hptr->tag);
 		    return;
 		}
@@ -575,7 +574,7 @@ summariseData(void)
     int	count;
 
     if (pmDebugOptions.appl0)
-	pmNotifyErr(LOG_DEBUG, "summariseData: resummarising");
+	__pmNotifyErr(LOG_DEBUG, "summariseData: resummarising");
     /* initialise counters */
     tindomsize = pindomsize = oindomsize = 0;
 
@@ -584,7 +583,7 @@ summariseData(void)
 	if (ringbuf.ring[count].working == 1)
 	    continue;
 	if (pmDebugOptions.appl0) {
-	    pmNotifyErr(LOG_DEBUG, "ring buffer table %d/%d has %d entries.\n",
+	    __pmNotifyErr(LOG_DEBUG, "ring buffer table %d/%d has %d entries.\n",
 			  count, rbufsize, ringbuf.ring[count].stats->entries);
 	}
 	__pmhashtraverse(ringbuf.ring[count].stats, summariseDataAux);
@@ -626,19 +625,19 @@ nextTraceInst(pmdaExt *pmda)
 }
 
 static int
-auxFetch(int inst, pmID pmid, char *tag, pmAtomValue *atom)
+auxFetch(int inst, __pmID_int *idp, char *tag, pmAtomValue *atom)
 {
-    if (inst != PM_IN_NULL && pmID_cluster(pmid) != 0)
+    if (inst != PM_IN_NULL && idp->cluster != 0)
 	return PM_ERR_INST;
 
     /* transaction, point, counter and observe trace values and control data */
-    if (pmID_cluster(pmid) == 0) {
+    if (idp->cluster == 0) {
 	hashdata_t	hash;
 	hashdata_t	*hptr;
 
 	hash.tag = tag;
 
-	switch (pmID_item(pmid)) {
+	switch (idp->item) {
 	case 0:				/* trace.transact.count */
 	    hash.tracetype = TRACE_TYPE_TRANSACT;
 	    if ((hptr = __pmhashlookup(&summary, hash.tag, &hash)) == NULL)
@@ -653,7 +652,7 @@ auxFetch(int inst, pmID pmid, char *tag, pmAtomValue *atom)
 		return 0;
 	    atom->f = (float)((double)hptr->txcount/(double)timespan.tv_sec);
 	    if (pmDebugOptions.appl1)
-		pmNotifyErr(LOG_DEBUG, "rate=%f=%f/%f('%s')\n", (float)atom->f,
+		__pmNotifyErr(LOG_DEBUG, "rate=%f=%f/%f('%s')\n", (float)atom->f,
 			(double)hptr->txcount, (double)timespan.tv_sec, tag);
 	    break;
 	case 2:				/* trace.transact.ave_time */
@@ -667,7 +666,7 @@ auxFetch(int inst, pmID pmid, char *tag, pmAtomValue *atom)
 	    else {
 		atom->f = (float)((double)hptr->txsum/(double)hptr->txcount);
 		if (pmDebugOptions.appl1)
-		    pmNotifyErr(LOG_DEBUG, "ave_time=%f=%f/%f('%s')\n", (float)atom->f,
+		    __pmNotifyErr(LOG_DEBUG, "ave_time=%f=%f/%f('%s')\n", (float)atom->f,
 			(double)hptr->txsum, (double)hptr->txcount, tag);
 	    }
 	    break;
@@ -707,12 +706,12 @@ auxFetch(int inst, pmID pmid, char *tag, pmAtomValue *atom)
 		return 0;
 	    atom->f = (float)((double)hptr->txcount/(double)timespan.tv_sec);
 	    if (pmDebugOptions.appl1)
-		pmNotifyErr(LOG_DEBUG, "rate=%f=%f/%f('%s')\n", (float)atom->f,
+		__pmNotifyErr(LOG_DEBUG, "rate=%f=%f/%f('%s')\n", (float)atom->f,
 			(double)hptr->txcount, (double)timespan.tv_sec, tag);
 	    break;
 	case 8:				/* trace.observe.count */
 	case 17:			/* trace.counter.count */
-	    hash.tracetype = (pmID_item(pmid) == 8)?
+	    hash.tracetype = (idp->item == 8)?
 			TRACE_TYPE_OBSERVE : TRACE_TYPE_COUNTER;
 	    if ((hptr = __pmhashlookup(&summary, hash.tag, &hash)) == NULL)
 		return PM_ERR_INST;
@@ -720,7 +719,7 @@ auxFetch(int inst, pmID pmid, char *tag, pmAtomValue *atom)
 	    break;
 	case 9:				/* trace.observe.rate */
 	case 18:			/* trace.counter.rate */
-	    hash.tracetype = (pmID_item(pmid) == 9)?
+	    hash.tracetype = (idp->item == 9)?
 			TRACE_TYPE_OBSERVE : TRACE_TYPE_COUNTER;
 	    if ((hptr = __pmhashlookup(&summary, hash.tag, &hash)) == NULL)
 		return PM_ERR_INST;
@@ -728,12 +727,12 @@ auxFetch(int inst, pmID pmid, char *tag, pmAtomValue *atom)
 		return 0;
 	    atom->f = (float)((double)hptr->txcount/(double)timespan.tv_sec);
 	    if (pmDebugOptions.appl1)
-		pmNotifyErr(LOG_DEBUG, "rate=%f=%f/%f('%s')\n", (float)atom->f,
+		__pmNotifyErr(LOG_DEBUG, "rate=%f=%f/%f('%s')\n", (float)atom->f,
 			(double)hptr->txcount, (double)timespan.tv_sec, tag);
 	    break;
 	case 10:			/* trace.observe.value */
 	case 19:			/* trace.counter.value */
-	    hash.tracetype = (pmID_item(pmid) == 10)?
+	    hash.tracetype = (idp->item == 10)?
 			TRACE_TYPE_OBSERVE : TRACE_TYPE_COUNTER;
 	    if ((hptr = __pmhashlookup(&summary, hash.tag, &hash)) == NULL)
 		return PM_ERR_INST;
@@ -768,14 +767,14 @@ auxFetch(int inst, pmID pmid, char *tag, pmAtomValue *atom)
 }
 
 static int
-getIndomSize(pmID pmid)
+getIndomSize(__pmID_int *pmidp)
 {
     int size;
 
-    if (pmID_cluster(pmid) != 0)
+    if (pmidp->cluster != 0)
 	return 1;
 
-    switch (pmID_item(pmid)) {
+    switch (pmidp->item) {
 	case 0:		/* uses summary's real counters (transact) */
 	case 5:
 	    size = indomtab[TRANSACT_INDOM].it_numinst;
@@ -820,6 +819,7 @@ traceFetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *pmda)
     static pmResult	*res = NULL;
     pmValueSet		*vset;
     pmDesc		*dp;
+    __pmID_int		*pmidp;
     pmdaMetric		*metap;
     pmAtomValue		atom;
     pmdaInstid		*ins;
@@ -848,10 +848,11 @@ traceFetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *pmda)
     for (i = 0; i < numpmid; i++) {
 	dp = NULL;
 	metap = NULL;
+	pmidp = (__pmID_int *)&pmidlist[i];
 	if (pmda->e_direct) {
-	    if (pmID_item(pmidlist[i]) < pmda->e_nmetrics &&
-		pmidlist[i] == pmda->e_metrics[pmID_item(pmidlist[i])].m_desc.pmid) {
-		metap = &pmda->e_metrics[pmID_item(pmidlist[i])];
+	    if (pmidp->item < pmda->e_nmetrics &&
+		pmidlist[i] == pmda->e_metrics[pmidp->item].m_desc.pmid) {
+		metap = &pmda->e_metrics[pmidp->item];
 		dp = &(metap->m_desc);
 	    }
 	}
@@ -865,7 +866,7 @@ traceFetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *pmda)
 	    }
 	}
 	if (dp == NULL) {
-	    pmNotifyErr(LOG_ERR, "traceFetch: Requested metric %s is not "
+	    __pmNotifyErr(LOG_ERR, "traceFetch: Requested metric %s is not "
 					"defined", pmIDStr(pmidlist[i]));
 	    numval = PM_ERR_PMID;
 	}
@@ -876,9 +877,9 @@ traceFetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *pmda)
 	     */
 	    if (dosummary == 1)
 		summariseData();
-	    numval = getIndomSize(pmidlist[i]);
+	    numval = getIndomSize(pmidp);
     if (pmDebugOptions.appl0)
-	pmNotifyErr(LOG_DEBUG, "instance domain for %s numval=%d",
+	__pmNotifyErr(LOG_DEBUG, "instance domain for %s numval=%d",
 		pmIDStr(dp->pmid), numval);
 	}
 	else
@@ -912,7 +913,7 @@ traceFetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *pmda)
 	j = 0;
 	do {
 	    if (ins == NULL) {
-		pmNotifyErr(LOG_ERR, "bogus instance ignored (pmid=%s)",
+		__pmNotifyErr(LOG_ERR, "bogus instance ignored (pmid=%s)",
 					pmIDStr(dp->pmid));
 		if ((res->numpmid = i) > 0)
 		    __pmFreeResultValues(res);
@@ -929,30 +930,30 @@ traceFetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *pmda)
 		}
 	    }
 	    vset->vlist[j].inst = ins->i_inst;
-	    if ((sts = auxFetch(ins->i_inst, pmidlist[i], ins->i_name, &atom)) < 0) {
+	    if ((sts = auxFetch(ins->i_inst, pmidp, ins->i_name, &atom)) < 0) {
 		if (sts == PM_ERR_PMID)
-		    pmNotifyErr(LOG_ERR, "unknown PMID requested - '%s'",
+		    __pmNotifyErr(LOG_ERR, "unknown PMID requested - '%s'",
 				pmIDStr(dp->pmid));
 		else if (sts == PM_ERR_INST)
-		    pmNotifyErr(LOG_ERR, "unknown instance requested - %d "
+		    __pmNotifyErr(LOG_ERR, "unknown instance requested - %d "
 			"(pmid=%s)", ins->i_inst, pmIDStr(dp->pmid));
 		else
-		    pmNotifyErr(LOG_ERR, "fetch error (pmid=%s): %s",
+		    __pmNotifyErr(LOG_ERR, "fetch error (pmid=%s): %s",
 				pmIDStr(dp->pmid), pmErrStr(sts));
 	    }
 	    else if (sts == 0) {	/* not current, so don't use */
 		if (pmDebugOptions.appl0)
-		    pmNotifyErr(LOG_DEBUG, "Instance is dated %s (pmid=%s)",
+		    __pmNotifyErr(LOG_DEBUG, "Instance is dated %s (pmid=%s)",
 					ins->i_name, pmIDStr(dp->pmid));
 	    }
 	    else if ((sts = __pmStuffValue(&atom, &vset->vlist[j], dp->type)) == PM_ERR_TYPE)
-		pmNotifyErr(LOG_ERR, "bad desc type (%d) for metric %s",
+		__pmNotifyErr(LOG_ERR, "bad desc type (%d) for metric %s",
 				dp->type, pmIDStr(dp->pmid));
 	    else if (sts >= 0) {
 		vset->valfmt = sts;
 		j++;
 		if (pmDebugOptions.appl0)
-		    pmNotifyErr(LOG_DEBUG, "Instance is good! %s (pmid=%s)",
+		    __pmNotifyErr(LOG_DEBUG, "Instance is good! %s (pmid=%s)",
 					ins->i_name, pmIDStr(dp->pmid));
 	    }
 	} while (dp->indom != PM_INDOM_NULL &&
@@ -974,24 +975,26 @@ traceStore(pmResult *result, pmdaExt *pmda)
     int		i, j;
     int         sts = 0;
     pmValueSet  *vsp = NULL;
+    __pmID_int   *pmidp = NULL;
     pmAtomValue	av;
     extern int	afid;
     extern void alarming(int, void *);
 
     for (i = 0; i < result->numpmid; i++) {
 	vsp = result->vset[i];
+	pmidp = (__pmID_int *)&vsp->pmid;
 
-	if (pmID_cluster(vsp->pmid) != 0)
+	if (pmidp->cluster != 0)
 	    return PM_ERR_PMID;
 
-	if (pmID_item(vsp->pmid) == 15) {	/* trace.control.reset */
+	if (pmidp->item == 15) {	/* trace.control.reset */
 	    if (pmDebugOptions.appl0)
-		pmNotifyErr(LOG_DEBUG, "resetting trace metrics");
+		__pmNotifyErr(LOG_DEBUG, "resetting trace metrics");
 	    /* reset the interval timer */
 	    if (afid >= 0) {
 		__pmAFunregister(afid);
 		if ((afid = __pmAFregister(&interval, NULL, alarming)) < 0) {
-		    pmNotifyErr(LOG_ERR, "__pmAFregister failed");
+		    __pmNotifyErr(LOG_ERR, "__pmAFregister failed");
 		    exit(1);
 		}
 	    }
@@ -1027,9 +1030,9 @@ traceStore(pmResult *result, pmdaExt *pmda)
 	    tindomsize = pindomsize = oindomsize = 0;
 	    /* definately need to recompute the summary next fetch */
 	    dosummary = 1;
-	    pmNotifyErr(LOG_INFO, "PMDA reset");
+	    __pmNotifyErr(LOG_INFO, "PMDA reset");
 	}
-	else if (pmID_item(vsp->pmid) == 16) {	/* trace.control.debug */
+	else if (pmidp->item == 16) {	/* trace.control.debug */
 	    if (vsp->numval != 1 || vsp->valfmt != PM_VAL_INSITU)
 		sts = PM_ERR_BADSTORE;
 	    else if (sts >= 0 && ((sts = pmExtractValue(vsp->valfmt,
@@ -1037,8 +1040,8 @@ traceStore(pmResult *result, pmdaExt *pmda)
 		if (pmDebug != av.l) {
 		    pmClearDebug("all");
 		    __pmSetDebugBits(av.l);
-		    pmNotifyErr(LOG_INFO, "debug level set to %d", pmDebug);
-		    debuglibrary();
+		    __pmNotifyErr(LOG_INFO, "debug level set to %d", pmDebug);
+		    debuglibrary(pmDebug);
 		}
 	    }
 	}
@@ -1070,20 +1073,20 @@ traceInit(pmdaInterface *dp)
     /* initialise ring buffer */
     rsize = (int)(sizeof(statlist_t) * rbufsize);
     if ((ringbuf.ring = (statlist_t *)malloc(rsize)) == NULL) {
-	pmNotifyErr(LOG_ERR, "failed during ring buffer initialise: %s",
+	__pmNotifyErr(LOG_ERR, "failed during ring buffer initialise: %s",
 		osstrerror());
 	exit(1);
     }
     for (rsize=0; rsize < rbufsize; rsize++) {
 	if ((ringbuf.ring[rsize].stats = (hashtable_t *)
 	 			malloc(sizeof(hashtable_t))) == NULL) {
-	    pmNotifyErr(LOG_ERR, "ring buffer initialise failed: %s",
+	    __pmNotifyErr(LOG_ERR, "ring buffer initialise failed: %s",
 		osstrerror());
 	    exit(1);
 	}
 	if ((sts = __pmhashinit(ringbuf.ring[rsize].stats, 0, sizeof(hashdata_t),
 						datacmp, datadel)) < 0) {
-	    pmNotifyErr(LOG_ERR, "ring buffer initialisation failed: %s",
+	    __pmNotifyErr(LOG_ERR, "ring buffer initialisation failed: %s",
 		osstrerror());
 	    exit(1);
 	}
@@ -1100,14 +1103,14 @@ traceInit(pmdaInterface *dp)
     dp->version.two.ext->e_idp = indomtab;
     if ((sts = __pmhashinit(&summary, 0, sizeof(hashdata_t),
 						datacmp, summarydel)) < 0) {
-	pmNotifyErr(LOG_ERR, "summary table initialisation failed: %s",
+	__pmNotifyErr(LOG_ERR, "summary table initialisation failed: %s",
 						osstrerror());
 	exit(1);
     }
     /* initialise list of reserved instance domains (for store recovery) */
     if ((sts = __pmhashinit(&history, 0, sizeof(instdata_t),
 						instcmp, instdel)) < 0) {
-	pmNotifyErr(LOG_ERR, "history table initialisation failed: %s",
+	__pmNotifyErr(LOG_ERR, "history table initialisation failed: %s",
 						osstrerror());
 	exit(1);
     }

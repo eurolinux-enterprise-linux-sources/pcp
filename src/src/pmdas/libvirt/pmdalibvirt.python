@@ -1,6 +1,6 @@
 #!/usr/bin/env pmpython
 #
-# Copyright (C) 2016-2018 Marko Myllynen <myllynen@redhat.com>
+# Copyright (C) 2016-2017 Marko Myllynen <myllynen@redhat.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,14 +13,14 @@
 # GNU General Public License for more details.
 #
 
-# Last updated for: libvirt 4.0.0
+# Last updated for: libvirt 3.8.0
 
 # pylint: disable=superfluous-parens, bad-whitespace
 # pylint: disable=invalid-name, line-too-long, no-self-use
 # pylint: disable=too-many-boolean-expressions, too-many-statements
 # pylint: disable=too-many-instance-attributes, too-many-locals
 # pylint: disable=too-many-branches, too-many-nested-blocks
-# pylint: disable=broad-except
+# pylint: disable=bare-except, broad-except
 # pylint: disable=bad-continuation, wrong-import-order
 # pylint: disable=consider-using-enumerate, too-many-return-statements
 
@@ -46,8 +46,7 @@ from cpmapi import PM_INDOM_NULL
 from cpmapi import PM_TYPE_U32, PM_TYPE_U64, PM_TYPE_STRING
 from cpmapi import PM_SEM_COUNTER, PM_SEM_INSTANT, PM_SEM_DISCRETE
 from cpmapi import PM_COUNT_ONE, PM_SPACE_BYTE, PM_SPACE_KBYTE, PM_TIME_SEC, PM_TIME_NSEC
-from cpmapi import PM_ERR_INST, PM_ERR_NYI, PM_ERR_PMID
-from cpmda import PMDA_FETCH_NOVALUES
+from cpmapi import PM_ERR_AGAIN, PM_ERR_INST, PM_ERR_NYI, PM_ERR_PMID, PM_ERR_VALUE
 
 if sys.version_info[0] >= 3:
     long = int # pylint: disable=redefined-builtin
@@ -109,7 +108,7 @@ class LibvirtPMDA(PMDA):
         ]
 
         self.vm_indom = self.indom(0)
-        self.vm_insts = pmdaIndom(self.vm_indom, {})
+        self.vm_insts = pmdaIndom(self.vm_indom, [])
         self.add_indom(self.vm_insts)
 
         self.vm_cluster = 1
@@ -141,7 +140,7 @@ class LibvirtPMDA(PMDA):
         ]
 
         self.vm_vcpu_indom = self.indom(1)
-        self.vm_vcpu_insts = pmdaIndom(self.vm_vcpu_indom, {})
+        self.vm_vcpu_insts = pmdaIndom(self.vm_vcpu_indom, [])
         self.add_indom(self.vm_vcpu_insts)
 
         self.vm_vcpustats_res = []
@@ -195,7 +194,7 @@ class LibvirtPMDA(PMDA):
         ]
 
         self.vm_block_indom = self.indom(2)
-        self.vm_block_insts = pmdaIndom(self.vm_block_indom, {})
+        self.vm_block_insts = pmdaIndom(self.vm_block_indom, [])
         self.add_indom(self.vm_block_insts)
 
         self.vm_blockstats_res = []
@@ -238,7 +237,7 @@ class LibvirtPMDA(PMDA):
         ]
 
         self.vm_net_indom = self.indom(3)
-        self.vm_net_insts = pmdaIndom(self.vm_net_indom, {})
+        self.vm_net_insts = pmdaIndom(self.vm_net_indom, [])
         self.add_indom(self.vm_net_insts)
 
         self.vm_netstats_res = []
@@ -382,11 +381,7 @@ class LibvirtPMDA(PMDA):
         conffile += '/' + self.read_name() + '/' + self.read_name() + '.conf'
 
         # Silently ignore missing file/section
-        # Python < 3.2 compat
-        if sys.version_info[0] >= 3 and sys.version_info[1] >= 2:
-            config = ConfigParser.ConfigParser()
-        else:
-            config = ConfigParser.SafeConfigParser()
+        config = ConfigParser.SafeConfigParser()
         config.read(conffile)
         if config.has_section('pmda'):
             for opt in config.options('pmda'):
@@ -543,6 +538,7 @@ class LibvirtPMDA(PMDA):
                             break
                 self.vm_vcpu_insts.set_instances(self.vm_vcpu_indom, insts)
                 self.replace_indom(self.vm_vcpu_indom, insts)
+
             except libvirt.libvirtError as error:
                 self.log("Failed to get domain vcpu stats: %s" % error)
             return
@@ -590,7 +586,7 @@ class LibvirtPMDA(PMDA):
                                     key = src.keys().index(path)
                                     path = src.values()[key]
                                     break
-                                except Exception:
+                                except:
                                     pass
                             if not path:
                                 continue
@@ -616,6 +612,7 @@ class LibvirtPMDA(PMDA):
                             break
                 self.vm_block_insts.set_instances(self.vm_block_indom, insts)
                 self.replace_indom(self.vm_block_indom, insts)
+
             except libvirt.libvirtError as error:
                 self.log("Failed to get domain block stats: %s" % error)
             return
@@ -666,6 +663,7 @@ class LibvirtPMDA(PMDA):
                             break
                 self.vm_net_insts.set_instances(self.vm_net_indom, insts)
                 self.replace_indom(self.vm_net_indom, insts)
+
             except libvirt.libvirtError as error:
                 self.log("Failed to get domain net stats: %s" % error)
             return
@@ -683,7 +681,7 @@ class LibvirtPMDA(PMDA):
     def libvirt_fetch_callback(self, cluster, item, inst):
         """ Fetch callback """
         if not self.conn:
-            return [PMDA_FETCH_NOVALUES, 0]
+            return [PM_ERR_AGAIN, 0]
 
         if cluster == self.hv_cluster:
             try:
@@ -694,11 +692,11 @@ class LibvirtPMDA(PMDA):
                     value = method()
                 value = self.convert_value(value, self.hv_metrics[item][2])
                 return [value, 1]
-            except Exception:
-                return [PMDA_FETCH_NOVALUES, 0]
+            except:
+                return [PM_ERR_VALUE, 0]
 
         if not self.doms:
-            return [PMDA_FETCH_NOVALUES, 0]
+            return [PM_ERR_AGAIN, 0]
 
         if cluster == self.vm_cluster:
             try:
@@ -720,7 +718,7 @@ class LibvirtPMDA(PMDA):
                     if self.vm_metrics[item][0] == 'dominfo.vcpu.current':
                         value = doc.xpath("/domain/vcpu")
                     else:
-                        return [PMDA_FETCH_NOVALUES, 0]
+                        return [PM_ERR_AGAIN, 0]
 
                 # Extract and scale if needed
                 if isinstance(value, list):
@@ -737,15 +735,15 @@ class LibvirtPMDA(PMDA):
 
                 value = self.convert_value(value, self.vm_metrics[item][2])
                 return [value, 1]
-            except Exception:
-                return [PMDA_FETCH_NOVALUES, 0]
+            except:
+                return [PM_ERR_VALUE, 0]
 
         if cluster == self.vm_memstats_cluster:
             try:
                 key = self.vm_memstats[item][0].rpartition('.')[2]
                 return [self.vm_memstats_res[self.vm_insts.inst_name_lookup(inst)][key], 1]
-            except Exception:
-                return [PMDA_FETCH_NOVALUES, 0]
+            except:
+                return [PM_ERR_VALUE, 0]
 
         if cluster == self.vm_cpustats_cluster or \
            cluster == self.vm_vcpustats_cluster or \
@@ -804,7 +802,7 @@ class LibvirtPMDA(PMDA):
                     if key in res[pos][1]:
                         return [res[pos][1][key], 1]
                     else:
-                        return [PMDA_FETCH_NOVALUES, 0]
+                        return [PM_ERR_AGAIN, 0]
 
                 # Non-combined values in dynamic clusters
                 if key == 'vcpu.current' or key == 'vcpu.maximum' or \
@@ -825,7 +823,7 @@ class LibvirtPMDA(PMDA):
                     if key in res[pos][1]:
                         return [res[pos][1][key], 1]
                     else:
-                        return [PMDA_FETCH_NOVALUES, 0]
+                        return [PM_ERR_AGAIN, 0]
 
                 # Combine N values for dynamic metrics
                 if 'vcpu' in mtx[item][0]:
@@ -835,7 +833,7 @@ class LibvirtPMDA(PMDA):
                 elif 'net' in mtx[item][0]:
                     count = res[pos][1]['net.count']
                 else:
-                    return [PMDA_FETCH_NOVALUES, 0]
+                    return [PM_ERR_VALUE, 0]
 
                 # Construct the combined total value
                 mtype = mtx[item][2]
@@ -861,8 +859,8 @@ class LibvirtPMDA(PMDA):
                 if mtype == PM_TYPE_STRING and value.startswith(' '):
                     value = value[1:]
                 return [value, 1]
-            except Exception:
-                return [PMDA_FETCH_NOVALUES, 0]
+            except:
+                return [PM_ERR_VALUE, 0]
 
         return [PM_ERR_PMID, 0]
 

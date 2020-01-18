@@ -1,5 +1,4 @@
 domain.h
-libpcp.h
 pmdasample
 pmda_sample.dll
 pmda_sample.so

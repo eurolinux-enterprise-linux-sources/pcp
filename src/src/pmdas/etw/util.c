@@ -16,6 +16,7 @@
 
 #define INITGUID
 #include <pmapi.h>
+#include <impl.h>
 #include <tdh.h>
 #include <evntrace.h>
 #include "util.h"

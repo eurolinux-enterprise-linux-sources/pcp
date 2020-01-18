@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 Red Hat.
+ * Copyright (c) 2016-2017 Red Hat.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -15,6 +15,7 @@
 #define LINUX_PMDA_H
 
 #include "pmapi.h"
+#include "impl.h"
 #include "pmda.h"
 
 /*
@@ -46,7 +47,7 @@ enum {
 	CLUSTER_MSG_LIMITS,	/* 22 msgctl(IPC_INFO) system call */
 	CLUSTER_SHM_LIMITS,	/* 23 shmctl(IPC_INFO) system call */
 	PROC_PID_STATUS,	/* 24 /proc/<pid>/status -> proc PMDA */
-	CLUSTER_UTMP,		/* 25 login records metrics */
+	CLUSTER_NUSERS,		/* 25 number of users */
 	CLUSTER_UPTIME,		/* 26 /proc/uptime */
 	CLUSTER_VFS,		/* 27 /proc/sys/fs */
 	CLUSTER_VMSTAT,		/* 28 /proc/vmstat */
@@ -68,7 +69,7 @@ enum {
 	PROC_CPUSCHED_PROCS,	/* 44 scheduler group processes -> proc PMDA */
 	PROC_MEMORY_GROUPS,	/* 45 memory control groups -> proc PMDA */
 	PROC_MEMORY_PROCS,	/* 46 memory group processes -> proc PMDA */
-	PROC_NET_CLS_GROUPS,	/* 47 network class fication control groups -> proc PMDA */
+	PROC_NET_CLS_GROUPS,	/* 47 network classification control groups -> proc PMDA */
 	PROC_NET_CLS_PROCS,	/* 48 network classification group processes -> proc PMDA */
 	CLUSTER_INTERRUPT_LINES,/* 49 /proc/interrupts percpu interrupts */
 	CLUSTER_INTERRUPT_OTHER,/* 50 /proc/interrupts percpu interrupts */
@@ -93,20 +94,8 @@ enum {
 	CLUSTER_KSM_INFO,	/* 69 /sys/kernel/mm/ksm */
 	CLUSTER_ZONEINFO_PROTECTION,	/* 70 /proc/zoneinfo protection item */
 	CLUSTER_TAPEDEV,	/* 71 /sys/class/scsi_tape */
-	CLUSTER_SYS_KERNEL,	/* 72 /proc/sys/kernel metrics */
+	CLUSTER_RANDOM,		/* 72 /proc/sys/kernel/random entropy state */
 	CLUSTER_NET_SOCKSTAT6,	/* 73 /proc/net/sockstat6 */
-	CLUSTER_TTY,            /* 74 proc/tty/device/serial metrics */
-	CLUSTER_LOCKS,		/* 75 /proc/locks */
-	CLUSTER_NET_TCP6,	/* 76 /proc/net/tcp6 */
-	CLUSTER_NET_RAW,	/* 77 /proc/net/raw */
-	CLUSTER_NET_RAW6,	/* 78 /proc/net/raw6 */
-	CLUSTER_NET_UDP,	/* 79 /proc/net/udp */
-	CLUSTER_NET_UDP6,	/* 80 /proc/net/udp6 */
-	CLUSTER_NET_UNIX,	/* 81 /proc/net/unix */
-	CLUSTER_SOFTIRQS_TOTAL,	/* 82 /proc/softirqs */
-	CLUSTER_PRESSURE_CPU,	/* 83 /proc/pressure/cpu metrics */
-	CLUSTER_PRESSURE_MEM,	/* 84 /proc/pressure/memory metrics */
-	CLUSTER_PRESSURE_IO,	/* 85 /proc/pressure/io metrics */
 
 	NUM_CLUSTERS		/* one more than highest numbered cluster */
 };
@@ -116,19 +105,14 @@ enum {
  */
 enum {
 	REFRESH_NET_MTU = NUM_CLUSTERS,
-	REFRESH_NET_TYPE,
 	REFRESH_NET_SPEED,
 	REFRESH_NET_DUPLEX,
 	REFRESH_NET_LINKUP,
 	REFRESH_NET_RUNNING,
-	REFRESH_NET_WIRELESS,
 
 	REFRESH_NETADDR_INET,
 	REFRESH_NETADDR_IPV6,
 	REFRESH_NETADDR_HW,
-
-	REFRESH_PROC_DISKSTATS,
-	REFRESH_PROC_PARTITIONS,
 
 	NUM_REFRESHES		/* one more than highest refresh index */
 };
@@ -141,7 +125,7 @@ enum {
 	DISK_INDOM,		/* 1 - disks */
 	LOADAVG_INDOM,		/* 2 - 1, 5, 15 minute load averages */
 	NET_DEV_INDOM,		/* 3 - network interfaces */
-	INTERRUPTS_INDOM,	/* 4 - interrupt lines */
+	PROC_INTERRUPTS_INDOM,	/* 4 - interrupt lines -> proc PMDA */
 	FILESYS_INDOM,		/* 5 - mounted bdev filesystems */
 	SWAPDEV_INDOM,		/* 6 - swap devices */
 	NFS_INDOM,		/* 7 - nfs operations */
@@ -172,9 +156,6 @@ enum {
 	ZONEINFO_INDOM,	        /* 32 - proc zoneinfo */
 	ZONEINFO_PROTECTION_INDOM,	/* 33 - proc zoneinfo protection item */
 	TAPEDEV_INDOM,		/* 34 - tape devices */
-	TTY_INDOM,              /* 35 - serial tty devices */
-	SOFTIRQS_INDOM,		/* 36 - softirqs */
-	PRESSUREAVG_INDOM,	/* 37 - 10, 60, 300 second pressure averages */
 
 	NUM_INDOMS		/* one more than highest numbered cluster */
 };

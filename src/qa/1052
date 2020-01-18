@@ -73,7 +73,7 @@ _filter()
         -e '/[0-9][0-9]:[0-9][0-9]:[0-9][0-9]/s/[^ ]*/TIMESTAMP/' \
 	-e "s;$python_path;\$PCP_PYTHON_PROG;" \
 	-e "s;$python;python;" \
-	-e 's;137.3.[0-9][0-9]*;137.3.ID;' \
+	-e 's;137.3.[0-9]\+;137.3.ID;' \
     #end
 }
 
@@ -102,7 +102,7 @@ cleanup()
 	    $sudo rm -rf ${pmda_saved_config_dir}
 	fi
     fi
-    $sudo rm -rf $tmp $tmp.* json.log
+    $sudo rm -rf $tmp $tmp.*
 }
 
 domain=137
@@ -154,7 +154,7 @@ cat > ${SRC1_METADATA} <<EOF
       "pointer": "/value",
       "type": "integer",
       "description": "Integer value",
-      "semantics": "instantaneous"
+      "semanatics": "instantaneous"
     },
     {
       "name": "counter",
@@ -481,8 +481,6 @@ _drain_output
 
 # Wait for dbpmda to quit.
 wait
-
-cat json.log >>$here/$seq.full
 
 status=0
 exit

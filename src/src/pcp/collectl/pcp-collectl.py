@@ -15,7 +15,7 @@
 
 """System status collector using the libpcp Wrapper module
 
-Additional Information: https://pcp.io
+Additional Information: http://pcp.io
 """
 
 # ignore line too long, missing docstring, method could be a function,
@@ -1016,8 +1016,7 @@ if __name__ == '__main__':
     try:
         i_samples = 0
         while (i_samples < opts.n_samples) or (opts.n_samples == 0):
-            if not replay_archive: # sleep only in live mode
-                pm.pmtimevalSleep(delta)
+            pm.pmtimevalSleep(delta)
             if opts.verbosity != "brief" and len(subsys) > 1:
                 print("\n### RECORD %d >>> %s <<< %s ###" % \
                      (i_samples+1, host, time.strftime("%a %b %d %H:%M:%S %Y")))

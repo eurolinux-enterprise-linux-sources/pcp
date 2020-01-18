@@ -1,6 +1,6 @@
 #
 # Copyright (c) 2000,2003,2004 Silicon Graphics, Inc.  All Rights Reserved.
-# Copyright (c) 2015,2018 Red Hat.
+# Copyright (c) 2015 Red Hat Inc.
 # 
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
@@ -72,8 +72,3 @@ $(VERSION_SCRIPT):
 	$(VERSION_SCRIPT_MAKERULE)
 
 $(LIBTARGET): $(VERSION_SCRIPT)
-
-pmcd.o:	$(TOPDIR)/src/include/pcp/libpcp.h
-
-check:: $(CFILES) $(HFILES)
-	$(CLINT) $^

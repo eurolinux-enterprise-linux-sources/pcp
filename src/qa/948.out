@@ -18,6 +18,7 @@ quit
 Goodbye
 
 === OK case ===
+Waiting for pmcd to terminate ...
 Log for pmlogger on HOST started DATE
 
 Config parsed
@@ -28,17 +29,19 @@ pmlogger: End of run time, exiting
 Log finished DATE
 verifying the archive
 PAGESZ samples:
-    PMID (hinv.pagesize): value PAGESZ
-    PMID (hinv.pagesize): value PAGESZ
-    PMID (hinv.pagesize): value PAGESZ
-    PMID (hinv.pagesize): value PAGESZ
+              PMID (hinv.pagesize): value PAGESZ
+              PMID (hinv.pagesize): value PAGESZ
+              PMID (hinv.pagesize): value PAGESZ
+              PMID (hinv.pagesize): value PAGESZ
 HZ samples:
-    PMID (kernel.all.hz): value HZ
-    PMID (kernel.all.hz): value HZ
-    PMID (kernel.all.hz): value HZ
-    PMID (kernel.all.hz): value HZ
+              PMID (kernel.all.hz): value HZ
+              PMID (kernel.all.hz): value HZ
+              PMID (kernel.all.hz): value HZ
+              PMID (kernel.all.hz): value HZ
 MILLION samples:
-    30.0.13 (sampledso.long.million): value 1000000
-    30.0.13 (sampledso.long.million): value 1000000
-    30.0.13 (sampledso.long.million): value 1000000
-    30.0.13 (sampledso.long.million): value 1000000
+              30.0.13 (sampledso.long.million): value 1000000
+              30.0.13 (sampledso.long.million): value 1000000
+              30.0.13 (sampledso.long.million): value 1000000
+              30.0.13 (sampledso.long.million): value 1000000
+Starting pmcd ... 
+Starting pmlogger ... 

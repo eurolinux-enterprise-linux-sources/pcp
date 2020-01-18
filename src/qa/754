@@ -22,7 +22,6 @@ _cleanup()
     cd $here
     rm -rf $tmp.*
     $sudo rm -f /tmp/unbound-qa.txt	# from test.sh
-    $sudo rm -f unbound.log
 }
 
 status=1	# failure is the default!

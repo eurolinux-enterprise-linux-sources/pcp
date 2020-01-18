@@ -17,6 +17,7 @@
 #include <QApplication>
 #include <QHostAddress>
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 #include "qed_timecontrol.h"
 #include "qed_console.h"
@@ -109,7 +110,6 @@ void QedTimeControl::init(int port, bool live,
     strncpy(my.tzData, (const char *)tzstring.toLatin1(), tzlen+1);
     strncpy(my.tzData + tzlen+1, (const char *)tzlabel.toLatin1(), lablen+1);
 
-    console->post("QedTimeControl::init: port=%d", port);
     if (port < 0) {
 	startTimeServer();
     } else {
@@ -224,8 +224,6 @@ void QedTimeControl::liveCloseConnection()
 {
     my.liveSocket->close();
     my.liveSocket = NULL;
-    if (pmDebugOptions.timecontrol)
-	console->post("QedTimeControl::liveCloseConnection: emit done");
     emit done();
     exit(0);
 }
@@ -234,8 +232,6 @@ void QedTimeControl::archiveCloseConnection()
 {
     my.archiveSocket->close();
     my.archiveSocket = NULL;
-    if (pmDebugOptions.timecontrol)
-	console->post("QedTimeControl::archiveCloseConnection: emit done");
     emit done();
     exit(0);
 }
@@ -369,9 +365,11 @@ void QedTimeControl::protocolMessage(bool live,
 	break;
     }
 
-    if (pmDebugOptions.timecontrol)
-	console->post("QedTimeControl::protocolMessage: recv pos=%f state=%d",
-		  QedApp::timevalToSeconds(packet->position), *state);
+#if DESPERATE
+    console->post(QedConsole::DebugProtocol,
+		  "QedTimeControl::protocolMessage: recv pos=%s state=%d",
+		  timeString(tosec(packet->position)), *state);
+#endif
 
     switch (*state) {
     case QedTimeControl::AwaitingACK:
@@ -400,15 +398,11 @@ void QedTimeControl::protocolMessage(bool live,
 	// and _not_ from the values that we initially sent to it.
 	//
 	memcpy(packet, msg, msg->length);
-	if (pmDebugOptions.timecontrol)
-	    console->post("QedTimeControl::protocolMessage: emit VCRMode(live=%d,<msg>,true)", live);
 	emit VCRMode(live, msg, true);
 	break;
 
     case QedTimeControl::ClientReady:
 	if (msg->command == QmcTime::Step) {
-	    if (pmDebugOptions.timecontrol)
-		console->post("QedTimeControl::protocolMessage: emit step");
 	    emit step(live, msg);
 	    msg->command = QmcTime::ACK;
 	    msg->length = sizeof(QmcTime::Packet);
@@ -423,12 +417,8 @@ void QedTimeControl::protocolMessage(bool live,
 	} else if (msg->command == QmcTime::VCRMode ||
 		   msg->command == QmcTime::VCRModeDrag ||
 		   msg->command == QmcTime::Bounds) {
-	    if (pmDebugOptions.timecontrol)
-		console->post("QedTimeControl::protocolMessage: emit VCRMode(live=%d,Drag)", live);
 	    emit VCRMode(live, msg, msg->command == QmcTime::VCRModeDrag);
 	} else if (msg->command == QmcTime::TZ) {
-	    if (pmDebugOptions.timecontrol)
-		console->post("QedTimeControl::protocolMessage: emit timeZone(live=%d,%s)", live, (char *)msg->data);
 	    emit timeZone(live, msg, (char *)msg->data);
 	}
 	break;

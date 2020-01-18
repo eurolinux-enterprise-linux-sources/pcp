@@ -20,7 +20,7 @@ use lib dirname (__FILE__);
 use Test::More;
 use Test::Magpie;
 
-use PCP::Queue;
+use Queue;
 
 BEGIN {
     plan(tests => 2)

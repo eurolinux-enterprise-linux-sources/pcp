@@ -63,5 +63,3 @@ domain.h: ../../pmns/stdpmid
 rpm.o: rpm.h
 rpm.o timer.o: timer.h
 rpm.o: $(VERSION_SCRIPT)
-
-rpm.o:	$(TOPDIR)/src/include/pcp/libpcp.h

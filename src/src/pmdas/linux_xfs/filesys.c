@@ -16,6 +16,7 @@
  */
 
 #include "pmapi.h"
+#include "impl.h"
 #include "pmda.h"
 #include "filesys.h"
 #include "sysfs_xfs.h"

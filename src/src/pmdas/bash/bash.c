@@ -93,7 +93,7 @@ check_processes(int context)
 
 static int
 bash_instance(pmInDom indom, int inst, char *name,
-		pmInResult **result, pmdaExt *pmda)
+		__pmInResult **result, pmdaExt *pmda)
 {
     check_processes(pmda->e_context);
     return pmdaInstance(indom, inst, name, result, pmda);
@@ -149,7 +149,7 @@ bash_trace_parser(bash_process_t *bash, bash_trace_t *trace,
 	    trace->flags |= PM_EVENT_FLAG_START;
 
 	if (pmDebugOptions.appl0)
-	    pmNotifyErr(LOG_DEBUG,
+	    __pmNotifyErr(LOG_DEBUG,
 		"event parsed: flags: %x time: %d line: %d func: '%s' cmd: '%s'",
 		trace->flags, time, trace->line, trace->function, trace->command);
     }
@@ -167,7 +167,7 @@ bash_trace_decoder(int eventarray,
     int			sts, count = 0;
 
     if (pmDebugOptions.appl0)
-	pmNotifyErr(LOG_DEBUG, "bash_trace_decoder[%ld bytes]", (long)size);
+	__pmNotifyErr(LOG_DEBUG, "bash_trace_decoder[%ld bytes]", (long)size);
 
     if (bash_trace_parser(process, &trace, timestamp, (const char *)buffer, size))
 	return 0;
@@ -223,12 +223,13 @@ bash_trace_decoder(int eventarray,
 static int
 bash_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 {
+    __pmID_int		*idp = (__pmID_int *)&(mdesc->m_desc.pmid);
     bash_process_t	*bp;
 
-    if (pmID_cluster(mdesc->m_desc.pmid) != 0)
+    if (idp->cluster != 0)
 	return PM_ERR_PMID;
 
-    switch (pmID_item(mdesc->m_desc.pmid)) {
+    switch (idp->item) {
     case bash_xtrace_maxmem:
 	atom->ull = (unsigned long long)bash_maxmem;
 	return PMDA_FETCH_STATIC;
@@ -244,7 +245,7 @@ bash_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	pmdaCacheLookup(indoms[BASH_INDOM].it_indom, inst, NULL, (void **)&bp))
 	return PM_ERR_INST;
 
-    switch (pmID_item(mdesc->m_desc.pmid)) {
+    switch (idp->item) {
     case bash_xtrace_numclients:
 	return pmdaEventQueueClients(bp->queueid, atom);
     case bash_xtrace_queuemem:
@@ -262,14 +263,15 @@ bash_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 static int
 bash_store_metric(pmValueSet *vsp, int context)
 {
+    __pmID_int	*idp = (__pmID_int *)&vsp->pmid;
     pmInDom	processes = indoms[BASH_INDOM].it_indom;
     int		sts;
 
-    if (pmID_cluster(vsp->pmid) != 0 || pmID_item(vsp->pmid) != bash_xtrace_records)
+    if (idp->cluster != 0 || idp->item != bash_xtrace_records)
 	return PM_ERR_PERMISSION;
 
     if (pmDebugOptions.appl0)
-	pmNotifyErr(LOG_DEBUG, "bash_store_metric walking bash set");
+	__pmNotifyErr(LOG_DEBUG, "bash_store_metric walking bash set");
 
     pmdaCacheOp(processes, PMDA_CACHE_WALK_REWIND);
     while ((sts = pmdaCacheOp(processes, PMDA_CACHE_WALK_NEXT)) != -1) {
@@ -280,8 +282,8 @@ bash_store_metric(pmValueSet *vsp, int context)
 	if ((sts = pmdaEventSetAccess(context, bp->queueid, 1)) < 0)
 	    return sts;
 	if (pmDebugOptions.appl0)
-            pmNotifyErr(LOG_DEBUG,
-			"Access granted client=%d bash=%" FMT_PID " queueid=%d",
+            __pmNotifyErr(LOG_DEBUG,
+			"Access granted client=%d bash=%d queueid=%d",
                         context, bp->pid, bp->queueid);
     }
     return 0;
@@ -295,12 +297,12 @@ bash_store(pmResult *result, pmdaExt *pmda)
 
     check_processes(context);
     if (pmDebugOptions.appl0)
-	pmNotifyErr(LOG_DEBUG, "bash_store called (%d)", result->numpmid);
+	__pmNotifyErr(LOG_DEBUG, "bash_store called (%d)", result->numpmid);
     for (i = 0; i < result->numpmid; i++) {
 	pmValueSet	*vsp = result->vset[i];
 
 	if (pmDebugOptions.appl0)
-	    pmNotifyErr(LOG_DEBUG, "bash_store_metric called");
+	    __pmNotifyErr(LOG_DEBUG, "bash_store_metric called");
 	if ((sts = bash_store_metric(vsp, context)) < 0)
 	    return sts;
     }
@@ -333,7 +335,7 @@ bash_main(pmdaInterface *dispatch)
 
     /* arm interval timer */
     if (__pmAFregister(&bash_interval, NULL, timer_expired) < 0) {
-	pmNotifyErr(LOG_ERR, "registering event interval handler");
+	__pmNotifyErr(LOG_ERR, "registering event interval handler");
 	exit(1);
     }
 
@@ -341,11 +343,11 @@ bash_main(pmdaInterface *dispatch)
 	memcpy(&readyfds, &fds, sizeof(readyfds));
 	nready = select(maxfd+1, &readyfds, NULL, NULL, NULL);
 	if (pmDebugOptions.appl2)
-            pmNotifyErr(LOG_DEBUG, "select: nready=%d interval=%d",
+            __pmNotifyErr(LOG_DEBUG, "select: nready=%d interval=%d",
                           nready, bash_interval_expired);
 	if (nready < 0) {
 	    if (neterror() != EINTR) {
-		pmNotifyErr(LOG_ERR, "select failure: %s", netstrerror());
+		__pmNotifyErr(LOG_ERR, "select failure: %s", netstrerror());
 		exit(1);
 	    } else if (!bash_interval_expired) {
 		continue;
@@ -355,13 +357,13 @@ bash_main(pmdaInterface *dispatch)
 	__pmAFblock();
 	if (nready > 0 && FD_ISSET(pmcdfd, &readyfds)) {
 	    if (pmDebugOptions.appl0)
-		pmNotifyErr(LOG_DEBUG, "processing pmcd PDU [fd=%d]", pmcdfd);
+		__pmNotifyErr(LOG_DEBUG, "processing pmcd PDU [fd=%d]", pmcdfd);
 	    if (__pmdaMainPDU(dispatch) < 0) {
 		__pmAFunblock();
 		exit(1);        /* fatal if we lose pmcd */
 	    }
 	    if (pmDebugOptions.appl0)
-		pmNotifyErr(LOG_DEBUG, "completed pmcd PDU [fd=%d]", pmcdfd);
+		__pmNotifyErr(LOG_DEBUG, "completed pmcd PDU [fd=%d]", pmcdfd);
 	}
 	if (bash_interval_expired) {
 	    bash_interval_expired = 0;
@@ -375,7 +377,7 @@ void
 bash_init(pmdaInterface *dp)
 {
     if (username)
-	pmSetProcessIdentity(username);
+	__pmSetProcessIdentity(username);
 
     if (dp->status != 0)
 	return;
@@ -420,15 +422,15 @@ main(int argc, char **argv)
     char		*endnum;
     pmdaInterface	desc;
     long		minmem;
-    int			c, sep = pmPathSeparator();
+    int			c, sep = __pmPathSeparator();
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     minmem = getpagesize();
     bash_maxmem = (minmem > DEFAULT_MAXMEM) ? minmem : DEFAULT_MAXMEM;
     pmsprintf(helppath, sizeof(helppath), "%s%c" "bash" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-    pmdaDaemon(&desc, PMDA_INTERFACE_5, pmGetProgname(), BASH, "bash.log", helppath);
+    pmdaDaemon(&desc, PMDA_INTERFACE_5, pmProgname, BASH, "bash.log", helppath);
 
     while ((c = pmdaGetOptions(argc, argv, &opts, &desc)) != EOF) {
 	switch (c) {
@@ -438,7 +440,7 @@ main(int argc, char **argv)
 		convertUnits(&endnum, &bash_maxmem);
 	    if (*endnum != '\0' || bash_maxmem < minmem) {
 		pmprintf("%s: invalid max memory '%s' (min=%ld)\n",
-			    pmGetProgname(), opts.optarg, minmem);
+			    pmProgname, opts.optarg, minmem);
 		opts.errors++;
 	    }
 	    break;
@@ -446,7 +448,7 @@ main(int argc, char **argv)
 	case 's':
 	    if (pmParseInterval(opts.optarg, &bash_interval, &endnum) < 0) {
 		pmprintf("%s: -s requires a time interval: %s\n",
-			 pmGetProgname(), endnum);
+			 pmProgname, endnum);
 		free(endnum);
 		opts.errors++;
 	    }

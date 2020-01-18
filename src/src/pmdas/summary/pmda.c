@@ -14,7 +14,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "pmda.h"
 #include <sys/stat.h>
 #include "summary.h"
@@ -29,7 +29,7 @@ int
 main(int argc, char **argv)
 {
     int			errflag = 0;
-    int			sep = pmPathSeparator();
+    int			sep = __pmPathSeparator();
     char		**commandArgv;
     pmdaInterface	dispatch;
     int			i;
@@ -40,13 +40,13 @@ main(int argc, char **argv)
     char		*command = NULL;
     char		*username;
 
-    pmSetProgname(argv[0]);
-    pmGetUsername(&username);
+    __pmSetProgname(argv[0]);
+    __pmGetUsername(&username);
     __pmSetInternalState(PM_STATE_PMCS);  /* we are below the PMAPI */
 
     pmsprintf(helpfile, sizeof(helpfile), "%s%c" "summary" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-    pmdaDaemon (&dispatch, PMDA_INTERFACE_2, pmGetProgname(), SYSSUMMARY,
+    pmdaDaemon (&dispatch, PMDA_INTERFACE_2, pmProgname, SYSSUMMARY,
 		"summary.log", helpfile);
 
     while ((c = pmdaGetOpt(argc, argv, "H:h:D:d:l:U:",
@@ -72,7 +72,7 @@ main(int argc, char **argv)
     }
     if (len == 0) {
 	fprintf(stderr, "%s: a command must be given after the options\n",
-		pmGetProgname());
+		pmProgname);
 	errflag++;
     }
     else {
@@ -88,7 +88,7 @@ main(int argc, char **argv)
 
     if (errflag) {
 	fprintf(stderr, "Usage: %s [options] command [arg ...]\n\n",
-		pmGetProgname());
+		pmProgname);
 	fputs("Options:\n"
 	      "  -h helpfile    help text file\n"
 	      "  -d domain      use domain (numeric) for metrics domain of PMDA\n"
@@ -102,7 +102,7 @@ main(int argc, char **argv)
     pmdaOpenLog(& dispatch);
 
     /* switch to alternate user account now */
-    pmSetProcessIdentity(username);
+    __pmSetProcessIdentity(username);
 
     /* initialize */
     summary_init(&dispatch);
@@ -145,7 +145,7 @@ main(int argc, char **argv)
     cmdpipe = clientPipe[0]; /* parent/agent reads from here */
     __pmSetVersionIPC(cmdpipe, PDU_VERSION2);
 
-    summaryMainLoop(pmGetProgname(), cmdpipe, &dispatch);
+    summaryMainLoop(pmProgname, cmdpipe, &dispatch);
 
     summary_done();
     exit(0);

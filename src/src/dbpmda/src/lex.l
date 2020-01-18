@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013,2017 Red Hat.
+ * Copyright (c) 2013 Red Hat.
  * Copyright (c) 1995-2003 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -15,9 +15,10 @@
 
 %{
 #include "pmapi.h"
+#include "impl.h"
 
-static int lineno;
-static int using_readline;
+static int lineno = 0;
+static int using_readline = 0;
 
 #include "./lex.h"
 
@@ -66,12 +67,9 @@ attr		{ return ATTR; }
 attribute	{ return ATTR; }
 children	{ return PMNS_CHILDREN; }
 close		{ return CLOSE; }
-cluster		{ return CLUSTER; }
-context		{ return CTXT; }
 debug		{ return DBG; }
 delete		{ return DEL; }
 desc		{ return DESC; }
-domain		{ return DOMAIN; }
 dso		{ BEGIN FNAME; return DSO; }
 exit		{ return QUIT; }
 fetch		{ return FETCH; }
@@ -80,10 +78,7 @@ help		{ return HELP; }
 indom		{ return INDOM; }
 inet		{ return INET; }
 instance	{ return INSTANCE; }
-instances	{ return INSTANCES; }
 ipv6		{ return IPV6; }
-item		{ return ITEM; }
-label		{ return LABEL; }
 name		{ return PMNS_NAME; }
 namespace	{ BEGIN FNAME; return NAMESPACE; }
 none		{ return NONE; }
@@ -196,10 +191,10 @@ watch		{ BEGIN FNAME; return WATCH; }
 #include <fcntl.h>
 
 static char	*prompt = "dbpmda";
-static char	*line;
+static char	*line = NULL;
 static int	lastc = '\n';
-static int	linepos;
-static int	linelen;
+static int	linepos = 0;
+static int	linelen = 0;
 static int	mark = -1;
 
 extern char	*configfile;
@@ -211,7 +206,7 @@ extern int	iflag;
 #ifdef FLEX_SCANNER
 
 static int
-dbpmdaGetc(char * inbuf)
+dbpmdaGetc (char * inbuf)
 {
     int inch;
 
@@ -284,7 +279,7 @@ done:
 }
 
 static int 
-dbpmdaFlexInput(char * inbuf, int ms)
+dbpmdaFlexInput (char * inbuf, int ms)
 {
     static FILE * inf = NULL;
     static int first = 1;
@@ -334,7 +329,7 @@ dbpmdaFlexInput(char * inbuf, int ms)
     if (linepos == linelen) {
 	linelen = (linelen) ? linelen * 2 : 128;
 	if ((line = (char *)realloc(line, linelen * sizeof(char))) == NULL) {
-	    fprintf(stderr, "%s: Lexer internal error\n", pmGetProgname());
+	    fprintf(stderr, "%s: Lexer internal error\n", pmProgname);
 	    exit(1);
 	}
     }
@@ -403,13 +398,13 @@ input(void)
 	    }
 	}
     }
-
+	
     if (peekc) {
 	lastc = peekc;
 	peekc = '\0';
 	return lastc;
     }
-
+	
   again:
     if (lastc == '\n' || first) {
 	if (iflag) {
@@ -500,7 +495,7 @@ locateError(void)
 
     if (mark < 0) {
 	fprintf(stderr, "%s: Unrecoverable internal error in locateError()\n",
-		pmGetProgname());
+		pmProgname);
 	exit(1);
     }
 
@@ -623,4 +618,6 @@ yyerror(const char *s)
 	fprintf(stderr, 
 	"Error [%s, line %d]: %s\nType 'help' for a list of commands.\n",
 		configfile, lineno, s);
+
+
 }

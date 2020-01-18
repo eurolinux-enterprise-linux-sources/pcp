@@ -8,6 +8,7 @@
 #include <sys/time.h>
 #include <pthread.h>
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 /*
  * do iter host cycles and 10*iter archive cycles
@@ -76,23 +77,6 @@ archworker(void *x)
     return NULL;
 }
 
-static void
-wait_for_thread(char *name, pthread_t tid)
-{
-    int		sts;
-    char	*msg;
-
-    sts = pthread_join(tid, (void *)&msg);
-    if (sts == 0) {
-	if (msg == PTHREAD_CANCELED)
-	    printf("thread %s: pthread_join: cancelled?\n", name);
-	else if (msg != NULL)
-	    printf("thread %s: pthread_join: %s\n", name, msg);
-    }
-    else
-	printf("thread %s: pthread_join: error: %s\n", name, strerror(sts));
-}
-
 int
 main(int argc, char *argv[])
 {
@@ -101,7 +85,7 @@ main(int argc, char *argv[])
     int c;
     pthread_t p1, p2;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:i:?")) != EOF) {
 	switch (c) {
@@ -109,7 +93,7 @@ main(int argc, char *argv[])
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -126,14 +110,14 @@ main(int argc, char *argv[])
     }
 
     if (errflag || optind != argc-2) {
-    	fprintf(stderr, "Usage: %s [-D...] [-i iter] hostname archivename\n", pmGetProgname());
+    	fprintf(stderr, "Usage: %s [-D...] [-i iter] hostname archivename\n", pmProgname);
 	exit(1);
     }
 
     pthread_create(&p1, NULL, &liveworker, argv[optind]);
     pthread_create(&p2, NULL, &archworker, argv[optind+1]);
-    wait_for_thread("p2", p2);
-    wait_for_thread("p1", p1);
+    pthread_join(p2, NULL);
+    pthread_join(p1, NULL);
 
     /* success, if we don't abort first! */
     printf("SUCCESS\n");

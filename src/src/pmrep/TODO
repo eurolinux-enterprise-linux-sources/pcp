@@ -1,19 +1,22 @@
--  add labels support [-m/-M]
-
 -  comment, clean up, optimize code
--  drop RHEL 6 / Python 2.6 support around RHEL 6 EOL (ca. 2020)
--  drop RHEL 7 / Python 2.x support around RHEL 7 EOL (ca. 2024)
 
--  includedir config file support (?)
--  copy directive conf file support (?)
--  generalized zabbix_interval (write to target in batches) (?)
+-  -Q/-B/-Y/-R/-W to override per-metric settings
+
+-  opt to support pmdumptext -X like output (or shorten inst names if needed) [-g]
+-  opt to output in short format (see pmdumptext -F/-G / pmNumberStr) [-m/-M]
+-  handle too wide unit display (like count/s when width is 5) if needed
+
+-  per-metric precision support (?)
+-  (re)add runtime directive to config file (?)
+-  generalized zabbix_interval (limit writes to target) (?)
 
 -----
 
-In use cmd line options:
-0123456789AaBbCcDdEeFfGgHhIiJjKkLlNnOoPpQqRrSsTtUuVvWwXxYyZz
+In use / reserved cmd line options:
+AaBbCcDdEeFfGgHhIiKkLlOoPpQqRrSsTtUuVvWwXxYyZz
 
-Reserved:
+Tentatively planned:
 Mm
 
 Available:
+JjNn

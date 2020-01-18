@@ -1,16 +1,12 @@
 cpu/GNUmakefile
 disk/GNUmakefile
 filesystem/GNUmakefile
-gfs2/GNUmakefile
 kernel/GNUmakefile
-kvm/GNUmakefile
-libvirt/GNUmakefile
 memory/GNUmakefile
 networking/GNUmakefile
 platform/GNUmakefile
 sgi/GNUmakefile
 sqlserver/GNUmakefile
-storage/GNUmakefile
-tools/GNUmakefile
 v1.0/GNUmakefile
+tools/GNUmakefile
 zeroconf/GNUmakefile

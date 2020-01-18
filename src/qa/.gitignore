@@ -16,7 +16,6 @@ big1.*
 661.png
 check.out
 check.log
-check.callback
 pmlogger.log
 webapi-pmcd-*
 webapi-webd-*
@@ -26,7 +25,6 @@ localconfig.h
 qa_hosts
 qa_outfiles
 rc_cron_check.clean
-stap_*.ko
 sudo
 008.out
 012.out
@@ -64,7 +62,6 @@ sudo
 375.out
 419.out
 422.out
-451.out
 480.out
 501.out
 519.out
@@ -88,4 +85,3 @@ sudo
 926.out
 944.out
 1051.out
-1067.out

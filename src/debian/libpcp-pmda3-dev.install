@@ -57,9 +57,6 @@ usr/share/man/man3/pmdaEventReleaseArray.3.gz
 usr/share/man/man3/pmdaEventReleaseHighResArray.3.gz
 usr/share/man/man3/pmdaEventResetArray.3.gz
 usr/share/man/man3/pmdaEventResetHighResArray.3.gz
-usr/share/man/man3/pmdaExtGetData.3.gz
-usr/share/man/man3/pmdaExtSetData.3.gz
-usr/share/man/man3/pmdaExtSetFlags.3.gz
 usr/share/man/man3/pmdafetch.3.gz
 usr/share/man/man3/pmdaFetch.3.gz
 usr/share/man/man3/pmdaGetContext.3.gz
@@ -75,8 +72,6 @@ usr/share/man/man3/pmdainstance.3.gz
 usr/share/man/man3/pmdaInstance.3.gz
 usr/share/man/man3/pmdainterfacemoved.3.gz
 usr/share/man/man3/pmdaInterfaceMoved.3.gz
-usr/share/man/man3/pmdalabel.3.gz
-usr/share/man/man3/pmdaLabel.3.gz
 usr/share/man/man3/pmdamain.3.gz
 usr/share/man/man3/pmdaMain.3.gz
 usr/share/man/man3/pmdaname.3.gz
@@ -98,16 +93,11 @@ usr/share/man/man3/pmdaRootProcessStart.3.gz
 usr/share/man/man3/pmdaRootProcessTerminate.3.gz
 usr/share/man/man3/pmdaRootProcessWait.3.gz
 usr/share/man/man3/pmdaRootShutdown.3.gz
-usr/share/man/man3/pmdasenderror.3.gz
-usr/share/man/man3/pmdaSendError.3.gz
 usr/share/man/man3/pmdaSetCheckCallBack.3.gz
-usr/share/man/man3/pmdaSetCommFlags.3.gz
-usr/share/man/man3/pmdaSetData.3.gz
 usr/share/man/man3/pmdaSetDoneCallBack.3.gz
 usr/share/man/man3/pmdaSetEndContextCallBack.3.gz
 usr/share/man/man3/pmdaSetFetchCallBack.3.gz
 usr/share/man/man3/pmdaSetFlags.3.gz
-usr/share/man/man3/pmdaSetLabelCallBack.3.gz
 usr/share/man/man3/pmdaSetResultCallBack.3.gz
 usr/share/man/man3/pmdastore.3.gz
 usr/share/man/man3/pmdaStore.3.gz

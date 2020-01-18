@@ -1,7 +1,7 @@
 # pylint: disable=C0103
 """Wrapper module for libpcp_pmda - Performace Co-Pilot Domain Agent API
 #
-# Copyright (C) 2013-2015,2017-2018 Red Hat.
+# Copyright (C) 2013-2015,2017 Red Hat.
 #
 # This file is part of the "pcp" module, the python interfaces for the
 # Performance Co-Pilot toolkit.
@@ -25,7 +25,7 @@ import os
 import cpmapi
 import cpmda
 from pcp.pmapi import pmContext as PCP
-from pcp.pmapi import pmInDom, pmDesc, pmUnits, pmErr, pmLabelSet
+from pcp.pmapi import pmInDom, pmDesc, pmUnits, pmErr
 
 from ctypes.util import find_library
 from ctypes import CDLL, c_int, c_long, c_char_p, c_void_p, cast, byref
@@ -58,23 +58,6 @@ LIBPCP_PMDA.pmdaCacheOp.argtypes = [pmInDom, c_long]
 LIBPCP_PMDA.pmdaCacheResize.restype = c_int
 LIBPCP_PMDA.pmdaCacheResize.argtypes = [pmInDom, c_int]
 
-LIBPCP_PMDA.pmdaAddLabels.restype = c_int
-LIBPCP_PMDA.pmdaAddLabels.argtypes = [POINTER(POINTER(pmLabelSet)), c_char_p]
-LIBPCP_PMDA.pmdaAddLabelFlags.restype = c_int
-LIBPCP_PMDA.pmdaAddLabelFlags.argtypes = [POINTER(pmLabelSet), c_int]
-
-def pmdaAddLabels(label):
-    result_p = POINTER(pmLabelSet)()
-    status = LIBPCP_PMDA.pmdaAddLabels(byref(result_p), label)
-    if status < 0:
-        raise pmErr(status)
-    return result_p
-
-def pmdaAddLabelFlags(labels, flags):
-    status = LIBPCP_PMDA.pmdaAddLabelFlags(labels, flags)
-    if status < 0:
-        raise pmErr(status)
-    return status
 
 ##
 # Definition of structures used by C library libpcp_pmda, derived from <pcp/pmda.h>
@@ -359,9 +342,9 @@ class MetricDispatch(object):
             replacement = pmdaIndom(it_indom, insts)
         # list indoms need to keep the table up-to-date for libpcp_pmda
         if (isinstance(insts, list)):
-            for i in range(len(self._indomtable)):  # _indomtable is persistently shared with pmda.c
-                if (self._indomtable[i].it_indom == it_indom):
-                    self._indomtable[i] = replacement # replace in place
+            for entry in self._indomtable:
+                if (entry.it_indom == it_indom):
+                    entry = replacement
                     break
         self._indoms[it_indom] = replacement
 
@@ -386,17 +369,6 @@ class MetricDispatch(object):
         """
         entry = self._indoms[indom]
         return entry.inst_name_lookup(instance)
-
-    def pmid_name_lookup(self, cluster, item):
-        """
-        Lookup the name associated with a performance metric identifier.
-        """
-        try:
-            name = self._metric_names[self.pmid(cluster, item)]
-        except KeyError:
-            name = None
-        return name
-
 
 class PMDA(MetricDispatch):
     """ Defines a PCP performance metrics domain agent
@@ -423,15 +395,12 @@ class PMDA(MetricDispatch):
     ##
     # overloads
 
-    def __init__(self, name, domain, logfile=None, helpfile=None):
+    def __init__(self, name, domain):
         self._name = name
         self._domain = domain
-        if not logfile:
-            # note: logfile == "-" is special, see pmOpenLog(3).
-            logfile = name + '.log'
+        logfile = name + '.log'
         pmdaname = 'pmda' + name
-        if not helpfile:
-            helpfile = '%s/%s/help' % (PCP.pmGetConfig('PCP_PMDAS_DIR'), name)
+        helpfile = '%s/%s/help' % (PCP.pmGetConfig('PCP_PMDAS_DIR'), name)
         MetricDispatch.__init__(self, domain, pmdaname, logfile, helpfile)
 
 
@@ -460,18 +429,6 @@ class PMDA(MetricDispatch):
         if indent:
             print('}')
 
-    def pmda_notready(self):
-        """
-        Tell PMCD the PMDA is not ready to process requests.
-        """
-        cpmda.pmda_notready()
-
-    def pmda_ready(self):
-        """
-        Tell PMCD the PMDA is ready to process requests.
-        """
-        cpmda.pmda_ready()
-
     def run(self):
         """
         All the real work happens herein; we can be called in one of three
@@ -498,10 +455,6 @@ class PMDA(MetricDispatch):
         return cpmda.set_fetch(fetch)
 
     @staticmethod
-    def set_label(label):
-        return cpmda.set_label(label)
-
-    @staticmethod
     def set_refresh(refresh):
         return cpmda.set_refresh(refresh)
 
@@ -512,10 +465,6 @@ class PMDA(MetricDispatch):
     @staticmethod
     def set_fetch_callback(fetch_callback):
         return cpmda.set_fetch_callback(fetch_callback)
-
-    @staticmethod
-    def set_label_callback(label_callback):
-        return cpmda.set_label_callback(label_callback)
 
     @staticmethod
     def set_store_callback(store_callback):
@@ -530,10 +479,6 @@ class PMDA(MetricDispatch):
         return cpmda.set_refresh_metrics(refresh_metrics)
 
     @staticmethod
-    def set_notify_change():
-        cpmda.set_notify_change()
-
-    @staticmethod
     def set_user(username):
         return cpmapi.pmSetProcessIdentity(username)
 
@@ -542,16 +487,8 @@ class PMDA(MetricDispatch):
         return cpmda.pmda_pmid(cluster, item)
 
     @staticmethod
-    def pmid_build(domain, cluster, item):
-        return cpmda.pmid_build(domain, cluster, item)
-
-    @staticmethod
     def indom(serial):
         return cpmda.pmda_indom(serial)
-
-    @staticmethod
-    def indom_build(domain, serial):
-        return cpmda.indom_build(domain, serial)
 
     @staticmethod
     def units(dim_space, dim_time, dim_count, scale_space, scale_time, scale_count):
@@ -568,3 +505,16 @@ class PMDA(MetricDispatch):
     @staticmethod
     def err(message):
         return cpmda.pmda_err(message)
+
+# Other methods perl API provides:
+#    add_timer()
+#    add_pipe()
+#    add_tail()
+#    add_sock()
+#    put_sock()
+#    set_inet_socket
+#    set_ipv6_socket
+#    set_unix_socket
+#    pmda_pmid_name(cluster,item)
+#    pmda_pmid_text(cluster,item)
+#

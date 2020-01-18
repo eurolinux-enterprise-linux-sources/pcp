@@ -25,5 +25,3 @@ ifeq "$(ENABLE_QT)" "true"
 endif
 
 include $(BUILDRULES)
-
-qmc_indom.o:	$(TOPDIR)/src/include/pcp/libpcp.h

@@ -3,7 +3,7 @@
 #
 # Copyright (c) 1995-2001,2003 Silicon Graphics, Inc.  All Rights Reserved.
 # Portions Copyright (c) 2008 Aconex.  All Rights Reserved.
-# Portions Copyright (c) 2013-2016,2018 Red Hat.
+# Portions Copyright (c) 2013-2016 Red Hat.
 # 
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
@@ -21,7 +21,7 @@
 tmp=`mktemp -d $PCP_TMPFILE_DIR/pmdaproc.XXXXXXXXX` || exit 1
 __tmp=$tmp	# (preserve backward compatibility)
 status=0
-trap "rm -rf $tmp $tmp.*; exit \$status" 0 1 2 3 15
+trap "rm -rf $tmp; exit \$status" 0 1 2 3 15
 prog=`basename $0`
 
 _setup_platform()
@@ -105,7 +105,7 @@ __wait_for_pmcd()
 {
     # 60 seconds default seems like a reasonable max time to get going
     [ -z "$__can_wait" ] && __can_wait=${1-60}
-    if $PCP_BINADM_DIR/pmcd_wait -t $__can_wait
+    if pmcd_wait -t $__can_wait
     then
 	__pmcd_is_dead=false	# should be set already, force it anyway
     else
@@ -165,7 +165,7 @@ __sighup_pmcd()
     __sts=1
     for __delay in 0.01 0.05 0.1 0.15 0.25 0.5 1 2
     do
-	$PCP_BINADM_DIR/pmsleep $__delay
+	pmsleep $__delay
 	__sighups=-1
 	eval `pmprobe -v pmcd.sighups 2>/dev/null \
 	      | $PCP_AWK_PROG '{ printf "__sighups=%d\n", $3 }'`
@@ -178,7 +178,7 @@ __sighup_pmcd()
     # now configurable delay for $signal_delay while pmcd actually
     # does post-SIGHUP work
     #
-    $PCP_BINADM_DIR/pmsleep $signal_delay
+    pmsleep $signal_delay
     return $__sts
 }
 
@@ -259,7 +259,7 @@ END					{ exit status }'
 	then
 	    pmsignal -s $__sig $__pids >/dev/null 2>&1
 	    # allow signal processing to be done
-	    $PCP_BINADM_DIR/pmsleep $signal_delay
+	    pmsleep $signal_delay
 	else
 	    break
 	fi
@@ -411,7 +411,7 @@ __check_root()
     else
 	if [ "X$ROOT" != X -a "X$ROOT" != X/ ]
 	then
-	    echo "$prog: \$ROOT was set to \"$ROOT\""
+	    echo "Install: \$ROOT was set to \"$ROOT\""
 	    echo "          Use -R rootdir to install somewhere other than /"
 	    status=1
 	    exit
@@ -433,7 +433,7 @@ __check_domain()
     then
 	__infile=domain.h.python
     else
-	echo "$prog: cannot find domain.h (or similar) to determine the Performance Metrics Domain"
+	echo "Install: cannot find domain.h (or similar) to determine the Performance Metrics Domain"
 	status=1
 	exit
     fi
@@ -460,7 +460,7 @@ __check_domain()
     fi
     if [ "X$domain" = X ]
     then
-	echo "$prog: cannot determine the Performance Metrics Domain from $__infile"
+	echo "Install: cannot determine the Performance Metrics Domain from $__infile"
 	status=1
 	exit
     fi
@@ -644,6 +644,45 @@ _choose_configfile()
     fi
 
     configfile=$__choice
+}
+
+# choose correct PMDA installation mode
+#
+# make sure we are installing in the correct style of configuration
+#
+__choose_mode()
+{
+    __def=m
+    $do_pmda && __def=b
+    echo \
+'You will need to choose an appropriate configuration for installation of
+the "'$iam'" Performance Metrics Domain Agent (PMDA).
+
+  collector	collect performance statistics on this system
+  monitor	allow this system to monitor local and/or remote systems
+  both		collector and monitor configuration for this system
+'
+    while true
+    do
+	$PCP_ECHO_PROG $PCP_ECHO_N 'Please enter c(ollector) or m(onitor) or b(oth) ['$__def'] '"$PCP_ECHO_C"
+	read ans
+	$__echo && echo "$ans"
+	case "$ans"
+	in
+	    "")	break
+		    ;;
+	    c|collector|b|both)
+		    do_pmda=true
+		    break
+		    ;;
+	    m|monitor)
+		    do_pmda=false
+		    break
+		    ;;
+	    *)	echo "Sorry, that is not acceptable response ..."
+		    ;;
+	esac
+    done
 }
 
 # choose an IPC method
@@ -877,9 +916,11 @@ _setup()
     case $prog
     in
 	*Install*)
-	    # Check that $ROOT is not set
+	    # Check that $ROOT is not set, we have a default domain value and
+	    # choose the installation mode (collector, monitor or both)
 	    #
 	    __check_root
+	    __choose_mode
 	    ;;
     esac
 }
@@ -928,196 +969,212 @@ _install()
 	exit
     fi
 
-    if $dso_opt || $perl_opt || $python_opt || $daemon_opt
+    if $do_pmda
     then
-	:
-    else
-	echo 'Botch: must set at least one of $dso_opt, $perl_opt, $python_opt or $daemon_opt to "true"'
-	status=1
-	exit
-    fi
-    if $daemon_opt
-    then
-	if $pipe_opt || $socket_opt
+	if $dso_opt || $perl_opt || $python_opt || $daemon_opt
 	then
 	    :
 	else
-	    echo 'Botch: must set at least one of $pipe_opt or $socket_opt to "true"'
+	    echo 'Botch: must set at least one of $dso_opt, $perl_opt, $python_opt or $daemon_opt to "true"'
 	    status=1
 	    exit
 	fi
-    fi
-
-    # Select a PMDA style (dso/perl/python/deamon), and for daemons the
-    # IPC method for communication between PMCD and the PMDA.
-    #
-    pmda_options=''
-    pmda_default_option=''
-    pmda_multiple_options=false
-
-    if $dso_opt
-    then
-	pmda_options="dso"
-	pmda_default_option="dso"
-    fi
-    if $perl_opt
-    then
-	pmda_default_option="perl"
-	if test -n "$pmda_options"
+	if $daemon_opt
 	then
-	    pmda_options="perl or $pmda_options"
-	    pmda_multiple_options=true
-	else
-	    pmda_options="perl"
-	fi
-    fi
-    if $python_opt
-    then
-	pmda_default_option="python"
-	if test -n "$pmda_options"
-	then
-	    pmda_options="python or $pmda_options"
-	    pmda_multiple_options=true
-	else
-	    pmda_options="python"
-	fi
-    fi
-    if $daemon_opt
-    then
-	pmda_default_option="daemon"
-	if test -n "$pmda_options"
-	then
-	    pmda_options="daemon or $pmda_options"
-	    pmda_multiple_options=true
-	else
-	    pmda_options="daemon"
-	fi
-    fi
-
-    pmda_type="$pmda_default_option"
-    if $pmda_multiple_options
-    then
-	while true
-	do
-	    $PCP_ECHO_PROG $PCP_ECHO_N "Install $iam as a $pmda_options agent? [$pmda_default_option] ""$PCP_ECHO_C"
-	    read pmda_type
-	    $__echo && echo "$pmda_type"
-	    if [ "X$pmda_type" = Xdaemon -o "X$pmda_type" = X ]
+	    if $pipe_opt || $socket_opt
 	    then
-		pmda_type=daemon
-		break
-	    elif [ "X$pmda_type" = Xdso ]
-	    then
-		break
-	    elif [ "X$pmda_type" = Xperl ]
-	    then
-		perl -e 'use PCP::PMDA' >$tmp/out 2>&1
-		if test $? -ne 0
-		then
-		    cat $tmp/out
-		    echo 'Perl PCP::PMDA module is not installed, install it and try again'
-		else
-		    break
-		fi
-	    elif [ "X$pmda_type" = Xpython ]
-	    then
-		$python -c 'from pcp import pmda' 2>/dev/null
-		if test $? -ne 0
-		then
-		    echo 'Python pcp pmda module is not installed, install it and try again'
-		else
-		    break
-		fi
+		:
 	    else
-		echo "Must choose one of $pmda_options, please try again"
-	    fi
-	done
-    fi
-    if [ "$pmda_type" = daemon ]
-    then
-	__choose_ipc $pmda_dir
-	__args="-d $domain $__args"
-	# Optionally use $PCP_DEBUG from the environment to set -D options
-	# in pmcd.conf for command line args
-	#
-	if [ -n "$PCP_DEBUG" ]
-	then
-	    __args="-D$PCP_DEBUG $__args"
-	fi
-
-    elif [ "$pmda_type" = perl ]
-    then
-	type="pipe	$ipc_prot		perl $perl_name"
-	__args=''
-    elif [ "$pmda_type" = python ]
-    then
-	type="pipe	$ipc_prot		$python $python_name"
-	__args=''
-    else
-	type="dso	$dso_entry	$dso_name"
-	__args=''
-    fi
-
-    # Install binaries
-    #
-    if [ "$pmda_type" = perl -o "$pmda_type" = python ]
-    then
-	:	# we can safely skip building binaries
-    elif [ -f Makefile -o -f makefile -o -f GNUmakefile ]
-    then
-	# $PCP_MAKE_PROG may contain command line args ... executable
-	# is first word
-	#
-	if [ ! -f "`echo $PCP_MAKE_PROG | sed -e 's/ .*//'`" -o ! -f "$PCP_INC_DIR/pmda.h" ]
-	then
-	    echo "$prog: Arrgh, PCP devel environment required to install this PMDA"
-	    status=1
-	    exit
-	fi
-
-	echo "Installing files ..."
-	if $PCP_MAKE_PROG install
-	then
-	    :
-	else
-	    echo "$prog: Arrgh, \"$PCP_MAKE_PROG install\" failed!"
-	    status=1
-	    exit
-	fi
-    fi
-
-    # Fix domain in help for instance domains (if any)
-    #
-    if [ -f $help_source ]
-    then
-	sed -e "/^@ $SYMDOM\./s/$SYMDOM\./$domain./" <$help_source \
-	| newhelp -n root -o $help_source
-    fi
-
-    if [ "X$pmda_type" = Xperl -o "X$pmda_type" = Xpython ]
-    then
-	# Juggle pmns and domain.h ... save originals and
-	# use *.{perl,python} ones created earlier
-	for file in pmns domain.h
-	do
-	    if [ ! -f "$file.$pmda_type" ]
-	    then
-		echo "Botch: $file.$pmda_type missing ... giving up"
+		echo 'Botch: must set at least one of $pipe_opt or $socket_opt to "true"'
 		status=1
 		exit
 	    fi
-	    if [ -f $file ]
+	fi
+
+	# Select a PMDA style (dso/perl/python/deamon), and for daemons the
+	# IPC method for communication between PMCD and the PMDA.
+	#
+	pmda_options=''
+	pmda_default_option=''
+	pmda_multiple_options=false
+
+	if $dso_opt
+	then
+	    pmda_options="dso"
+	    pmda_default_option="dso"
+	fi
+	if $perl_opt
+	then
+	    pmda_default_option="perl"
+	    if test -n "$pmda_options"
 	    then
-		if diff $file.$pmda_type $file >/dev/null
+		pmda_options="perl or $pmda_options"
+		pmda_multiple_options=true
+	    else
+		pmda_options="perl"
+	    fi
+	fi
+	if $python_opt
+	then
+	    pmda_default_option="python"
+	    if test -n "$pmda_options"
+	    then
+		pmda_options="python or $pmda_options"
+		pmda_multiple_options=true
+	    else
+		pmda_options="python"
+	    fi
+	fi
+	if $daemon_opt
+	then
+	    pmda_default_option="daemon"
+	    if test -n "$pmda_options"
+	    then
+		pmda_options="daemon or $pmda_options"
+		pmda_multiple_options=true
+	    else
+		pmda_options="daemon"
+	    fi
+	fi
+
+	pmda_type="$pmda_default_option"
+	if $pmda_multiple_options
+	then
+	    while true
+	    do
+		$PCP_ECHO_PROG $PCP_ECHO_N "Install $iam as a $pmda_options agent? [$pmda_default_option] ""$PCP_ECHO_C"
+		read pmda_type
+		$__echo && echo "$pmda_type"
+		if [ "X$pmda_type" = Xdaemon -o "X$pmda_type" = X ]
 		then
-		    :
+		    pmda_type=daemon
+		    break
+		elif [ "X$pmda_type" = Xdso ]
+		then
+		    break
+		elif [ "X$pmda_type" = Xperl ]
+		then
+		    perl -e 'use PCP::PMDA' >$tmp/out 2>&1
+		    if test $? -ne 0
+		    then
+			cat $tmp/out
+			echo 'Perl PCP::PMDA module is not installed, install it and try again'
+		    else
+			break
+		    fi
+		elif [ "X$pmda_type" = Xpython ]
+		then
+		    $python -c 'from pcp import pmda' 2>/dev/null
+		    if test $? -ne 0
+		    then
+			echo 'Python pcp pmda module is not installed, install it and try again'
+		    else
+			break
+		    fi
 		else
-		    [ ! -f $file.save ] && mv $file $file.save
+		    echo "Must choose one of $pmda_options, please try again"
+		fi
+	    done
+	fi
+	if [ "$pmda_type" = daemon ]
+	then
+	    __choose_ipc $pmda_dir
+	    __args="-d $domain $__args"
+	elif [ "$pmda_type" = perl ]
+	then
+	    type="pipe	binary		perl $perl_name"
+	    __args=''
+	elif [ "$pmda_type" = python ]
+	then
+	    type="pipe	binary		$python $python_name"
+	    __args=''
+	else
+	    type="dso	$dso_entry	$dso_name"
+	    __args=''
+	fi
+
+	# Install binaries
+	#
+	if [ "$pmda_type" = perl -o "$pmda_type" = python ]
+	then
+	    :	# we can safely skip building binaries
+	elif [ -f Makefile -o -f makefile -o -f GNUmakefile ]
+	then
+	    # $PCP_MAKE_PROG may contain command line args ... executable
+	    # is first word
+	    #
+	    if [ ! -f "`echo $PCP_MAKE_PROG | sed -e 's/ .*//'`" -o ! -f "$PCP_INC_DIR/pmda.h" ]
+	    then
+		echo "$prog: Arrgh, PCP devel environment required to install this PMDA"
+		status=1
+		exit
+	    fi
+
+	    echo "Installing files ..."
+	    if $PCP_MAKE_PROG install
+	    then
+		:
+	    else
+		echo "$prog: Arrgh, \"$PCP_MAKE_PROG install\" failed!"
+		status=1
+		exit
+	    fi
+	fi
+
+	# Fix domain in help for instance domains (if any)
+	#
+	if [ -f $help_source ]
+	then
+	    case $pmda_interface
+	    in
+		1)
+			help_version=1
+			;;
+		*)	# PMDA_INTERFACE_2 or later
+			help_version=2
+			;;
+	    esac
+	    sed -e "/^@ $SYMDOM\./s/$SYMDOM\./$domain./" <$help_source \
+	    | newhelp -n root -v $help_version -o $help_source
+	fi
+    fi
+
+    if $do_pmda
+    then
+	if [ "X$pmda_type" = Xperl -o "X$pmda_type" = Xpython ]
+	then
+	    # Juggle pmns and domain.h ... save originals and
+	    # use *.{perl,python} ones created earlier
+	    for file in pmns domain.h
+	    do
+		if [ ! -f "$file.$pmda_type" ]
+		then
+		    echo "Botch: $file.$pmda_type missing ... giving up"
+		    status=1
+		    exit
+		fi
+		if [ -f $file ]
+		then
+		    if diff $file.$pmda_type $file >/dev/null
+		    then
+			:
+		    else
+			[ ! -f $file.save ] && mv $file $file.save
+			mv $file.$pmda_type $file
+		    fi
+		else
 		    mv $file.$pmda_type $file
 		fi
-	    else
-		mv $file.$pmda_type $file
-	    fi
+	    done
+	fi
+    else
+	# Maybe PMNS only install, and only implementation may be
+	# Perl or Python ones ... simpler juggling needed here.
+	#
+	for file in pmns domain.h
+	do
+	    [ ! -f $file -a -f $file.perl ] && mv $file.perl $file
+	    [ ! -f $file -a -f $file.python ] && mv $file.python $file
 	done
     fi
 
@@ -1167,7 +1224,7 @@ _install()
     fi
 
     $PCP_SHARE_DIR/lib/lockpmns $NAMESPACE
-    trap "$PCP_SHARE_DIR/lib/unlockpmns \$NAMESPACE; rm -rf $tmp $tmp.*; exit \$status" 0 1 2 3 15
+    trap "$PCP_SHARE_DIR/lib/unlockpmns \$NAMESPACE; rm -rf $tmp; exit \$status" 0 1 2 3 15
 
     echo "Updating the Performance Metrics Name Space (PMNS) ..."
 
@@ -1196,7 +1253,7 @@ _install()
 	if pminfo $__ns_opt $__n >/dev/null 2>&1
 	then
             cd $PMNSDIR
-	    if  $PCP_BINADM_DIR/pmnsdel -n $PMNSROOT $__n >$tmp/base 2>&1
+	    if pmnsdel -n $PMNSROOT $__n >$tmp/base 2>&1
 	    then
 		pmsignal -a -s HUP pmcd >/dev/null 2>&1
 	    else
@@ -1234,7 +1291,7 @@ _install()
 	sed -e "s/$SYMDOM:/$domain:/" <$__s >$PMNSDIR/$__n
 
         cd $PMNSDIR
-	if $PCP_BINADM_DIR/pmnsadd -n $PMNSROOT $__n
+	if pmnsadd -n $PMNSROOT $__n
 	then
 	    # Ensure the PMNS timestamp will be different the next
 	    # time the PMNS is updated 
@@ -1250,52 +1307,59 @@ _install()
         cd $__here
     done
 
-    trap "rm -rf $tmp $tmp.*; exit \$status" 0 1 2 3 15
+    trap "rm -rf $tmp; exit \$status" 0 1 2 3 15
     $PCP_SHARE_DIR/lib/unlockpmns $NAMESPACE
 
     _install_views pmchart
     _install_views kmchart
     _install_views pmview
 
-    # Terminate old PMDA
-    #
-    echo "Terminate PMDA if already installed ..."
-    __pmda_cull $iam $domain
-
-    # Rotate log files
-    #
-    if [ -f $PCP_LOG_DIR/pmcd/$iam.log ]
+    if $do_pmda
     then
-	rm -f $PCP_LOG_DIR/pmcd/$iam.log.prev
-	mv -f $PCP_LOG_DIR/pmcd/$iam.log $PCP_LOG_DIR/pmcd/$iam.log.prev
-    fi
+	# Terminate old PMDA
+	#
+	echo "Terminate PMDA if already installed ..."
+	__pmda_cull $iam $domain
 
-    # Add PMDA to pmcd's configuration file
-    #
-    echo "Updating the PMCD control file, and notifying PMCD ..."
-    if [ -n "$args" ]
-    then
-	__args="$__args $args"
-    fi
-    __pmda_add "$iam	$domain	$type $__args"
+	# Rotate log files
+	#
+	if [ -f $PCP_LOG_DIR/pmcd/$iam.log ]
+	then
+	    rm -f $PCP_LOG_DIR/pmcd/$iam.log.prev
+	    mv -f $PCP_LOG_DIR/pmcd/$iam.log $PCP_LOG_DIR/pmcd/$iam.log.prev
+	fi
 
-    # Check that the agent is running OK
-    #
-    if $do_check
-    then
-	__delay_int=`echo $check_delay | sed -e 's/\..*//g'`
-	[ "$__delay_int" -gt 5 ] && echo "Wait $check_delay seconds for the $iam agent to initialize ..."
-	$PCP_BINADM_DIR/pmsleep $check_delay
-	for __n in $pmns_name
-	do
-	    $PCP_ECHO_PROG $PCP_ECHO_N "Check $__n metrics have appeared ... ""$PCP_ECHO_C"
-	    pmprobe -i $__ns_opt $__n | tee $tmp/verbose | __filter $__n
-	    if $__verbose
-	    then
-		echo "pminfo output ..."
-		cat $tmp/verbose
-	    fi
-	done
+	# Add PMDA to pmcd's configuration file
+	#
+	echo "Updating the PMCD control file, and notifying PMCD ..."
+	if [ -n "$args" ]
+	then
+	    __xargs="$__xargs $args"
+	else
+	    __xargs="$__args"
+	fi
+	__pmda_add "$iam	$domain	$type $__xargs"
+
+	# Check that the agent is running OK
+	#
+	if $do_check
+	then
+	    __delay_int=`echo $check_delay | sed -e 's/\..*//g'`
+	    [ "$__delay_int" -gt 5 ] && echo "Wait $check_delay seconds for the $iam agent to initialize ..."
+	    pmsleep $check_delay
+	    for __n in $pmns_name
+	    do
+		$PCP_ECHO_PROG $PCP_ECHO_N "Check $__n metrics have appeared ... ""$PCP_ECHO_C"
+		pmprobe -i $__ns_opt $__n | tee $tmp/verbose | __filter $__n
+		if $__verbose
+		then
+		    echo "pminfo output ..."
+		    cat $tmp/verbose
+		fi
+	    done
+	fi
+    else
+	echo "Skipping PMDA install and PMCD re-configuration"
     fi
 }
 
@@ -1305,7 +1369,7 @@ _remove()
     #
 
     $PCP_SHARE_DIR/lib/lockpmns $NAMESPACE
-    trap "$PCP_SHARE_DIR/lib/unlockpmns \$NAMESPACE; rm -rf $tmp $tmp.*; exit \$status" 0 1 2 3 15
+    trap "$PCP_SHARE_DIR/lib/unlockpmns \$NAMESPACE; rm -rf $tmp; exit \$status" 0 1 2 3 15
 
     echo "Culling the Performance Metrics Name Space ..."
     cd $PMNSDIR
@@ -1313,7 +1377,7 @@ _remove()
     for __n in $pmns_name
     do
 	$PCP_ECHO_PROG $PCP_ECHO_N "$__n ... ""$PCP_ECHO_C"
-	if $PCP_BINADM_DIR/pmnsdel -n $PMNSROOT $__n >$tmp/base 2>&1
+	if pmnsdel -n $PMNSROOT $__n >$tmp/base 2>&1
 	then
 	    rm -f $PMNSDIR/$__n
 	    __sighup_pmcd
@@ -1338,47 +1402,52 @@ _remove()
     #
     cd $__here
 
-    echo "Updating the PMCD control file, and notifying PMCD ..."
-    __pmda_cull $iam $domain
-
-    if [ -f Makefile -o -f makefile -o -f GNUmakefile ]
+    if $do_pmda
     then
-	echo "Removing files ..."
-	$PCP_MAKE_PROG clobber >/dev/null
-    fi
-    for __i in *.pmchart
-    do
-	if [ "$__i" != "*.pmchart" ]
-	then
-	    __dest=$PCP_VAR_DIR/config/pmchart/`basename $__i .pmchart`
-	    rm -f $__dest
-	fi
-    done
-    for __i in *.kmchart
-    do
-	if [ "$__i" != "*.kmchart" ]
-	then
-	    __dest=$PCP_VAR_DIR/config/kmchart/`basename $__i .kmchart`
-	    rm -f $__dest
-	fi
-    done
+	echo "Updating the PMCD control file, and notifying PMCD ..."
+	__pmda_cull $iam $domain
 
-    if $do_check
-    then
-	for __n in $pmns_name
+	if [ -f Makefile -o -f makefile -o -f GNUmakefile ]
+	then
+	    echo "Removing files ..."
+	    $PCP_MAKE_PROG clobber >/dev/null
+	fi
+	for __i in *.pmchart
 	do
-	    $PCP_ECHO_PROG $PCP_ECHO_N "Check $__n metrics have gone away ... ""$PCP_ECHO_C"
-	    if pminfo -n $NAMESPACE -f $__n >$tmp/base 2>&1
+	    if [ "$__i" != "*.pmchart" ]
 	    then
-		echo "Arrgh, something has gone wrong!"
-		cat $tmp/base
-	    else
-		echo "OK"
+		__dest=$PCP_VAR_DIR/config/pmchart/`basename $__i .pmchart`
+		rm -f $__dest
 	    fi
 	done
+	for __i in *.kmchart
+	do
+	    if [ "$__i" != "*.kmchart" ]
+	    then
+		__dest=$PCP_VAR_DIR/config/kmchart/`basename $__i .kmchart`
+		rm -f $__dest
+	    fi
+	done
+
+	if $do_check
+	then
+	    for __n in $pmns_name
+	    do
+		$PCP_ECHO_PROG $PCP_ECHO_N "Check $__n metrics have gone away ... ""$PCP_ECHO_C"
+		if pminfo -n $NAMESPACE -f $__n >$tmp/base 2>&1
+		then
+		    echo "Arrgh, something has gone wrong!"
+		    cat $tmp/base
+		else
+		    echo "OK"
+		fi
+	    done
+	fi
+    else
+	echo "Skipping PMDA removal and PMCD re-configuration"
     fi
 
-    trap "rm -rf $tmp $tmp.*; exit \$status" 0 1 2 3 15
+    trap "rm -rf $tmp; exit \$status" 0 1 2 3 15
     $PCP_SHARE_DIR/lib/unlockpmns $NAMESPACE
 }
 
@@ -1390,7 +1459,7 @@ _check_userroot()
 	then
 	    : running in a non-default installation, do not need to be root
 	else
-	    echo "Error: You must be root (uid 0) to update the pmcd(1) configuration."
+	    echo "Error: You must be root (uid 0) to update the PCP collector configuration."
 	    status=1
 	    exit
 	fi
@@ -1503,31 +1572,15 @@ pmns_source=pmns
 pmns_dupok=false
 #	Source for the helptext
 help_source=help
+#	Assume libpcp_pmda.so.3
+pmda_interface=3
 #	Full pathname to directory where PMDA is to be found ...
 #	exectable and/or DSO, domain.h, pmns, control files, etc.
 pmda_dir="`pwd`"
 
-if [ "$PCP_PLATFORM" = mingw ]
-then
-    # Special hack for mingw ...
-    # $pmda_dir needs to be an absolute pathname, but if we have a
-    # half-baked mingw chroot, then / is not the root of the Windows
-    # filesystem.  For example $PCP_DIR is something like
-    # C:\git-sdk-64\mingw64 and if pwd returns something like
-    # /mingw64/... then we want pmda_dir to be
-    # C:/git-sdk-64/mingw64/...
-    #
-    pmda_dir_1=`echo $pmda_dir | sed -e 's@^/\([^/][^/]*\)/.*@\1@'`
-    PCP_DIR_N=`echo $PCP_DIR | sed -e 's@\\\\@/@g' -e 's@.*/\([^/][^/]*\)/*$@\1@'`
-    if [ "$pmda_dir_1" = "$PCP_DIR_N" ]
-    then
-	pmda_dir=`echo $pmda_dir | sed -e 's@^/[^/][^/]*\(/.*\)@\1@'`
-	pmda_dir="`echo $PCP_DIR | sed -e 's@\\\\@/@g'`$pmda_dir"
-    fi
-fi
-
 # Other variables and constants
 #
+do_pmda=true
 do_check=true
 __here=`pwd`
 __pmcd_is_dead=false
@@ -1536,7 +1589,7 @@ __verbose=false
 __ns_opt=''
 __args=''
 
-trap "rm -rf $tmp $tmp.*; exit \$status" 0 1 2 3 15
+trap "rm -rf $tmp; exit \$status" 0 1 2 3 15
 
 # Parse command line args
 #
@@ -1546,6 +1599,10 @@ do
     in
 	-e)	# echo user input
 	    __echo=true
+	    ;;
+
+	-N)	# name space only
+	    do_pmda=false
 	    ;;
 
 	-n)	# alternate name space
@@ -1590,9 +1647,9 @@ do
 	*)
 	    if [ "$prog" = "Install" ]
 	    then
-		echo "Usage: $prog [-eQV] [-n namespace] [-R rootdir]"
+		echo "Usage: $prog [-eNQV] [-n namespace] [-R rootdir]"
 	    else
-		echo "Usage: $prog [-eQV] [-n namespace]"
+		echo "Usage: $prog [-eNQV] [-n namespace]"
 	    fi
 	    status=1
 	    exit

@@ -17,7 +17,7 @@ rewrite(pmResult *rp)
 			(rp->numpmid - 1) * sizeof(pmValueSet *))) == NULL) {
 	fprintf(stderr,
 		"%s: rewrite: cannot malloc pmResult for %d metrics\n",
-		    pmGetProgname(), rp->numpmid);
+		    pmProgname, rp->numpmid);
 	    exit(1);
     }
     orp->numpmid = 0;
@@ -34,7 +34,7 @@ rewrite(pmResult *rp)
 	if (pmidlist[i] != vsp->pmid) {
 	    fprintf(stderr,
 		"%s: rewrite: Arrgh, mismatched PMID %s vs %s\n",
-		    pmGetProgname(), pmIDStr(pmidlist[i]), pmIDStr(vsp->pmid));
+		    pmProgname, pmIDStr(pmidlist[i]), pmIDStr(vsp->pmid));
 	    exit(1);
 	}
 
@@ -48,7 +48,7 @@ rewrite(pmResult *rp)
 	    __uint64_t bytes = (sizeof(pmValueSet) + need * sizeof(pmValue));
 	    fprintf(stderr,
 		"%s: rewrite: Arrgh, cannot malloc %"PRIi64" bytes for ovsp\n",
-		    pmGetProgname(), bytes);
+		    pmProgname, bytes);
 	    exit(1);
 	}
 	ovsp->pmid = vsp->pmid;
@@ -70,7 +70,7 @@ rewrite(pmResult *rp)
 		    if (vp == NULL) {
 			fprintf(stderr,
 			    "%s: rewrite: Arrgh: cannot find inst %d in value_t list for %s (%s)\n",
-				pmGetProgname(), vsp->vlist[j].inst, namelist[i], pmIDStr(vsp->pmid));
+				pmProgname, vsp->vlist[j].inst, namelist[i], pmIDStr(vsp->pmid));
 			exit(1);
 		    }
 		    if ((vp->control & (V_SEEN|V_INIT)) == 0)
@@ -86,7 +86,7 @@ rewrite(pmResult *rp)
 			if (sts < 0) {
 			    fprintf(stderr,
 				"%s: rewrite: pmExtractValue failed for pmid %s value %d: %s\n",
-				    pmGetProgname(), pmIDStr(vsp->pmid), j, pmErrStr(sts));
+				    pmProgname, pmIDStr(vsp->pmid), j, pmErrStr(sts));
 			    exit(1);
 			}
 			ovsp->pmid = vsp->pmid;
@@ -95,7 +95,7 @@ rewrite(pmResult *rp)
 			if (k < 0) {
 			    fprintf(stderr,
 				"%s: rewrite: __pmStuffValue failed for pmid %s value %d: %s\n",
-				    pmGetProgname(), pmIDStr(vsp->pmid), j, pmErrStr(sts));
+				    pmProgname, pmIDStr(vsp->pmid), j, pmErrStr(sts));
 			    exit(1);
 			}
 			if (ovsp->numval == 0)
@@ -154,7 +154,7 @@ rewrite_free(void)
 	if (j == numpmid) {
 	    fprintf(stderr,
 		"%s: rewrite_free: Arrgh, cannot find pmid %s in pmidlist[]\n",
-		    pmGetProgname(), pmIDStr(vsp->pmid));
+		    pmProgname, pmIDStr(vsp->pmid));
 	    exit(1);
 	}
 	mp = &metriclist[j];

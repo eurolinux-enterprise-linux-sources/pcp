@@ -15,7 +15,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "pmda.h"
 #include "pmdaroot.h"
 
@@ -298,7 +298,7 @@ __pmdaRecvRootPDUStart(int fd, void *buffer, int buflen)
     msgh.msg_namelen = 0;
  
     if ((sts = recvmsg(fd, &msgh, MSG_NOSIGNAL)) < 0) {
-	pmNotifyErr(LOG_DEBUG, "recvmsg: %d %s\n", errno, strerror(errno));
+	__pmNotifyErr(LOG_DEBUG, "recvmsg: %d %s\n", errno, strerror(errno));
 	return -oserror();
     }
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env pmpython
 #
-# Copyright (C) 2014-2018 Red Hat.
+# Copyright (C) 2014-2017 Red Hat.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
@@ -12,8 +12,7 @@
 # or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
 # for more details.
 #
-# pylint: disable=bad-continuation,consider-using-enumerate
-#
+# pylint: disable=C0103,R0914,R0902
 """ Display NUMA memory allocation statistucs """
 
 import os
@@ -46,7 +45,7 @@ class NUMAStat(object):
                 self.width = 1000000000        # mimic numastat(1) here
             else:
 		# popen() is SAFE, command is a literal string
-                (_, width) = os.popen('stty size', 'r').read().split()
+                (rows, width) = os.popen('stty size', 'r').read().split()
                 self.width = int(width)
             self.width = int(os.getenv('NUMASTAT_WIDTH', self.width))
         if self.width < 32:
@@ -54,7 +53,7 @@ class NUMAStat(object):
 
     def option(self, opt, optarg, index):
         """ Perform setup for an individual command line option """
-        if opt == 'w':
+        if (opt == 'w'):
             self.width = int(optarg)
 
     def options(self):
@@ -108,7 +107,7 @@ class NUMAStat(object):
             Nodes is a list of strings, values is a list of lists of values.
         """
         columns = len(nodes) * 16
-        if columns == 0:
+        if (columns == 0):
             print("No NUMA nodes found, exiting")
             sys.exit(1)
         self.resize()

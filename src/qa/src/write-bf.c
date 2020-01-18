@@ -1,4 +1,5 @@
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 typedef struct {
 	unsigned int	a:16;

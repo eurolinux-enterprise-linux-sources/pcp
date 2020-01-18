@@ -17,6 +17,7 @@
  */
 
 #include "pmapi.h"
+#include "impl.h"
 #include <rpc/rpc.h>
 
 #define AUTOFSD_PROGRAM 100099UL
@@ -36,7 +37,7 @@ main(int argc, char **argv)
     char		*host = "local:";
     int			errflag = 0;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "h:t:?")) != EOF) {
 	switch (c) {
@@ -47,7 +48,7 @@ main(int argc, char **argv)
 
 	case 't':	/* change timeout interval */
 	    if (pmParseInterval(optarg, &tv, &p) < 0) {
-		fprintf(stderr, "%s: illegal -t argument\n", pmGetProgname());
+		fprintf(stderr, "%s: illegal -t argument\n", pmProgname);
 		fputs(p, stderr);
 		free(p);
 		errflag++;
@@ -56,7 +57,7 @@ main(int argc, char **argv)
 
 	case '?':
 	default:
-	    fprintf(stderr, "Usage: %s [-h host] [-t timeout]\n", pmGetProgname());
+	    fprintf(stderr, "Usage: %s [-h host] [-t timeout]\n", pmProgname);
 	    errflag++;
 	    break;
 	}

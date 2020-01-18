@@ -6,8 +6,7 @@ QA output created by 503
 pmlogger_daily: [TMP.control:2]
 Error: no pmlogger instance running for host "HOSTNAME"
 ... logging for host "HOSTNAME" unchanged
-pmlogger_daily: [TMP.control:2]
-Warning: skipping pmnewlog because we don't know which pmlogger to stop
+
 Input archives to be merged:
 	20111001.21.10
 	20111001.22.10
@@ -15,7 +14,7 @@ Output archive files:
 -rw-r--r-- ... 20111001.meta
 -rw-r--r-- ... 20111001.index
 -rw-r--r-- ... 20111001.0
-Removing input archive files ...... done
+Removing input archive files ... done
 
 !!! global { hostname -> dreaming } !!!
 
@@ -26,8 +25,7 @@ Removing input archive files ...... done
 pmlogger_daily: [TMP.control:2]
 Error: no pmlogger instance running for host "HOSTNAME"
 ... logging for host "HOSTNAME" unchanged
-pmlogger_daily: [TMP.control:2]
-Warning: skipping pmnewlog because we don't know which pmlogger to stop
+
 Input archives to be merged:
 	20111001.21.10
 	20111001.22.10
@@ -50,8 +48,7 @@ pmlogger_merge: Error: file "20111001.0" not created
 pmlogger_daily: [TMP.control:2]
 Error: no pmlogger instance running for host "HOSTNAME"
 ... logging for host "HOSTNAME" unchanged
-pmlogger_daily: [TMP.control:2]
-Warning: skipping pmnewlog because we don't know which pmlogger to stop
+
 Input archives to be merged:
 	20111001.21.10
 	20111001.22.10
@@ -59,7 +56,7 @@ Output archive files:
 -rw-r--r-- ... 20111001.meta
 -rw-r--r-- ... 20111001.index
 -rw-r--r-- ... 20111001.0
-Removing input archive files ...... done
+Removing input archive files ... done
 --- TMP.in
 +++ TMP.out
 @@ -1,7 +1,7 @@
@@ -69,8 +66,8 @@ Removing input archive files ...... done
  Log Label (Log Format Version 2)
 -Performance metrics from host bozo-laptop
 +Performance metrics from host dreaming
-     commencing Sat Oct  1 21:10:11.751520 2011
-     ending     Sat Oct  1 22:10:12.128378 2011
+   commencing Sat Oct  1 21:10:11.751 2011
+   ending     Sat Oct  1 22:10:12.128 2011
  
 
 +++ expect fix via local symlink config file +++
@@ -80,8 +77,7 @@ Removing input archive files ...... done
 pmlogger_daily: [TMP.control:2]
 Error: no pmlogger instance running for host "HOSTNAME"
 ... logging for host "HOSTNAME" unchanged
-pmlogger_daily: [TMP.control:2]
-Warning: skipping pmnewlog because we don't know which pmlogger to stop
+
 Input archives to be merged:
 	20111001.21.10
 	20111001.22.10
@@ -89,7 +85,7 @@ Output archive files:
 -rw-r--r-- ... 20111001.meta
 -rw-r--r-- ... 20111001.index
 -rw-r--r-- ... 20111001.0
-Removing input archive files ...... done
+Removing input archive files ... done
 --- TMP.in
 +++ TMP.out
 @@ -1,7 +1,7 @@
@@ -99,8 +95,8 @@ Removing input archive files ...... done
  Log Label (Log Format Version 2)
 -Performance metrics from host bozo-laptop
 +Performance metrics from host dreaming
-     commencing Sat Oct  1 21:10:11.751520 2011
-     ending     Sat Oct  1 22:10:12.128378 2011
+   commencing Sat Oct  1 21:10:11.751 2011
+   ending     Sat Oct  1 22:10:12.128 2011
  
 
 +++ expect fix via global config dir +++
@@ -110,8 +106,7 @@ Removing input archive files ...... done
 pmlogger_daily: [TMP.control:2]
 Error: no pmlogger instance running for host "HOSTNAME"
 ... logging for host "HOSTNAME" unchanged
-pmlogger_daily: [TMP.control:2]
-Warning: skipping pmnewlog because we don't know which pmlogger to stop
+
 Input archives to be merged:
 	20111001.21.10
 	20111001.22.10
@@ -119,7 +114,7 @@ Output archive files:
 -rw-r--r-- ... 20111001.meta
 -rw-r--r-- ... 20111001.index
 -rw-r--r-- ... 20111001.0
-Removing input archive files ...... done
+Removing input archive files ... done
 --- TMP.in
 +++ TMP.out
 @@ -1,7 +1,7 @@
@@ -129,8 +124,8 @@ Removing input archive files ...... done
  Log Label (Log Format Version 2)
 -Performance metrics from host bozo-laptop
 +Performance metrics from host dreaming
-     commencing Sat Oct  1 21:10:11.751520 2011
-     ending     Sat Oct  1 22:10:12.128378 2011
+   commencing Sat Oct  1 21:10:11.751 2011
+   ending     Sat Oct  1 22:10:12.128 2011
  
 
 +++ expect fix via symlink to global config dir +++
@@ -140,8 +135,7 @@ Removing input archive files ...... done
 pmlogger_daily: [TMP.control:2]
 Error: no pmlogger instance running for host "HOSTNAME"
 ... logging for host "HOSTNAME" unchanged
-pmlogger_daily: [TMP.control:2]
-Warning: skipping pmnewlog because we don't know which pmlogger to stop
+
 Input archives to be merged:
 	20111001.21.10
 	20111001.22.10
@@ -149,7 +143,7 @@ Output archive files:
 -rw-r--r-- ... 20111001.meta
 -rw-r--r-- ... 20111001.index
 -rw-r--r-- ... 20111001.0
-Removing input archive files ...... done
+Removing input archive files ... done
 --- TMP.in
 +++ TMP.out
 @@ -1,7 +1,7 @@
@@ -159,8 +153,8 @@ Removing input archive files ...... done
  Log Label (Log Format Version 2)
 -Performance metrics from host bozo-laptop
 +Performance metrics from host dreaming
-     commencing Sat Oct  1 21:10:11.751520 2011
-     ending     Sat Oct  1 22:10:12.128378 2011
+   commencing Sat Oct  1 21:10:11.751 2011
+   ending     Sat Oct  1 22:10:12.128 2011
  
 
 !!! metric sampledso.double.hundred { type -> float } !!!
@@ -172,8 +166,7 @@ Removing input archive files ...... done
 pmlogger_daily: [TMP.control:2]
 Error: no pmlogger instance running for host "HOSTNAME"
 ... logging for host "HOSTNAME" unchanged
-pmlogger_daily: [TMP.control:2]
-Warning: skipping pmnewlog because we don't know which pmlogger to stop
+
 Input archives to be merged:
 	20111001.21.10
 	20111001.22.10
@@ -194,8 +187,7 @@ pmlogger_merge: Error: file "20111001.0" not created
 pmlogger_daily: [TMP.control:2]
 Error: no pmlogger instance running for host "HOSTNAME"
 ... logging for host "HOSTNAME" unchanged
-pmlogger_daily: [TMP.control:2]
-Warning: skipping pmnewlog because we don't know which pmlogger to stop
+
 Input archives to be merged:
 	20111001.21.10
 	20111001.22.10
@@ -203,7 +195,7 @@ Output archive files:
 -rw-r--r-- ... 20111001.meta
 -rw-r--r-- ... 20111001.index
 -rw-r--r-- ... 20111001.0
-Removing input archive files ...... done
+Removing input archive files ... done
 --- TMP.in
 +++ TMP.out
 @@ -40,7 +40,7 @@
@@ -216,20 +208,20 @@ Removing input archive files ...... done
  PMID: 30.0.3 (sampledso.milliseconds)
      Data Type: double  InDom: PM_INDOM_NULL 0xffffffff
 @@ -121,10 +121,10 @@
- 21:10:11.751520	      0          132          132
- 21:10:11.876269	      0          350          284
- 21:10:11.878990	      0          652          428
--22:10:11.751520	      0         1727         3456
--22:10:11.876269	      0         1768         3608
--22:10:11.878990	      0         1940         3752
--22:10:12.128378	      0         2112         6248
-+22:10:11.751520	      0         1727         3448
-+22:10:11.876269	      0         1768         3600
-+22:10:11.878990	      0         1940         3744
-+22:10:12.128378	      0         2112         6232
+ 21:10:11.751       0          132          132
+ 21:10:11.876       0          350          284
+ 21:10:11.878       0          652          428
+-22:10:11.751       0         1727         3456
+-22:10:11.876       0         1768         3608
+-22:10:11.878       0         1940         3752
+-22:10:12.128       0         2112         6248
++22:10:11.751       0         1727         3448
++22:10:11.876       0         1768         3600
++22:10:11.878       0         1940         3744
++22:10:12.128       0         2112         6232
  
- 21:10:11.751520 3 metrics
-     2.3.3 (pmcd.pmlogger.host): inst [1933 or "1933"] value "localhost.localdomain"
+ 21:10:11.751  2.3.3 (pmcd.pmlogger.host): inst [1933 or "1933"] value "localhost.localdomain"
+               2.3.0 (pmcd.pmlogger.port): inst [1933 or "1933"] value 4331
 
 +++ expect fix via local symlink config file +++
 
@@ -238,8 +230,7 @@ Removing input archive files ...... done
 pmlogger_daily: [TMP.control:2]
 Error: no pmlogger instance running for host "HOSTNAME"
 ... logging for host "HOSTNAME" unchanged
-pmlogger_daily: [TMP.control:2]
-Warning: skipping pmnewlog because we don't know which pmlogger to stop
+
 Input archives to be merged:
 	20111001.21.10
 	20111001.22.10
@@ -247,7 +238,7 @@ Output archive files:
 -rw-r--r-- ... 20111001.meta
 -rw-r--r-- ... 20111001.index
 -rw-r--r-- ... 20111001.0
-Removing input archive files ...... done
+Removing input archive files ... done
 --- TMP.in
 +++ TMP.out
 @@ -40,7 +40,7 @@
@@ -260,20 +251,20 @@ Removing input archive files ...... done
  PMID: 30.0.3 (sampledso.milliseconds)
      Data Type: double  InDom: PM_INDOM_NULL 0xffffffff
 @@ -121,10 +121,10 @@
- 21:10:11.751520	      0          132          132
- 21:10:11.876269	      0          350          284
- 21:10:11.878990	      0          652          428
--22:10:11.751520	      0         1727         3456
--22:10:11.876269	      0         1768         3608
--22:10:11.878990	      0         1940         3752
--22:10:12.128378	      0         2112         6248
-+22:10:11.751520	      0         1727         3448
-+22:10:11.876269	      0         1768         3600
-+22:10:11.878990	      0         1940         3744
-+22:10:12.128378	      0         2112         6232
+ 21:10:11.751       0          132          132
+ 21:10:11.876       0          350          284
+ 21:10:11.878       0          652          428
+-22:10:11.751       0         1727         3456
+-22:10:11.876       0         1768         3608
+-22:10:11.878       0         1940         3752
+-22:10:12.128       0         2112         6248
++22:10:11.751       0         1727         3448
++22:10:11.876       0         1768         3600
++22:10:11.878       0         1940         3744
++22:10:12.128       0         2112         6232
  
- 21:10:11.751520 3 metrics
-     2.3.3 (pmcd.pmlogger.host): inst [1933 or "1933"] value "localhost.localdomain"
+ 21:10:11.751  2.3.3 (pmcd.pmlogger.host): inst [1933 or "1933"] value "localhost.localdomain"
+               2.3.0 (pmcd.pmlogger.port): inst [1933 or "1933"] value 4331
 
 +++ expect fix via global config dir +++
 
@@ -282,8 +273,7 @@ Removing input archive files ...... done
 pmlogger_daily: [TMP.control:2]
 Error: no pmlogger instance running for host "HOSTNAME"
 ... logging for host "HOSTNAME" unchanged
-pmlogger_daily: [TMP.control:2]
-Warning: skipping pmnewlog because we don't know which pmlogger to stop
+
 Input archives to be merged:
 	20111001.21.10
 	20111001.22.10
@@ -291,7 +281,7 @@ Output archive files:
 -rw-r--r-- ... 20111001.meta
 -rw-r--r-- ... 20111001.index
 -rw-r--r-- ... 20111001.0
-Removing input archive files ...... done
+Removing input archive files ... done
 --- TMP.in
 +++ TMP.out
 @@ -40,7 +40,7 @@
@@ -304,20 +294,20 @@ Removing input archive files ...... done
  PMID: 30.0.3 (sampledso.milliseconds)
      Data Type: double  InDom: PM_INDOM_NULL 0xffffffff
 @@ -121,10 +121,10 @@
- 21:10:11.751520	      0          132          132
- 21:10:11.876269	      0          350          284
- 21:10:11.878990	      0          652          428
--22:10:11.751520	      0         1727         3456
--22:10:11.876269	      0         1768         3608
--22:10:11.878990	      0         1940         3752
--22:10:12.128378	      0         2112         6248
-+22:10:11.751520	      0         1727         3448
-+22:10:11.876269	      0         1768         3600
-+22:10:11.878990	      0         1940         3744
-+22:10:12.128378	      0         2112         6232
+ 21:10:11.751       0          132          132
+ 21:10:11.876       0          350          284
+ 21:10:11.878       0          652          428
+-22:10:11.751       0         1727         3456
+-22:10:11.876       0         1768         3608
+-22:10:11.878       0         1940         3752
+-22:10:12.128       0         2112         6248
++22:10:11.751       0         1727         3448
++22:10:11.876       0         1768         3600
++22:10:11.878       0         1940         3744
++22:10:12.128       0         2112         6232
  
- 21:10:11.751520 3 metrics
-     2.3.3 (pmcd.pmlogger.host): inst [1933 or "1933"] value "localhost.localdomain"
+ 21:10:11.751  2.3.3 (pmcd.pmlogger.host): inst [1933 or "1933"] value "localhost.localdomain"
+               2.3.0 (pmcd.pmlogger.port): inst [1933 or "1933"] value 4331
 
 +++ expect fix via symlink to global config dir +++
 
@@ -326,8 +316,7 @@ Removing input archive files ...... done
 pmlogger_daily: [TMP.control:2]
 Error: no pmlogger instance running for host "HOSTNAME"
 ... logging for host "HOSTNAME" unchanged
-pmlogger_daily: [TMP.control:2]
-Warning: skipping pmnewlog because we don't know which pmlogger to stop
+
 Input archives to be merged:
 	20111001.21.10
 	20111001.22.10
@@ -335,7 +324,7 @@ Output archive files:
 -rw-r--r-- ... 20111001.meta
 -rw-r--r-- ... 20111001.index
 -rw-r--r-- ... 20111001.0
-Removing input archive files ...... done
+Removing input archive files ... done
 --- TMP.in
 +++ TMP.out
 @@ -40,7 +40,7 @@
@@ -348,20 +337,20 @@ Removing input archive files ...... done
  PMID: 30.0.3 (sampledso.milliseconds)
      Data Type: double  InDom: PM_INDOM_NULL 0xffffffff
 @@ -121,10 +121,10 @@
- 21:10:11.751520	      0          132          132
- 21:10:11.876269	      0          350          284
- 21:10:11.878990	      0          652          428
--22:10:11.751520	      0         1727         3456
--22:10:11.876269	      0         1768         3608
--22:10:11.878990	      0         1940         3752
--22:10:12.128378	      0         2112         6248
-+22:10:11.751520	      0         1727         3448
-+22:10:11.876269	      0         1768         3600
-+22:10:11.878990	      0         1940         3744
-+22:10:12.128378	      0         2112         6232
+ 21:10:11.751       0          132          132
+ 21:10:11.876       0          350          284
+ 21:10:11.878       0          652          428
+-22:10:11.751       0         1727         3456
+-22:10:11.876       0         1768         3608
+-22:10:11.878       0         1940         3752
+-22:10:12.128       0         2112         6248
++22:10:11.751       0         1727         3448
++22:10:11.876       0         1768         3600
++22:10:11.878       0         1940         3744
++22:10:12.128       0         2112         6232
  
- 21:10:11.751520 3 metrics
-     2.3.3 (pmcd.pmlogger.host): inst [1933 or "1933"] value "localhost.localdomain"
+ 21:10:11.751  2.3.3 (pmcd.pmlogger.host): inst [1933 or "1933"] value "localhost.localdomain"
+               2.3.0 (pmcd.pmlogger.port): inst [1933 or "1933"] value 4331
 
 +++ expect fail when -r used and local config file present +++
 
@@ -370,8 +359,7 @@ Removing input archive files ...... done
 pmlogger_daily: [TMP.control:2]
 Error: no pmlogger instance running for host "HOSTNAME"
 ... logging for host "HOSTNAME" unchanged
-pmlogger_daily: [TMP.control:2]
-Warning: skipping pmnewlog because we don't know which pmlogger to stop
+
 Input archives to be merged:
 	20111001.21.10
 	20111001.22.10

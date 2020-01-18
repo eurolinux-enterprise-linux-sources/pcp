@@ -8,7 +8,6 @@
 ** of counters.
 **
 ** Copyright (C) 1996-2014 Gerlof Langeveld
-** Copyright (C) 2015,2019 Red Hat
 **
 ** This program is free software; you can redistribute it and/or modify it
 ** under the terms of the GNU General Public License as published by the
@@ -22,23 +21,21 @@
 */
 #define USERSTUB	9999999
 #define MAXUSERSEL	64
-#define AT_MAXPID	32
+#define MAXPID		32
 
 struct syscap {
 	int	nrcpu;
-	int	nrgpu;
 	count_t	availcpu;
 	count_t	availmem;
 	count_t	availdsk;
 	count_t	availnet;
-	count_t	availgpumem;	// GPU memory in Kb!
 };
 
 struct pselection {
 	char	username[256];
 	uid_t	userid[MAXUSERSEL];
 
-	pid_t	pid[AT_MAXPID];
+	pid_t	pid[MAXPID];
 
 	char	progname[64];
 	int	prognamesz;
@@ -47,8 +44,6 @@ struct pselection {
 	char	argname[64];
 	int	argnamesz;
 	regex_t	argregex;
-
-	char 	container[16];
 };
 
 struct sselection {
@@ -80,7 +75,6 @@ struct sselection {
 #define	MPROCMEM	'm'
 #define	MPROCDSK	'd'
 #define	MPROCNET	'n'
-#define	MPROCGPU	'e'
 #define	MPROCSCH	's'
 #define	MPROCVAR	'v'
 #define	MPROCARG	'c'
@@ -88,13 +82,11 @@ struct sselection {
 
 #define	MCUMUSER	'u'
 #define	MCUMPROC	'p'
-#define	MCUMCONT	'j'
 
 #define	MSORTCPU	'C'
 #define	MSORTDSK	'D'
 #define	MSORTMEM	'M'
 #define	MSORTNET	'N'
-#define	MSORTGPU	'E'
 #define	MSORTAUTO	'A'
 
 #define	MTHREAD		'y'
@@ -107,7 +99,6 @@ struct sselection {
 
 #define	MSELUSER	'U'
 #define	MSELPROC	'P'
-#define	MSELCONT	'J'
 #define	MSELPID		'I'
 #define	MSELARG		'/'
 #define	MSELSYS		'S'
@@ -133,8 +124,8 @@ struct sselection {
 ** general function prototypes
 */
 void	totalcap   (struct syscap *, struct sstat *, struct tstat **, int);
-void	pricumproc (struct sstat *,  struct devtstat *,
-				int, unsigned int, int, double);
+void	pricumproc (struct sstat *,  struct tstat **, int, int, int,
+			int, int, int, int, int, unsigned int, int, int);
 
 void	showgenproc(struct tstat *, double, int, int);
 void	showmemproc(struct tstat *, double, int, int);
@@ -147,7 +138,7 @@ void	showcmdproc(struct tstat *, double, int, int);
 
 void	printg     (const char *, ...);
 int	prisyst(struct sstat  *, int, int, int, int, struct sselection *,
-			char *, int, int, int, int, int, int, int, int, int);
+			char *, int, int, int, int, int, int, int);
 int	priproc(struct tstat  **, int, int, int, int, int, char, char,
 	        struct syscap *, int, int);
 void	priphead(int, int, char *, char *, char);

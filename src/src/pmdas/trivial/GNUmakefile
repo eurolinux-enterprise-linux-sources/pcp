@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2012-2015,2018 Red Hat.
+# Copyright (c) 2012-2015 Red Hat.
 # Copyright (c) 2000,2003,2004 Silicon Graphics, Inc.  All Rights Reserved.
 # 
 # This program is free software; you can redistribute it and/or modify it
@@ -16,32 +16,28 @@
 TOPDIR = ../../..
 include $(TOPDIR)/src/include/builddefs
 
+DFILES 	= README
 CFILES	= trivial.c
 CMDTARGET = pmdatrivial$(EXECSUFFIX)
-LIBTARGET = pmda_trivial.$(DSOSUFFIX)
 LLDLIBS = $(PCP_PMDALIB)
 LCFLAGS = -I.
-DFILES 	= README help
-SCRIPTS = pmdatrivial.perl
-ifeq "$(HAVE_PYTHON)" "true"
-SCRIPTS += pmdatrivial.python
-endif
+LSRCFILES = Install Remove pmns help $(DFILES) root GNUmakefile.install
 
 IAM	= trivial
 DOMAIN	= TRIVIAL
 PMDADIR	= $(PCP_PMDAS_DIR)/$(IAM)
 
-LDIRT	= domain.h *.o $(IAM).log pmda$(IAM) pmda_$(IAM).$(DSOSUFFIX)
+LDIRT	= domain.h *.o $(IAM).log pmda$(IAM) pmda_$(IAM).so
 
-default_pcp default:	$(CMDTARGET) $(LIBTARGET)
+default_pcp default:	$(CMDTARGET)
 
 include $(BUILDRULES)
 
 install install_pcp:	default
 	$(INSTALL) -m 755 -d $(PMDADIR)
-	$(INSTALL) -m 755 Install Remove $(SCRIPTS) $(PMDADIR)
+	$(INSTALL) -m 755 Install Remove $(PMDADIR)
 	$(INSTALL) -m 644 GNUmakefile.install $(PMDADIR)/Makefile
-	$(INSTALL) -m 644 $(DFILES) root pmns domain.h $(CFILES) $(PMDADIR)
+	$(INSTALL) -m 644 $(DFILES) root help pmns domain.h $(CFILES) $(PMDADIR)
 
 $(OBJECTS): domain.h
 

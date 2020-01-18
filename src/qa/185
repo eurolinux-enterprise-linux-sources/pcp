@@ -17,15 +17,15 @@ export PCP_TMP_DIR=$tmpdir
 # get standard filters
 . ./common.product
 . ./common.filter
-. ./common.check
 
+tmp=$tmpdir/$$
 signal=$PCP_BINADM_DIR/pmsignal
-trap "$signal -a pmlogger >/dev/null 2>&1; cd; rm -rf $tmpdir $tmp $tmp.* /tmp/pmlogger.log /tmp/pmlogger.log.prior /tmp/Latest; exit" 0 1 2 3 15
+trap "$signal -a pmlogger >/dev/null 2>&1; cd; rm -rf $tmpdir; exit" 0 1 2 3 15
 
 _filter_dumplog()
 {
     sed \
-	-e '/^[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\.[0-9][0-9]*[0-9]/s//TIMESTAMP/' \
+	-e '/^[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\.[0-9][0-9][0-9]/s//TIMESTAMP/' \
 	-e 's/^\(log started  *\).*/\1DATESTAMP/' \
 	-e 's/^\(last log entry  *\).*/\1DATESTAMP/' \
 	-e 's/^\(current time  *\).*/\1DATESTAMP/' \
@@ -75,7 +75,6 @@ log mandatory on 20 sec sample.bin
 log advisory on 1 min sample.bucket
 End-of-File
 rm -f $tmp.arch.*
-$sudo rm -f /tmp/pmlogger.log /tmp/pmlogger.log.prior /tmp/Latest
 pmlogger -L -c $tmp.config -l $tmp.log $tmp.arch &
 pid=$!
 sleep 1

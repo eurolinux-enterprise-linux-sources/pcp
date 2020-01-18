@@ -14,7 +14,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include <ctype.h>
 
 static __pmLogPort *logport;
@@ -100,7 +100,7 @@ __pmLogFindLocalPorts(int pid, __pmLogPort **result)
     struct dirent	**files = NULL;	/* array of port file dirents */
     char		*p;
     int			len;
-    char		*namebuf;
+    char		namebuf[MAXPATHLEN];
     int			(*scanfn)(const_dirent *dep);
     FILE		*pfile;
     char		buf[MAXPATHLEN];
@@ -113,7 +113,7 @@ __pmLogFindLocalPorts(int pid, __pmLogPort **result)
 
     if ((p = pmGetOptionalConfig("PCP_TMP_DIR")) == NULL)
 	return PM_ERR_GENERIC;
-    lendir = pmsprintf(dir, sizeof(dir), "%s%cpmlogger", p, pmPathSeparator());
+    lendir = pmsprintf(dir, sizeof(dir), "%s%cpmlogger", p, __pmPathSeparator());
 
     /* Set up the appropriate function to select files from the control port
      * directory.  Anticipate that this will usually be an exact match for
@@ -182,13 +182,9 @@ __pmLogFindLocalPorts(int pid, __pmLogPort **result)
     /* namebuf is the complete pathname, p points to the trailing filename
      * within namebuf.
      */
-    if ((namebuf = malloc(len)) == NULL) {
-	free(files);
-	return -oserror();
-    }
     strcpy(namebuf, dir);
     p = namebuf + lendir;
-    *p++ = pmPathSeparator();
+    *p++ = __pmPathSeparator();
 
     /* open the file, try to read the port number and add the port to the
      * logport array if successful.
@@ -286,8 +282,7 @@ __pmLogFindLocalPorts(int pid, __pmLogPort **result)
 	}
 	free(files[i]);
     }
-
-    free(namebuf);
+    
     if (i == nf) {			/* all went well */
 	n = nlogports;
 	*result = logport;
@@ -342,13 +337,9 @@ __pmIsLocalhost(const char *hostname)
 		    if (__pmSockAddrCompare(addr1, addr2) == 0) {
 			__pmHostEntFree(servInfo1);
 			__pmHostEntFree(servInfo2);
-			__pmSockAddrFree(addr1);
-			__pmSockAddrFree(addr2);
 			return 1;
 		    }
-		    __pmSockAddrFree(addr2);
 		}
-		__pmSockAddrFree(addr1);
 	    }
 	    __pmHostEntFree(servInfo1);
 	    __pmHostEntFree(servInfo2);

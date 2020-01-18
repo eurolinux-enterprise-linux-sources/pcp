@@ -13,7 +13,7 @@
 # 
 use strict;
 
-package PCP::JVMMemory;
+package JVMMemory;
 
 sub new {
     my $class = shift;

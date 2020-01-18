@@ -1,5 +1,8 @@
 QA output created by 1091
 PM_CONTEXT_LOCAL, default PMNS ...
+disk.dev.blkread
+disk.dev.blktotal
+disk.dev.blkwrite
 disk.dev.read
 disk.dev.read_bytes
 disk.dev.total
@@ -11,6 +14,9 @@ load(name=(null), dupok=1, use_cpp=0) lic case=0 fname=PCP_VAR_DIR/pmns/root
 loadascii(dupok=1, use_cpp=0) fname=PCP_VAR_DIR/pmns/root
 
 PM_CONTEXT_LOCAL, $PCP_VAR_DIR/pmns/root PMNS ...
+disk.dev.blkread
+disk.dev.blktotal
+disk.dev.blkwrite
 disk.dev.read
 disk.dev.read_bytes
 disk.dev.total
@@ -29,7 +35,7 @@ loadascii(dupok=1, use_cpp=1) fname=TMP.pmns
 
 PM_CONTEXT_ARCHIVE, PM_NS_DEFAULT case ...
 required 1 log reads
-required 2 log reads
+required 1 log reads
 required 2 log reads
 required 10 log reads
 load(name=(null), dupok=1, use_cpp=1) lic case=0 fname=PCP_VAR_DIR/pmns/root

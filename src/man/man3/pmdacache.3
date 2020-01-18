@@ -144,7 +144,7 @@ This rule is perhaps the responsibility of the PMDA, but is often
 a characteristic of the environment in which the PMDA runs.
 .IP 4. 3n
 It is preferable, although not mandatory, for the association between
-an external instance name and an internal instance identifier to
+and external instance name and an internal instance identifier to
 be persistent.
 This rule is supported by the
 .B pmdaCache
@@ -312,7 +312,7 @@ The
 .B pmdaCacheLookup
 interface is required by the PMDA's fetch callback
 that is registered via
-.BR pmdaSetFetchCallBack (3).
+.BR pmdaSetFetchCallback (3).
 Here the internal instance identifier is passed to the fetch callback
 to identifier for which instance a value is required.
 Typical usage is shown in the code fragment below.
@@ -536,7 +536,7 @@ PMDA_CACHE_REUSE mode.
 PMDA_CACHE_REORG
 Reorganize the cache to allow faster retrieval of
 .B active
-entries, at the cost of slower retrieval for
+entries, and the cost of slower retrieval for
 .B inactive
 entries, and reclaim any culled entries.  The cache may be internally
 re-organized as entries are added, so this operation is not required
@@ -718,7 +718,7 @@ directory.
 .BR pmdaInit (3),
 .BR pmdaInstance (3),
 .BR pmdaFetch (3),
-.BR pmdaLabel (3),
+.BR pmdaSetFetchCallback (3),
 .BR pmErrStr (3)
 and
 .BR pmGetInDom (3).

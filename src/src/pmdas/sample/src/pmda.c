@@ -18,7 +18,7 @@
  */
 
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
 #include <pcp/pmda.h>
 #include "domain.h"
 #include "percontext.h"
@@ -84,17 +84,17 @@ done(void)
 int
 main(int argc, char **argv)
 {
-    int			sep = pmPathSeparator();
+    int			sep = __pmPathSeparator();
     char		helppath[MAXPATHLEN];
     char		*username;
 
     _isDSO = 0;
-    pmSetProgname(argv[0]);
-    pmGetUsername(&username);
+    __pmSetProgname(argv[0]);
+    __pmGetUsername(&username);
 
     pmsprintf(helppath, sizeof(helppath), "%s%c" "sample" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-    pmdaDaemon(&dispatch, PMDA_INTERFACE_LATEST, pmGetProgname(), SAMPLE,
+    pmdaDaemon(&dispatch, PMDA_INTERFACE_LATEST, pmProgname, SAMPLE,
 		"sample.log", helppath);
 
     pmdaGetOptions(argc, argv, &opts, &dispatch);
@@ -105,7 +105,7 @@ main(int argc, char **argv)
     pmdaOpenLog(&dispatch);
     if (opts.username)
 	username = opts.username;
-    pmSetProcessIdentity(username);
+    __pmSetProcessIdentity(username);
 
     sample_init(&dispatch);
     pmdaSetCheckCallBack(&dispatch, check);

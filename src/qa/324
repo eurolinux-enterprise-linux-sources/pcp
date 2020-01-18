@@ -19,7 +19,8 @@ echo "QA output created by $seq"
 $sudo ipcs -m | grep -iq deadbeef && \
     _notrun "Cannot run with SHM key 0xdeadbeef already in use"
 
-echo >$tmp.input 'pigs
+echo >$tmp.input 'b
+pigs
 can
 fly
 '
@@ -33,12 +34,12 @@ _cleanup()
     then
 	:
     else
-	if [ -f $PCP_PMCDCONF_PATH.$seq ]
+	if [ -f $tmp.pmcd.conf ]
 	then
-	    $sudo cp $PCP_PMCDCONF_PATH.$seq $PCP_PMCDCONF_PATH
-	    $sudo rm -f $PCP_PMCDCONF_PATH.$seq
+	    $sudo cp $tmp.pmcd.conf $PCP_PMCDCONF_PATH
+	    rm -f $tmp.pmcd.conf
 	fi
-	_service pcp restart 2>&1 | _filter_pcp_start
+	_service pcp restart | _filter_pcp_start
 	_wait_for_pmcd
 	_wait_for_pmlogger
 	if $install_on_cleanup
@@ -89,7 +90,7 @@ cd $home/$iam
 unset ROOT MAKEFLAGS
 
 # copy the pmcd config file to restore state later.
-$sudo cp $PCP_PMCDCONF_PATH $PCP_PMCDCONF_PATH.$seq
+cp $PCP_PMCDCONF_PATH $tmp.pmcd.conf
 
 # start from a known starting point
 $sudo ./Remove >/dev/null 2>&1

@@ -134,7 +134,7 @@ pmns_refresh(void)
 	domain = strtoul(pmid, &next, 10);
 	cluster = strtoul(next+1, &next, 10);
 	item = strtoul(next+1, &next, 10);
-	id = pmID_build(domain, cluster, item);
+	id = pmid_build(domain, cluster, item);
 	if ((sts = __pmAddPMNSNode(pmns, id, SvPV_nolen(metric))) < 0)
 	    croak("failed to add metric %s(%s) to namespace: %s",
 		SvPV_nolen(metric), pmIDStr(id), pmErrStr(sts));
@@ -198,12 +198,12 @@ void
 domain_write(void)
 {
     char *p, name[512] = { 0 };
-    int i, len = strlen(pmGetProgname());
+    int i, len = strlen(pmProgname);
 
     if (len >= sizeof(name) - 1)
 	len = sizeof(name) - 2;
-    p = pmGetProgname();
-    if (strncmp(p, "pmda", 4) == 0)
+    p = pmProgname;
+    if (strncmp(pmProgname, "pmda", 4) == 0)
 	p += 4;
     for (i = 0; i < len; i++)
 	name[i] = toupper(p[i]);
@@ -269,7 +269,7 @@ preinstance(pmInDom indom)
 }
 
 int
-instance_wrapper(pmInDom indom, int a, char *b, pmInResult **rp, pmdaExt *pmda)
+instance_wrapper(pmInDom indom, int a, char *b, __pmInResult **rp, pmdaExt *pmda)
 {
     if (need_refresh)
 	pmns_refresh();
@@ -630,11 +630,12 @@ new(CLASS,name,domain)
 	char *	pmdaname;
 	char	helpfile[256];
     CODE:
+	pmProgname = name;
 	RETVAL = &dispatch;
 	logfile = local_strdup_suffix(name, ".log");
 	pmdaname = local_strdup_prefix("pmda", name);
-	pmSetProgname(pmdaname);
-	sep = pmPathSeparator();
+	__pmSetProgname(pmdaname);
+	sep = __pmPathSeparator();
 	if ((p = getenv("PCP_PERL_DEBUG")) != NULL) {
 	    if (pmSetDebug(p) < 0)
 		fprintf(stderr, "unrecognized debug options specification (%s)\n", p);
@@ -676,7 +677,7 @@ pmda_pmid(cluster,item)
 	unsigned int	cluster
 	unsigned int	item
     CODE:
-	RETVAL = pmID_build(dispatch.domain, cluster, item);
+	RETVAL = pmid_build(dispatch.domain, cluster, item);
     OUTPUT:
 	RETVAL
 
@@ -688,7 +689,7 @@ pmda_pmid_name(cluster,item)
 	const char	*name;
 	SV		**rval;
     CODE:
-	name = pmIDStr(pmID_build(dispatch.domain, cluster, item));
+	name = pmIDStr(pmid_build(dispatch.domain, cluster, item));
 	rval = hv_fetch(metric_names, name, strlen(name), 0);
 	if (!rval || !(*rval))
 	    XSRETURN_UNDEF;
@@ -704,7 +705,7 @@ pmda_pmid_text(cluster,item)
 	const char	*name;
 	SV		**rval;
     CODE:
-	name = pmIDStr(pmID_build(dispatch.domain, cluster, item));
+	name = pmIDStr(pmid_build(dispatch.domain, cluster, item));
 	rval = hv_fetch(metric_oneline, name, strlen(name), 0);
 	if (!rval || !(*rval))
 	    XSRETURN_UNDEF;
@@ -849,7 +850,7 @@ error(self,message)
     PREINIT:
 	(void)self;
     CODE:
-	pmNotifyErr(LOG_ERR, "%s", message);
+	__pmNotifyErr(LOG_ERR, "%s", message);
 
 int
 set_user(self,username)
@@ -858,7 +859,7 @@ set_user(self,username)
     PREINIT:
 	(void)self;
     CODE:
-	RETVAL = pmSetProcessIdentity(username);
+	RETVAL = __pmSetProcessIdentity(username);
     OUTPUT:
 	RETVAL
 
@@ -1205,7 +1206,7 @@ log(self,message)
     PREINIT:
 	(void)self;
     CODE:
-	pmNotifyErr(LOG_INFO, "%s", message);
+	__pmNotifyErr(LOG_INFO, "%s", message);
 
 void
 err(self,message)
@@ -1214,7 +1215,7 @@ err(self,message)
     PREINIT:
 	(void)self;
     CODE:
-	pmNotifyErr(LOG_ERR, "%s", message);
+	__pmNotifyErr(LOG_ERR, "%s", message);
 
 void
 connect_pmcd(self)

@@ -14,8 +14,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "pmda.h"
 
 /* yacc/lex routines */
@@ -32,13 +31,12 @@ extern void setup_context(void);
 extern void reset_profile(void);
 extern char *strcons(char *, char *);
 extern char *strnum(int);
-extern char *strcluster(pmID);
 extern void initmetriclist(void);
 extern void addmetriclist(pmID);
 extern void initarglist(void);
 extern void addarglist(char *);
 extern void doargs(void);
-extern void printindom(FILE *, pmInResult *);
+extern void printindom(FILE *, __pmInResult *);
 extern void dohelp(int, int);
 extern void dostatus(void);
 extern int fillResult(pmResult *, int);
@@ -79,7 +77,7 @@ typedef struct {
 extern param_t	param;
 
 /* the single profile */
-extern pmProfile	*profile;
+extern __pmProfile	*profile;
 extern int		profile_changed;
 
 /* status info */

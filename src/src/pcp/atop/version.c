@@ -12,6 +12,7 @@
 ** See the GNU General Public License for more details.
 */
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 char *
 getstrvers(void)
@@ -20,7 +21,7 @@ getstrvers(void)
 
 	pmsprintf(vers, sizeof vers,
 		"%s version: %s <pcp@groups.io>",
-		pmGetProgname(), PCP_VERSION);
+		pmProgname, PCP_VERSION);
 
 	return vers;
 }

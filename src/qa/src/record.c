@@ -5,12 +5,10 @@
  */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 #include <pcp/pmafm.h>
 #include <sys/types.h>
-#include <errno.h>
-#if HAVE_SYS_WAIT_H
 #include <sys/wait.h>
-#endif
 
 /*
  * Usage: record folio creator replay host [...]
@@ -24,7 +22,6 @@ static char *reportexit(int status)
 
     if (status == 0 || status == -1)
 	return buf;
-#if HAVE_SYS_WAIT_H
     if (WIFEXITED(status)) {
 	if (WIFSIGNALED(status))
 	    pmsprintf(buf, sizeof(buf), " exit %d, signal %d", WEXITSTATUS(status), WTERMSIG(status));
@@ -36,7 +33,6 @@ static char *reportexit(int status)
 	if (WIFSIGNALED(status))
 	    pmsprintf(buf, sizeof(buf), " signal %d", WTERMSIG(status));
     }
-#endif
     return buf;
 }
 
@@ -50,9 +46,10 @@ main(int argc, char **argv)
     int			i;
     int			j;
     FILE		*f;
+    extern int		errno;
 
     /* trim cmd name of leading directory components */
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:?")) != EOF) {
 	switch (c) {
@@ -61,7 +58,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -83,7 +80,7 @@ main(int argc, char **argv)
 \n\
 Options:\n\
   -D debugspec    set PCP debugging options\n",
-                pmGetProgname());
+                pmProgname);
         exit(1);
     }
 

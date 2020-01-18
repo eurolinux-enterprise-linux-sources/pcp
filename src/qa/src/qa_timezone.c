@@ -6,7 +6,7 @@
  */
 
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
 
 #if !defined(HAVE_UNDERBAR_ENVIRON)
 #define _environ environ

@@ -16,6 +16,7 @@
  */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 #include <pcp/pmda.h>
 #include "percontext.h"
 
@@ -121,7 +122,7 @@ growtab(int ctx)
 {
     ctxtab = (perctx_t *)realloc(ctxtab, (ctx+1)*sizeof(ctxtab[0]));
     if (ctxtab == NULL) {
-	pmNoMem("growtab", (ctx+1)*sizeof(ctxtab[0]), PM_FATAL_ERR);
+	__pmNoMem("growtab", (ctx+1)*sizeof(ctxtab[0]), PM_FATAL_ERR);
 	/*NOTREACHED*/
     }
     while (num_ctx <= ctx) {

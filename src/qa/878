@@ -38,10 +38,6 @@ _cleanup()
 _prepare_pmda pipe
 trap "_cleanup; exit \$status" 0 1 2 3 15
 
-# don't need to regenerate config.default with pmlogconf
-#
-export PMLOGGER_CHECK_SKIP_LOGCONF=yes
-
 _stop_auto_restart pmcd
 
 # move aside pipe configuration state to be restored later.
@@ -66,7 +62,7 @@ EOF1
 _filter_pmval()
 {
     sed \
-	-e "s/[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9]*[0-9]/HH:MM:SS.MSEC/g"\
+	-e "s/[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9]/HH:MM:SS.MSEC/g"\
 	-e "s/$hostname/HOST/g" \
     #end
 }

@@ -13,7 +13,7 @@
  */
 
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
 
 void
 set_tm(struct timeval *ntv, struct tm *ntm, struct tm *btm, int mon,
@@ -66,9 +66,8 @@ main(int argc, char *argv[])
     int errflag = 0;
     int c;
     int sts;
-    time_t clock;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:?")) != EOF) {
 	switch (c) {
@@ -77,7 +76,7 @@ main(int argc, char *argv[])
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -90,7 +89,7 @@ main(int argc, char *argv[])
     }
 
     if (errflag) {
-	fprintf(stderr, "Usage: %s [-D debug] [strftime_fmt ...]\n", pmGetProgname());
+	fprintf(stderr, "Usage: %s [-D debug] [strftime_fmt ...]\n", pmProgname);
 	exit(1);
     }
 
@@ -115,14 +114,12 @@ main(int argc, char *argv[])
     set_tm(NULL, &tmtmp, &tmstart, 0, 19, 11, 45);
     tmtmp_str = asctime(&tmtmp);
     char *tmtmp_c = strchr(tmtmp_str, '\n');
-    if (tmtmp_c)
-	*tmtmp_c = ' ';
+    *tmtmp_c = ' ';
     if (__pmParseTime(tmtmp_str, &tvstart, &tvend, &tvrslt, &errmsg) != 0) {
 	printf ("%s: %s\n", errmsg, tmtmp_str);
     }
     
-    clock = tvrslt.tv_sec;
-    localtime_r(&clock, &tmrslt);	// time_t => tm
+    localtime_r(&tvrslt.tv_sec, &tmrslt);	// time_t => tm
     printf("   ");
     dump_dt(tmtmp_str, &tmrslt);
 
@@ -230,8 +227,7 @@ main(int argc, char *argv[])
 	    if (__pmParseTime(buffer, &tvstart, &tvend, &tvrslt, &errmsg) != 0) {
 		printf ("%s: %s\n", errmsg, tmtmp_str);
 	    }
-	    clock = tvrslt.tv_sec;
-	    localtime_r(&clock, &tmrslt);	// time_t => tm
+	    localtime_r(&tvrslt.tv_sec, &tmrslt);	// time_t => tm
 
 	    if (pmDebugOptions.appl0)
 		fprintf(stderr, "tmrslt: sec=%d min=%d hour=%d mday=%d mon=%d year=%d wday=%d yday=%d isdst=%d\n",
@@ -244,8 +240,7 @@ main(int argc, char *argv[])
 	    if (pmParseTimeWindow(buffer, NULL, NULL, NULL, &tvstart, &tvend, &rsltStart, &rsltEnd, &rsltOffset, &errmsg) < 0) {
 		printf ("%s: %s\n", errmsg, tmtmp_str);
 	    }
-	    clock = rsltStart.tv_sec;
-	    localtime_r(&clock, &tmrslt);	// time_t => tm
+	    localtime_r(&rsltStart.tv_sec, &tmrslt);	// time_t => tm
 
 	    if (pmDebugOptions.appl0)
 		fprintf(stderr, "tmrslt: sec=%d min=%d hour=%d mday=%d mon=%d year=%d wday=%d yday=%d isdst=%d\n",
@@ -255,8 +250,7 @@ main(int argc, char *argv[])
 
 	    printf("#2 ");
 	    dump_dt(buffer, &tmrslt);
-	    clock = rsltEnd.tv_sec;
-	    localtime_r(&clock, &tmrslt);	// time_t => tm
+	    localtime_r(&rsltEnd.tv_sec, &tmrslt);	// time_t => tm
 
 	    if (pmDebugOptions.appl0)
 		fprintf(stderr, "tmrslt: sec=%d min=%d hour=%d mday=%d mon=%d year=%d wday=%d yday=%d isdst=%d\n",

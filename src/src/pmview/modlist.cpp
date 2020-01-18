@@ -22,7 +22,9 @@
 #include <Inventor/actions/SoBoxHighlightRenderAction.h>
 #include <Inventor/Qt/viewers/SoQtExaminerViewer.h>
 #include "modlist.h"
-#include "main.h"
+
+#include <iostream>
+using namespace std;
 
 const QString ModList::theBogusId = "TOP";
 const char ModList::theModListId = 'i';
@@ -55,7 +57,7 @@ ModList::ModList(SoQtViewer *viewer,
   _allId(0)
 {
     QSettings modSettings;
-    modSettings.beginGroup(pmGetProgname());
+    modSettings.beginGroup(pmProgname);
     QString sval = modSettings.value("saturation", QString("")).toString();
     modSettings.endGroup();
 
@@ -175,7 +177,7 @@ ModList::selCB(void *ptrToThis, SoPath *path)
 {
     ModList		*me = (ModList *)ptrToThis;
     Modulate		*obj;
-    int			oldCount = 0;
+    int			oldCount;
     int			id;
 
     if (!me->_allFlag)
@@ -185,8 +187,10 @@ ModList::selCB(void *ptrToThis, SoPath *path)
     
     if (id < 0) {
 
-	if (pmDebugOptions.appl1)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_APPL1)
 	    cerr << "ModList::selCB: Nothing selected" << endl;
+#endif
 
 	return;
 	/*NOTREACHED*/
@@ -196,11 +200,13 @@ ModList::selCB(void *ptrToThis, SoPath *path)
 	obj = me->_list[id];
 	oldCount = me->_selList[id];
 
-	if (pmDebugOptions.appl1)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_APPL1)
 	    cerr << "ModList::selCB: Before Selected [" << id << "] = "
 		 << *obj << endl 
 		 << "oldCount = " << oldCount << ", _numSel = "
 		 << me->_numSel << ", _allFlag = false" << endl; 
+#endif
 
 	me->_selList[id] = obj->select(path);
 
@@ -215,7 +221,8 @@ ModList::selCB(void *ptrToThis, SoPath *path)
     if (me->_selInvCB != NULL)
 	(*(me->_selInvCB))(me, path);
 
-    if (pmDebugOptions.appl1) {
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_APPL1) {
 	cerr << "ModList::selCB: After Selected [" << id << "] " << endl
 	     << "oldCount = " << oldCount << ", _numSel = "
 	     << me->_numSel << ", _allFlag = " 
@@ -224,6 +231,7 @@ ModList::selCB(void *ptrToThis, SoPath *path)
 	cerr << "ModList::selCB: selection state:" << endl;
 	me->dumpSelections(cerr);
     }
+#endif
 }
 
 void
@@ -239,8 +247,10 @@ ModList::deselectCB(void *ptrToThis, SoPath *path)
 
     if (id < 0) {
 
-	if (pmDebugOptions.appl1)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_APPL1)
 	    cerr << "ModList::deselectCB: Nothing deselected" << endl;
+#endif
 
 	return;
 	/*NOTREACHED*/
@@ -248,9 +258,11 @@ ModList::deselectCB(void *ptrToThis, SoPath *path)
 
     obj = me->_list[id];
 
-    if (pmDebugOptions.appl1)
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_APPL1)
 	cerr << "ModList::deselectCB: Deselected [" << id << "] = "
 	     << *obj << endl;
+#endif
 
     oldCount = me->_selList[id];
     me->_selList[id] = obj->remove(path);
@@ -270,10 +282,12 @@ ModList::deselectCB(void *ptrToThis, SoPath *path)
     if (me->_deselInvCB != NULL)
 	(*(me->_deselInvCB))(me, path);
 
-    if (pmDebugOptions.appl1) {
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_APPL1) {
 	cerr << "ModList::deselectCB: selection state:" << endl;
 	me->dumpSelections(cerr);
     }
+#endif
 }
 
 void
@@ -302,8 +316,10 @@ ModList::motionCB(void *ptrToThis, SoEventCallback *theEvent)
 	    (*me)[me->_current].removeInfo(path);
 	    me->_current = me->size();
 
-	    if (pmDebugOptions.appl1)
+#ifdef PCP_DEBUG
+	    if (pmDebug & DBG_TRACE_APPL1)
 		cerr << "ModList::motionCB: remove object " << id << endl;
+#endif
 	}
     }
     else if (me->_current != id) {
@@ -312,14 +328,18 @@ ModList::motionCB(void *ptrToThis, SoEventCallback *theEvent)
 	me->_current = id;
 	(*me)[me->_current].selectInfo(path);
 
-    if (pmDebugOptions.appl1)
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_APPL1)
 	cerr << "ModList::motionCB: new object " << id << endl;
+#endif
     }
     else {
 	(*me)[me->_current].selectInfo(path);
 
-	if (pmDebugOptions.appl1)
-	    cerr << "ModList::motionCB: same object " << id << endl;
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_APPL1)
+	cerr << "ModList::motionCB: same object " << id << endl;
+#endif
     }
 
     // Note: the call to _selCB below used to only be done if the guard
@@ -355,9 +375,11 @@ ModList::launch(Launch &launch, bool all) const
 
     if (all == false && _numSel > 0) {
 
-	if (pmDebugOptions.appl1)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_APPL1)
 	    cerr << "ModList::launch: launching for " << _numSel
 		 << " objects" << endl;
+#endif
 
 	for (i = 0; i < _selList.size(); i++) {
 	    if (_selList[i] > 0)
@@ -366,8 +388,10 @@ ModList::launch(Launch &launch, bool all) const
     }
     else {
 
-	if (pmDebugOptions.appl1)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_APPL1)
 	    cerr << "ModList::launch: launching for all objects" << endl;
+#endif
 
 	for (i = 0; i < _list.size(); i++)
 	    _list[i]->launch(launch, true);
@@ -401,8 +425,10 @@ ModList::oneSelPath() const
 void
 ModList::deselectPath(SoPath *path)
 {
-    if (pmDebugOptions.appl1)
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_APPL1)
 	cerr << "ModList::deselectPath:" << endl;
+#endif
 
     _selection->deselect(path);
     deselectCB(this, path);
@@ -415,8 +441,10 @@ ModList::selectAllId(SoNode *node, int count)
 
     _allId = findToken(path);
 
-    if (pmDebugOptions.appl1)
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_APPL1)
 	cerr << "ModList::selectAllId: Select All on " << _allId << endl;
+#endif
 
     if (_allId > 0) {
 	_numSel += count - _selList[_allId];

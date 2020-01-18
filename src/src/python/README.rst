@@ -14,4 +14,4 @@ monitoring of distributed processing.
 
 For more information and details on how to contribute to the PCP project
 visit `pcp.io
-<https://pcp.io/community.html>`_.
+<http://pcp.io/community.html>`_.

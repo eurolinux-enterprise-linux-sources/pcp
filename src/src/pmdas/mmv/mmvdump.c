@@ -17,10 +17,9 @@
 #include <pcp/pmapi.h>
 #include <pcp/mmv_stats.h>
 #include <pcp/mmv_dev.h>
-#include <pcp/libpcp.h>
+#include <pcp/impl.h>
 #include <inttypes.h>
 #include <sys/stat.h>
-#include <strings.h>
 
 int
 dump_indoms(void *addr, size_t size, int idx, long base, __uint64_t offset, __int32_t count)
@@ -385,7 +384,7 @@ dump_value(void *addr, size_t size, mmv_disk_value_t *vals, int i, int toc, int 
 	printf(" = \"%s\"", string->payload);
 	break;
     case MMV_TYPE_ELAPSED:
-	pmtimevalNow(&tv);
+	__pmtimevalNow(&tv);
 	t = vals[i].value.ll;
 	if (vals[i].extra < 0)
 	    t += ((tv.tv_sec*1e6 + tv.tv_usec) + vals[i].extra);
@@ -535,34 +534,6 @@ dump_strings(void *addr, size_t size, int idx, long base, __uint64_t offset, __i
     return 0;
 }
 
-int
-dump_labels(void *addr, size_t size, int idx, long base, __uint64_t offset, __int32_t count)
-{
-    int i;
-    mmv_disk_label_t *lb = (mmv_disk_label_t *)((char *)addr + offset);
-
-    printf("\nTOC[%d]: offset %ld, labels offset %"PRIi64" (%d entries)\n",
-		idx, base, offset, count);
-
-    for (i = 0; i < count; i++) {
-	__uint64_t off = offset + i * sizeof(mmv_disk_label_t);
-
-	if (size < off + sizeof(mmv_disk_label_t)) {
-	    printf("Bad file size: too small for toc[%d] metric[%d]\n", idx, i);
-	    return 1;
-	}
-	printf("  [%u/%"PRIu64"] %s\n",
-		i+1, offset + i * sizeof(mmv_disk_label_t), 
-		lb[i].payload);
-	printf("        flags=0x%x, identity=0x%x\n",
-		lb[i].flags, lb[i].identity);
-	printf("        internal=0x%x\n",
-		lb[i].internal);
-    }
-    
-    return 0;
-}
-
 static char *
 flagstr(int flags)
 {
@@ -615,9 +586,7 @@ dump(const char *file, void *addr, size_t size)
 	return 1;
     }
     version = hdr->version;
-    if (version != MMV_VERSION1 && version != MMV_VERSION2 &&
-	version != MMV_VERSION3)
-    {
+    if (version != MMV_VERSION1 && version != MMV_VERSION2) {
 	printf("Version %d not supported\n", version);
 	return 1;
     }
@@ -684,10 +653,6 @@ dump(const char *file, void *addr, size_t size)
 	    if (dump_strings(addr, size, i, base, offset, count))
 		sts = 1;
 	    break;
-	case MMV_TOC_LABELS:
-	    if (dump_labels(addr, size, i, base, offset, count))
-		sts = 1;
-	    break;    
 	default:
 	    printf("Unrecognised TOC[%d] type: 0x%x\n", i, type);
 	    sts = 1;
@@ -713,7 +678,7 @@ main(int argc, char **argv)
     else
 	pmsprintf(file, MAXPATHLEN, "%s%cmmv%ctest",
 		pmGetConfig("PCP_TMP_DIR"),
-		pmPathSeparator(), pmPathSeparator());
+		__pmPathSeparator(), __pmPathSeparator());
     file[MAXPATHLEN-1] = '\0';
 
     if ((fd = open(file, O_RDONLY)) < 0)

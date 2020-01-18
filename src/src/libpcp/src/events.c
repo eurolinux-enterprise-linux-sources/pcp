@@ -24,7 +24,7 @@
  */
 #include <inttypes.h>
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "internal.h"
 #include "fault.h"
 
@@ -112,12 +112,9 @@ dump_parameter(FILE *f, pmEventParameter *epp)
 	case PM_TYPE_AGGREGATE_STATIC:
 	    fprintf(f, " = [%08x...]", ((__uint32_t *)vbuf)[0]);
 	    break;
-	case PM_TYPE_UNKNOWN:
-	    fprintf(f, " : unknown type");
-	    break;
 	default:
-	    fprintf(f, " : bad type %u", epp->ep_type);
-	    break;
+	    fprintf(f, " : bad type %s",
+		    pmTypeStr_r(epp->ep_type, strbuf, sizeof(strbuf)));
     }
     fputc('\n', f);
 }
@@ -359,7 +356,7 @@ __pmCheckEventRecords(pmValueSet *vsp, int idx)
     return check_event_records(vsp, idx, 0);
 }
 
-static int
+int
 __pmCheckHighResEventRecords(pmValueSet *vsp, int idx)
 {
     return check_event_records(vsp, idx, 1);
@@ -406,7 +403,7 @@ PM_FAULT_POINT("libpcp/" __FILE__ ":2", PM_FAULT_ALLOC);
 	    if ((sts = pmLookupName(1, &name, &pmid_flags)) < 0) {
 		fprintf(stderr, "%s: Warning: failed to get PMID for %s: %s\n",
 			caller, name, pmErrStr_r(sts, errmsg, sizeof(errmsg)));
-		pmid_flags = pmID_build(pmID_domain(pmid_flags), pmID_cluster(pmid_flags), 1);
+		__pmid_int(&pmid_flags)->item = 1;
 	    }
 	}
 	vset->pmid = pmid_flags;
@@ -426,7 +423,7 @@ PM_FAULT_POINT("libpcp/" __FILE__ ":2", PM_FAULT_ALLOC);
 	    if ((sts = pmLookupName(1, &name, &pmid_missed)) < 0) {
 		fprintf(stderr, "%s: Warning: failed to get PMID for %s: %s\n",
 			caller, name, pmErrStr_r(sts, errmsg, sizeof(errmsg)));
-		pmid_missed = pmID_build(pmID_domain(pmid_missed), pmID_cluster(pmid_missed), 1);
+		__pmid_int(&pmid_missed)->item = 1;
 	    }
 	}
 	vset->pmid = pmid_missed;
@@ -499,7 +496,6 @@ static int
 UnpackEventRecords(__pmContext *ctxp, pmValueSet *vsp, int idx, pmResult ***rap)
 {
     pmEventArray	*eap;
-    pmResult		**rpp;
     const char		caller[] = "pmUnpackEventRecords";
     char		*base;
     size_t		need;
@@ -525,9 +521,8 @@ UnpackEventRecords(__pmContext *ctxp, pmValueSet *vsp, int idx, pmResult ***rap)
      */
 PM_FAULT_POINT("libpcp/" __FILE__ ":1", PM_FAULT_ALLOC);
     need = (eap->ea_nrecords + 1) * sizeof(pmResult *);
-    if ((rpp = (pmResult **)malloc(need)) == NULL)
+    if ((*rap = (pmResult **)malloc(need)) == NULL)
 	return -oserror();
-    *rap = rpp;
 
     base = (char *)&eap->ea_record[0];
     /* walk packed event record array */
@@ -600,7 +595,6 @@ int
 pmUnpackHighResEventRecords(pmValueSet *vsp, int idx, pmHighResResult ***rap)
 {
     pmHighResEventArray	*hreap;
-    pmHighResResult	**rpp;
     const char		caller[] = "pmUnpackHighResEventRecords";
     char		*base;
     size_t		need;
@@ -626,9 +620,8 @@ pmUnpackHighResEventRecords(pmValueSet *vsp, int idx, pmHighResResult ***rap)
      */
 PM_FAULT_POINT("libpcp/" __FILE__ ":7", PM_FAULT_ALLOC);
     need = (hreap->ea_nrecords + 1) * sizeof(pmHighResResult *);
-    if ((rpp = (pmHighResResult **)malloc(need)) == NULL)
+    if ((*rap = (pmHighResResult **)malloc(need)) == NULL)
 	return -oserror();
-    *rap = rpp;
 
     base = (char *)&hreap->ea_record[0];
     /* walk packed event record array */
@@ -677,7 +670,7 @@ PM_FAULT_POINT("libpcp/" __FILE__ ":8", PM_FAULT_ALLOC);
 bail:
     while (r >= 0) {
 	if ((*rap)[r] != NULL)
-	    __pmFreeHighResResult((*rap)[r]);
+	    pmFreeHighResResult((*rap)[r]);
 	r--;
     }
     free(*rap);
@@ -705,6 +698,6 @@ pmFreeHighResEventResult(pmHighResResult **rset)
     if (rset == NULL)
 	return;
     for (r = 0; rset[r] != NULL; r++)
-	__pmFreeHighResResult(rset[r]);
+	pmFreeHighResResult(rset[r]);
     free(rset);
 }

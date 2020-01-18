@@ -88,7 +88,7 @@ Options:\n\
   -t timeout   time in seconds before aborting the wait for individual\n\
                commands to complete [default 20 seconds]\n\
   -U username  run the agent and commands as alternate user [default \"pcp\"]\n",
-	pmGetProgname());
+	pmProgname);
     exit(1);
 }
 
@@ -99,7 +99,7 @@ main(int argc, char **argv)
     int			n = 0;
     int			i;
     int			err = 0;
-    int			sep = pmPathSeparator();
+    int			sep = __pmPathSeparator();
     int			line;
     int                 numcmd = 0;
     int                 parseonly = 0;
@@ -111,12 +111,12 @@ main(int argc, char **argv)
     char		lbuf[256];
     char		mypath[MAXPATHLEN];
 
-    pmSetProgname(argv[0]);
-    pmGetUsername(&username);
+    __pmSetProgname(argv[0]);
+    __pmGetUsername(&username);
 
     pmsprintf(mypath, sizeof(mypath), "%s%c" "shping" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-    pmdaDaemon(&dispatch, PMDA_INTERFACE_2, pmGetProgname(), SHPING, 
+    pmdaDaemon(&dispatch, PMDA_INTERFACE_2, pmProgname, SHPING, 
 		"shping.log", mypath);
 
     while ((n = pmdaGetOpt(argc, argv,"CD:d:I:l:t:U:?",
@@ -132,7 +132,7 @@ main(int argc, char **argv)
 		if (*endnum != '\0') {
 		    fprintf(stderr, 
 		    	    "%s: -I requires number of seconds as argument\n",
-			    pmGetProgname());
+			    pmProgname);
 		    err++;
 		}
 		break;
@@ -142,7 +142,7 @@ main(int argc, char **argv)
 		if (*endnum != '\0') {
 		    fprintf(stderr, 
 		    	    "%s: -t requires number of seconds as argument\n",
-			    pmGetProgname());
+			    pmProgname);
 		    err++;
 		}
 		break;
@@ -163,7 +163,7 @@ main(int argc, char **argv)
     configfile = argv[optind];
     if ((conf = fopen(configfile, "r")) == NULL) {
 	fprintf(stderr, "%s: Unable to open config file \"%s\": %s\n",
-	    pmGetProgname(), configfile, osstrerror());
+	    pmProgname, configfile, osstrerror());
 	exit(1);
     }
     line = 0;
@@ -195,7 +195,7 @@ main(int argc, char **argv)
 	if (parseonly)
 	    continue;
 	if ((cmdlist = (cmd_t *)realloc(cmdlist, numcmd * sizeof(cmd_t))) == NULL) {
-	    pmNoMem("main:cmdlist", numcmd * sizeof(cmd_t), 
+	    __pmNoMem("main:cmdlist", numcmd * sizeof(cmd_t), 
 		     PM_FATAL_ERR);
 	}
 
@@ -216,7 +216,7 @@ main(int argc, char **argv)
 
     if (numcmd == 0) {
 	fprintf(stderr, "%s: No commands in config file \"%s\"?\n",
-	    pmGetProgname(), configfile);
+	    pmProgname, configfile);
 	exit(1);
     }
     else if (parseonly)
@@ -233,7 +233,7 @@ main(int argc, char **argv)
     /* set up indom description */
     indomtab.it_numinst = numcmd;
     if ((indomtab.it_set = (pmdaInstid *)malloc(numcmd*sizeof(pmdaInstid))) == NULL) {
-	pmNoMem("main.indomtab", numcmd * sizeof(pmdaInstid), PM_FATAL_ERR);
+	__pmNoMem("main.indomtab", numcmd * sizeof(pmdaInstid), PM_FATAL_ERR);
     }
     for (i = 0; i < numcmd; i++) {
 	indomtab.it_set[i].i_inst = i;
@@ -245,7 +245,7 @@ main(int argc, char **argv)
 #endif
 
     pmdaOpenLog(&dispatch);
-    pmSetProcessIdentity(username);
+    __pmSetProcessIdentity(username);
 
     shping_init(&dispatch);
     pmdaConnect(&dispatch);

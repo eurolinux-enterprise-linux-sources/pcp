@@ -13,6 +13,7 @@
  */
 
 #include "pmapi.h"
+#include "impl.h"
 #include "trace.h"
 
 typedef enum { UNKNOWN, COUNTER, OBSERVE, TRANSACT } trace_t;
@@ -37,8 +38,8 @@ main(int argc, char **argv)
 	} arg;
     } api;
 
-    pmSetProgname(argv[0]);
-    me = pmGetProgname();
+    __pmSetProgname(argv[0]);
+    me = pmProgname;
 
     memset(&api, 0, sizeof(api));
 

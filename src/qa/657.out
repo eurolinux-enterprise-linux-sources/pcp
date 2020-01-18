@@ -1,15 +1,21 @@
 QA output created by 657
+Waiting for pmcd to terminate ...
 
 === Setting up QA fakeroot testing data ===
 
 === Installing Device Mapper PMDA ===
-Updating the Performance Metrics Name Space (PMNS) ...
+You will need to choose an appropriate configuration for installation of
+the "dm" Performance Metrics Domain Agent (PMDA).
+  collector	collect performance statistics on this system
+  monitor	allow this system to monitor local and/or remote systems
+  both		collector and monitor configuration for this system
+Please enter c(ollector) or m(onitor) or b(oth) [b] Updating the Performance Metrics Name Space (PMNS) ...
 Terminate PMDA if already installed ...
 [...install files, make output...]
 Updating the PMCD control file, and notifying PMCD ...
-Check dmcache metrics have appeared ... 16 metrics and X values
-Check dmthin metrics have appeared ... 13 metrics and X values
-Check dmstats metrics have appeared ... 15 metrics and X values
+Check dmcache metrics have appeared ... 16 metrics and 16 values
+Check dmthin metrics have appeared ... 13 metrics and 16 values
+Check dmstats metrics have appeared ... 13 metrics and 0 values
 
 === Check dm-cache metrics ===
 
@@ -228,3 +234,6 @@ Help:
 The highest mapped sector of the thin volume.
     inst [0 or "vg_1-lv3"] value 8388607
     inst [1 or "vg_1-lv2"] value 8388607
+Waiting for pmcd to terminate ...
+Starting pmcd ... 
+Starting pmlogger ... 

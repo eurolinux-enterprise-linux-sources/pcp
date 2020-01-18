@@ -31,7 +31,7 @@ IAM	= simple
 DOMAIN	= SIMPLE
 PMDADIR	= $(PCP_PMDAS_DIR)/$(IAM)
 
-LDIRT	= domain.h *.o $(IAM).log pmda$(IAM) pmda_$(IAM).$(DSOSUFFIX)
+LDIRT	= domain.h *.o $(IAM).log pmda$(IAM) pmda_$(IAM).so
 
 default_pcp default:	$(CMDTARGET) $(LIBTARGET)
 

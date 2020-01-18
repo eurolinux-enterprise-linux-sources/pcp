@@ -1,6 +1,6 @@
 '\"macro stdmacro
 .\"
-.\" Copyright (c) 2012-2017,2019 Red Hat.
+.\" Copyright (c) 2012-2016 Red Hat.
 .\" Copyright (c) 2000 Silicon Graphics, Inc.  All Rights Reserved.
 .\" 
 .\" This program is free software; you can redistribute it and/or modify it
@@ -596,16 +596,8 @@ The value for this parameter should be
 Additionally, the \f2protocol\fP can include the \f3notready\fP keyword
 to indicate that the agent must be marked as not being ready to process
 requests from \f3pmcd\f1. The agent will explicitly notify the \f3pmcd\fP
-when it is ready to process the requests by sending a \f3PM_ERR_PMDAREADY\fP 
+when it is ready to process the requests by sending \f3PM_ERR_PMDAREADY\fP 
 PDU.
-For further details of this protocol, including a description of the
-IPC parameters that can be specified in a PMDA
-.B Install
-script with the
-.B ipc_prot
-parameter,
-see the relevant section in
-.BR PMDA (3). 
 .PD
 .TP 14
 .I command
@@ -647,16 +639,6 @@ The access control section of the file must start with a line of the form:
 .TP
 .B [access]
 .PP
-In addition to (or instead of) the access section in the
-.B pmcd
-configuration file, access control specifications are also
-read from a file having the same name as the
-.B pmcd
-configuration file, but with '.access' appended to the name.
-This optional file must not contain the
-.B [access]
-keyword.
-.PP
 Leading and trailing whitespace may appear around and within the brackets and
 the case of the
 .B access
@@ -673,11 +655,8 @@ There are two kinds of operations that occur via
 .B fetch
 allows retrieval of information from
 .BR pmcd .
-This may be information about a metric (e.g. its description, instance domain,
-labels or help text) or a value for a metric.
-See
-.BR pminfo (1)
-for further information.
+This may be information about a metric (e.g. its description, instance domain
+or help text) or a value for a metric.
 .TP 15
 .B store
 allows
@@ -688,9 +667,6 @@ zero).  Alternatively, it may be a value used by the PMDA to introduce a
 change to some aspect of monitoring of that metric (e.g. server side event
 filtering) \- possibly even only for the active client tool performing the
 store operation, and not others.
-See
-.BR pmstore (1)
-for further information.
 .PP
 Access to
 .B pmcd
@@ -1016,39 +992,6 @@ However,
 reconfiguration (see the next section) re-evaluates all the connection counts
 and will cause client connections to be dropped where connection limits have
 been exceeded.
-.SH "AGENT FENCING"
-Preventing sampling during the life of a PMDA is sometimes desirable, for
-example if that sampling impacts on sensitive phases of a scheduled job.
-A temporary ``fence'' can be raised to block all PMAPI client access to
-one or more agents in this situation.
-This functionality is provided by the built-in PMCD PMDA and the
-.B pmstore (1)
-command, as in
-.PP
-.CS
-# pmstore \-i nfsclient,kvm pmcd.agent.fenced 1
-.CE
-.PP
-If the optional comma-separated list of agent names is omitted, all agents
-will be fenced.
-To resume normal operation, the ``fence'' can be lowered as follows
-.PP
-.CS
-# pmstore \-i nfsclient,kvm pmcd.agent.fenced 0
-.CE
-.PP
-Lowering the fence for all PMDAs at once is performed using
-.PP
-.CS
-# pmstore pmcd.agent.fenced 0
-.CE
-.PP
-Elevated privileges are required to store to the
-.I pmcd.agent.fenced
-metric.
-For additional information, see the help text associated with this metric,
-which can be accessed using the fI\-T\fB, \fB\-\-helptext\fR option to
-.BR pminfo (1).
 .SH "RECONFIGURING PMCD"
 If the configuration file has been changed or if an agent is not responding
 because it has terminated or the PMNS has been changed,
@@ -1071,9 +1014,8 @@ Errors are reported in the
 .B pmcd
 log file.
 .PP
-It also checks the PMNS file and any labels files for changes.
-If any of these files have been modified, then the PMNS and/or
-context labels are reloaded.
+It also checks the PMNS file for changes. If the PMNS file has been
+modified, then it is reloaded.
 Use of
 .BR tail (1)
 on the log file is recommended while reconfiguring
@@ -1199,9 +1141,6 @@ for details).
 .I $PCP_PMCDCONF_PATH
 default configuration file
 .TP
-.I $PCP_PMCDCONF_PATH.access
-optional access control specification file
-.TP
 .I $PCP_PMCDOPTIONS_PATH
 command line options to
 .B pmcd
@@ -1216,28 +1155,17 @@ additional environment variables that will be set when
 executes.
 Only settings of the form "PMCD_VARIABLE=value" will be honoured.
 .TP
-.B $PCP_SYSCONF_DIR/labels
-directory of files containing the global metric labels that will be
-set for every client context created by
-.BR pmcd .
-File names starting with a ``.'' are ignored, and files ending in
-``.json'' are ``JSONB'' formatted name:value pairs.
-The merged set can be queried via the
-.B pmcd.labels
-metric.
-Context labels are applied universally to all values.
-.TP
 .B \&./pmcd.log
 (or
 .B $PCP_LOG_DIR/pmcd/pmcd.log
 when started automatically)
-.br
-All messages and diagnostics are directed here.
 .TP
 .B $PCP_RUN_DIR/pmcd.pid
 contains an ascii decimal representation of the process ID of 
-.BR pmcd ,
-when it's running.
+.B pmcd
+, when it's running.
+.br
+All messages and diagnostics are directed here
 .TP
 .B /etc/pki/nssdb
 default Network Security Services (NSS) certificate database

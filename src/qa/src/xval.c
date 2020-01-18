@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 static int type[] = {
     PM_TYPE_32, PM_TYPE_U32, PM_TYPE_64, PM_TYPE_U64, PM_TYPE_FLOAT, PM_TYPE_DOUBLE, PM_TYPE_STRING, PM_TYPE_AGGREGATE, PM_TYPE_EVENT, PM_TYPE_HIGHRES_EVENT };
@@ -35,11 +36,11 @@ _y(void *ap, int type)
 	    break;
 	case PM_TYPE_64:
 	    /* avoid alignment problems */
-	    printf("%" FMT_INT64, av.ll);
+	    printf("%lld", (long long)av.ll);
 	    break;
 	case PM_TYPE_U64:
 	    /* avoid alignment problems */
-	    printf("%" FMT_UINT64, av.ull);
+	    printf("%llu", (unsigned long long)av.ull);
 	    break;
 	case PM_TYPE_FLOAT:
 	    printf("%e", (double)av.f);
@@ -104,9 +105,7 @@ main(int argc, char *argv[])
     int		valfmt;
     int		vflag = 0;	/* set to 1 to show all results */
     int		sgn = 1;	/* -u to force 64 unsigned from command line value */
-    __int64_t 	llv;
-    char	*fmt_int64x;
-    char	*p;
+    long long 	llv;
 
     ea.ea_nrecords = 1;
     ea.ea_record[0].er_nparams = 0;
@@ -145,28 +144,11 @@ main(int argc, char *argv[])
 	    continue;
 	}
 	/* note value is in hex! */
-	fmt_int64x = strdup("%" FMT_INT64);
-	for (p = fmt_int64x; *p; p++)
-	    ;
-	p--;
-	if (*p != 'd') {
-	    fprintf(stderr, "Botch: expect FMT_INT64 (%s) to end in 'd'\n", FMT_INT64);
-	    exit (1);
-	}
-	*p = 'x';
-	sscanf(argv[0], fmt_int64x, &llv);
-	if (sgn) {
-	    printf("\nValue: %" FMT_INT64, llv);
-	    printf(" 0x");
-	    printf(fmt_int64x, llv);
-	    putchar('\n');
-	}
-	else {
-	    printf("\nValue: %" FMT_UINT64, llv);
-	    printf(" 0x");
-	    printf(fmt_int64x, llv);
-	    putchar('\n');
-	}
+	sscanf(argv[0], "%llx", &llv);
+	if (sgn)
+	    printf("\nValue: %lld 0x%016llx\n", llv, llv);
+	else
+	    printf("\nValue: %llu 0x%016llx\n", (unsigned long long)llv, llv);
 
 	for (i = 0; i < sizeof(type)/sizeof(type[0]); i++) {
 	    valfmt = PM_VAL_INSITU;
@@ -225,7 +207,7 @@ main(int argc, char *argv[])
 		case PM_TYPE_STRING:
 		    valfmt = PM_VAL_SPTR;
 		    pv.value.pval = vbp;
-		    pmsprintf(vbp->vbuf, len, "%" FMT_INT64, llv);
+		    pmsprintf(vbp->vbuf, len, "%lld", llv);
 		    vbp->vlen = PM_VAL_HDR_SIZE + strlen(vbp->vbuf) + 1;
 		    vbp->vtype = PM_TYPE_STRING;
 		    ap = &bv;
@@ -436,7 +418,7 @@ error_cases:
     if ((e = pmExtractValue(PM_VAL_INSITU, &pv, PM_TYPE_FLOAT, &av, PM_TYPE_64)) < 0)
 	printf("%s\n", pmErrStr(e));
     else
-	printf("%" FMT_INT64 "\n", av.ll);
+	printf("%lld\n", (long long)av.ll);
 
     bv.f = (float)0x7fffffffffffffffLL;
     memcpy(avp, (void *)&bv.f, sizeof(bv.f));
@@ -444,7 +426,7 @@ error_cases:
     if ((e = pmExtractValue(PM_VAL_INSITU, &pv, PM_TYPE_FLOAT, &av, PM_TYPE_64)) < 0)
 	printf("%s\n", pmErrStr(e));
     else
-	printf("%" FMT_INT64 "\n", av.ll);
+	printf("%lld\n", (long long)av.ll);
 
     bv.f = 123.456;
     memcpy(avp, (void *)&bv.f, sizeof(bv.f));
@@ -452,7 +434,7 @@ error_cases:
     if ((e = pmExtractValue(PM_VAL_INSITU, &pv, PM_TYPE_FLOAT, &av, PM_TYPE_U64)) < 0)
 	printf("%s\n", pmErrStr(e));
     else
-	printf("%" FMT_UINT64 "\n", av.ull);
+	printf("%llu\n", (unsigned long long)av.ull);
 
     bv.f = (float)((unsigned long long)0xffffffffffffffffLL);
     memcpy(avp, (void *)&bv.f, sizeof(bv.f));
@@ -460,7 +442,7 @@ error_cases:
     if ((e = pmExtractValue(PM_VAL_INSITU, &pv, PM_TYPE_FLOAT, &av, PM_TYPE_U64)) < 0)
 	printf("%s\n", pmErrStr(e));
     else
-	printf("%" FMT_UINT64 "\n", av.ull);
+	printf("%llu\n", (unsigned long long)av.ull);
 
     bv.f = -123.456;
     memcpy(avp, (void *)&bv.f, sizeof(bv.f));
@@ -468,7 +450,7 @@ error_cases:
     if ((e = pmExtractValue(PM_VAL_INSITU, &pv, PM_TYPE_FLOAT, &av, PM_TYPE_U64)) < 0)
 	printf("%s\n", pmErrStr(e));
     else
-	printf("%" FMT_UINT64 "\n", av.ull);
+	printf("%llu\n", (unsigned long long)av.ull);
 
     bv.f = 123.45678;
     memcpy(avp, (void *)&bv.f, sizeof(bv.f));
@@ -492,19 +474,19 @@ error_cases:
     avp = (void *)vbp->vbuf;
     bv.ll = 12345;
     memcpy(avp, (void *)&bv.ll, sizeof(bv.ll));
-    printf("bad 64: %" FMT_INT64 " -> 64: ", bv.ll);
+    printf("bad 64: %12lld -> 64: ", (long long)bv.ll);
     if ((e = pmExtractValue(PM_VAL_SPTR, &pv, PM_TYPE_64, &av, PM_TYPE_64)) < 0)
 	printf("%s\n", pmErrStr(e));
     else
-	printf("%" FMT_INT64 "\n", av.ll);
+	printf("%12lld\n", (long long)av.ll);
 
     vbp->vlen = PM_VAL_HDR_SIZE + sizeof(bv.ull);
     memcpy(avp, (void *)&bv.ull, sizeof(bv.ull));
-    printf("bad U64: %" FMT_UINT64 " -> U64: ", bv.ull);
+    printf("bad U64: %12llu -> U64: ", (unsigned long long)bv.ull);
     if ((e = pmExtractValue(PM_VAL_SPTR, &pv, PM_TYPE_U64, &av, PM_TYPE_U64)) < 0)
 	printf("%s\n", pmErrStr(e));
     else
-	printf("%" FMT_UINT64 "\n", av.ull);
+	printf("%12llu\n", (unsigned long long)av.ull);
 
     vbp->vlen = PM_VAL_HDR_SIZE + sizeof(bv.f);
     bv.f = 123.456;

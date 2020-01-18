@@ -56,5 +56,3 @@ $(OBJECTS): domain.h
 
 domain.h: ../../pmns/stdpmid
 	$(DOMAIN_MAKERULE)
-
-event.o util.o:	$(TOPDIR)/src/include/pcp/libpcp.h

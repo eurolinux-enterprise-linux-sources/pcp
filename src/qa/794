@@ -8,10 +8,9 @@
 seq=`basename $0`
 echo "QA output created by $seq"
 
-. ./common.containers
+. ./common.docker
 
 _check_containers
-_check_docker_binary
 _check_docker_images busybox
 count=`_count_docker_containers`
 [ "$count" -gt 0 ] && \
@@ -34,8 +33,7 @@ trap "_cleanup; exit \$status" 0 1 2 3 15
 
 _filter()
 {
-    tee -a $seq.full \
-    | sed \
+    sed \
 	-e "s/\[.*\]: /[INST]: /g" \
 	-e "s/$container/CONTAINER/g" \
 	-e "s/$container_hostname/CONTAINER_HOSTNAME/g" \
@@ -46,11 +44,9 @@ _filter()
 
 _exclude_clients()
 {
-    # remove any long-running clients (pmlogger/pmie) or
-    # anonymous clients (whoami == "")
-    #
+    # remove any long-running clients (pmlogger/pmie)
     pminfo -f pmcd.client.whoami | \
-    egrep 'pmlogger|pmie|""' | \
+    egrep ' pmlogger | pmie ' | \
     sed -e 's/ *inst \[\([0-9][0-9]*\) or .*/-x \1 /g'
 }
 

@@ -6,7 +6,7 @@
 
 set -e # detect syntax errors or subsidiary command failures
 sts=1  # presume failure, in case of an unexpected early exit
-tmp=`mktemp -d /tmp/pcp.XXXXXXXXX` || exit 1
+tmp=`mktemp -d /var/tmp/pcp.XXXXXXXXX` || exit 1
 trap "rm -rf $tmp; exit \$sts" 0 1 2 3 15
 
 NM=nm
@@ -157,13 +157,12 @@ discovery.o
     group			# single-threaded server scope
     done_default		# guarded by __pmLock_extcall mutex
     def_timeout			# guarded by __pmLock_extcall mutex
+checksum.o
 config.o
     ?__pmNativeConfig		# const
     config_lock		# local mutex
     state			# guarded by config_lock
     ?features			# const
-    ?pcp_dir			# one-trip initialization then read-only
-    ?init			# one-trip initialization then read-only
 connectlocal.o
     atexit_installed		# guarded by __pmLock_libpcp mutex
     buffer			# assert safe, see notes in connectlocal.c
@@ -215,7 +214,7 @@ derive_parser.tab.o
     tokbuf			# guarded by registered.mutex
     tokbuflen			# guarded by registered.mutex
     string			# guarded by registered.mutex
-    lexicon			# guarded by registered.mutex
+    this			# guarded by registered.mutex
     lexpeek			# guarded by registered.mutex
     ?registered			# guarded by registered.mutex
     pmid			# guarded by registered.mutex
@@ -247,11 +246,10 @@ derive_parser.tab.o
     derive_nerrs		# guarded by registered.mutex
     parse_tree			# guarded by registered.mutex
     np				# guarded by registered.mutex
-    in_matchinst		# guarded by registered.mutex
     ?n_eh_str			# guarded by registered.mutex
     ?n_eh_c			# guarded by registered.mutex
     ?l_eh_str			# guarded by registered.mutex
-    ?noUnits			# const
+    noUnits			# const
     ?yyval_default		# local to parser ... depends on yacc/bison version
     ?__emutls_v.derive_errmsg	# thread private (MinGW)
     ?type_c			# const (MinGW)
@@ -301,8 +299,6 @@ getdate.tab.o
     yytable                	# const
     yytranslate            	# const
 getopt.o
-    ?paths                	# const, may be optimized away
-    ?fallback                	# const, may be optimized away
 hash.o
 help.o
 instance.o
@@ -313,29 +309,24 @@ interp.o
     ignore_mark_records		# no unsafe side-effects, see notes in util.c
     ignore_mark_gap		# no unsafe side-effects, see notes in util.c
 io.o
-    compress_ctl		# const
-    ?ncompress			# const
-    sbuf			# one-trip initialization then read-only
 io_stdio.o
      __pm_stdio			# file operations using stdio
-?io_xz.o
-    __pm_xz			# file operations using xz decompression
+io_xz.o
+#    __pm_xz			# file operations using xz decompression
 ipc.o
     ipc_lock			# local mutex
     __pmIPCTable		# guarded by ipc_lock mutex
     __pmLastUsedFd		# guarded by ipc_lock mutex
     ipcentrysize		# guarded by ipc_lock mutex
     ipctablecount		# guarded by ipc_lock mutex
-jsmn.o
-labels.o
 lock.o
-    ?lock_lock			# local mutex
+    lock_lock			# local mutex
     __pmLock_libpcp		# the global libpcp mutex
     __pmLock_extcall		# mutex for calls to external routines that are not thread-safe
     ?init			# local __pmInitLocks mutex
     ?done			# guarded by local __pmInitLocks mutex
     ?__pmTPDKey			# one-trip initialization then read-only
-    ?multi_init			# guarded by lock_lock mutex
+    multi_init			# guarded by lock_lock mutex
     ?multi_seen			# guarded by lock_lock mutex
     ?hashctl			# for lock debug tracing
     ?__pmTPDKey			# if don't have __thread support
@@ -355,6 +346,8 @@ logportmap.o
 logutil.o
     logutil_lock		# local mutex
     tbuf			# __pmLogName deprecated by __pmLogName_r
+    compress_ctl		# const
+    ?ncompress			# const
     ?__pmLogReads		# diag counter, no atomic updates
     pc_hc			# guarded by logutil_lock mutex
 secureserver.o
@@ -394,8 +387,6 @@ profile.o
 p_text.o
 p_fetch.o
 p_instance.o
-p_label.o
-    ?type			# const
 p_lcontrol.o
 p_lrequest.o
 p_lstatus.o
@@ -429,6 +420,8 @@ pmns.o
 p_pmns.o
 p_profile.o
 p_result.o
+probe.o
+    ?againWait			# const (LLVM)
 profile.o
 p_text.o
 rtime.o
@@ -441,14 +434,10 @@ rtime.o
     ?months			# const (MinGW)
     ?wdays			# const (MinGW)
     ?startend_relative_terms	# const
-shellprobe.o
-    ?againWait			# const (LLVM)
 sortinst.o
 spec.o
 store.o
 stuffvalue.o
-subnetprobe.o
-    ?againWait			# const (LLVM)
 tv.o
 tz.o
     curzone			# guarded by __pmLock_libpcp mutex
@@ -460,9 +449,10 @@ tz.o
     tzbuffer			# guarded by __pmLock_libpcp mutex
     ?wildabbr			# const (MinGW)
 units.o
+    typename			# const
     abuf			# pmAtomStr deprecated by pmAtomStr_r
+    tbuf			# pmTypeStr deprecated by pmTypeStr_r
     ubuf			# pmUnitsStr deprecated by pmUnitsStr_r
-    ?errmsg			# const
     count_keywords              # const
     exponent_keywords           # const
     space_keywords              # const
@@ -475,6 +465,7 @@ util.o
     indombuf			# pmInDomStr deprecated by pmInDomStr_r
     ebuf			# pmEventFlagsStr deprecated by pmEventFlagsStr_r
     nbuf			# pmNumberStr deprecated by pmNumberStr_r
+    ?unknownVal			# const, variable may be optimized away by gcc
     debug_map			# const
     ?num_debug			# const
     pmState			# no unsafe side-effects, see notes in util.c
@@ -487,26 +478,24 @@ util.o
     nfilelog			# guarded by util_lock mutex
     dosyslog			# no unsafe side-effects, see notes in util.c
     done_exit			# guarded by util_lock mutex
+    ?pmprintf_atexit_installed	# guarded by __pmLock_libpcp mutex
+    ferr			# guarded by __pmLock_libpcp mutex
     errtype			# no unsafe side-effects, see notes in util.c
-    msgbuf			# guarded by util_lock mutex
-    msgbuflen			# guarded by util_lock mutex
-    msgsize			# guarded by util_lock mutex
-    filename			# guarded by __pmLock_extcall mutex when set
-    				# in a one-trip initialization
+    fptr			# guarded by util_lock mutex
+    fname			# guarded by __pmLock_libpcp mutex
+    msgsize			# guarded by __pmLock_libpcp mutex
     ?base			# no unsafe side-effects, see notes in util.c
+    first			# __pmEventType deprecated by __pmEventType_r
+    last			# __pmEventType deprecated by __pmEventType_r
+    sum				# __pmEventType deprecated by __pmEventType_r
     ?bp				# const
     ?dp_h			# const
     ?dp_l			# const
-    typename			# const
     xconfirm_init		# no unsafe side-effects, see notes in util.c
     xconfirm			# no unsafe side-effects, see notes in util.c
-    ?get			# sbrk(0) hack for Mac OS X, safe
-    ?highwater			# sbrk(0) hack for Mac OS X, safe
-    ?pick			# sbrk(0) hack for Mac OS X, safe
-deprecated.o
+    tmpdir_init			# no unsafe side-effects, see notes in util.c
+    tmpdir			# no unsafe side-effects, see notes in util.c
 ?win32.o
-				# skip statics in win32.c as we don't run this
-				# script for Windows builds
 END				# this is magic, DO NOT DELETE THIS LINE
 End-of-File
 

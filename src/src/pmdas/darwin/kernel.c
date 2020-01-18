@@ -19,6 +19,7 @@
 #include <sys/mount.h>
 #include <mach/mach.h>
 #include "pmapi.h"
+#include "impl.h"
 #include "pmda.h"
 
 #include "darwin.h"
@@ -94,8 +95,8 @@ refresh_uptime(unsigned int *uptime)
 	    return -oserror();
     }
 
-    pmtimevalNow(&timediff);
-    pmtimevalDec(&timediff, &boottime);
+    __pmtimevalNow(&timediff);
+    __pmtimevalDec(&timediff, &boottime);
     *uptime = timediff.tv_sec;
     return 0;
 }

@@ -12,6 +12,7 @@
 #define HOST handle == 0 ? "local:" : host
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 #define NUMCTX 10
 
@@ -63,14 +64,14 @@ main(int argc, char **argv)
     char	*endnum;
     static char	*usage = "[-a archive] [-c dmfile] [-D debugspec] [-h hostname] [-L] [-n namespace] [-s iterations]";
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "a:c:D:h:Ln:s:")) != EOF) {
 	switch (c) {
 
 	case 'a':	/* archive name */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmProgname);
 		errflag++;
 	    }
 	    type = PM_CONTEXT_ARCHIVE;
@@ -80,7 +81,7 @@ main(int argc, char **argv)
 	case 'c':	/* derived metrics config file */
 	    sts = pmLoadDerivedConfig(optarg);
 	    if (sts < 0) {
-		fprintf(stderr, "%s: -c error: %s\n", pmGetProgname(), pmErrStr(sts));
+		fprintf(stderr, "%s: -c error: %s\n", pmProgname, pmErrStr(sts));
 		exit(1);
 	    }
 	    break;
@@ -89,14 +90,14 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
 
 	case 'h':	/* hostname for PMCD to contact */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmProgname);
 		errflag++;
 	    }
 	    host = optarg;
@@ -105,7 +106,7 @@ main(int argc, char **argv)
 
 	case 'L':	/* local mode, no PMCD */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmProgname);
 		errflag++;
 	    }
 	    host = NULL;
@@ -114,7 +115,7 @@ main(int argc, char **argv)
 
 	case 'n':	/* alternative name space file */
 	    if ((sts = pmLoadASCIINameSpace(optarg, 1)) < 0) {
-		fprintf(stderr, "%s: cannot load namespace from \"%s\": %s\n", pmGetProgname(), optarg, pmErrStr(sts));
+		fprintf(stderr, "%s: cannot load namespace from \"%s\": %s\n", pmProgname, optarg, pmErrStr(sts));
 		exit(1);
 	    }
 	    break;
@@ -122,7 +123,7 @@ main(int argc, char **argv)
 	case 's':	/* iterations */
 	    iter = (int)strtol(optarg, &endnum, 10);
 	    if (*endnum != '\0' || iter < 0) {
-		fprintf(stderr, "%s: -s requires positive numeric argument\n", pmGetProgname());
+		fprintf(stderr, "%s: -s requires positive numeric argument\n", pmProgname);
 		errflag++;
 	    }
 	    break;
@@ -135,7 +136,7 @@ main(int argc, char **argv)
     }
 
     if (errflag) {
-	fprintf(stderr, "Usage: %s %s\n", pmGetProgname(), usage);
+	fprintf(stderr, "Usage: %s %s\n", pmProgname, usage);
 	exit(1);
     }
 

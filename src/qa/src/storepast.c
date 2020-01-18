@@ -7,6 +7,7 @@
  */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 int
 main(int argc, char **argv)
@@ -22,14 +23,14 @@ main(int argc, char **argv)
     char	*name = "sample.write_me";
     pmID	pmid;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "a:D:h:n:")) != EOF) {
 	switch (c) {
 
 	case 'a':	/* archive name */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a and/or -h allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a and/or -h allowed\n", pmProgname);
 		errflag++;
 	    }
 	    type = PM_CONTEXT_ARCHIVE;
@@ -40,14 +41,14 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
 
 	case 'h':	/* contact PMCD on this hostname */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a and/or -h allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a and/or -h allowed\n", pmProgname);
 		errflag++;
 	    }
 	    host = optarg;
@@ -74,12 +75,12 @@ Options:\n\
   -D debugspec	set PCP debugging options\n\
   -h hostname	connect to PMCD on this host\n\
   -n namespace	alternative PMNS specification file\n",
-		pmGetProgname());
+		pmProgname);
 	exit(1);
     }
 
     if ((sts = pmLoadASCIINameSpace(namespace, 1)) < 0) {
-	printf("%s: Cannot load namespace from \"%s\": %s\n", pmGetProgname(), namespace, pmErrStr(sts));
+	printf("%s: Cannot load namespace from \"%s\": %s\n", pmProgname, namespace, pmErrStr(sts));
 	exit(1);
     }
 
@@ -91,10 +92,10 @@ Options:\n\
     if ((sts = pmNewContext(type, host)) < 0) {
 	if (type == PM_CONTEXT_HOST)
 	    fprintf(stderr, "%s: Cannot connect to PMCD on host \"%s\": %s\n",
-		pmGetProgname(), host, pmErrStr(sts));
+		pmProgname, host, pmErrStr(sts));
 	else
 	    fprintf(stderr, "%s: Cannot open archive \"%s\": %s\n",
-		pmGetProgname(), host, pmErrStr(sts));
+		pmProgname, host, pmErrStr(sts));
 	exit(1);
     }
 
@@ -103,13 +104,13 @@ Options:\n\
 	gettimeofday(&back, (struct timezone *)0);
 	back.tv_sec -= 3600;	/* an hour ago */
 	if ((sts = pmSetMode(PM_MODE_BACK, &back, 0)) < 0) {
-	    printf("%s: pmSetMode: %s\n", pmGetProgname(), pmErrStr(sts));
+	    printf("%s: pmSetMode: %s\n", pmProgname, pmErrStr(sts));
 	    exit(1);
 	}
     }
 
     if ((sts = pmLookupName(1, &name, &pmid)) < 0) {
-	printf("%s: pmLookupName: %s\n", pmGetProgname(), pmErrStr(sts));
+	printf("%s: pmLookupName: %s\n", pmProgname, pmErrStr(sts));
 	exit(1);
     }
 

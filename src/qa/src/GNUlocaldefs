@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2012-2018 Red Hat.
+# Copyright (c) 2012-2016 Red Hat.
 # Copyright (c) 2009 Aconex.  All Rights Reserved.
 # Copyright (c) 1997-2002 Silicon Graphics, Inc.  All Rights Reserved.
 #
@@ -30,26 +30,21 @@ CFILES = disk_test.c exercise.c context_test.c chkoptfetch.c \
 	read-bf.c write-bf.c slow_af.c indom.c tztest.c \
 	multifetch.c pmconvscale.c torture-eol.c \
 	crashpmcd.c dumb_pmda.c torture_cache.c wrap_int.c \
-	labels.c mergelabels.c mergelabelsets.c \
 	matchInstanceName.c torture_pmns.c \
 	mmv_genstats.c mmv_instances.c mmv_poke.c mmv_noinit.c mmv_nostats.c \
-	mmv2_genstats.c mmv2_instances.c mmv2_nostats.c mmv2_simple.c \
-	mmv3_simple.c mmv3_labels.c mmv3_bad_labels.c mmv3_nostats.c mmv3_genstats.c \
-	record.c record-setarg.c clientid.c grind_ctx.c \
+	record.c record-setarg.c clientid.c killparent.c grind_ctx.c \
 	pmdacache.c check_import.c unpack.c hrunpack.c aggrstore.c atomstr.c \
 	semstr.c grind_conv.c getconfig.c err.c torture_logmeta.c keycache.c \
 	keycache2.c pmdaqueue.c drain-server.c template.c anon-sa.c \
 	username.c rtimetest.c getcontexthost.c badpmda.c chkputlogresult.c \
 	churnctx.c badUnitsStr_r.c units-parse.c rootclient.c derived.c \
 	lookupnametest.c getversion.c pdubufbounds.c statvfs.c storepmcd.c \
-	github-50.c archfetch.c sortinst.c fetchgroup.c \
+	github-50.c archfetch.c fetchloop.c sortinst.c fetchgroup.c \
 	loadderived.c sum16.c badmmv.c multictx.c mmv_simple.c \
+	mmv2_genstats.c mmv2_instances.c mmv2_nostats.c mmv2_simple.c \
 	httpfetch.c json_test.c check_pmiend_fdleak.c loadconfig2.c \
 	archctl_segfault.c debug.c int2pmid.c int2indom.c exectest.c \
-	unpickargs.c hanoi.c progname.c countmark.c \
-	indom2int.c pmid2int.c scanmeta.c traverse_return_codes.c \
-	timeshift.c checkstructs.c bcc_profile.c sha1int2ext.c \
-	getdomainname.c
+	unpickargs.c hanoi.c chain.c
 
 ifeq ($(shell test -f ../localconfig && echo 1), 1)
 include ../localconfig
@@ -65,18 +60,15 @@ ifeq ($(shell test $(PCP_VER) -ge 3600 && echo 1), 1)
 CFILES += multithread0.c multithread1.c multithread2.c multithread3.c \
 	multithread4.c multithread5.c multithread6.c multithread7.c \
 	multithread8.c multithread9.c multithread10.c multithread11.c \
-	multithread12.c \
 	exerlock.c
 else
 MYFILES += multithread0.c multithread1.c multithread2.c multithread3.c \
 	multithread4.c multithread5.c multithread6.c multithread7.c \
 	multithread8.c multithread9.c multithread10.c multithread11.c \
-	multithread12.c \
 	exerlock.c
 LDIRT += multithread0 multithread1 multithread2 multithread3 \
 	multithread4 multithread5 multithread6 multithread7 \
 	multithread8 multithread9 multithread10 multithread11 \
-	multithread12 \
 	exerlock
 endif
 
@@ -95,7 +87,7 @@ LDIRT += parsehostattrs parsehostspec check_import_name
 endif
 
 ifeq ($(shell test $(PCP_VER) -ge 3802 && echo 1), 1)
-POSIXFILES += chkacc4.c
+CFILES += chkacc4.c
 else
 MYFILES += chkacc4.c
 LDIRT += chkacc4
@@ -118,12 +110,9 @@ endif
 MYFILES += check_fault_injection.c exercise_fault.c
 LDIRT += check_fault_injection exercise_fault
 
-# POSIXFILES and TRACEFILES are ones we don't even try to build on
-# non-Posix platforms like Windows
-#
 POSIXFILES = \
 	ipc.c proc_test.c context_fd_leak.c arch_maxfd.c torture_trace.c \
-	779246.c killparent.c fetchloop.c chain.c spawn.c 
+	779246.c 
 
 TRACEFILES = \
 	obs.c tstate.c tabort.c 
@@ -144,9 +133,7 @@ PYTHONFILES = \
 	fsstats.python procpid.python \
 	test_set_source.python test_pmda_memleak.python \
 	test_webcontainers.python test_webprocesses.python \
-	test_pmfg.python \
-	mergelabels.python mergelabelsets.python \
-	bcc_version_check.python sort_xml.python
+        test_pmfg.python
 # not installed:
 PYFILES = $(shell echo $(PYTHONFILES) | sed -e 's/\.python/.py/g')
 LDIRT += $(PYFILES)
@@ -164,20 +151,19 @@ endif
 MYFILES += \
 	err_v1.dump \
 	root_irix root_pmns tiny.pmns sgi.bf versiondefs \
-	pthread_barrier.h libpcp.h pv.c qa_test.c qa_timezone.c \
+	pthread_barrier.h pv.c qa_test.c qa_timezone.c \
 	permslist \
 	qa_shmctl.c qa_sem_msg_ctl.c \
-	qa_shmctl_stat.c qa_msgctl_stat.c qa_semctl_stat.c \
-	qa_libpcp_compat.c
+	qa_shmctl_stat.c qa_msgctl_stat.c qa_semctl_stat.c
 
-MYSCRIPTS = grind-tools show-args fixhosts mkpermslist \
+MYSCRIPTS = grind-tools ipcs_clear show-args fixhosts mkpermslist \
 	memcachestats.pl
 
 PSCRIPTS = $(PERLFILES) $(PYTHONFILES)
 
 CFILES_TARGETS = $(CFILES)
 
-TARGETS = $(subst broken_pmda,,$(basename $(patsubst %.c,%,$(CFILES_TARGETS)))) \
+TARGETS = $(subst broken_pmda,,$(basename $(CFILES_TARGETS))) \
 	chkctx2_lite template \
 	fetchrate_lite pv
 
@@ -220,7 +206,8 @@ LDIRT	+= *.log domain.h help.pag help.dir \
 default default_pcp: \
 	$(CFILES_TARGETS) $(TARGETS) \
 	$(SRCARCHPART) \
-	$(PLFILES) $(PYFILES)
+	$(PLFILES) $(PYFILES) \
+	ipcs_clear
 
 setup: default $(XTRATARGETS)
 
@@ -298,11 +285,11 @@ sys5_ipc:	sys5_ipc.c
 	rm -f $@
 	$(CCF) $(CDEFS) -o $@ sys5_ipc.c
 
+stripmark: stripmark.c
+	$(CCF) $(CDEFS) -o $@ stripmark.c
+
 anon-sa: anon-sa.c
 	$(CCF) $(CDEFS) -o $@ anon-sa.c
-
-bcc_profile: bcc_profile.c
-	$(CCF) $(CDEFS) -g -fno-omit-frame-pointer -o $@ bcc_profile.c
 
 # --- need libpcp
 #
@@ -313,7 +300,7 @@ template:	template.c
 
 exercise:	exercise.c
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ exercise.c $(LDLIBS)
+	$(CCF) $(CDEFS) -o $@ exercise.c  $(LDLIBS)
 
 chkacc1:	chkacc1.c
 	rm -f $@
@@ -329,7 +316,7 @@ chkacc3:	chkacc3.c
 
 ipc:	ipc.c
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ ipc.c $(LDLIBS)
+	$(CCF) $(CDEFS) -o $@ ipc.c  $(LDLIBS)
 
 chk_memleak:	chk_memleak.c
 	rm -f $@
@@ -337,11 +324,11 @@ chk_memleak:	chk_memleak.c
 
 chknumval:	chknumval.c
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ chknumval.c $(LDLIBS)
+	$(CCF) $(CDEFS) -o $@ chknumval.c  $(LDLIBS)
 
 logcontrol:	logcontrol.c
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ logcontrol.c $(LDLIBS)
+	$(CCF) $(CDEFS) -o $@ logcontrol.c  $(LDLIBS)
 
 numberstr: numberstr.c
 	rm -f $@
@@ -349,36 +336,15 @@ numberstr: numberstr.c
 
 pmcdgone:	pmcdgone.c localconfig.h
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ pmcdgone.c $(LDLIBS)
+	$(CCF) $(CDEFS) -o $@ pmcdgone.c  $(LDLIBS)
 
 slow_af:	slow_af.c
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ slow_af.c $(LDLIBS)
+	$(CCF) $(CDEFS) -o $@ slow_af.c  $(LDLIBS)
 
 mmv_poke:	mmv_poke.c
 	rm -f $@
 	$(CCF) $(CDEFS) -o $@ mmv_poke.c $(LDLIBS)
-
-labels:	labels.c
-	rm -f $@
-	$(CCF) $(CDEFS) -o $@ labels.c $(LDLIBS)
-
-mergelabels:	mergelabels.c
-	rm -f $@
-	$(CCF) $(CDEFS) -o $@ mergelabels.c $(LDLIBS)
-
-mergelabelsets:	mergelabelsets.c
-	rm -f $@
-	$(CCF) $(CDEFS) -o $@ mergelabelsets.c $(LDLIBS)
-
-traverse_return_codes:	traverse_return_codes.c
-	rm -f $@
-	$(CCF) $(CDEFS) -o $@ traverse_return_codes.c $(LDLIBS)
-
-getdomainname:	getdomainname.c
-	rm -f $@
-	$(CCF) $(CDEFS) -o $@ getdomainname.c $(LDLIBS)
-
 
 # --- need libpcp but also PM_CONTEXT_LOCAL
 #
@@ -478,15 +444,15 @@ mmv%:	mmv%.o
 #
 pducheck:	pducheck.o 
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ pducheck.o $(TRACELIB) $(LDLIBS) -lpcp_pmda
+	$(CCF) $(CDEFS) -o $@ pducheck.o  $(TRACELIB) $(LDLIBS) -lpcp_pmda
 
 pducrash:	pducrash.o 
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ pducrash.o $(TRACELIB) $(LDLIBS)
+	$(CCF) $(CDEFS) -o $@ pducrash.o  $(TRACELIB) $(LDLIBS)
 
 pdu-server:	pdu-server.o
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ pdu-server.o $(TRACELIB) $(LDLIBS)
+	$(CCF) $(CDEFS) -o $@ pdu-server.o  $(TRACELIB) $(LDLIBS)
 
 obs:	obs.c
 	rm -f $@
@@ -503,10 +469,6 @@ tstate:	tstate.c
 tabort:	tabort.c
 	rm -f $@
 	$(CCF) $(CDEFS) -o $@ tabort.c $(TRACELIB) 
-
-sortinst:	sortinst.c
-	rm -f $@
-	$(CCF) $(CDEFS) -o $@ sortinst.c $(LIB_FOR_REGEX)
 
 # --- need libpcp_import
 #
@@ -528,13 +490,10 @@ check_pmiend_fdleak:	check_pmiend_fdleak.c
 
 httpfetch:	httpfetch.c
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ $@.c $(LDLIBS) -lpcp_pmda -lpcp_web $(LIB_FOR_LIBUV)
+	$(CCF) $(CDEFS) -o $@ $@.c $(LDLIBS) -lpcp_pmda -lpcp_web
 json_test:	json_test.c
 	rm -f $@
-	$(CCF) $(CDEFS) -o $@ $@.c $(LDLIBS) -lpcp_pmda -lpcp_web $(LIB_FOR_LIBUV)
-sha1int2ext:	sha1int2ext.o
-	rm -f $@
-	$(CCF) $(CDEFS) -o $@ $@.c $(LDLIBS) -lpcp_pmda -lpcp_web $(LIB_FOR_LIBUV)
+	$(CCF) $(CDEFS) -o $@ $@.c $(LDLIBS) -lpcp_pmda -lpcp_web
 
 # --- need libpcp_fault
 #
@@ -603,10 +562,6 @@ multithread11:	multithread11.c
 	rm -f $@
 	$(CCF) $(CDEFS) -o $@ $@.c $(LIB_FOR_PTHREADS) $(LDLIBS)
 
-multithread12:	multithread12.c
-	rm -f $@
-	$(CCF) $(CDEFS) -o $@ $@.c $(LIB_FOR_PTHREADS) $(LDLIBS)
-
 exerlock:	exerlock.c
 	rm -f $@
 	$(CCF) $(CDEFS) -o $@ $@.c $(LIB_FOR_PTHREADS) $(LDLIBS)
@@ -661,101 +616,11 @@ qa_sem_msg_ctl.$(DSOSUFFIX):	 qa_sem_msg_ctl.c
 
 ifneq ($(NVIDIAQALIB),)
 $(NVIDIAQALIB):	nvidia-ml.o
-	$(CC) $(LDFLAGS) $(_SHAREDOPTS) -o $@ $< $(LDLIBS)
+	$(CC) $(LDFLAGS) $(_SHAREDOPTS) -o $@ $<
 endif
 
 arch_maxfd.o:	localconfig.h
 scale.o:	localconfig.h
 
-779246.o:	libpcp.h
-aggrstore.o:	libpcp.h
-badmmv.o:	libpcp.h
-chkacc1.o:	libpcp.h
-chkacc2.o:	libpcp.h
-chkacc3.o:	libpcp.h
-chkacc4.o:	libpcp.h
-chkhelp.o:	libpcp.h
-chk_memleak.o:	libpcp.h
-chknumval.o:	libpcp.h
-chkoptfetch.o:	libpcp.h
-chkputlogresult.o:	libpcp.h
-churnctx.o:	libpcp.h
-clientid.o:	libpcp.h
-clienttimeout.o:	libpcp.h
-context_test.o:	libpcp.h
-crashpmcd.o:	libpcp.h
-debug.o:	libpcp.h
-defctx.o:	libpcp.h
-descreqX2.o:	libpcp.h
-disk_test.o:	libpcp.h
-dumb_pmda.o:	libpcp.h
-endian.o:	libpcp.h
-eofarch.o:	libpcp.h
-eol.o:	libpcp.h
-exectest.o:	libpcp.h
-exercise.o:	libpcp.h
-exerlock.o:	libpcp.h
-fetchpdu.o:	libpcp.h
-github-50.o:	libpcp.h
-hashwalk.o:	libpcp.h
-hex2nbo.o:	libpcp.h
-hp-mib.o:	libpcp.h
-hrunpack.o:	libpcp.h
-interp0.o:	libpcp.h
-interp1.o:	libpcp.h
-interp2.o:	libpcp.h
-interp3.o:	libpcp.h
-interp4.o:	libpcp.h
-interp_bug2.o:	libpcp.h
-interp_bug.o:	libpcp.h
-ipc.o:	libpcp.h
-logcontrol.o:	libpcp.h
-mmv_noinit.o:	libpcp.h
-mmv_poke.o:	libpcp.h
-multictx.o:	libpcp.h
-multithread0.o:	libpcp.h
-multithread1.o:	libpcp.h
-multithread2.o:	libpcp.h
-multithread3.o:	libpcp.h
-multithread4.o:	libpcp.h
-multithread8.o:	libpcp.h
-multithread9.o:	libpcp.h
-nameall.o:	libpcp.h
-parsehostattrs.o:	libpcp.h
-parsehostspec.o:	libpcp.h
-pdubufbounds.o:	libpcp.h
-pducheck.o:	libpcp.h
-pducrash.o:	libpcp.h
-pdu-server.o:	libpcp.h
-pmcdgone.o:	libpcp.h
-pmlcmacro.o:	libpcp.h
-pmnsinarchives.o:	libpcp.h
-pmnsunload.o:	libpcp.h
-proc_test.o:	libpcp.h
-qa_libpcp_compat.o:	libpcp.h
-qa_timezone.o:	libpcp.h
-recon.o:	libpcp.h
-rtimetest.o:	libpcp.h
-slow_af.o:	libpcp.h
-sortinst.o:	libpcp.h
-store.o:	libpcp.h
-storepmcd.o:	libpcp.h
-stripmark.o:	libpcp.h
-torture_api.o:	libpcp.h
-torture_indom.o:	libpcp.h
-torture_logmeta.o:	libpcp.h
-torture_pmns.o:	libpcp.h
-tztest.o:	libpcp.h
-unpack.o:	libpcp.h
-unpickargs.o:	libpcp.h
-xarch.o:	libpcp.h
-xlog.o:	libpcp.h
-xmktime.o:	libpcp.h
-xxx.o:	libpcp.h
-
 bozo:
-	@echo CFILES_TARGETS=$(CFILES_TARGETS)
-	@echo "patsubst ->" $(patsubst %.c,%,$(CFILES_TARGETS))
-	@echo "basename ->" $(basename $(patsubst %.c,%,$(CFILES_TARGETS)))
-	@echo "subst ->" $(subst broken_pmda,,$(basename $(patsubst %.c,%,$(CFILES_TARGETS))))
 	@echo TARGETS=$(TARGETS)

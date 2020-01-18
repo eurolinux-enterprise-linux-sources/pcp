@@ -1,0 +1,57 @@
+commit 4117de7ca98a38b79d32398680e883b47d55fffa
+Author: Nathan Scott <nathans@redhat.com>
+Date:   Tue Jan 30 11:12:27 2018 +1100
+
+    build: more multilib fallout - drop accidental redefinitions
+
+    Some 64 vs 32 bit macro definitions have been accidentally
+    duplicated into config.h (must reside in config{sz,32,64}.h).
+
+    These then resulted in potentially incorrect pmlogrewrite
+    rules being generated in the build, which resulted in some
+    bad pmlogger setups happening internally.
+
+    Tweak qa/377 to ensure this duplication doesn't occur again.
+
+diff --git a/qa/377 b/qa/377
+index 071b840cf..0f7854068 100755
+--- a/qa/377
++++ b/qa/377
+@@ -15,19 +15,15 @@ echo "QA output created by $seq"
+
+ if [ -f $PCP_INC_DIR/config.h ]
+ then
+-    # PCP 3.8.3 or later
+     defs=$PCP_INC_DIR/config.h
+-elif [ -f $PCP_INC_DIR/platform_header.h ]
+-then
+-    # PCP 3.6 or later
+-    defs=$PCP_INC_DIR/platform_header.h
+-elif [ -f $PCP_INC_DIR/platform_defs.h ]
+-then
+-    # older PCP versions
+-    defs=$PCP_INC_DIR/platform_defs.h
+ else
+     _notrun "No $PCP_INC_DIR headers found"
+ fi
++
++# HAVE_64BIT_LONG should be in config{sz,64}.h, *not* here:
++grep '#define HAVE_64BIT_LONG' $defs >/dev/null 2>&1 && \
++    _fail "HAVE_64BIT_LONG is defined in $defs"
++
+ grep '#define HAVE_BITFIELDS_LTOR' $defs >/dev/null 2>&1 || \
+     _notrun "HAVE_BITFIELDS_LTOR is false"
+
+diff --git a/src/pmdas/linux/mk.rewrite b/src/pmdas/linux/mk.rewrite
+index a1f81b3b2..80355f0e0 100755
+--- a/src/pmdas/linux/mk.rewrite
++++ b/src/pmdas/linux/mk.rewrite
+@@ -12,7 +12,7 @@ tmp=/var/tmp/$$
+ trap "rm -f $tmp.*; exit 0" 0 1 2 3 15
+
+ cat <<End-of-File >$tmp.c
+-#include <pcp/config.h>
++#include <pcp/platform_defs.h>
+ #if defined(HAVE_64BIT_LONG)
+ KERNEL_ULONG=PM_TYPE_U64
+ #else

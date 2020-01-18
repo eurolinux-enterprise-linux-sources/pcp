@@ -3,10 +3,10 @@
  */
 
 /*
- * General exerciser for PMCDs
+ * General exerciser, checks (for licensed/unlicensed PMCDs)
  *	- PMCD availability
  *	- pmDesc availability
- *	- indom availability
+ *	- indom availiability
  *	- metric value availability
  *	- memory leaks (when -i used to make iterations > 1)
  */
@@ -14,7 +14,9 @@
 #include <ctype.h>
 #include <string.h>
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
+
+extern int	errno;
 
 static int	_metrics;
 static int	_indom;
@@ -86,7 +88,9 @@ dometric(const char *name)
 }
 
 int
-main(int argc, char *argv[])
+main(argc, argv)
+int argc;
+char *argv[];
 {
     int		c;
     int		sts;
@@ -99,8 +103,8 @@ main(int argc, char *argv[])
     unsigned long datasize;
     static char	*usage = "[-D debugspec] [-h hostname] [-i iterations] [-n namespace] [-l licenseflag ] [name ...]";
 
-    pmSetProgname(argv[0]);
     __pmProcessDataSize(NULL);
+    __pmSetProgname(pmProgname);
 
     while ((c = getopt(argc, argv, "D:h:i:l:n:")) != EOF) {
 	switch (c) {
@@ -109,7 +113,7 @@ main(int argc, char *argv[])
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -121,7 +125,7 @@ main(int argc, char *argv[])
 	case 'i':	/* iteration count */
 	    iter = (int)strtol(optarg, &endnum, 10);
 	    if (*endnum != '\0') {
-		fprintf(stderr, "%s: -i requires numeric argument\n", pmGetProgname());
+		fprintf(stderr, "%s: -i requires numeric argument\n", pmProgname);
 		errflag++;
 	    }
 	    break;
@@ -138,14 +142,14 @@ main(int argc, char *argv[])
     }
 
     if (errflag) {
-	fprintf(stderr, "Usage: %s %s\n", pmGetProgname(), usage);
+	fprintf(stderr, "Usage: %s %s\n", pmProgname, usage);
 	exit(1);
     }
 
     sts = pmNewContext(PM_CONTEXT_HOST, host);
 
     if (sts < 0) {
-	printf("%s: Cannot connect to PMCD on host \"%s\": %s\n", pmGetProgname(), host, pmErrStr(sts));
+	printf("%s: Cannot connect to PMCD on host \"%s\": %s\n", pmProgname, host, pmErrStr(sts));
 	exit(1);
     }
 
@@ -154,7 +158,7 @@ main(int argc, char *argv[])
 	 * only explicitly load namespace if -n specified
 	 */
 	if ((sts = pmLoadASCIINameSpace(namespace, 1)) < 0) {
-	    printf("%s: Cannot load namespace from \"%s\": %s\n", pmGetProgname(), namespace, pmErrStr(sts));
+	    printf("%s: Cannot load namespace from \"%s\": %s\n", pmProgname, namespace, pmErrStr(sts));
 	    exit(1);
 	}
     }
@@ -165,8 +169,10 @@ main(int argc, char *argv[])
 	if (optind >= argc)
 	    pmTraversePMNS("", dometric);
 	else {
-	    for (c = optind; c < argc; c++)
-		pmTraversePMNS(argv[c], dometric);
+	    int	a;
+	    for (a = optind; a < argc; a++) {
+		pmTraversePMNS(argv[a], dometric);
+	    }
 	}
 	__pmProcessDataSize(&datasize);
 	printf("[%d] %d metrics, %d getindom, %d insitu, %d ptr",

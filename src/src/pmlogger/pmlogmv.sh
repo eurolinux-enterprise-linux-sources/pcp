@@ -83,36 +83,17 @@ then
     # NOTREACHED
 fi
 
-# need to handle compression suffixes at the end of a file name
-#
-eval `pmconfig -L -s compress_suffixes`
-if [ -n "$compress_suffixes" ]
-then
-    pat=`echo $compress_suffixes | sed -e 's/\.//g' -e 's/ /|/g' -e 's/^/(/' -e 's/$/)/'`
-else
-    # fallback to a fixed list, as of PCP 4.0.1
-    #
-    pat='(xz|lzma|bz2|bz|gz|Z|z)'
-fi
-
 if [ -f "$1" ]
 then
-    # oldname is an existing file, strip any compression suffix,
-    # then strip the expected PCP suffix
+    # oldname is an existing file, strip the expected PCP suffix
     #
-    if echo "$1" | egrep -q "\\.$pat\$"
-    then
-	base=`echo "$1" | sed -e 's/\.[a-zA-Z][a-zA-Z0-9]*$//'`
-    else
-	base="$1"
-    fi
-    case "$base"
+    case "$1"
     in
 	*[0-9])
-	    old=`echo "$base" | sed -e 's/\.[0-9][0-9]*$//'`
+	    old=`echo "$1" | sed -e 's/\.[0-9][0-9]*$//'`
 	    ;;
 	*.index|*.meta)
-	    old=`echo "$base" | sed -e 's/\.[a-z][a-z]*$//'`
+	    old=`echo "$1" | sed -e 's/\.[a-z][a-z]*$//'`
 	    ;;
 	*)
 	    echo >&2 "$prog: Error: oldname argument ($1) is not a PCP archive"
@@ -132,7 +113,7 @@ _cleanup()
 	do
 	    if [ ! -f "$f" ]
 	    then
-		part=`echo "$f" | sed -e "s@^$old.@@"`
+		part=`echo "$f" | sed -e 's/.*\.\([^.][^.]*\)$/\1/'`
 		if [ ! -f "$new.$part" ]
 		then
 		    echo >&2 "$prog: Fatal: $f and $new.$part lost"
@@ -186,8 +167,7 @@ _count_links()
 
 # get oldnames inventory check required files are present
 #
-ls "$old".* 2>&1 \
-| egrep '\.((index|meta|[0-9][0-9]*)|((index|meta|[0-9][0-9]*)\.'"$pat"'))$' >$tmp/old
+ls "$old".* 2>&1 | egrep '\.(index|meta|[0-9][0-9]*)$' >$tmp/old
 if [ -s $tmp/old ]
 then
     # $old may be an ambiguous suffix, e.g. 20140417.00 (with more than
@@ -195,17 +175,7 @@ then
     # no duplicates
     #
     touch $tmp/ok
-    cat $tmp/old \
-    | while read fname
-    do
-	if echo "$fname" | egrep -q "\\.$pat\$"
-	then
-	    echo "$fname" | sed -e 's/\.[a-zA-Z0-9]$//'
-	else
-	    echo "$fname"
-	fi
-    done \
-    | sed \
+    sed <$tmp/old \
 	-e 's/.*\.index$/index/' \
 	-e 's/.*\.meta$/meta/' \
 	-e 's/.*\.\([0-9][0-9]*\)$/\1/' \
@@ -229,31 +199,20 @@ else
     echo >&2 "$prog: Error: cannot find any files for the input archive ($old)"
     exit
 fi
-if grep -q '\.[0-9][0-9]*$' $tmp/old
-then
-    :
-elif egrep -q '\.[0-9][0-9]*\.'"$pat"'$' $tmp/old
+if grep -q '.[0-9][0-9]*$' $tmp/old
 then
     :
 else
     echo >&2 "$prog: Error: cannot find any data files for the input archive ($old)"
-    ls -l "$old"* >&2
-    echo "Inspecting files in this list ..." >&2
-    cat $tmp/old >&2
+    ls -l "$old"*
     exit
 fi
-
-if grep -q '\.meta$' $tmp/old
-then
-    :
-elif egrep -q '\.meta\.'"$pat"'$' $tmp/old
+if grep -q '.meta$' $tmp/old
 then
     :
 else
-    echo >&2 "$prog: Error: cannot find .meta file for the input archive ($old)"
-    ls -l "$old"* >&2
-    echo "Inspecting files in this list ..." >&2
-    cat $tmp/old >&2
+    echo >&2 "$prog: Error: cannot find .metadata file for the input archive ($old)"
+    ls -l "$old"*
     exit
 fi
 
@@ -268,7 +227,7 @@ do
 	_cleanup
 	# NOTREACHED
     fi
-    part=`echo "$f" | sed -e "s@^$old.@@"`
+    part=`echo "$f" | sed -e 's/.*\.\([^.][^.]*\)$/\1/'`
     if [ -f "$new.$part" ]
     then
 	echo >&2 "$prog: Error: ln-pass: output file already exists: $new.$part"

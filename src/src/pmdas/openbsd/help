@@ -17,13 +17,11 @@ Microseconds per "hz" tick.
 @ kernel.all.cpu.user total user CPU time for all CPUs
 @ kernel.all.cpu.nice total nice user CPU time for all CPUs
 @ kernel.all.cpu.sys total sys CPU time for all CPUs
-@ kernel.all.cpu.spin total system spinlock CPU time for all CPUs
 @ kernel.all.cpu.intr total interrupt CPU time for all CPUs
 @ kernel.all.cpu.idle total idle CPU time for all CPUs
 @ kernel.percpu.cpu.user user CPU time for each CPU
 @ kernel.percpu.cpu.nice nice user CPU time for each CPU
 @ kernel.percpu.cpu.sys sys CPU time for each CPU
-@ kernel.percpu.cpu.spin system spinlock CPU time for each CPU
 @ kernel.percpu.cpu.intr interrupt CPU time for each CPU
 @ kernel.percpu.cpu.idle idle CPU time for each CPU
 
@@ -33,8 +31,6 @@ Microseconds per "hz" tick.
 @ hinv.ninterface number of active (up) network interfaces
 @ hinv.physmem total system memory
 @ hinv.pagesize kernel page size
-@ hinv.machine name of the hardware type the system is running on
-Alias for kernel.uname.machine on OpenBSD.
 @ hinv.cpu.vendor system's CPU vendor
 @ hinv.cpu.model system's CPU model
 

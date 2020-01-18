@@ -2,7 +2,7 @@
  * Copyright (c) 2000,2004,2007-2008 Silicon Graphics, Inc.  All Rights Reserved.
  * Portions Copyright (c) International Business Machines Corp., 2002
  * Portions Copyright (c) 2007-2009 Aconex.  All Rights Reserved.
- * Portions Copyright (c) 2013-2019 Red Hat.
+ * Portions Copyright (c) 2013-2017 Red Hat.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -34,7 +34,6 @@ root {
     tmpfs
     sysfs
     tape
-    tty
 }
 
 hinv {
@@ -97,75 +96,20 @@ kernel.all {
     uptime		60:26:0
     idletime		60:26:1
     nusers		60:25:0
-    nroots		60:25:1
-    nsessions		60:25:2
     lastpid		60:2:1
     runnable		60:2:2
     nprocs		60:2:3
     interrupts
-    softirqs
     entropy
-    pid_max		60:72:2
-    pressure
 }
 
 kernel.all.interrupts {
-    total		60:4:0
     errors		60:4:3
-}
-
-kernel.all.softirqs {
-    total		60:82:0
 }
 
 kernel.all.entropy {
     avail		60:72:0
     poolsize		60:72:1
-}
-
-kernel.all.pressure {
-    cpu
-    memory
-    io
-}
-
-kernel.all.pressure.cpu {
-    some
-}
-
-kernel.all.pressure.cpu.some {
-    avg			60:83:0
-    total		60:83:1
-}
-
-kernel.all.pressure.memory {
-    some
-    full
-}
-
-kernel.all.pressure.memory.some {
-    avg			60:84:0
-    total		60:84:1
-}
-
-kernel.all.pressure.memory.full {
-    avg			60:84:2
-    total		60:84:3
-}
-
-kernel.all.pressure.io {
-    some
-    full
-}
-
-kernel.all.pressure.io.some {
-    avg			60:85:0
-    total		60:85:1
-}
-
-kernel.all.pressure.io.full {
-    avg			60:85:2
-    total		60:85:3
 }
 
 kernel.all.cpu {
@@ -302,8 +246,6 @@ ipc.msg {
     perms 		60:65:2
     msgsz 		60:65:3
     messages 		60:65:4
-    last_send_pid	60:65:5
-    last_recv_pid	60:65:6
 }
 
 ipc.shm {
@@ -324,8 +266,6 @@ ipc.shm {
     segsz 		60:64:3
     nattch 		60:64:4
     status 		60:64:5
-    creator_pid		60:64:6
-    last_access_pid	60:64:7
 }
 
 pmda {
@@ -359,7 +299,6 @@ disk.dev {
     total_rawactive	60:0:79
     aveq		60:0:47
     scheduler		60:0:59
-    capacity		60:0:87
 }
 
 disk.all {
@@ -398,7 +337,6 @@ disk.dm {
     read_rawactive	60:54:14
     write_rawactive	60:54:15
     total_rawactive	60:54:16
-    capacity		60:54:17
 }
 
 disk.md {
@@ -419,7 +357,6 @@ disk.md {
     write_rawactive	60:59:15
     total_rawactive	60:59:16
     status		60:60:0
-    capacity		60:59:17
 }
 
 disk.partitions {
@@ -439,7 +376,6 @@ disk.partitions {
     read_rawactive      60:10:13
     write_rawactive     60:10:14
     total_rawactive	60:10:15
-    capacity		60:10:16
 }
 
 mem {
@@ -651,18 +587,12 @@ network {
     tcp
     udp
     udplite
-    udpconn
-    rawconn
     tcpconn
     softnet
-    unix
     ip6
     icmp6
     udp6
-    udpconn6
     udplite6
-    rawconn6
-    tcpconn6
 }
 
 network.interface {
@@ -676,8 +606,6 @@ network.interface {
     duplex		60:3:24
     up			60:3:25
     running		60:3:26
-    wireless		60:3:28
-    type		60:3:29
     inet_addr		60:33:0
     ipv6_addr		60:33:1
     ipv6_scope		60:33:2
@@ -1101,67 +1029,6 @@ network.udplite6 {
     incsumerrors	60:58:81
 }
 
-network.tcpconn {
-    established		60:19:1
-    syn_sent		60:19:2
-    syn_recv		60:19:3
-    fin_wait1		60:19:4
-    fin_wait2		60:19:5
-    time_wait		60:19:6
-    close		60:19:7
-    close_wait		60:19:8
-    last_ack		60:19:9
-    listen		60:19:10
-    closing		60:19:11
-}
-
-network.tcpconn6 {
-    established		60:76:1
-    syn_sent		60:76:2
-    syn_recv		60:76:3
-    fin_wait1		60:76:4
-    fin_wait2		60:76:5
-    time_wait		60:76:6
-    close		60:76:7
-    close_wait		60:76:8
-    last_ack		60:76:9
-    listen		60:76:10
-    closing		60:76:11
-}
-
-network.rawconn {
-    count		60:77:1
-}
-
-network.rawconn6 {
-    count		60:78:1
-}
-
-network.udpconn {
-    established		60:79:1
-    listen		60:79:2
-}
-
-network.udpconn6 {
-    established		60:80:1
-    listen		60:80:2
-}
-
-network.unix {
-    datagram
-    stream
-}
-
-network.unix.datagram {
-    count		60:81:1
-}
-
-network.unix.stream {
-    established		60:81:2
-    listen		60:81:3
-    count		60:81:4
-}
-
 filesys {
     capacity		60:5:1
     used		60:5:2
@@ -1295,6 +1162,20 @@ nfs4.server {
     reqs		60:7:67
 }
 
+network.tcpconn {
+    established		60:19:1
+    syn_sent		60:19:2
+    syn_recv		60:19:3
+    fin_wait1		60:19:4
+    fin_wait2		60:19:5
+    time_wait		60:19:6
+    close		60:19:7
+    close_wait		60:19:8
+    last_ack		60:19:9
+    listen		60:19:10
+    closing		60:19:11
+}
+
 mem.slabinfo {
     objects
     slabs
@@ -1370,10 +1251,7 @@ mem.vmstat {
 	nr_writeback_temp		60:28:56
 	nr_written			60:28:94
 	numa_foreign			60:28:95
-	numa_hint_faults		60:28:152
-	numa_hint_faults_local		60:28:153
 	numa_hit			60:28:96
-	numa_huge_pte_updates		60:28:151
 	numa_interleave			60:28:97
 	numa_local			60:28:98
 	numa_miss			60:28:99
@@ -1403,14 +1281,11 @@ mem.vmstat {
 	pgrefill_high			60:28:18
 	pgrefill_normal			60:28:19
 	pgrotated			60:28:36
-	pgscan_direct			60:28:146
 	pgscan_direct_dma		60:28:29
 	pgscan_direct_dma32		60:28:67
 	pgscan_direct_high		60:28:27
 	pgscan_direct_movable		60:28:68
 	pgscan_direct_normal		60:28:28
-	pgscan_direct_throttle		60:28:147
-	pgscan_kswapd			60:28:148
 	pgscan_kswapd_dma		60:28:26
 	pgscan_kswapd_dma32		60:28:69
 	pgscan_kswapd_high		60:28:24
@@ -1421,12 +1296,10 @@ mem.vmstat {
 	pgsteal_high			60:28:21
 	pgsteal_movable			60:28:72
 	pgsteal_normal			60:28:22
-	pgsteal_kswapd			60:28:150
 	pgsteal_kswapd_dma		60:28:138
 	pgsteal_kswapd_dma32		60:28:139
 	pgsteal_kswapd_normal		60:28:140
 	pgsteal_kswapd_movable		60:28:141
-	pgsteal_direct			60:28:149
 	pgsteal_direct_dma		60:28:142
 	pgsteal_direct_dma32		60:28:143
 	pgsteal_direct_normal		60:28:144
@@ -1475,8 +1348,6 @@ vfs {
     files
     inodes
     dentry
-    aio
-    locks
 }
 
 vfs.files {
@@ -1493,35 +1364,6 @@ vfs.inodes {
 vfs.dentry {
     count		60:27:5
     free		60:27:6
-}
-
-vfs.aio {
-    count		60:27:7
-    max			60:27:8
-}
-
-vfs.locks {
-    posix
-    flock
-    lease
-}
-
-vfs.locks.posix {
-    read		60:75:0
-    write		60:75:1
-    count		60:75:2
-}
-
-vfs.locks.flock {
-    read		60:75:3
-    write		60:75:4
-    count		60:75:5
-}
-
-vfs.locks.lease {
-    read		60:75:6
-    write		60:75:7
-    count		60:75:8
 }
 
 sysfs {
@@ -1547,17 +1389,4 @@ tape.dev {
     write_byte_cnt	60:71:7
     write_cnt		60:71:8
     write_ns		60:71:9
-}
-tty {
-    serial
-}
-
-tty.serial {
-    tx      60:74:0
-    rx	    60:74:1
-    frame   60:74:2
-    parity  60:74:3
-    brk     60:74:4
-    overrun 60:74:5
-    irq	    60:74:6
 }

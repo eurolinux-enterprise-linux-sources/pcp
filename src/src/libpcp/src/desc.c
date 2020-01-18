@@ -13,7 +13,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "pmda.h"
 #include "internal.h"
 #include "fault.h"
@@ -45,7 +45,7 @@ __pmRecvDesc(int fd, __pmContext *ctxp, int timeout, pmDesc *desc)
  * current context is not locked.
  */
 int
-pmLookupDesc_ctx(__pmContext *ctxp, int derive_locked, pmID pmid, pmDesc *desc)
+pmLookupDesc_ctx(__pmContext *ctxp, pmID pmid, pmDesc *desc)
 {
     int		need_unlock = 0;
     __pmDSO	*dp;
@@ -95,7 +95,7 @@ pmLookupDesc_ctx(__pmContext *ctxp, int derive_locked, pmID pmid, pmDesc *desc)
     }
     else {
 	/* assume PM_CONTEXT_ARCHIVE */
-	sts = __pmLogLookupDesc(ctxp->c_archctl, pmid, desc);
+	sts = __pmLogLookupDesc(ctxp->c_archctl->ac_log, pmid, desc);
     }
 
     if (sts == PM_ERR_PMID || sts == PM_ERR_PMID_LOG || sts == PM_ERR_NOAGENT) {
@@ -106,7 +106,7 @@ pmLookupDesc_ctx(__pmContext *ctxp, int derive_locked, pmID pmid, pmDesc *desc)
 	 * PM_ERR_BADDERIVE really means the derived metric bind failed,
 	 * so we should propagate that one back ...
 	 */
-	sts2 = __dmdesc(ctxp, derive_locked, pmid, desc);
+	sts2 = __dmdesc(ctxp, pmid, desc);
 	if (sts2 >= 0 || sts2 == PM_ERR_BADDERIVE)
 	    sts = sts2;
     }
@@ -132,7 +132,7 @@ int
 pmLookupDesc(pmID pmid, pmDesc *desc)
 {
     int	sts;
-    sts = pmLookupDesc_ctx(NULL, PM_NOT_LOCKED, pmid, desc);
+    sts = pmLookupDesc_ctx(NULL, pmid, desc);
     return sts;
 }
 

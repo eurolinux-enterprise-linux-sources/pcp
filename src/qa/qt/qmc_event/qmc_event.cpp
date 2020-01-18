@@ -21,14 +21,14 @@ main(int argc, char* argv[])
     int		sts = 0;
     int		c;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
     while ((c = getopt(argc, argv, "D:?")) != EOF) {
 	switch (c) {
 	case 'D':
 	    sts = pmSetDebug(optarg);
             if (sts < 0) {
 		pmprintf("%s: unrecognized debug options specification (%s)\n",
-			 pmGetProgname(), optarg);
+			 pmProgname, optarg);
                 sts = 1;
             }
             break;
@@ -40,7 +40,7 @@ main(int argc, char* argv[])
     }
 
     if (sts) {
-	pmprintf("Usage: %s\n", pmGetProgname());
+	pmprintf("Usage: %s\n", pmProgname);
 	pmflush();
 	exit(1);
         /*NOTREACHED*/

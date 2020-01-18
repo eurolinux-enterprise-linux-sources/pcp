@@ -7,6 +7,7 @@
 
 #include <ctype.h>
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 #include <pcp/pmda.h>
 
 int
@@ -25,7 +26,7 @@ main(int argc, char **argv)
     struct timeval	stamp = { 123, 456 };
     struct timespec	hrstamp = { 123456, 78901234 };
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:")) != EOF) {
 	switch (c) {
@@ -34,7 +35,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -47,7 +48,7 @@ main(int argc, char **argv)
     }
 
     if (errflag || optind != argc) {
-	printf("Usage: %s %s\n", pmGetProgname(), usage);
+	printf("Usage: %s %s\n", pmProgname, usage);
 	exit(1);
     }
 
@@ -58,10 +59,10 @@ main(int argc, char **argv)
     printf("%u -> %s\n", atom.ul, pmAtomStr(&atom, PM_TYPE_U32));
 
     atom.ll = -1234567890123LL;
-    printf("%" FMT_INT64 " -> %s\n", atom.ll, pmAtomStr(&atom, PM_TYPE_64));
+    printf("%lld -> %s\n", (long long)atom.ll, pmAtomStr(&atom, PM_TYPE_64));
 
     atom.ull = 0x8000000000000000LL;
-    printf("%" FMT_UINT64 " -> %s\n", atom.ull, pmAtomStr(&atom, PM_TYPE_U64));
+    printf("%llu -> %s\n", (unsigned long long)atom.ull, pmAtomStr(&atom, PM_TYPE_U64));
 
     atom.f = 123.456;
     printf("%.3f -> %s\n", atom.f, pmAtomStr(&atom, PM_TYPE_FLOAT));

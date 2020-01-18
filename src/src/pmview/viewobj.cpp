@@ -16,9 +16,11 @@
 #include <Inventor/nodes/SoTranslation.h>
 #include <Inventor/nodes/SoCube.h>
 #include <Inventor/nodes/SoCylinder.h>
-#include "main.h"
 #include "pmview.h"
 #include "viewobj.h"
+
+#include <iostream>
+using namespace std;
 
 int		ViewObj::theNumModObjects = 0;
 
@@ -125,7 +127,8 @@ ViewObj::setTran(float xTran, float zTran, int setWidth, int setDepth)
     float x = xTran + ((setWidth - (float)width()) * _xAlign);
     float z = zTran + ((setDepth - (float)depth()) * _zAlign);
 
-    if (pmDebugOptions.appl0) {
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_APPL0) {
 	cerr << "ViewObj::setTran: " << name() << ":" << endl;
 	cerr << "x=" << x << ", xTran =" << xTran << ", setWidth=" 
 	     << setWidth << ", width=" << width() << ", xAlign=" << _xAlign 
@@ -134,6 +137,7 @@ ViewObj::setTran(float xTran, float zTran, int setWidth, int setDepth)
 	     << setDepth << ", depth=" << depth() << ", zAlign=" << _zAlign 
 	     << endl << endl;
     }
+#endif
 
     _tran->translation.setValue(x, 0.0, z);
 }

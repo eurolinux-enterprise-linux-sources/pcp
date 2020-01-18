@@ -54,7 +54,7 @@ probes.h: probes.d pmcd.stp
 probes.o: probes.d
 	$(DTRACE) -G -s $< -o $@
 endif
-ifneq "$(findstring $(TARGET_OS),solaris freebsd netbsd)" ""
+ifneq "$(findstring $(TARGET_OS),solaris freebsd)" ""
 $(STATICLIBTARGET): rewrite
 trace.o: probes.h
 probes.h: probes.d
@@ -79,15 +79,10 @@ endif
 ifeq "$(ENABLE_PROBES)" "true"
 ifeq "$(TARGET_OS)" "linux"
 	$(INSTALL) -m 755 -d $(PCP_SHARE_DIR)/../systemtap/tapset
-	$(INSTALL) -m 644 pmcd.stp $(PCP_SHARE_DIR)/../systemtap/tapset/pmcd.stp
+	$(INSTALL) -m 444 pmcd.stp $(PCP_SHARE_DIR)/../systemtap/tapset/pmcd.stp
 endif
 endif
 
 default_pcp : default
 
 install_pcp : install
-
-client.o:	$(TOPDIR)/src/include/pcp/libpcp.h
-
-check::	$(CFILES)
-	$(CLINT) $^

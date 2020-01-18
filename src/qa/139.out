@@ -29,7 +29,6 @@ pmlc> query sample.bad.unknown
 pmlc> query sample.bad.nosupport
 pmlc> query sample.bad
 sample.bad.novalues
-sample.bad.fetch.again
 pmlc> query sample
 sample.control
 sample.daemon_pid
@@ -68,7 +67,6 @@ sample.secret.foo.bar.four
 sample.secret.foo.bar.grunt.five
 sample.secret.foo.bar.grunt.snort.six
 sample.secret.foo.bar.grunt.snort.huff.puff.seven
-sample.ghosts.visible
 sample.long.one
 sample.long.ten
 sample.long.hundred
@@ -126,7 +124,6 @@ sample.aggregate.write_me
 sample.hordes.one
 sample.hordes.two
 sample.bad.novalues
-sample.bad.fetch.again
 sample.wrap.long
 sample.wrap.ulong
 sample.wrap.longlong
@@ -177,5 +174,4 @@ sample.negative.discrete.m_32
 sample.negative.discrete.m_64
 sample.negative.discrete.m_float
 sample.negative.discrete.m_double
-sample.controller.mirage
 pmlc> 

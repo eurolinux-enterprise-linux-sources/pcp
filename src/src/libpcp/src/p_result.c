@@ -34,7 +34,7 @@
 
 #include <ctype.h>
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "internal.h"
 
 /*
@@ -50,7 +50,7 @@ typedef struct {
 
 typedef struct {
     __pmPDUHdr		hdr;
-    pmTimeval		timestamp;	/* when returned */
+    __pmTimeval		timestamp;	/* when returned */
     int			numpmid;	/* no. of PMIDs to follow */
     __pmPDU		data[1];	/* zero or more */
 } result_t;
@@ -156,7 +156,7 @@ int
 __pmSendResult_ctx(__pmContext *ctxp, int fd, int from, const pmResult *result)
 {
     int		sts;
-    __pmPDU	*pdubuf = NULL;
+    __pmPDU	*pdubuf;
     result_t	*pp;
 
     if (ctxp != NULL)
@@ -216,7 +216,7 @@ __pmDecodeResult_ctx(__pmContext *ctxp, __pmPDU *pdubuf, pmResult **result)
 #elif defined(HAVE_32BIT_PTR)
     pmValueSet	*vsp;		/* vlist_t == pmValueSet */
 #else
-#error Bozo - unexpected sizeof pointer!! - commented for static checking
+    Bozo - unexpected sizeof pointer!!
 #endif
 
     if (ctxp != NULL)
@@ -259,9 +259,9 @@ __pmDecodeResult_ctx(__pmContext *ctxp, __pmPDU *pdubuf, pmResult **result)
 	vlp = (vlist_t *)&pp->data[vsize/sizeof(__pmPDU)];
 
 	if (sizeof(*vlp) - sizeof(vlp->vlist) - sizeof(int) > (pduend - (char *)vlp)) {
-	    if (pmDebugOptions.pdu && pmDebugOptions.desperate) {
-		fprintf(stderr, "__pmDecodeResult: Bad: pmid[%d] outer vlp past end of PDU buffer\n", i);
-	    }
+	if (pmDebugOptions.pdu && pmDebugOptions.desperate) {
+	    fprintf(stderr, "__pmDecodeResult: Bad: pmid[%d] outer vlp past end of PDU buffer\n", i);
+	}
 	    goto corrupt;
 	}
 
@@ -338,7 +338,7 @@ __pmDecodeResult_ctx(__pmContext *ctxp, __pmPDU *pdubuf, pmResult **result)
 		    }
 		    if (pduvbp->vlen > (size_t)(pduend - (char *)pduvbp)) {
 			if (pmDebugOptions.pdu && pmDebugOptions.desperate) {
-			    fprintf(stderr, "__pmDecodeResult: Bad: pmid[%d] value[%d] pduvp past end of PDU buffer\n", i, j);
+			    fprintf(stderr, "__pmDecodeResult: Bad: pmid[%d] value[%d] third pduvp past end of PDU buffer\n", i, j);
 			}
 			goto corrupt;
 		    }
@@ -367,18 +367,6 @@ __pmDecodeResult_ctx(__pmContext *ctxp, __pmPDU *pdubuf, pmResult **result)
 	vbsize > INT_MAX / sizeof(pmValueBlock) ||
 	offset != pp->hdr.len - (pduend - vsplit) ||
 	offset + vbsize != pduend - (char *)pdubuf) {
-	if (pmDebugOptions.pdu && pmDebugOptions.desperate) {
-	    if (need < 0)
-		fprintf(stderr, "__pmDecodeResult: Bad: need (%d) < 0\n", need);
-	    if (vsize > INT_MAX / sizeof(__pmPDU))
-		fprintf(stderr, "__pmDecodeResult: Bad: vsize (%d) > %d\n", vsize, (int)(INT_MAX / sizeof(__pmPDU)));
-	    if (vbsize > INT_MAX / sizeof(pmValueBlock))
-		fprintf(stderr, "__pmDecodeResult: Bad: vbsize (%d) > %d\n", vbsize, (int)(INT_MAX / sizeof(pmValueBlock)));
-	    if (offset != pp->hdr.len - (pduend - vsplit))
-		fprintf(stderr, "__pmDecodeResult: Bad: offset (%d) != %d\n", offset, (int)(pp->hdr.len - (pduend - vsplit)));
-	    if (offset + vbsize != pduend - (char *)pdubuf)
-		fprintf(stderr, "__pmDecodeResult: Bad: offset+vbsize (%d) != pduend-pdubuf (%d)\n", (int)(offset + vbsize), (int)(pduend - (char *)pdubuf));
-	}
 	goto corrupt;
     }
 
@@ -575,7 +563,7 @@ __pmDecodeResult_ctx(__pmContext *ctxp, __pmPDU *pdubuf, pmResult **result)
 		    }
 		    if (pduvbp->vlen > (size_t)(pduend - (char *)pduvbp)) {
 			if (pmDebugOptions.pdu && pmDebugOptions.desperate) {
-			    fprintf(stderr, "__pmDecodeResult: Bad: pmid[%d] value[%d] pduvp past end of PDU buffer\n", i, j);
+			    fprintf(stderr, "__pmDecodeResult: Bad: pmid[%d] value[%d] third pduvp past end of PDU buffer\n", i, j);
 			}
 			goto corrupt;
 		    }

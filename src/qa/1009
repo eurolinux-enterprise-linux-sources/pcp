@@ -23,7 +23,7 @@ echo "unix_domain_sockets=$unix_domain_sockets" >>$seq.full
 echo "target=$target" >>$seq.full
 
 # real QA test starts here
-inst=`$sudo pminfo $target -F proc.psinfo.pid \
+inst=`pminfo $target -F proc.psinfo.pid \
       | tee -a $seq.full \
       | sed -n -e '/inst \[1 /{
 s/^[^"]*"//
@@ -34,13 +34,13 @@ p
 if [ -z "$inst" ]
 then
     echo "Arrgh, cannot find proc.psinfo.pid for init!"
-    $sudo pminfo $target -F proc.psinfo.pid
+    pminfo $target -F proc.psinfo.pid
 fi
 
 echo "proc.psinfo.pid[$inst] 0" >$tmp.config
 echo "proc.psinfo.pid[1]" >> $tmp.config
 
-$sudo pmdumptext $target -G -s 1 -f '' -t 1 -c $tmp.config >$tmp.out 2>&1
+pmdumptext $target -G -s 1 -f '' -t 1 -c $tmp.config >$tmp.out 2>&1
 
 echo
 echo "expect two \"1\"s ..."

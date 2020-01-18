@@ -25,7 +25,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "internal.h"
 
 static char	*envtz;			/* buffer in env */
@@ -133,8 +133,8 @@ __pmSquashTZ(char *tzbuffer)
 
     if (offset != 0) {
 	int hours = offset / 3600;
-	int mins = abs ((int)((offset % 3600) / 60));
-	int len = (int)strlen(tzn);
+	int mins = abs ((offset % 3600) / 60);
+	int len = (int) strlen(tzn);
 
 	if (mins == 0) {
 	    /* -3 for +HH in worst case */
@@ -344,8 +344,7 @@ __pmTimezone(void)
 char *
 __pmTimezone_r(char *buf, int buflen)
 {
-    strncpy(buf, __pmTimezone(), (size_t)buflen);
-    buf[buflen-1] = '\0';
+    strcpy(buf, __pmTimezone());
     return buf;
 }
 
@@ -407,7 +406,7 @@ pmNewZone(const char *tz)
     zone = (char **)realloc(zone, nzone * sizeof(char *));
     if (zone == NULL) {
 	PM_UNLOCK(__pmLock_extcall);
-	pmNoMem("pmNewZone", nzone * sizeof(char *), PM_FATAL_ERR);
+	__pmNoMem("pmNewZone", nzone * sizeof(char *), PM_FATAL_ERR);
 	/* NOTREACHED */
     }
     zone[curzone] = strdup(envtz);
@@ -468,31 +467,13 @@ pmCtime(const time_t *clock, char *buf)
 {
 #if !defined(IS_SOLARIS) && !defined(IS_MINGW)
     struct tm	tbuf;
-#else
-    time_t	epoch = 0;
-    struct tm	*tmp;
-    char	*ap;
 #endif
 
     PM_LOCK(__pmLock_extcall);
     if (curzone >= 0) {
 	_pushTZ();
 #if defined(IS_SOLARIS) || defined(IS_MINGW)
-	tmp = localtime(clock);			/* THREADSAFE */
-	if (tmp == NULL) {
-	    if (pmDebugOptions.context && pmDebugOptions.desperate)
-		fprintf(stderr, "pmCtime: localtime(%" FMT_INT64 ") after _pushTZ() failed\n", (__int64_t)(*clock));
-	    tmp = localtime(&epoch);		/* THREADSAFE */
-	}
-	ap = asctime(tmp);			/* THREADSAFE */
-	if (ap == NULL) {
-	    if (pmDebugOptions.context && pmDebugOptions.desperate)
-		fprintf(stderr, "pmCtime: asctime(%02d:%02d:%02d %02d/%02d/%04d) failed\n",
-			(int)tmp->tm_hour, (int)tmp->tm_min, (int)tmp->tm_sec,
-			(int)tmp->tm_mday, (int)tmp->tm_mon+1, (int)tmp->tm_year+1900);
-	    ap = "???";
-	}
-	strcpy(buf, ap);
+	strcpy(buf, asctime(localtime(clock)));		/* THREADSAFE */
 #else
 	asctime_r(localtime_r(clock, &tbuf), buf);
 #endif
@@ -500,21 +481,7 @@ pmCtime(const time_t *clock, char *buf)
     }
     else {
 #if defined(IS_SOLARIS) || defined(IS_MINGW)
-	tmp = localtime(clock);			/* THREADSAFE */
-	if (tmp == NULL) {
-	    if (pmDebugOptions.context && pmDebugOptions.desperate)
-		fprintf(stderr, "pmCtime: localtime(%" FMT_INT64 ") failed\n", (__int64_t)(*clock));
-	    tmp = localtime(&epoch);		/* THREADSAFE */
-	}
-	ap = asctime(tmp);			/* THREADSAFE */
-	if (ap == NULL) {
-	    if (pmDebugOptions.context && pmDebugOptions.desperate)
-		fprintf(stderr, "pmCtime: asctime(%02d:%02d:%02d %02d/%02d/%04d) failed\n",
-			(int)tmp->tm_hour, (int)tmp->tm_min, (int)tmp->tm_sec,
-			(int)tmp->tm_mday, (int)tmp->tm_mon+1, (int)tmp->tm_year+1900);
-	    ap = "???";
-	}
-	strcpy(buf, ap);
+	strcpy(buf, asctime(localtime(clock)));		/* THREADSAFE */
 #else
 	asctime_r(localtime_r(clock, &tbuf), buf);
 #endif
@@ -529,7 +496,6 @@ pmLocaltime(const time_t *clock, struct tm *result)
 {
 #if defined(IS_SOLARIS) || defined(IS_MINGW)
     struct tm	*tmp;
-    time_t	epoch = 0;
 #endif
 
     PM_LOCK(__pmLock_extcall);
@@ -538,11 +504,6 @@ pmLocaltime(const time_t *clock, struct tm *result)
 	_pushTZ();
 #if defined(IS_SOLARIS) || defined(IS_MINGW)
 	tmp = localtime(clock);		/* THREADSAFE */
-	if (tmp == NULL) {
-	    if (pmDebugOptions.context && pmDebugOptions.desperate)
-		fprintf(stderr, "pmLocaltime: localtime(%" FMT_INT64 ") after _pushTZ() failed\n", (__int64_t)(*clock));
-	    tmp = localtime(&epoch);		/* THREADSAFE */
-	}
         memcpy(result, tmp, sizeof(*result));
 #else
 	localtime_r(clock, result);
@@ -552,11 +513,6 @@ pmLocaltime(const time_t *clock, struct tm *result)
     else {
 #if defined(IS_SOLARIS) || defined(IS_MINGW)
 	tmp = localtime(clock);		/* THREADSAFE */
-	if (tmp == NULL) {
-	    if (pmDebugOptions.context && pmDebugOptions.desperate)
-		fprintf(stderr, "pmLocaltime: localtime(%" FMT_INT64 ") failed\n", (__int64_t)(*clock));
-	    tmp = localtime(&epoch);		/* THREADSAFE */
-	}
         memcpy(result, tmp, sizeof(*result));
 #else
 	localtime_r(clock, result);

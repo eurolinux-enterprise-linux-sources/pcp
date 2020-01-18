@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015,2018 Red Hat.
+ * Copyright (c) 2012-2015 Red Hat.
  * Copyright (c) 1995-2001,2004 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -449,7 +449,7 @@ GetPorts(char *file)
 	    /* not a fatal error; continue on without control file */
 #ifdef DESPERATE
 	    fprintf(stderr, "%s: error creating port map file %s: %s.  Exiting.\n",
-		    pmGetProgname(), file, osstrerror());
+		    pmProgname, file, osstrerror());
 #endif
 	    return;
 	}
@@ -469,8 +469,7 @@ GetPorts(char *file)
 	fprintf(mapstream, "%s\n", pmcd_host);
 
 	/* then the full pathname to the archive base */
-	/* THREADSAFE - no locks acquired in __pmNativePath() */
-	archBase = __pmNativePath(archBase);
+	__pmNativePath(archBase);
 	if (__pmAbsolutePath(archBase))
 	    fprintf(mapstream, "%s\n", archBase);
 	else {
@@ -479,7 +478,7 @@ GetPorts(char *file)
 	    if (getcwd(path, MAXPATHLEN) == NULL)
 		fprintf(mapstream, "\n");
 	    else
-		fprintf(mapstream, "%s%c%s\n", path, pmPathSeparator(), archBase);
+		fprintf(mapstream, "%s%c%s\n", path, __pmPathSeparator(), archBase);
 	}
 
 	/* and finally, the annotation from -m or -x */
@@ -504,16 +503,12 @@ void
 init_ports(void)
 {
     int		i, j, n, sts;
-    int		sep = pmPathSeparator();
+    int		sep = __pmPathSeparator();
     int		extlen, baselen;
     char	path[MAXPATHLEN];
     char	pidfile[MAXPATHLEN];
-#if defined(HAVE_STRUCT_SOCKADDR_UN)
     int		pidlen;
-#endif
-#ifndef IS_MINGW
     struct stat	sbuf;
-#endif
     pid_t	mypid = getpid();
     pid_t	pid;
 
@@ -543,7 +538,7 @@ init_ports(void)
     if (atexit(cleanup) != 0) {
 	perror("atexit");
 	fprintf(stderr, "%s: unable to register atexit cleanup function.  Exiting\n",
-		pmGetProgname());
+		pmProgname);
 	cleanup();
 	exit(1);
     }
@@ -561,7 +556,7 @@ init_ports(void)
     n = baselen + extlen + 1;
     ctlfile = (char *)malloc(n);
     if (ctlfile == NULL)
-	pmNoMem("port file name", n, PM_FATAL_ERR);
+	__pmNoMem("port file name", n, PM_FATAL_ERR);
     strcpy(ctlfile, path);
 
     /* try to create the port file directory. OK if it already exists */
@@ -569,7 +564,7 @@ init_ports(void)
     if (sts < 0) {
 	if (oserror() != EEXIST) {
 	    fprintf(stderr, "%s: error creating port file dir %s: %s\n",
-		pmGetProgname(), ctlfile, osstrerror());
+		pmProgname, ctlfile, osstrerror());
 	    exit(1);
 	}
     } else {
@@ -593,7 +588,7 @@ init_ports(void)
 	n = baselen + 9;	/* separator + "primary" + null */
 	linkfile = (char *)malloc(n);
 	if (linkfile == NULL)
-	    pmNoMem("primary logger link file name", n, PM_FATAL_ERR);
+	    __pmNoMem("primary logger link file name", n, PM_FATAL_ERR);
 	pmsprintf(linkfile, n, "%s%cprimary", path, sep);
 
 #ifndef IS_MINGW
@@ -606,11 +601,11 @@ init_ports(void)
 	if (lstat(linkfile, &sbuf) == 0 && !S_ISLNK(sbuf.st_mode)) {
 	    if (unlink(linkfile) != 0) {
 		fprintf(stderr, "%s: warning: failed to remove old-style hardlink to stale control file '%s': %s\n",
-			pmGetProgname(), linkfile, osstrerror());
+			pmProgname, linkfile, osstrerror());
 	    }
 	    else if (pmDebugOptions.context) {
-		fprintf(stderr, "%s: info: removed old-style hardlink to stale control file '%s' (mode: %0lo)\n",
-			pmGetProgname(), linkfile, (long)sbuf.st_mode);
+		fprintf(stderr, "%s: info: removed old-style hardlink to stale control file '%s' (mode: %0o)\n",
+			pmProgname, linkfile, sbuf.st_mode);
 	    }
 	}
 #endif
@@ -622,27 +617,27 @@ init_ports(void)
 	if (get_pid_from_symlink(linkfile, &pid) == 0) {
 	    /* primary symlink is OK */
 	    if (pmDebugOptions.context) {
-		fprintf(stderr, "%s: info: found primary symlink -> pid %" FMT_PID "\n", pmGetProgname(), pid);
+		fprintf(stderr, "%s: info: found primary symlink -> pid %" FMT_PID "\n", pmProgname, pid);
 	    }
 	    if (!__pmProcessExists(pid)) {
 	    	if (unlink(linkfile) != 0) {
 		    fprintf(stderr, "%s: warning: failed to remove '%s' symlink to stale control file for pid %" FMT_PID ": %s\n",
-			    pmGetProgname(), linkfile, pid, osstrerror());
+			    pmProgname, linkfile, pid, osstrerror());
 		}
 		else if (pmDebugOptions.context) {
 		    fprintf(stderr, "%s: info: removed '%s' symlink to stale control file for pid %" FMT_PID "\n",
-			    pmGetProgname(), linkfile, pid);
+			    pmProgname, linkfile, pid);
 		}
 		/* remove the stale control file too */
-		pmsprintf(pidfile, sizeof(pidfile), "%s%cpmlogger%c%" FMT_PID,
+		pmsprintf(pidfile, sizeof(pidfile), "%s%cpmlogger%c%d",
 				pmGetConfig("PCP_TMP_DIR"), sep, sep, pid);
 	    	if (unlink(pidfile) != 0) {
 		    fprintf(stderr, "%s: warning: failed to remove stale control file '%s': %s\n",
-			    pmGetProgname(), pidfile, osstrerror());
+			    pmProgname, pidfile, osstrerror());
 		}
 		else if (pmDebugOptions.context) {
 		    fprintf(stderr, "%s: info: removed stale control file '%s': %s\n",
-			    pmGetProgname(), pidfile, osstrerror());
+			    pmProgname, pidfile, osstrerror());
 		}
 	    }
 	}
@@ -654,19 +649,19 @@ init_ports(void)
 	    /* configuration error - only one primary pmlogger should be configured */
 	    if (pid == -1)
 		fprintf(stderr, "%s: ERROR: there is already a primary pmlogger running, pid <unknown> linkfile=%s\n",
-		    pmGetProgname(), linkfile);
+		    pmProgname, linkfile);
 	    else
 		fprintf(stderr, "%s: ERROR: there is already a primary pmlogger running, pid %" FMT_PID " linkfile=%s\n",
-		    pmGetProgname(), pid, linkfile);
+		    pmProgname, pid, linkfile);
 	    exit(1);
 	}
 
 	if ((sts = symlink(ctlfile, linkfile)) != 0) {
 	    fprintf(stderr, "%s: error creating primary logger symbolic link %s: %s\n",
-		    pmGetProgname(), linkfile, osstrerror());
+		    pmProgname, linkfile, osstrerror());
 	}
 	else if (pmDebugOptions.context) {
-	    fprintf(stderr, "%s: info: created control file symlink %s -> %s\n", pmGetProgname(), linkfile, ctlfile);
+	    fprintf(stderr, "%s: info: created control file symlink %s -> %s\n", pmProgname, linkfile, ctlfile);
 	}
 
 #if defined(HAVE_STRUCT_SOCKADDR_UN)
@@ -683,17 +678,17 @@ init_ports(void)
 	if (stat(linkSocketPath, &sbuf) == 0 && S_ISSOCK(sbuf.st_mode)) {
 	    if (unlink(linkSocketPath) != 0) {
 		fprintf(stderr, "%s: warning: failed to remove old-style hardlink to stale socket '%s': %s\n",
-			pmGetProgname(), linkSocketPath, osstrerror());
+			pmProgname, linkSocketPath, osstrerror());
 	    }
 	    else if (pmDebugOptions.context) {
 		fprintf(stderr, "%s: info: removed old-style hardlink to stale socket '%s': %s\n",
-			pmGetProgname(), linkSocketPath, osstrerror());
+			pmProgname, linkSocketPath, osstrerror());
 	    }
 	}
 
 	/* Remove the symlink if it points to a stale primary pmlogger socket */
 	if ((pidlen = readlink(linkSocketPath, pidfile, sizeof(pidfile))) > 0) {
-	    pidfile[pidlen-1] = '\0';
+	    pidfile[pidlen] = '\0';
 	    for (i=0; i < pidlen; i++) {
 		/* first digit is the start of the PID */
 		if (isdigit((int)pidfile[i])) {
@@ -701,20 +696,20 @@ init_ports(void)
 		    if (!__pmProcessExists(pid)) {
 			if (unlink(linkSocketPath) != 0) {
 			    fprintf(stderr, "%s: warning: failed to remove '%s' symlink to stale socket '%s': %s\n",
-				    pmGetProgname(), linkSocketPath, pidfile, osstrerror());
+				    pmProgname, linkSocketPath, pidfile, osstrerror());
 			}
 			else if (pmDebugOptions.context) {
 			    fprintf(stderr, "%s: info: removed '%s' symlink to stale socket '%s'\n",
-				    pmGetProgname(), linkSocketPath, pidfile);
+				    pmProgname, linkSocketPath, pidfile);
 			}
 			/* remove the stale socket too */
 			if (unlink(pidfile) != 0) {
 			    fprintf(stderr, "%s: warning: failed to remove stale pmlogger socket '%s': %s\n",
-				    pmGetProgname(), pidfile, osstrerror());
+				    pmProgname, pidfile, osstrerror());
 			}
 			else if (pmDebugOptions.context) {
 			    fprintf(stderr, "%s: info: removed stale pmlogger socket '%s'\n",
-				    pmGetProgname(), pidfile);
+				    pmProgname, pidfile);
 			}
 		    }
 		    break;
@@ -730,7 +725,7 @@ init_ports(void)
 	if (access(linkSocketPath, F_OK) == 0) {
 	    /* configuration error - only one primary pmlogger should be configured */
 	    fprintf(stderr, "%s: ERROR: there is already a primary pmlogger running, socketPath=%s linkSocketPath=%s\n",
-		    pmGetProgname(), socketPath, linkSocketPath);
+		    pmProgname, socketPath, linkSocketPath);
 	    exit(1);
 	}
 
@@ -739,11 +734,11 @@ init_ports(void)
 	 */
 	if ((sts = symlink(socketPath, linkSocketPath)) != 0) {
 	    fprintf(stderr, "%s: error creating primary logger socket symbolic link %s: %s\n",
-		    pmGetProgname(), linkSocketPath, osstrerror());
+		    pmProgname, linkSocketPath, osstrerror());
 	}
 	else if (pmDebugOptions.context) {
 	    fprintf(stderr, "%s: info: created primary pmlogger socket symlink %s -> %s\n",
-		    pmGetProgname(), linkSocketPath, socketPath);
+		    pmProgname, linkSocketPath, socketPath);
 	}
 
 	if ((linkSocketPath = strdup(linkSocketPath)) == NULL) {
@@ -777,8 +772,6 @@ check_local_creds(__pmHashCtl *attrs)
 			(const char *)node->data : NULL);
     if (connectingUser == NULL) {
 	/* We don't know who is connecting. */
-	if (pmDebugOptions.context)
-	    fprintf(stderr, "check_local_creds: connectingUser is NULL => connection refused\n");
 	return PM_ERR_PERMISSION;
     }
 
@@ -787,8 +780,6 @@ check_local_creds(__pmHashCtl *attrs)
     connectingUid = strtol(connectingUser, &end, 0);
     if (errno != 0 || *end != '\0') {
 	/* Can't convert the connecting user to a uid cleanly. */
-	if (pmDebugOptions.context)
-	    fprintf(stderr, "check_local_creds: connectingUser \"%s\" is bad => connection refused\n", connectingUser);
 	return PM_ERR_PERMISSION;
     }
 
@@ -801,8 +792,6 @@ check_local_creds(__pmHashCtl *attrs)
 	return 0;
 
     /* Connection is not allowed. */
-    if (pmDebugOptions.context)
-	fprintf(stderr, "check_local_creds: uid connecting %ld != %ld or %ld => connection refused\n", (long)connectingUid, (long)getuid(), (long)geteuid());
     return PM_ERR_PERMISSION;
 }
 #endif /* defined(HAVE_STRUCT_SOCKADDR_UN) */
@@ -825,7 +814,6 @@ control_req(int ctlfd)
     if (fd == -1) {
 	fprintf(stderr, "error accepting client: %s\n", netstrerror());
 	__pmSockAddrFree(addr);
-	pmlc_host[0] = '\0';
 	return 0;
     }
     __pmSetSocketIPC(fd);
@@ -838,7 +826,6 @@ control_req(int ctlfd)
 			 pmErrStr(sts));
 	__pmSockAddrFree(addr);
 	__pmCloseSocket(fd);
-	pmlc_host[0] = '\0';
 	return 0;
     }
 
@@ -848,7 +835,6 @@ control_req(int ctlfd)
 	fprintf(stderr, "error connecting to client: %s\n", pmErrStr(sts));
 	__pmSockAddrFree(addr);
 	__pmCloseSocket(fd);
-	pmlc_host[0] = '\0';
 	return 0;
     }
 
@@ -881,7 +867,6 @@ control_req(int ctlfd)
 	sleep(1);	/* QA 083 seems like there is a race w/out this delay */
 	__pmSockAddrFree(addr);
 	__pmCloseSocket(fd);
-	pmlc_host[0] = '\0';
 	return 0;
     }
 
@@ -902,7 +887,6 @@ control_req(int ctlfd)
 			pmErrStr(sts));
 	    __pmSockAddrFree(addr);
 	    __pmCloseSocket(fd);
-	    pmlc_host[0] = '\0';
 	    return 0;
 	}
 
@@ -914,7 +898,6 @@ control_req(int ctlfd)
 			pmErrStr(sts));
 	    __pmSockAddrFree(addr);
 	    __pmCloseSocket(fd);
-	    pmlc_host[0] = '\0';
 	    return 0;
 	}
 
@@ -937,7 +920,6 @@ control_req(int ctlfd)
 	fprintf(stderr, "error sending connection ACK to client: %s\n",
 		     pmErrStr(sts));
 	__pmCloseSocket(fd);
-	pmlc_host[0] = '\0';
 	return 0;
     }
     clientfd = fd;

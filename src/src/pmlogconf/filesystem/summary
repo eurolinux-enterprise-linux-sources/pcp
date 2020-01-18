@@ -5,6 +5,4 @@ force	available
 	filesys.used
 	filesys.free
 	filesys.avail		# for Linux
-	filesys.freefiles
-	filesys.usedfiles
-	filesys.maxfiles
+

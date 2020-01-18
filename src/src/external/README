@@ -1,20 +1,7 @@
 Lightweight JSON parser
-    - https://github.com/mnunberg/jsonsl
-
-Previously (now being deprecated, do not use)
+    - http://zserge.com/jsmn.html
     - https://github.com/zserge/jsmn/
 
 Lightweight HTTP parser
+    - https://nodejs.org/
     - https://github.com/nodejs/http-parser/
-
-sort_r (portable quicksort with closure)
-    - https://github.com/noporpoise/sort_r
-
-hash (portable performant hash function)
-    - http://burlteburtle.net/bob/hash/evahash.html
-
-sha1, crc16, dict, sds (hash and string helpers)
-    - https://github.com/antirez/redis/blob/5.0/src
-
-Lightweight .ini file parser
-    - https://github.com/benhoyt/inih/

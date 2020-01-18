@@ -7,9 +7,9 @@
 ** This source-file contains the Linux-specific functions to calculate
 ** figures to be visualized.
 ** 
-** Copyright (C) 2015,2018,2019 Red Hat.
 ** Copyright (C) 2009-2010 JC van Winkel
 ** Copyright (C) 2000-2012 Gerlof Langeveld
+** Copyright (C) 2015 Red Hat.
 **
 ** This program is free software; you can redistribute it and/or modify it
 ** under the terms of the GNU General Public License as published by the
@@ -22,13 +22,20 @@
 ** See the GNU General Public License for more details.
 */
 
-#include <pcp/pmapi.h>
-
-#ifdef HAVE_NCURSES_CURSES_H
-#include <ncurses/curses.h>
-#else
+#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/stat.h>
+#include <signal.h>
+#include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <termio.h>
+#include <unistd.h>
+#include <stdarg.h>
 #include <curses.h>
-#endif
 #include <pwd.h>
 #include <grp.h>
 #include <regex.h>
@@ -46,7 +53,6 @@ static void	make_proc_dynamicgen(void);
 ** these defaults can be overruled via the config-file
 */
 int   cpubadness = 90;        /* percentage           */
-int   gpubadness = 100;       /* percentage           */
 int   membadness = 90;        /* percentage           */
 int   swpbadness = 80;        /* percentage           */
 int   dskbadness = 70;        /* percentage           */
@@ -78,8 +84,6 @@ sys_printdef *cpusyspdefs[] = {
 	&syspdef_CPUIDLE,
 	&syspdef_CPUWAIT,
 	&syspdef_BLANKBOX,
-	&syspdef_CPUIPC,
-	&syspdef_CPUCYCLE,
 	&syspdef_CPUFREQ,
 	&syspdef_CPUSCALE,
 	&syspdef_CPUSTEAL,
@@ -94,8 +98,6 @@ sys_printdef *cpisyspdefs[] = {
 	&syspdef_CPUIIDLE,
 	&syspdef_CPUIWAIT,
 	&syspdef_BLANKBOX,
-	&syspdef_CPUIIPC,
-	&syspdef_CPUICYCLE,
 	&syspdef_CPUIFREQ,
 	&syspdef_CPUISCALE,
 	&syspdef_CPUISTEAL,
@@ -110,19 +112,6 @@ sys_printdef *cplsyspdefs[] = {
 	&syspdef_CPLCSW,
 	&syspdef_CPLNUMCPU,
 	&syspdef_CPLINTR,
-	&syspdef_BLANKBOX,
-        0
-};
-sys_printdef *gpusyspdefs[] = {
-	&syspdef_GPUBUS,
-	&syspdef_GPUGPUPERC,
-	&syspdef_GPUMEMPERC,
-	&syspdef_GPUMEMOCC,
-	&syspdef_GPUMEMTOT,
-	&syspdef_GPUMEMUSE,
-	&syspdef_GPUMEMAVG,
-	&syspdef_GPUTYPE,
-	&syspdef_GPUNRPROC,
 	&syspdef_BLANKBOX,
         0
 };
@@ -159,15 +148,6 @@ sys_printdef *pagsyspdefs[] = {
 	&syspdef_PAGSTALL,
 	&syspdef_PAGSWIN,
 	&syspdef_PAGSWOUT,
-	&syspdef_BLANKBOX,
-        0
-};
-sys_printdef *psisyspdefs[] = {
-	&syspdef_PSICPUS,
-	&syspdef_PSIMEMS,
-	&syspdef_PSIMEMF,
-	&syspdef_PSIIOS,
-	&syspdef_PSIIOF,
 	&syspdef_BLANKBOX,
         0
 };
@@ -262,9 +242,9 @@ sys_printdef *netnetsyspdefs[] = {
 };
 sys_printdef *netintfsyspdefs[] = {
 	&syspdef_NETNAME,
+	&syspdef_NETSPEEDMAX,
 	&syspdef_NETPCKI,
 	&syspdef_NETPCKO,
-	&syspdef_NETSPEEDMAX,
 	&syspdef_NETSPEEDIN,
 	&syspdef_NETSPEEDOUT,
 	&syspdef_NETCOLLIS,
@@ -273,18 +253,6 @@ sys_printdef *netintfsyspdefs[] = {
 	&syspdef_NETSNDERR,
 	&syspdef_NETRCVDROP,
 	&syspdef_NETSNDDROP,
-	&syspdef_BLANKBOX,
-        0
-};
-
-sys_printdef *infinisyspdefs[] = {
-	&syspdef_IFBNAME,
-	&syspdef_IFBPCKI,
-	&syspdef_IFBPCKO,
-	&syspdef_IFBSPEEDMAX,
-	&syspdef_IFBSPEEDIN,
-	&syspdef_IFBSPEEDOUT,
-	&syspdef_IFBLANES,
 	&syspdef_BLANKBOX,
         0
 };
@@ -322,7 +290,6 @@ proc_printdef *allprocpdefs[]=
 	&procprt_FSGID,
 	&procprt_CTID,
 	&procprt_VPID,
-	&procprt_CID,
 	&procprt_STDATE,
 	&procprt_STTIME,
 	&procprt_ENDATE,
@@ -355,27 +322,10 @@ proc_printdef *allprocpdefs[]=
 	&procprt_UDPSASZ,
 	&procprt_RNET,
 	&procprt_SNET,
-	&procprt_BANDWI,
-	&procprt_BANDWO,
-	&procprt_GPULIST,
-	&procprt_GPUMEMNOW,
-	&procprt_GPUMEMAVG,
-	&procprt_GPUGPUBUSY,
-	&procprt_GPUMEMBUSY,
+	&procprt_RNETBW,
+	&procprt_SNETBW,
 	&procprt_SORTITEM,
         0
-};
-
-/*
- * table with all proc_printdefs with PID/TID width to be initialized
- */
-proc_printdef *idprocpdefs[]= 
-{
-	&procprt_PID,
-	&procprt_TID,
-	&procprt_PPID,
-	&procprt_VPID,
-	0
 };
 
 
@@ -390,13 +340,11 @@ proc_printpair schedprocs[MAXITEMS];
 proc_printpair genprocs[MAXITEMS];
 proc_printpair dskprocs[MAXITEMS];
 proc_printpair netprocs[MAXITEMS];
-proc_printpair gpuprocs[MAXITEMS];
 proc_printpair varprocs[MAXITEMS];
 proc_printpair cmdprocs[MAXITEMS];
 proc_printpair ownprocs[MAXITEMS];
 proc_printpair totusers[MAXITEMS];
 proc_printpair totprocs[MAXITEMS];
-proc_printpair totconts[MAXITEMS];
 
 
 /*****************************************************************/
@@ -408,17 +356,14 @@ sys_printpair sysprcline[MAXITEMS];
 sys_printpair allcpuline[MAXITEMS];
 sys_printpair indivcpuline[MAXITEMS];
 sys_printpair cplline[MAXITEMS];
-sys_printpair gpuline[MAXITEMS];
 sys_printpair memline[MAXITEMS];
 sys_printpair swpline[MAXITEMS];
 sys_printpair pagline[MAXITEMS];
-sys_printpair psiline[MAXITEMS];
 sys_printpair contline[MAXITEMS];
 sys_printpair dskline[MAXITEMS];
 sys_printpair nettransportline[MAXITEMS];
 sys_printpair netnetline[MAXITEMS];
 sys_printpair netinterfaceline[MAXITEMS];
-sys_printpair infinibandline[MAXITEMS];
 sys_printpair nfsmountline[MAXITEMS];
 sys_printpair nfcline[MAXITEMS];
 sys_printpair nfsline[MAXITEMS];
@@ -434,7 +379,7 @@ typedef struct {
 **         output: { { "ABCD", 3 }, {"EFG", 1},  { "QWE", 16}, { 0, 0 }  }
 */
 static void
-makeargv(char *line, const char *linename, name_prio *vec) 
+makeargv(char *line, const char *linename, name_prio *vec)
 {
         int   i=0;
         char *p=line;
@@ -543,43 +488,6 @@ make_sys_prints(sys_printpair *ar, int maxn, const char *pairs,
 }
 
 
-
-/*
- * init_proc_prints: determine width of columns that are
- *                   dependent of dynamic values 
- */
-void 
-init_proc_prints()
-{
-	int 	i, numdigits = 5;
-	char	linebuf[64];
-
-	/*
-	** determine maximum number of digits for PID/TID
-	*/
-	if (pmsprintf(linebuf, sizeof linebuf, "%d", pidmax))
-		numdigits = strlen(linebuf);
-
-	/*
-	** fill number of digits for various PID/TID columns
-	** and reformat header to new width
-	*/
-	for (i=0; idprocpdefs[i] != 0; i++)
-	{
-		idprocpdefs[i]->width = numdigits;
-
-		if ( strlen(idprocpdefs[i]->head) < numdigits)
-		{
-			char *p = malloc(numdigits+1);
-
-			ptrverify(p, "Malloc failed for formatted header\n");
-
-			pmsprintf(p, numdigits+1, "%*s", numdigits, idprocpdefs[i]->head);
-			idprocpdefs[i]->head = p;
-		}
-	}
-}
-
 /*
  * make_proc_prints: make array of proc_printpairs
  * input: string, proc_printpair array, maxentries
@@ -633,7 +541,6 @@ totalcap(struct syscap *psc, struct sstat *sstat,
         register int    i;
 
         psc->nrcpu      = sstat->cpu.nrcpu;
-
         psc->availcpu   = sstat->cpu.all.stime +
                           sstat->cpu.all.utime +
                           sstat->cpu.all.ntime +
@@ -668,19 +575,16 @@ totalcap(struct syscap *psc, struct sstat *sstat,
 		psc->availdsk += curstat->dsk.rsz;
 		psc->availdsk += nett_wsz;
 	}
-
-	for (psc->availgpumem=i=0; i < sstat->gpu.nrgpus; i++)
-		psc->availgpumem += sstat->gpu.gpu[i].memtotnow;
-
-	psc->nrgpu = sstat->gpu.nrgpus;
 }
 
 /*
 ** calculate cumulative system- and user-time for all active processes
 */
 void
-pricumproc(struct sstat *sstat, struct devtstat *devtstat,
-           int nexit, unsigned int noverflow, int avgval, double delta)
+pricumproc(struct sstat *sstat, struct tstat **proclist,
+           int nactproc, int ntask, int totproc,
+	   int totrun, int totslpi, int totslpu, int totzomb,
+           int nexit, unsigned int noverflow, int avgval, int nsecs)
 {
 
         static int firsttime=1;
@@ -709,15 +613,13 @@ pricumproc(struct sstat *sstat, struct devtstat *devtstat,
                     make_sys_prints(allcpuline, MAXITEMS,
 	                "CPUSYS:9 "
 	                "CPUUSER:8 "
-	                "CPUIRQ:6 "
+	                "CPUIRQ:5 "
 	                "BLANKBOX:0 "
-	                "CPUIDLE:7 "
-	                "CPUWAIT:7 "
+	                "CPUIDLE:6 "
+	                "CPUWAIT:6 "
+	                "BLANKBOX:0 "
                         "CPUSTEAL:2 "
                         "CPUGUEST:3 "
-	                "BLANKBOX:0 "
-                        "CPUIPC:5 "
-                        "CPUCYCLE:4 "
                         "CPUFREQ:4 "
                         "CPUSCALE:4 ", cpusyspdefs, "builtin allcpuline");
                 }
@@ -727,15 +629,13 @@ pricumproc(struct sstat *sstat, struct devtstat *devtstat,
                     make_sys_prints(indivcpuline, MAXITEMS,
 	                "CPUISYS:9 "
                         "CPUIUSER:8 "
-	                "CPUIIRQ:6 "
+	                "CPUIIRQ:5 "
 	                "BLANKBOX:0 "
-	                "CPUIIDLE:7 "
-	                "CPUIWAIT:7 "
+	                "CPUIIDLE:6 "
+	                "CPUIWAIT:6 "
+	                "BLANKBOX:0 "
                         "CPUISTEAL:2 "
                         "CPUIGUEST:3 "
-	                "BLANKBOX:0 "
-                        "CPUIIPC:5 "
-                        "CPUICYCLE:4 "
                         "CPUIFREQ:4 "
                         "CPUISCALE:4 ", cpisyspdefs, "builtin indivcpuline");
                 }
@@ -751,21 +651,6 @@ pricumproc(struct sstat *sstat, struct devtstat *devtstat,
 	                "CPLINTR:5 "
 	                "BLANKBOX:0 "
 	                "CPLNUMCPU:1", cplsyspdefs, "builtin cplline");
-                }
-
-                if (gpuline[0].f == 0)
-                {
-                    make_sys_prints(gpuline, MAXITEMS,
-	                "GPUBUS:8 "
-	                "GPUGPUPERC:7 "
-	                "GPUMEMPERC:6 "
-	                "GPUMEMOCC:5 "
-	                "GPUMEMTOT:3 "
-	                "GPUMEMUSE:4 "
-	                "GPUMEMAVG:2 "
-	                "GPUNRPROC:2 "
-	                "BLANKBOX:0 "
-	                "GPUTYPE:1 ", gpusyspdefs, "builtin gpuline");
                 }
 
                 if (memline[0].f == 0)
@@ -815,18 +700,6 @@ pricumproc(struct sstat *sstat, struct devtstat *devtstat,
 	                "BLANKBOX:0 "
 	                "PAGSWIN:3 "
 	                "PAGSWOUT:4", pagsyspdefs, "builtin pagline");
-                }
-                if (psiline[0].f == 0)
-                {
-                    make_sys_prints(psiline, MAXITEMS,
-	                "PSICPUS:3 "
-	                "PSIMEMS:3 "
-	                "PSIMEMF:3 "
-	                "PSIIOS:3 "
-	                "PSIIOF:3 "
-	                "BLANKBOX:0 "
-	                "BLANKBOX:0 "
-	                "BLANKBOX:0 ", psisyspdefs, "builtin psiline");
                 }
                 if (contline[0].f == 0)
                 {
@@ -940,11 +813,11 @@ pricumproc(struct sstat *sstat, struct devtstat *devtstat,
                 {
                     make_sys_prints(netinterfaceline, MAXITEMS,
 	                "NETNAME:8 "
+	                "NETSPEEDMAX:5 "
 	                "BLANKBOX:0 "
 	                "NETPCKI:7 "
 	                "NETPCKO:7 "
 	                "BLANKBOX:0 "
-	                "NETSPEEDMAX:5 "
 	                "NETSPEEDIN:6 "
 	                "NETSPEEDOUT:6 "
 	                "BLANKBOX:0 "
@@ -955,25 +828,6 @@ pricumproc(struct sstat *sstat, struct devtstat *devtstat,
                         "NETRCVDROP:3 "
                         "NETSNDDROP:3", netintfsyspdefs, "builtin netinterfaceline");
                 }
-                if (infinibandline[0].f == 0)
-                {
-                    make_sys_prints(infinibandline, MAXITEMS,
-	                "IFBNAME:8 "
-	                "BLANKBOX:0 "
-	                "IFBPCKI:7 "
-	                "IFBPCKO:7 "
-	                "BLANKBOX:0 "
-	                "IFBSPEEDMAX:5 "
-	                "IFBSPEEDIN:6 "
-	                "IFBSPEEDOUT:6 "
-	                "IFBLANES:4 "
-	                "BLANKBOX:0 "
-	                "BLANKBOX:0 "
-	                "BLANKBOX:0 "
-	                "BLANKBOX:0 "
-	                "BLANKBOX:0 "
-	                "BLANKBOX:0 ", infinisyspdefs, "builtin infinibandline");
-                }
         }  // firsttime
 
 
@@ -981,23 +835,23 @@ pricumproc(struct sstat *sstat, struct devtstat *devtstat,
         extraparam extra;
 
 
-        for (i=0, extra.totut=extra.totst=0; i < devtstat->nprocactive; i++)
+        for (i=0, extra.totut=extra.totst=0; i < nactproc; i++)
         {
-		struct tstat *curstat = *(devtstat->procactive+i);
+		struct tstat *curstat = *(proclist+i);
 
                 extra.totut	+= curstat->cpu.utime;
                 extra.totst 	+= curstat->cpu.stime;
         }
 
-        extra.nproc	= devtstat->nprocall;
-	extra.ntrun	= devtstat->totrun;
-	extra.ntslpi	= devtstat->totslpi;
-	extra.ntslpu	= devtstat->totslpu;
-        extra.nzomb	= devtstat->totzombie;
+        extra.nproc	= totproc;
+	extra.ntrun	= totrun;
+	extra.ntslpi	= totslpi;
+	extra.ntslpu	= totslpu;
+        extra.nzomb	= totzomb;
         extra.nexit	= nexit;
         extra.noverflow	= noverflow;
         extra.avgval	= avgval;
-        extra.nsecs	= (int)(delta > 1.0 ? delta : 1.0);
+        extra.nsecs	= nsecs;
 
         move(1, 0);
         showsysline(sysprcline, sstat, &extra, "PRC", 0);
@@ -1011,7 +865,7 @@ priphead(int curlist, int totlist, char *showtype, char *showorder,
 							char autosort)
 {
         static int      firsttime=1;
-        static int      prev_supportflags = -1, prev_threadview = -1;
+        static int      prev_supportflags = -1;;
 
 	/*
  	** determine once the layout of all per-process reports
@@ -1019,8 +873,6 @@ priphead(int curlist, int totlist, char *showtype, char *showorder,
 	*/
         if (firsttime) 
         {
-		init_proc_prints();
-
                 make_proc_prints(memprocs, MAXITEMS, 
                         "PID:10 TID:3 MINFLT:2 MAJFLT:2 VSTEXT:4 VSLIBS:4 "
 			"VDATA:4 VSTACK:4 VSIZE:6 RSIZE:7 PSIZE:5 "
@@ -1029,9 +881,9 @@ priphead(int curlist, int totlist, char *showtype, char *showorder,
                         "built-in memprocs");
 
                 make_proc_prints(schedprocs, MAXITEMS, 
-                        "PID:10 TID:6 CID:5 VPID:4 CTID:4 TRUN:7 TSLPI:7 "
-			"TSLPU:7 POLI:8 NICE:9 PRI:9 RTPR:9 CPUNR:8 ST:8 "
-			"EXC:8 S:8 SORTITEM:10 CMD:10", 
+                        "PID:10 TID:6 VPID:5 CTID:5 TRUN:7 TSLPI:7 TSLPU:7 "
+			"POLI:8 NICE:9 PRI:9 RTPR:9 CPUNR:8 ST:8 EXC:8 "
+                        "S:8 SORTITEM:10 CMD:10", 
                         "built-in schedprocs");
 
                 make_proc_prints(dskprocs, MAXITEMS, 
@@ -1044,17 +896,12 @@ priphead(int curlist, int totlist, char *showtype, char *showorder,
                         "PID:10 TID:6 "
 			"TCPRCV:9 TCPRASZ:4 TCPSND:9 TCPSASZ:4 "
 			"UDPRCV:8 UDPRASZ:3 UDPSND:8 UDPSASZ:3 "
-			"BANDWI:10 BANDWO:10 "
+			"RNETBW:10 SNETBW:10 "
                         "SORTITEM:10 CMD:10", 
                         "built-in netprocs");
 
-                make_proc_prints(gpuprocs, MAXITEMS, 
-                        "PID:10 TID:5 CID:4 GPULIST:8 GPUGPUBUSY:8 GPUMEMBUSY:8 "
-			"GPUMEM:7 GPUMEMAVG:6 S:8 SORTITEM:10 CMD:10", 
-                        "built-in gpuprocs");
-
                 make_proc_prints(varprocs, MAXITEMS,
-                        "PID:10 TID:4 PPID:9 CID:2 VPID:1 CTID:1 "
+                        "PID:10 TID:4 PPID:9 VPID:1 CTID:1 "
 			"RUID:8 RGID:8 EUID:5 EGID:4 "
      			"SUID:3 SGID:2 FSUID:3 FSGID:2 "
                         "STDATE:7 STTIME:7 ENDATE:5 ENTIME:5 "
@@ -1076,23 +923,15 @@ priphead(int curlist, int totlist, char *showtype, char *showorder,
                         "RSIZE:8 PSIZE:8 SWAPSZ:5 RDDSK:7 CWRDSK:7 "
 			"RNET:6 SNET:6 SORTITEM:10 CMD:10", 
                         "built-in totprocs");
-
-                make_proc_prints(totconts, MAXITEMS, 
-                        "NPROCS:10 SYSCPU:9 USRCPU:9 VSIZE:6 "
-                        "RSIZE:8 PSIZE:8 SWAPSZ:5 RDDSK:7 CWRDSK:7 "
-			"RNET:6 SNET:6 SORTITEM:10 CID:10", 
-                        "built-in totconts");
         }
 
 	/*
  	** update the generic report if needed
 	*/
-	if (prev_supportflags != supportflags || prev_threadview != threadview)
+	if (prev_supportflags != supportflags)
 	{
 		make_proc_dynamicgen();
-
 		prev_supportflags = supportflags;
-		prev_threadview   = threadview;
 
 		if (*showtype == MPROCNET && !(supportflags&NETATOP) )
 		{
@@ -1122,10 +961,6 @@ priphead(int curlist, int totlist, char *showtype, char *showorder,
                 showhdrline(netprocs, curlist, totlist, *showorder, autosort);
                 break;
 
-           case MPROCGPU:
-                showhdrline(gpuprocs, curlist, totlist, *showorder, autosort);
-                break;
-
            case MPROCVAR:
                 showhdrline(varprocs, curlist, totlist, *showorder, autosort);
                 break;
@@ -1149,73 +984,56 @@ priphead(int curlist, int totlist, char *showtype, char *showorder,
            case MCUMPROC:
                 showhdrline(totprocs, curlist, totlist, *showorder, autosort);
                 break;
-
-           case MCUMCONT:
-                showhdrline(totconts, curlist, totlist, *showorder, autosort);
-                break;
         }
 }
-
-/*
-** assemble the layout of the generic line,
-** depending on the supported features (like
-** I/O stats, network stats) and current view
-*/
-#define	FORMPID	"PID:10 "
-#define	FORMTID	"TID:6 "
-#define	FORMCID	"CID:5 "
-#define	FORMCPU	"SYSCPU:9 USRCPU:9 "
-#define FORMMEM	"VGROW:8 RGROW:8 "
-#define FORMDSK	"RDDSK:7 CWRDSK:7 "
-#define FORMNET	"RNET:6 SNET:6 "
-#define FORMMSC	"RUID:3 EUID:2 ST:4 EXC:4 THR:4 S:4 CPUNR:4 "
-#define FORMEND	"SORTITEM:10 CMD:10"
 
 static void
 make_proc_dynamicgen()
 {
-	char format[300], *p = format;
-
-	memcpy(p, FORMPID, sizeof FORMPID -1);
-	p += sizeof FORMPID -1;
-
-	if (threadview)
+	if ( (supportflags & (IOSTAT|NETATOP)) == (IOSTAT|NETATOP)) 
 	{
-		memcpy(p, FORMTID, sizeof FORMTID -1);
-		p += sizeof FORMTID -1;
+		// iostat and netatop data is available
+		make_proc_prints(genprocs, MAXITEMS, 
+			"PID:10 TID:4 SYSCPU:9 USRCPU:9 "
+			"VGROW:8 RGROW:8 "
+			"RDDSK:7 CWRDSK:7 "
+			"RNET:6 SNET:6 S:5 "
+			"SORTITEM:10 CMD:10", 
+			"built-in genprocs");
 	}
-
-	if (supportflags & DOCKSTAT)
+	else if (supportflags & IOSTAT) 
 	{
-		memcpy(p, FORMCID, sizeof FORMCID -1);
-		p += sizeof FORMCID -1;
-	}
-
-	memcpy(p, FORMCPU, sizeof FORMCPU -1);
-	p += sizeof FORMCPU -1;
-
-	memcpy(p, FORMMEM, sizeof FORMMEM -1);
-	p += sizeof FORMMEM -1;
-
-	if (supportflags & IOSTAT)
+		// only iostat data is available
+		make_proc_prints(genprocs, MAXITEMS, 
+			"PID:10 TID:4 RUID:3 EUID:2 THR:4 "
+			"SYSCPU:9 USRCPU:9 "
+			"VGROW:8 RGROW:8 "
+			"RDDSK:7 CWRDSK:7 "
+			"ST:6 EXC:6 S:6 "
+			"CPUNR:5 SORTITEM:10 CMD:10", 
+			"built-in genprocs");
+	} 
+	else if (supportflags & NETATOP) 
 	{
-		memcpy(p, FORMDSK, sizeof FORMDSK -1);
-		p += sizeof FORMDSK -1;
+		// only netatop data is available
+		make_proc_prints(genprocs, MAXITEMS, 
+			"PID:10 TID:4 SYSCPU:9 USRCPU:9 "
+			"VGROW:8 RGROW:8 "
+			"RNET:7 SNET:7 "
+			"ST:5 EXC:5 S:6 "
+			"CPUNR:5 SORTITEM:10 CMD:10", 
+			"built-in genprocs");
 	}
-
-	if (supportflags & NETATOP)
+	else 
 	{
-		memcpy(p, FORMNET, sizeof FORMNET -1);
-		p += sizeof FORMNET -1;
+		// no optional data is available
+		make_proc_prints(genprocs, MAXITEMS, 
+			"PID:10 TID:4 SYSCPU:9 USRCPU:9 "
+			"VGROW:8 RGROW:8 RUID:4 EUID:3 "
+			"THR:7 ST:7 EXC:7 S:7 "
+			"SORTITEM:10 CMD:10", 
+			"built-in genprocs");
 	}
-
-	memcpy(p, FORMMSC, sizeof FORMMSC -1);
-	p += sizeof FORMMSC -1;
-
-	memcpy(p, FORMEND, sizeof FORMEND);
-	p += sizeof FORMEND;
-
-	make_proc_prints(genprocs, MAXITEMS, format, "built-in genprocs");
 }
 
 /*
@@ -1314,23 +1132,6 @@ priproc(struct tstat **proclist, int firstproc, int lastproc, int curline,
                         }
                         break;
 
-                   case MSORTGPU:
-                        perc = 0.0;
-
-			if (!curstat->gpu.state)
-				break;
-
-                        if (curstat->gpu.gpubusy != -1)
-			{
-                        	perc = curstat->gpu.gpubusy;
-			}
-			else
-			{
-                        	perc = curstat->gpu.memnow*100 *
-				       sb->nrgpu / sb->availgpumem;
-			}
-                        break;
-
                    default:
                         perc = 0.0;
                 }
@@ -1360,10 +1161,6 @@ priproc(struct tstat **proclist, int firstproc, int lastproc, int curline,
                         showprocline(netprocs, curstat, perc, nsecs, avgval);
                         break;
 
-                   case MPROCGPU:
-                        showprocline(gpuprocs, curstat, perc, nsecs, avgval);
-                        break;
-
                    case MPROCVAR:
                         showprocline(varprocs, curstat, perc, nsecs, avgval);
                         break;
@@ -1387,10 +1184,6 @@ priproc(struct tstat **proclist, int firstproc, int lastproc, int curline,
                    case MCUMPROC:
                         showprocline(totprocs, curstat, perc, nsecs, avgval);
                         break;
-
-                   case MCUMCONT:
-                        showprocline(totconts, curstat, perc, nsecs, avgval);
-                        break;
                 }
 
                 curline++;
@@ -1409,9 +1202,8 @@ static void	pridisklike(extraparam *, struct perdsk *, char *,
 int
 prisyst(struct sstat *sstat, int curline, int nsecs, int avgval,
         int fixedhead, struct sselection *selp, char *highorderp,
-        int maxcpulines, int maxgpulines, int maxdsklines, int maxmddlines,
-	int maxlvmlines, int maxintlines, int maxifblines,
-	int maxnfslines, int maxcontlines)
+        int maxcpulines, int maxdsklines, int maxmddlines,
+	int maxlvmlines, int maxintlines, int maxnfslines, int maxcontlines)
 {
         extraparam      extra;
         int             lin;
@@ -1498,9 +1290,7 @@ prisyst(struct sstat *sstat, int curline, int nsecs, int avgval,
                                 extra.percputot = 1; /* avoid divide-by-zero */
 
 
-			if (screen)
-        	                move(curline, 0);
-
+                        move(curline, 0);
                         showsysline(indivcpuline, sstat, &extra, "cpu",
 								badness);
                         curline++;
@@ -1516,65 +1306,6 @@ prisyst(struct sstat *sstat, int curline, int nsecs, int avgval,
 
         showsysline(cplline, sstat, &extra, "CPL", 0);
         curline++;
-
-        /*
-        ** GPU statistics
-        */
-	if (sstat->gpu.nrgpus)
-	{
-        	for (extra.index=0, lin=0;
-		     extra.index < sstat->gpu.nrgpus && lin < maxgpulines;
-		     extra.index++)
-        	{
-			int	totbusy;
-			count_t	avgmemuse;
-
-			// notice that GPU percentage and memory percentage
-			// are not always available; in that case both
-			// values have the value -1
-			//
-			totbusy = sstat->gpu.gpu[extra.index].gpuperccum +
-			          sstat->gpu.gpu[extra.index].memperccum;
-
-			if (totbusy == -2)	// metrics available?
-				totbusy= 0;
-
-			if (sstat->gpu.gpu[extra.index].samples == 0)
-			{
-				totbusy =
-					sstat->gpu.gpu[extra.index].gpupercnow +
-			          	sstat->gpu.gpu[extra.index].mempercnow;
-
-				avgmemuse =
-					sstat->gpu.gpu[extra.index].memusenow;
-			}
-			else
-			{
-				totbusy = totbusy /
-				     	sstat->gpu.gpu[extra.index].samples;
-
-		   		avgmemuse =
-					 sstat->gpu.gpu[extra.index].memusecum/
-			                 sstat->gpu.gpu[extra.index].samples;
-			}
-
-        		if (gpubadness)
-                		badness = totbusy * 100 / gpubadness;
-        		else
-                		badness = 0;
-
-			if (	totbusy > 0 			||
-			    	// memusage > 512 MiB (rather arbitrary)?
-			    	avgmemuse > 512*1024 		||
-			    	fixedhead			  )
-			{
-					showsysline(gpuline, sstat,
-							&extra, "GPU", badness);
-	 				curline++;
-					lin++;
-			}
-		}
-	}
 
         /*
         ** MEMORY statistics
@@ -1671,35 +1402,6 @@ prisyst(struct sstat *sstat, int curline, int nsecs, int avgval,
                 curline++;
         }
 
-        /*
-        ** Pressure statistics
-        */
-	if (sstat->psi.present)
-	{
-        	if (fixedhead                 ||
-	            sstat->psi.cpusome.avg10  || sstat->psi.memsome.avg10  ||
-	            sstat->psi.iosome.avg10   ||
-	            sstat->psi.cpusome.avg60  || sstat->psi.memsome.avg60  ||
-	            sstat->psi.iosome.avg60   ||
-	            sstat->psi.cpusome.avg300 || sstat->psi.memsome.avg300 ||
-	            sstat->psi.iosome.avg300    )
-	        {
-			badness = sstat->psi.cpusome.avg10 >
-			          sstat->psi.cpusome.avg60 ?
-			          sstat->psi.cpusome.avg10 :
-			          sstat->psi.cpusome.avg60;
-
-			if (badness < sstat->psi.cpusome.avg300)
-				badness = sstat->psi.cpusome.avg300;
-
-			if (screen)
-                		move(curline, 0);
-
-                	showsysline(psiline, sstat, &extra,"PSI", badness);
-                	curline++;
-		}
-	}
-
 	/*
  	** Container statistics (if any)
 	*/
@@ -1741,20 +1443,20 @@ prisyst(struct sstat *sstat, int curline, int nsecs, int avgval,
         ** NFS server and client statistics
         */
 	for (extra.index=0, lin=0;
-	     extra.index < sstat->nfs.nfsmounts.nrmounts && lin < maxnfslines;
+	     extra.index < sstat->nfs.nrmounts && lin < maxnfslines;
 								extra.index++)
 	{
 		int i = extra.index;
 
-		if ( (sstat->nfs.nfsmounts.nfsmnt[i].bytesread     +
-		      sstat->nfs.nfsmounts.nfsmnt[i].byteswrite    +
-		      sstat->nfs.nfsmounts.nfsmnt[i].bytesdread    +
-		      sstat->nfs.nfsmounts.nfsmnt[i].bytesdwrite   +
-		      sstat->nfs.nfsmounts.nfsmnt[i].bytestotread  +
-		      sstat->nfs.nfsmounts.nfsmnt[i].bytestotwrite +
-		      sstat->nfs.nfsmounts.nfsmnt[i].pagesmread    +
-		      sstat->nfs.nfsmounts.nfsmnt[i].pagesmwrite    ) ||
-		      sstat->nfs.nfsmounts.nfsmnt[i].age < nsecs      ||
+		if ( (sstat->nfs.nfsmnt[i].bytesread     +
+		      sstat->nfs.nfsmnt[i].byteswrite    +
+		      sstat->nfs.nfsmnt[i].bytesdread    +
+		      sstat->nfs.nfsmnt[i].bytesdwrite   +
+		      sstat->nfs.nfsmnt[i].bytestotread  +
+		      sstat->nfs.nfsmnt[i].bytestotwrite +
+		      sstat->nfs.nfsmnt[i].pagesmread    +
+		      sstat->nfs.nfsmnt[i].pagesmwrite    ) ||
+		      sstat->nfs.nfsmnt[i].age < nsecs      ||
 		      fixedhead                                         )
 		{
 			if (screen)
@@ -1785,7 +1487,7 @@ prisyst(struct sstat *sstat, int curline, int nsecs, int avgval,
         }
 
         /*
-        ** NET statistics: transport
+        ** NET statistics
         */
         if (sstat->net.tcp.InSegs             ||
             sstat->net.tcp.OutSegs            ||
@@ -1802,9 +1504,6 @@ prisyst(struct sstat *sstat, int curline, int nsecs, int avgval,
                 curline++;
         }
 
-        /*
-        ** NET statistics: network
-        */
         if (sstat->net.ipv4.InReceives ||
             sstat->net.ipv6.Ip6InReceives ||
             sstat->net.ipv4.OutRequests ||
@@ -1818,9 +1517,6 @@ prisyst(struct sstat *sstat, int curline, int nsecs, int avgval,
                 curline++;
         }
 
-        /*
-        ** NET statistics: interfaces
-        */
         for (extra.index=0, lin=0;
 	     sstat->intf.intf[extra.index].name[0] && lin < maxintlines;
              extra.index++)
@@ -1886,54 +1582,6 @@ prisyst(struct sstat *sstat, int curline, int nsecs, int avgval,
         }
 
         /*
-        ** NET statistics: InfiniBand
-        */
-        for (extra.index=0, lin=0;
-	     extra.index < sstat->ifb.nrports && lin < maxifblines;
-             extra.index++)
-        {
-                if (sstat->ifb.ifb[extra.index].rcvb ||
-                    sstat->ifb.ifb[extra.index].sndb || fixedhead)
-                {
-                        /*
-                        ** calculate busy-percentage for IB port
-                        */
-                       count_t ival, oval;
-
-                        /*
-                        ** convert byte-transfers to bit-transfers     (*    8)
-                        ** convert bit-transfers  to kilobit-transfers (/ 1000)
-                        ** per second
-                        */
-                        ival    = sstat->ifb.ifb[extra.index].rcvb/125/nsecs;
-                        oval    = sstat->ifb.ifb[extra.index].sndb/125/nsecs;
-
-			busy = (ival > oval ? ival : oval) *
-			                 sstat->ifb.ifb[extra.index].lanes /
-					(sstat->ifb.ifb[extra.index].rate * 10);
-
-                        if (netbadness)
-                                badness = busy * 100 / netbadness;
-                        else
-                                badness = 0;
-
-                        if (highbadness < badness)
-                        {
-                                highbadness = badness;
-                                *highorderp = MSORTNET;
-                        }
-
-			if (screen)
-                		move(curline, 0);
-
-                        showsysline(infinibandline, sstat, &extra, 
-                                      			"IFB", badness);
-                        curline++;
-                        lin++;
-                }
-        }
-
-        /*
         ** application statistics
         **
         ** WWW: notice that we cause one access ourselves by fetching
@@ -1941,7 +1589,7 @@ prisyst(struct sstat *sstat, int curline, int nsecs, int avgval,
         */
         if (sstat->www.accesses > 1 || fixedhead )
         {
-		char format1[8], format2[8], format3[8], format4[8], format5[8];
+		char	format1[8], format2[8], format3[8], format4[8], format5[8];
 
 		if (screen)
                		move(curline, 0);
@@ -2023,7 +1671,7 @@ pridisklike(extraparam *ep, struct perdsk *dp, char *lp, char *highorderp,
 
 
 /*
-** process-level sort-functions
+** sort-functions
 */
 int
 compcpu(const void *a, const void *b)
@@ -2035,7 +1683,7 @@ compcpu(const void *a, const void *b)
 
         if (acpu < bcpu) return  1;
         if (acpu > bcpu) return -1;
-	else             return compmem(a, b);
+	return compmem(a, b);
 }
 
 int
@@ -2059,7 +1707,7 @@ compdsk(const void *a, const void *b)
 
         if (adsk < bdsk) return  1;
         if (adsk > bdsk) return -1;
-	else             return compcpu(a, b);
+	return compcpu(a, b);
 }
 
 int
@@ -2070,37 +1718,7 @@ compmem(const void *a, const void *b)
 
         if (amem < bmem) return  1;
         if (amem > bmem) return -1;
-	else             return  0;
-}
-
-int
-compgpu(const void *a, const void *b)
-{
-        register char 	 astate = (*(struct tstat **)a)->gpu.state;
-        register char 	 bstate = (*(struct tstat **)b)->gpu.state;
-        register count_t abusy  = (*(struct tstat **)a)->gpu.gpubusy;
-        register count_t bbusy  = (*(struct tstat **)b)->gpu.gpubusy;
-        register count_t amem   = (*(struct tstat **)a)->gpu.memnow;
-        register count_t bmem   = (*(struct tstat **)b)->gpu.memnow;
-
-        if (!astate)		// no GPU usage?
-		abusy = amem = -2; 
-
-        if (!bstate)		// no GPU usage?
-		bbusy = bmem = -2; 
-
-	if (abusy == -1 || bbusy == -1)
-	{
-        	if (amem < bmem)	return  1;
-	        if (amem > bmem) 	return -1;
-                return  0;
-	}
-	else
-	{
-		if (abusy < bbusy)	return  1;
-		if (abusy > bbusy)	return -1;
-       		return  0;
-	}
+	return  0;
 }
 
 int
@@ -2117,7 +1735,7 @@ compnet(const void *a, const void *b)
 
         if (anet < bnet) return  1;
         if (anet > bnet) return -1;
-	else             return compcpu(a, b);
+	return compcpu(a, b);
 }
 
 int
@@ -2128,7 +1746,7 @@ compusr(const void *a, const void *b)
 
         if (uida > uidb) return  1;
         if (uida < uidb) return -1;
-	else             return  0;
+	return  0;
 }
 
 int
@@ -2141,18 +1759,6 @@ compnam(const void *a, const void *b)
 }
 
 int
-compcon(const void *a, const void *b)
-{
-        register char *containera = (*(struct tstat **)a)->gen.container;
-        register char *containerb = (*(struct tstat **)b)->gen.container;
-
-       return strcmp(containera, containerb);
-}
-
-/*
-** system-level sort functions
-*/
-int
 cpucompar(const void *a, const void *b)
 {
         register count_t aidle = ((struct percpu *)a)->itime +
@@ -2162,29 +1768,7 @@ cpucompar(const void *a, const void *b)
 
         if (aidle < bidle) return -1;
         if (aidle > bidle) return  1;
-	else               return  0;
-}
-
-int
-gpucompar(const void *a, const void *b)
-{
-        register count_t agpuperc  = ((struct pergpu *)a)->gpuperccum;
-        register count_t bgpuperc  = ((struct pergpu *)b)->gpuperccum;
-        register count_t amemuse   = ((struct pergpu *)a)->memusenow;
-        register count_t bmemuse   = ((struct pergpu *)b)->memusenow;
-
-	if (agpuperc == -1 || bgpuperc == -1)
-	{
-        	if (amemuse < bmemuse)	return  1;
-        	if (amemuse > bmemuse)	return -1;
-                return  0;
-	}
-	else
-	{
-        	if (agpuperc < bgpuperc)	return  1;
-        	if (agpuperc > bgpuperc)	return -1;
-                return  0;
-	}
+	return  0;
 }
 
 int
@@ -2195,7 +1779,7 @@ diskcompar(const void *a, const void *b)
 
         if (amsio < bmsio) return  1;
         if (amsio > bmsio) return -1;
-	else               return  0;
+	return  0;
 }
 
 int
@@ -2212,13 +1796,14 @@ intfcompar(const void *a, const void *b)
         count_t asbyte         = ((struct perintf *)a)->sbyte;
         count_t bsbyte         = ((struct perintf *)b)->sbyte;
 
+
         /*
         ** if speed of first interface known, calculate busy factor
         */
         if (aspeed)
         {
                 if (aduplex)
-                        afactor = (arbyte > asbyte ? arbyte : asbyte) 
+                        afactor = (arbyte > asbyte ? arbyte : asbyte)
                                                                 * 10 / aspeed;
                 else
                         afactor = (arbyte + asbyte)             * 10 / aspeed;
@@ -2243,14 +1828,14 @@ intfcompar(const void *a, const void *b)
         {
                 if (afactor < bfactor)  return  1;
                 if (afactor > bfactor)  return -1;
-		else                    return  0;
+		return  0;
         }
 
         if (!aspeed && !bspeed)
         {
                 if ((arbyte + asbyte) < (brbyte + bsbyte))      return  1;
                 if ((arbyte + asbyte) > (brbyte + bsbyte))      return -1;
-		else                                            return  0;
+		return  0;
         }
 
         if (aspeed)
@@ -2258,20 +1843,6 @@ intfcompar(const void *a, const void *b)
         else
                 return  1;
 }
-
-int
-ifbcompar(const void *a, const void *b)
-{
-        count_t atransfer  = ((struct perifb *)a)->rcvb +
-                             ((struct perifb *)a)->sndb;
-        count_t btransfer  = ((struct perifb *)b)->rcvb +
-                             ((struct perifb *)b)->sndb;
-
-	if (atransfer < btransfer)	return  1;
-	if (atransfer > btransfer)	return -1;
-	return  0;
-}
-
 
 int
 nfsmcompar(const void *a, const void *b)
@@ -2290,7 +1861,7 @@ nfsmcompar(const void *a, const void *b)
 
         if (aused < bused) return  1;
         if (aused > bused) return -1;
-	else               return  0;
+	return  0;
 }
 
 int
@@ -2304,7 +1875,7 @@ contcompar(const void *a, const void *b)
 
         if (aused < bused) return  1;
         if (aused > bused) return -1;
-	else               return  0;
+	return  0;
 }
 
 /*
@@ -2352,12 +1923,6 @@ void
 do_cpucritperc(char *name, char *val)
 {
         cpubadness = get_perc(name, val);
-}
-
-void
-do_gpucritperc(char *name, char *val)
-{
-        gpubadness = get_perc(name, val);
 }
 
 void
@@ -2421,12 +1986,6 @@ do_owncplline(char *name, char *val)
 }
 
 void
-do_owngpuline(char *name, char *val)
-{
-        make_sys_prints(gpuline, MAXITEMS, val, gpusyspdefs, name);
-}
-
-void
 do_ownmemline(char *name, char *val)
 {
         make_sys_prints(memline, MAXITEMS, val, memsyspdefs, name);
@@ -2466,12 +2025,6 @@ void
 do_ownnetinterfaceline(char *name, char *val)
 {
         make_sys_prints(netinterfaceline, MAXITEMS, val, netintfsyspdefs, name);
-}
-
-void
-do_owninfinibandline(char *name, char *val)
-{
-        make_sys_prints(infinibandline, MAXITEMS, val, infinisyspdefs, name);
 }
 
 void

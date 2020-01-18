@@ -85,5 +85,3 @@ $(OBJECTS):	hypnotoad.h domain.h
 
 pdhlist.exe:	pdhlist.o error.o
 	$(CCF) -o pdhlist.exe pdhlist.o error.o $(LLDFLAGS) -L$(TOPDIR)/src/libpcp/src -lpcp -lpdh
-
-$(OBJECTS):	$(TOPDIR)/src/include/pcp/libpcp.h

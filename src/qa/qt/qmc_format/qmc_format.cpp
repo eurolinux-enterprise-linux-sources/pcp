@@ -16,16 +16,16 @@ main(int argc, char *argv[])
     double	d;
     char	*endptr;
 
-    pmSetProgname(argv[0]);
+    pmProgname = basename(argv[0]);
     if (argc != 2) {
-	cerr << "Usage: " << pmGetProgname() << " double" << endl;
+	cerr << "Usage: " << pmProgname << " double" << endl;
 	exit(1);
 	/*NOTREACHED*/
     }
 
     d = strtod(argv[1], &endptr);
     if (endptr != NULL && endptr[0] != '\0') {
-	cerr << pmGetProgname() << ": argument \"" << argv[1] 
+	cerr << pmProgname << ": argument \"" << argv[1] 
 	     << "\" must be a double (\"" << endptr << "\")" << endl;
 	exit(1);
 	/*NOTREACHED*/

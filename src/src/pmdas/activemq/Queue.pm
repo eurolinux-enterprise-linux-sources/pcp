@@ -13,7 +13,7 @@
 # 
 use strict;
 
-package PCP::Queue;
+package Queue;
 
 use Digest::MD5 qw(md5);
 

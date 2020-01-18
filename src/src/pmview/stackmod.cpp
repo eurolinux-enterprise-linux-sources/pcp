@@ -23,6 +23,9 @@
 #include "modlist.h"
 #include "launch.h"
 
+#include <iostream>
+using namespace std;
+
 //
 // Use debug flag LIBPMDA to trace stack refreshes
 //
@@ -65,10 +68,12 @@ StackMod::StackMod(MetricList *metrics, SoNode *obj, StackMod::Height height)
 
 	initScale = 1.0 / (float)numValues;
 
-	if (pmDebugOptions.appl2)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_APPL2)
 	    cerr << "StackMod::StackMod: numValues = "
 		 << numValues << ", num of blocks = " << m << endl 
 		 << *_metrics;
+#endif
 
 	for (m = 0, v = 0; m < numMetrics; m++) {
 	    const QmcMetric &metric = _metrics->metric(m);
@@ -157,8 +162,10 @@ StackMod::refresh(bool fetchFlag)
 
     static QVector<double> values;
 
-    if (pmDebugOptions.libpmda)
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_LIBPMDA)
 	cerr << endl << "StackMod::refresh" << endl;
+#endif
 
     if (status() < 0)
 	return;
@@ -175,8 +182,10 @@ StackMod::refresh(bool fetchFlag)
 	    StackBlock &block = _blocks[v];
 	    double &value = values[v];
 
-	    if (pmDebugOptions.libpmda)
+#ifdef PCP_DEBUG
+	    if (pmDebug & DBG_TRACE_LIBPMDA)
 		cerr << '[' << v << "] ";
+#endif
 
 	    if (metric.error(i) <= 0) {
 		if (block._state != Modulate::error) {
@@ -186,8 +195,11 @@ StackMod::refresh(bool fetchFlag)
 		value = Modulate::theMinScale;
 		sum += value;
 
-		if (pmDebugOptions.libpmda)
+#ifdef PCP_DEBUG
+		if (pmDebug & DBG_TRACE_LIBPMDA)
 		    cerr << "Error, value set to " << value << endl;
+#endif
+
 	    }
 	    else if (block._state == Modulate::error ||
 		     block._state == Modulate::start) {
@@ -200,22 +212,30 @@ StackMod::refresh(bool fetchFlag)
 		if (value < theMinScale)
 		    value = theMinScale;
 		sum += value;
-		if (pmDebugOptions.libpmda)
+#ifdef PCP_DEBUG
+		if (pmDebug & DBG_TRACE_LIBPMDA)
 		    cerr << "Error->Normal, value = " << value << endl;
+#endif
+
 	    }
 	    else {
 		value = metric.value(i) * theScale;
 		if (value < theMinScale)
 		    value = theMinScale;
 		sum += value;
-		if (pmDebugOptions.libpmda)
+#ifdef PCP_DEBUG
+		if (pmDebug & DBG_TRACE_LIBPMDA)
 		    cerr << "Normal, value = " << value << endl;
+#endif
+
 	    }
 	}
     }
     
-    if (pmDebugOptions.libpmda)
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_LIBPMDA)
 	cerr << "sum = " << sum << endl;
+#endif
     
     if (sum > theNormError && _height != util) {
 	if (_blocks[0]._state != Modulate::saturated) {
@@ -271,8 +291,10 @@ StackMod::refresh(bool fetchFlag)
 	StackBlock &block = _blocks[v];
 	double &value = values[v];
  
-	if (pmDebugOptions.libpmda)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_LIBPMDA)
 	    cerr << '[' << v << "] scale = " << value << endl;
+#endif
 
 	block._scale->scaleFactor.setValue(1.0, value, 1.0);
 	
@@ -342,9 +364,11 @@ StackMod::infoText(QString &str, bool selected) const
     }
 
     if (v >= _blocks.size()) {
-	if (pmDebugOptions.appl2)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_APPL2)
 	    cerr << "StackMod::infoText: infoText requested but nothing selected"
 		 << endl;
+#endif
 	str = "";
     }
     else if (_height == fixed && v == _blocks.size() - 1) {
@@ -418,8 +442,10 @@ StackMod::selectAll()
 
     theModList->selectAllId(_root, _blocks.size());
 
-    if (pmDebugOptions.appl2)
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_APPL2)
 	cerr << "StackMod::selectAll" << endl;
+#endif
 
     for (i = 0; i < _blocks.size(); i++) {
 	if (_blocks[i]._selected == false) {
@@ -440,9 +466,11 @@ StackMod::select(SoPath *path)
 	_blocks[value]._selected = true;
 	_selectCount++;
 
-	if (pmDebugOptions.appl2)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_APPL2)
 	    cerr << "StackMod::select: value = " << value
 		 << ", count = " << _selectCount << endl;
+#endif
     }
     return _selectCount;
 }
@@ -457,13 +485,19 @@ StackMod::remove(SoPath *path)
 	_blocks[value]._selected = false;
 	_selectCount--;
 
-	if (pmDebugOptions.appl2)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_APPL2)
 	    cerr << "StackMod::remove: value = " << value
 		 << ", count = " << _selectCount << endl;
+#endif
+
     }
-    else if (pmDebugOptions.appl2)
+
+#ifdef PCP_DEBUG
+    else if (pmDebug & DBG_TRACE_APPL2)
 	cerr << "StackMod::remove: did not remove " << value 
 	     << ", count = " << _selectCount << endl;
+#endif
 
     return _selectCount;
 }
@@ -499,8 +533,10 @@ StackMod::findBlock(SoPath *path, int &metric, int &inst,
 
     if (i >= 0) {
 
-	if (pmDebugOptions.appl2)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_APPL2) 
 	    cerr << "StackMod::findBlock: stack id = " << str << endl;
+#endif
 
 	sscanf(str, "%c%d", &c, &value);
 	
@@ -530,9 +566,14 @@ StackMod::findBlock(SoPath *path, int &metric, int &inst,
 	metric = inst = 0;
     }
 
-    if (pmDebugOptions.appl2)
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_APPL2) {
 	cerr << "StackMod::findBlock: metric = " << metric
 	     << ", inst = " << inst << ", value = " << value << endl;
+    }
+#endif
+
+    return;
 }
 
 void

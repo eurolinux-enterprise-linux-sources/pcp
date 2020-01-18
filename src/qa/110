@@ -142,7 +142,8 @@ echo "=== pipe daemon agent ==="
 echo "=== pipe daemon agent ===" >>$here/$seq.full
 $sudo ./Remove >$tmp.out 2>&1
 $sudo rm -f $PMDA_LOG_PATH
-echo 'daemon
+echo 'both
+daemon
 pipe' | $sudo ./Install -e >>$tmp.out 2>&1
 _full
 
@@ -159,14 +160,16 @@ echo
 echo "=== Unix socket daemon agent ==="
 echo "=== Unix socket daemon agent ===" >>$here/$seq.full
 $sudo ./Remove >$tmp.out 2>&1
-echo 'daemon
+echo 'both
+daemon
 socket
 Unix
 '"$tmp.fifo-1" | $sudo ./Install -e >>$tmp.out 2>&1
 echo "+++ fifo-1 PMDA log +++" >>$here/$seq.full
 cat $PMDA_LOG_PATH >>$here/$seq.full
 $sudo rm -f $PMDA_LOG_PATH
-echo 'daemon
+echo 'both
+daemon
 socket
 Unix
 '"$tmp.fifo-2" | $sudo ./Install -e >>$tmp.out 2>&1
@@ -197,7 +200,8 @@ then
     exit 1
 fi
 
-echo 'daemon
+echo 'both
+daemon
 socket
 Internet
 '$port1 | $sudo ./Install -e >>$tmp.out 2>&1
@@ -206,7 +210,8 @@ Internet
 port2=`expr $port1 + 1`
 
 $sudo rm -f $PMDA_LOG_PATH
-echo 'daemon
+echo 'both
+daemon
 socket
 Internet
 '$port2 | $sudo ./Install -e >>$tmp.out 2>&1
@@ -225,9 +230,11 @@ echo
 echo "=== dso agent ==="
 echo "=== dso agent ===" >>$here/$seq.full
 $sudo ./Remove >$tmp.out 2>&1
-echo dso | $sudo ./Install -e >>$tmp.out 2>&1
+echo 'both
+dso' | $sudo ./Install -e >>$tmp.out 2>&1
 $sudo rm -f $PMDA_LOG_PATH
-echo dso | $sudo ./Install -e >>$tmp.out 2>&1
+echo 'both
+dso' | $sudo ./Install -e >>$tmp.out 2>&1
 _full
 
 _filter <$tmp.out

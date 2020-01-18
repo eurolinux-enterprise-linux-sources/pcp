@@ -3,6 +3,7 @@
  */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 /* Be careful when changing LIMIT.  Also change malloc and pmsprintf! */
 
@@ -11,7 +12,7 @@
 static void
 usage (void)
 {
-    fprintf(stderr, "Usage %s: basename nfiles\n", pmGetProgname());
+    fprintf(stderr, "Usage %s: basename nfiles\n", pmProgname);
     exit(1);
 }
 
@@ -24,7 +25,7 @@ main(int argc, char* argv[])
     char	*extptr;
     int		i, sts, len;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     if (argc != 3)
 	usage();

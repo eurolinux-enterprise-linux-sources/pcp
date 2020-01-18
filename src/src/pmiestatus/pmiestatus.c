@@ -13,13 +13,14 @@
  */
 #include <sys/stat.h>
 #include "pmapi.h"
+#include "impl.h"
 #include "stats.h"
 
 int
 main(int argc, char **argv)
 {
     int i;
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     for (i=1; i < argc; i++) {
 	pmiestats_t ps;
@@ -28,30 +29,30 @@ main(int argc, char **argv)
 
 	if (f < 0) {
 	    fprintf(stderr, "%s: cannot open %s - %s\n",
-		    pmGetProgname(), argv[i], osstrerror());
+		    pmProgname, argv[i], osstrerror());
 	    continue;
 	}
 
 	if (fstat(f, &st) < 0) {
 	    fprintf(stderr, "%s: cannot get size of %s - %s\n",
-		    pmGetProgname(), argv[i], osstrerror());
+		    pmProgname, argv[i], osstrerror());
 	    goto closefile;
 	}
 
 	if (st.st_size != sizeof(ps)) {
 	    fprintf(stderr, "%s: %s is not a valid pmie stats file\n",
-		    pmGetProgname(), argv[i]);
+		    pmProgname, argv[i]);
 	    goto closefile;
 	}
 	if (read(f, &ps, sizeof(ps)) != sizeof(ps)) {
 	    fprintf(stderr, "%s: cannot read %ld bytes from %s\n",
-		    pmGetProgname(), (long)sizeof(ps), argv[i]);
+		    pmProgname, (long)sizeof(ps), argv[i]);
 	    goto closefile;
 	}
 
 	if (ps.version != 1) {
 	    fprintf(stderr, "%s: unsupported version %d in %s\n",
-		    pmGetProgname(), ps.version, argv[i]);
+		    pmProgname, ps.version, argv[i]);
 	    goto closefile;
 	}
 

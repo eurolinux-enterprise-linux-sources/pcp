@@ -1,6 +1,14 @@
 QA output created by 241
 
 === mmv agent installation ===
+You will need to choose an appropriate configuration for installation of
+the "mmv" Performance Metrics Domain Agent (PMDA).
+
+  collector	collect performance statistics on this system
+  monitor	allow this system to monitor local and/or remote systems
+  both		collector and monitor configuration for this system
+
+Please enter c(ollector) or m(onitor) or b(oth) [b] b
 Updating the Performance Metrics Name Space (PMNS) ...
 Terminate PMDA if already installed ...
 [...install files, make output...]
@@ -21,3 +29,6 @@ interval:  0.50 sec
                     6
                     7
                     8
+Waiting for pmcd to terminate ...
+Starting pmcd ... 
+Starting pmlogger ... 

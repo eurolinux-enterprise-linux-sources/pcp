@@ -1,7 +1,4 @@
 #! /bin/sh
-#
-# RETIRED 22 Nov 2017
-#
 # PCP QA Test No. 162
 # namespace only Install/Remove for pmdas
 #
@@ -89,8 +86,7 @@ do
     if [ -f $instdir/Install ] 
     then
 	cd $instdir
-	# used to be -N here
-	$sudo ./Install -e -n $tmp/root </dev/null 2>&1 | _filter_ins
+	$sudo ./Install -e -n $tmp/root -N </dev/null 2>&1 | _filter_ins
 	pminfo -n $tmp/root $pmda | _filter | LC_COLLATE=POSIX sort
     else
 	echo "Error: $instdir/Install does not exist"
@@ -108,8 +104,7 @@ do
     if [ -f $instdir/Remove ]
     then
 	cd $instdir
-	# used to be -N here
-	$sudo ./Remove -n $tmp/root
+	$sudo ./Remove -n $tmp/root -N
 	pminfo -n $tmp/root $pmda
     else
 	echo "Error: $instdir/Install does not exist"

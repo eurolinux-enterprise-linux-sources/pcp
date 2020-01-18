@@ -107,27 +107,15 @@ then
     # or
     # NAME="Arch Linux"
     #
-    name=`sed </etc/os-release -n -e '/^NAME *= */{
-s///
-s/"//g
-p
-}'`
+    name=`sed </etc/os-release -n -e '/^NAME *= */s///p'`
     name=`echo "$name" | sed -e 's/"//g'`
-    ver=`sed </etc/os-release -n -e '/^VERSION *= */{
-s///
-s/"//g
-p
-}'`
+    ver=`sed </etc/os-release -n -e '/^VERSION *= */s///p'`
     os="$name $ver"
     $debug && from=' [/etc/os-release]'
 elif [ -f /etc/release ]
 then
     #    OpenSolaris 2010.05 snv_134b X86
-    #
     #    OpenIndiana Development oi_148 X86
-    #
-    #    OpenIndiana Hipster 2017.10 (powered by illumos)
-    #    ... and more lines ...
     #
     try=`sed </etc/release -n -e '/Open[A-Z]/{
 s/.*Open/Open/
@@ -136,7 +124,6 @@ s/ /~/
 s/ .*//
 s/~/ /g
 p
-q
 }'`
     if [ -n "$try" ]
     then

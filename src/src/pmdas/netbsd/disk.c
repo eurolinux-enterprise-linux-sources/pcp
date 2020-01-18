@@ -25,6 +25,7 @@
  */
 
 #include "pmapi.h"
+#include "impl.h"
 #include "pmda.h"
 #include "netbsd.h"
 #include <sys/param.h>
@@ -57,12 +58,12 @@ refresh_disk_metrics(void)
 	/* initialization or something has changed */
 	if (ndisk == -1) {
 	    if (pmDebugOptions.appl0)
-		fprintf(stderr, "Info: refresh_disk_metrics: initial ndisk=%d\n", (int)(buflen / sizeof(struct io_sysctl)));
+		fprintf(stderr, "Info: refresh_disk_metrics: initial ndisk=%d\n", buflen / sizeof(struct io_sysctl));
 	    pmdaCacheOp(indomtab[DISK_INDOM].it_indom, PMDA_CACHE_LOAD);
 	}
 	else {
 	if (pmDebugOptions.appl0)
-	    fprintf(stderr, "Info: refresh_disk_metrics: ndisk changed from %d to %d\n", ndisk, (int)(buflen / sizeof(struct io_sysctl)));
+	    fprintf(stderr, "Info: refresh_disk_metrics: ndisk changed from %d to %d\n", ndisk, buflen / sizeof(struct io_sysctl));
 	    pmdaCacheOp(indomtab[DISK_INDOM].it_indom, PMDA_CACHE_INACTIVE);
 	}
 	ndisk = buflen / sizeof(struct io_sysctl);
@@ -70,7 +71,7 @@ refresh_disk_metrics(void)
 	    free(stats);
 	stats = (struct io_sysctl *)malloc(buflen);
 	if (stats == NULL) {
-	    pmNoMem("refresh_disk_metrics: stats", buflen, PM_FATAL_ERR);
+	    __pmNoMem("refresh_disk_metrics: stats", buflen, PM_FATAL_ERR);
 	    /* NOTREACHED */
 	}
 	/* fetch all the available data */
@@ -121,7 +122,7 @@ do_disk_metrics(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	if (sts == PMDA_CACHE_ACTIVE) {
 	    sts = 1;
 	    /* cluster and domain already checked, just need item ... */
-	    switch (pmID_item(mdesc->m_desc.pmid)) {
+	    switch (pmid_item(mdesc->m_desc.pmid)) {
 		case 0:		/* disk.dev.read */
 		    atom->ull = sp->rxfer;
 		    break;
@@ -166,7 +167,7 @@ do_disk_metrics(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    if (!pmdaCacheLookup(indomtab[DISK_INDOM].it_indom, l_inst, NULL, (void **)&sp))
 		continue;
 	    /* cluster and domain already checked, just need item ... */
-	    switch (pmID_item(mdesc->m_desc.pmid)) {
+	    switch (pmid_item(mdesc->m_desc.pmid)) {
 		case 6:		/* disk.all.read */
 		    atom->ull += sp->rxfer;
 		    break;

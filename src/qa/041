@@ -40,6 +40,7 @@ _expect()
     echo "" | tee -a $seq.full
 }
 
+tmp=/var/tmp/qa041.$$
 _needclean=true
 TAG=000666000magic
 status=1
@@ -56,7 +57,7 @@ _cleanup()
     then
 	[ -f $tmp.control ] && \
 	    $sudo cp $tmp.control $PCP_PMLOGGERCONTROL_PATH
-	_service pcp restart 2>&1 | _filter_pcp_start
+	_service pcp restart | _filter_pcp_start
 	_restore_auto_restart pmcd
 	_wait_for_pmcd
 	_wait_for_pmlogger
@@ -141,9 +142,9 @@ PMCD_CONNECT_TIMEOUT=1000
 export PMCD_CONNECT_TIMEOUT
 pminfo -f sample.long.million >$tmp.tmp 2>&1 &
 
-_expect "Forcing termination"
+_expect "Starting, Waiting, Forcing termination and Starting again"
 ps $PCP_PS_ALL_FLAGS | egrep "PID|$pid" >>$seq.full
-( $sudo $PCP_RC_DIR/pmcd restart; $sudo $PCP_RC_DIR/pmlogger restart ) >$tmp.two 2>&1
+_service pcp restart >$tmp.two 2>&1
 _wait_for_pmcd
 _wait_for_pmlogger
 wait

@@ -22,7 +22,7 @@
  *  pmlogextract configfile lexer
  */
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "logger.h"
 
 int lineno = 1;

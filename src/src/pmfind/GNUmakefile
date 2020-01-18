@@ -29,8 +29,3 @@ install : default
 default_pcp : default
 
 install_pcp : install
-
-pmfind.o:	$(TOPDIR)/src/include/pcp/libpcp.h
-
-check:: $(CFILES)
-	$(CLINT) $^

@@ -8,7 +8,9 @@ seq=`basename $0`
 echo "QA output created by $seq"
 
 # get standard environment, filters and checks
-. ./common.containers
+. ./common.product
+. ./common.filter
+. ./common.check
 
 _check_containers
 
@@ -156,7 +158,7 @@ echo "== container archive data dump:" >>$seq.full
 ls -lR $tmp.dir >>$seq.full # for reference
 for f in $tmp.dir/$hostname--*/*.meta; do
     echo == $f == >>$seq.full
-    pmdumplog -dilmst $f >>$seq.full
+    pmdumplog -a $f >>$seq.full
 done
 
 status=0

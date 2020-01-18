@@ -1405,6 +1405,7 @@ init_data(int domain)
 {
     int			i;
     int			serial;
+    __pmID_int		*ip;
 
     /*
      * set up kstat() handle ... failure is fatal
@@ -1429,7 +1430,8 @@ init_data(int domain)
     for (i = 0; i < metrictab_sz; i++) {
 	metrictab[i].m_user = &metricdesc[i];
 	metrictab[i].m_desc = metricdesc[i].md_desc;
-	metricdesc[i].md_desc.pmid = pmID_build(domain, pmID_cluster(metricdesc[i].md_desc.pmid), pmID_item(metricdesc[i].md_desc.pmid));
+	ip = (__pmID_int *)&metricdesc[i].md_desc.pmid;
+	ip->domain = domain;
 
 	if (metricdesc[i].md_desc.indom != PM_INDOM_NULL) {
 	    serial = metricdesc[i].md_desc.indom;
@@ -1443,7 +1445,7 @@ init_data(int domain)
      * us but we need properly setup indoms for pmdaCache which means that
      * we have to do it ourselves */
     for (i = 0; i < indomtab_sz; i++) {
-	indomtab[i].it_indom = pmInDom_build(domain, pmInDom_serial(indomtab[i].it_indom));
+	__pmindom_int(&indomtab[i].it_indom)->domain = domain;
     }
 
     /*

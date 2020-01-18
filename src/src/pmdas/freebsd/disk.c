@@ -19,6 +19,7 @@
  */
 
 #include "pmapi.h"
+#include "impl.h"
 #include "pmda.h"
 #include <devstat.h>
 #include "freebsd.h"
@@ -58,25 +59,10 @@ refresh_disk_metrics(void)
 	for (i = 0; i < devinfo.numdevs; i++) {
 	    dsp = &devinfo.devices[i];
 	    /*
-	     * Skip entries that are not interesting ... 
-	     * "cd or acd"	CD/CD-ROM drives
-	     * "mcd"		Mitsumi CD-ROM drives
-	     * "scd"		Sony CD-ROM drives
-	     * "fd"		floppy devices
-	     * "sa"		SCSI tape drives
-	     * "ast"		IDE tape drives
-	     * "fla"		flash drives
-	     * "pass"		CAM application passthrough driver
+	     * Skip entries that are not interesting ... only include
+	     * "da" (direct access) disks at this stage
 	     */
-	    if (strcmp(dsp->device_name, "cd") == 0 ||
-		strcmp(dsp->device_name, "acd") == 0 ||
-		strcmp(dsp->device_name, "mcd") == 0 ||
-		strcmp(dsp->device_name, "scd") == 0 ||
-		strcmp(dsp->device_name, "fd") == 0 ||
-		strcmp(dsp->device_name, "sa") == 0 ||
-		strcmp(dsp->device_name, "ast") == 0 ||
-		strcmp(dsp->device_name, "fla") == 0 ||
-		strcmp(dsp->device_name, "pass") == 0)
+	    if (strcmp(dsp->device_name, "da") != 0)
 		continue;
 	    pmsprintf(iname, sizeof(iname), "%s%d", dsp->device_name, dsp->unit_number);
 	    sts = pmdaCacheLookupName(indomtab[DISK_INDOM].it_indom, iname, NULL, NULL);
@@ -112,7 +98,7 @@ do_disk_metrics(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	if (sts == PMDA_CACHE_ACTIVE) {
 	    sts = 1;
 	    /* cluster and domain already checked, just need item ... */
-	    switch (pmID_item(mdesc->m_desc.pmid)) {
+	    switch (pmid_item(mdesc->m_desc.pmid)) {
 		case 0:		/* disk.dev.read */
 		    atom->ull = dsp->operations[DEVSTAT_READ];
 		    break;
@@ -126,15 +112,15 @@ do_disk_metrics(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 		    break;
 
 		case 3:		/* disk.dev.read_bytes */
-		    atom->ull = (dsp->bytes[DEVSTAT_READ] + 512) / 1024;
+		    atom->ull = dsp->bytes[DEVSTAT_READ];
 		    break;
 
 		case 4:		/* disk.dev.write_bytes */
-		    atom->ull = (dsp->bytes[DEVSTAT_WRITE] + 512) / 1024;
+		    atom->ull = dsp->bytes[DEVSTAT_WRITE];
 		    break;
 
 		case 5:		/* disk.dev.total_bytes */
-		    atom->ull = (dsp->bytes[DEVSTAT_READ] + dsp->bytes[DEVSTAT_WRITE] + 512) / 1024;
+		    atom->ull = dsp->bytes[DEVSTAT_READ] + dsp->bytes[DEVSTAT_WRITE];
 		    break;
 
 		case 12:	/* disk.dev.blkread */
@@ -170,7 +156,7 @@ do_disk_metrics(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    lsts = pmdaCacheLookup(indomtab[DISK_INDOM].it_indom, i, NULL, (void **)&dsp);
 	    if (lsts == PMDA_CACHE_ACTIVE) {
 		/* cluster and domain already checked, just need item ... */
-		switch (pmID_item(mdesc->m_desc.pmid)) {
+		switch (pmid_item(mdesc->m_desc.pmid)) {
 		    case 6:		/* disk.all.read */
 			atom->ull += dsp->operations[DEVSTAT_READ];
 			break;
@@ -184,15 +170,15 @@ do_disk_metrics(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 			break;
 
 		    case 9:		/* disk.all.read_bytes */
-			atom->ull += (dsp->bytes[DEVSTAT_READ] + 512) / 1024;
+			atom->ull += dsp->bytes[DEVSTAT_READ];
 			break;
 
 		    case 10:		/* disk.all.write_bytes */
-			atom->ull += (dsp->bytes[DEVSTAT_WRITE] + 512) / 1024;
+			atom->ull += dsp->bytes[DEVSTAT_WRITE];
 			break;
 
 		    case 11:		/* disk.all.total_bytes */
-			atom->ull += (dsp->bytes[DEVSTAT_READ] + dsp->bytes[DEVSTAT_WRITE] + 512) / 1024;
+			atom->ull += dsp->bytes[DEVSTAT_READ] + dsp->bytes[DEVSTAT_WRITE];
 			break;
 
 		    case 15:		/* disk.all.blkread */

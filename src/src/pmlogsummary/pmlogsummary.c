@@ -17,7 +17,7 @@
 #include <stdarg.h>
 #include <limits.h>
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 
 static pmLongOptions longopts[] = {
     PMAPI_OPTIONS_HEADER("Options"),
@@ -119,7 +119,7 @@ tsub(struct timeval *a, struct timeval *b)
 {
     if ((a == NULL) || (b == NULL))
 	return -1;
-    pmtimevalDec(a, b);
+    __pmtimevalDec(a, b);
     if (a->tv_sec < 0) {
 	/* clip negative values at zero */
 	a->tv_sec = 0;
@@ -133,7 +133,7 @@ tadd(struct timeval *a, struct timeval *b)
 {
     if ((a == NULL) || (b == NULL))
 	return -1;
-    pmtimevalInc(a, b);
+    __pmtimevalInc(a, b);
     return 0;
 }
 
@@ -146,7 +146,7 @@ pmiderr(pmID pmid, const char *msg, ...)
 	char	**names;
 
 	numnames = pmNameAll(pmid, &names);
-	fprintf(stderr, "%s: ", pmGetProgname());
+	fprintf(stderr, "%s: ", pmProgname);
 	__pmPrintMetricNames(stderr, numnames, names, " or ");
 	fprintf(stderr, "(%s) - ", pmIDStr(pmid));
 	va_start(arg, msg);
@@ -163,20 +163,18 @@ printstamp(struct timeval *stamp, int delimiter)
     if (dayflag) {
 	char	*ddmm;
 	char	*yr;
-	time_t	time;
 
-	time = stamp->tv_sec;
-	ddmm = pmCtime(&time, timebuf);
+	ddmm = pmCtime((const time_t *)&stamp->tv_sec, timebuf);
 	ddmm[10] = ' ';
 	ddmm[11] = '\0';
 	yr = &ddmm[20];
 	printf("%c'%s", delimiter, ddmm);
-	pmPrintStamp(stdout, stamp);
+	__pmPrintStamp(stdout, stamp);
 	printf(" %4.4s\'", yr);
     }
     else {
 	printf("%c", delimiter);
-	pmPrintStamp(stdout, stamp);
+	__pmPrintStamp(stdout, stamp);
     }
 }
 
@@ -187,23 +185,21 @@ printlabel(void)
     char        *ddmm;
     char        *yr;
     int         sts;
-    time_t	time;
 
     if ((sts = pmGetArchiveLabel(&label)) < 0) {
 	fprintf(stderr, "%s: Cannot get archive label record: %s\n",
-		pmGetProgname(), pmErrStr(sts));
+		pmProgname, pmErrStr(sts));
 	exit(1);
     }
 
     printf("Log Label (Log Format Version %d)\n", label.ll_magic & 0xff);
     printf("Performance metrics from host %s\n", label.ll_hostname);
 
-    time = opts.start.tv_sec;
-    ddmm = pmCtime(&time, timebuf);
+    ddmm = pmCtime((const time_t *)&opts.start.tv_sec, timebuf);
     ddmm[10] = '\0';
     yr = &ddmm[20];
     printf("  commencing %s ", ddmm);
-    pmPrintStamp(stdout, &opts.start);
+    __pmPrintStamp(stdout, &opts.start);
     printf(" %4.4s\n", yr);
 
     if (opts.finish.tv_sec == INT_MAX) {
@@ -211,12 +207,11 @@ printlabel(void)
 	printf("  ending     UNKNOWN\n");
     }
     else {
-	time = opts.finish.tv_sec;
-	ddmm = pmCtime(&time, timebuf);
+	ddmm = pmCtime((const time_t *)&opts.finish.tv_sec, timebuf);
 	ddmm[10] = '\0';
 	yr = &ddmm[20];
 	printf("  ending     %s ", ddmm);
-	pmPrintStamp(stdout, &opts.finish);
+	__pmPrintStamp(stdout, &opts.finish);
 	printf(" %4.4s\n", yr);
     }
 }
@@ -264,7 +259,7 @@ printsummary(const char *name)
     /* cast away const, pmLookupName should never modify name */
     if ((sts = pmLookupName(1, (char **)&name, &pmid)) < 0) {
 	fprintf(stderr, "%s: failed to lookup metric name (pmid=%s): %s\n",
-		pmGetProgname(), name, pmErrStr(sts));
+		pmProgname, name, pmErrStr(sts));
 	return;
     }
 
@@ -283,13 +278,13 @@ printsummary(const char *name)
 		tsub(&timediff, &instdata->lasttime);
 		val = instdata->lastval;
 		instdata->stocave += val;
-		instdata->timeave += val*pmtimevalToReal(&timediff);
+		instdata->timeave += val*__pmtimevalToReal(&timediff);
 		instdata->lasttime = opts.finish;
 		instdata->count++;
 	    }
 	    metrictimespan = instdata->lasttime;
 	    tsub(&metrictimespan, &instdata->firsttime);
-	    metricspan = pmtimevalToReal(&metrictimespan);
+	    metricspan = __pmtimevalToReal(&metrictimespan);
 	    /* counter metric doesn't cover 90% of log */
 	    star = (avedata->desc.sem == PM_SEM_COUNTER && metricspan / logspan <= 0.1);
 
@@ -419,24 +414,24 @@ newHashInst(pmValue *vp,
 
     if ((sts = pmExtractValue(valfmt, vp, avedata->desc.type, &av, PM_TYPE_DOUBLE)) < 0) {
 	pmiderr(avedata->desc.pmid, "failed to extract value: %s\n", pmErrStr(sts));
-	fprintf(stderr, "%s: possibly corrupt archive?\n", pmGetProgname());
+	fprintf(stderr, "%s: possibly corrupt archive?\n", pmProgname);
 	exit(1);
     }
     size = (pos+1) * sizeof(instData *);
     avedata->instlist = (instData **) realloc(avedata->instlist, size);
     if (avedata->instlist == NULL)
-	pmNoMem("newHashInst.instlist", size, PM_FATAL_ERR);
+	__pmNoMem("newHashInst.instlist", size, PM_FATAL_ERR);
     size = sizeof(instData);
     avedata->instlist[pos] = instdata = (instData *) malloc(size);
     if (instdata == NULL)
-	pmNoMem("newHashInst.instlist[inst]", size, PM_FATAL_ERR);
+	__pmNoMem("newHashInst.instlist[inst]", size, PM_FATAL_ERR);
     if (nbins == 0)
 	instdata->bin = NULL;
     else {	/* we are doing binning ... make space for the bins */
 	size = nbins * sizeof(unsigned int);
 	instdata->bin = (unsigned int *)malloc(size);
 	if (instdata->bin == NULL)
-	    pmNoMem("newHashInst.instlist[inst].bin", size, PM_FATAL_ERR);
+	    __pmNoMem("newHashInst.instlist[inst].bin", size, PM_FATAL_ERR);
 	memset(instdata->bin, 0, size);
     }
     instdata->inst = vp->inst;
@@ -574,7 +569,7 @@ markrecord(pmResult *result)
 		    tsub(&timediff, &instdata->lasttime);
 		    val = instdata->lastval;
 		    instdata->stocave += val;
-		    instdata->timeave += val*pmtimevalToReal(&timediff);
+		    instdata->timeave += val*__pmtimevalToReal(&timediff);
 		    instdata->lasttime = result->timestamp;
 		    instdata->count++;
 		}
@@ -672,7 +667,7 @@ calcbinning(pmResult *result)
 
 		timediff = result->timestamp;
 		tsub(&timediff, &instdata->lasttime);
-		diff = pmtimevalToReal(&timediff);
+		diff = __pmtimevalToReal(&timediff);
 		wrap = 0;
 		if (avedata->desc.sem == PM_SEM_COUNTER) {
 		    diff *= avedata->scale;
@@ -758,7 +753,7 @@ calcaverage(pmResult *result)
 	    avedata = (aveData*) malloc(sizeof(aveData));
 	    newHashItem(vsp, &desc, avedata, &result->timestamp);
 	    if (__pmHashAdd(avedata->desc.pmid, (void*)avedata, &hashlist) < 0) {
-		pmiderr(avedata->desc.pmid, "failed %s hash table insertion\n", pmGetProgname());
+		pmiderr(avedata->desc.pmid, "failed %s hash table insertion\n", pmProgname);
 		/* free memory allocated above on insert failure */
 		for (j = 0; j < vsp->numval; j++)
 		    if (avedata->instlist[j]) free(avedata->instlist[j]);
@@ -809,7 +804,7 @@ calcaverage(pmResult *result)
 		    continue;
 		timediff = result->timestamp;
 		tsub(&timediff, &instdata->lasttime);
-		diff = pmtimevalToReal(&timediff);
+		diff = __pmtimevalToReal(&timediff);
 		wrap = 0;
 		if (avedata->desc.sem == PM_SEM_COUNTER) {
 		    diff *= avedata->scale;
@@ -873,7 +868,7 @@ calcaverage(pmResult *result)
 				    __pmPrintMetricNames(stderr, numnames, names, " or ");
 				    fprintf(stderr, " (inst[%s]: %f) at ",
 					(istr == NULL ? "":istr), rate);
-				    pmPrintStamp(stderr, &result->timestamp);
+				    __pmPrintStamp(stderr, &result->timestamp);
 				    fprintf(stderr, "\n");
 				}
 				if (rate > instdata->max) {
@@ -881,7 +876,7 @@ calcaverage(pmResult *result)
 				    __pmPrintMetricNames(stderr, numnames, names, " or ");
 				    fprintf(stderr, " (inst[%s]: %f) at ",
 					(istr == NULL ? "":istr), rate);
-				    pmPrintStamp(stderr, &result->timestamp);
+				    __pmPrintStamp(stderr, &result->timestamp);
 				    fprintf(stderr, "\n");
 				}
 				if (numnames > 0) free(names);
@@ -931,7 +926,7 @@ calcaverage(pmResult *result)
 
 			metrictimespan = result->timestamp;
 			tsub(&metrictimespan, &instdata->firsttime);
-			metricspan = pmtimevalToReal(&metrictimespan);
+			metricspan = __pmtimevalToReal(&metrictimespan);
 			numnames = pmNameAll(avedata->desc.pmid, &names);
 			fprintf(stderr, "++ ");
 			__pmPrintMetricNames(stderr, numnames, names, " or ");
@@ -1003,7 +998,7 @@ main(int argc, char *argv[])
 	    sts = (int)strtol(opts.optarg, &endnum, 10);
 	    if (*endnum != '\0' || sts < 0) {
 		pmprintf("%s: -B requires positive numeric argument\n",
-			pmGetProgname());
+			pmProgname);
 		opts.errors++;
 	    }
 	    else
@@ -1049,7 +1044,7 @@ main(int argc, char *argv[])
 	case 'p':	/* number of digits after decimal point */
 	    precision = (unsigned int)strtol(opts.optarg, &endnum, 10);
 	    if (*endnum != '\0') {
-		pmprintf("%s: -p requires numeric argument\n", pmGetProgname());
+		pmprintf("%s: -p requires numeric argument\n", pmProgname);
 		opts.errors++;
 	    }
 	    break;
@@ -1098,7 +1093,7 @@ main(int argc, char *argv[])
 
     if ((sts = c = pmNewContext(PM_CONTEXT_ARCHIVE, archive)) < 0) {
 	fprintf(stderr, "%s: Cannot open archive \"%s\": %s\n",
-		pmGetProgname(), archive, pmErrStr(sts));
+		pmProgname, archive, pmErrStr(sts));
 	exit(1);
     }
 
@@ -1108,14 +1103,14 @@ main(int argc, char *argv[])
     }
     
     if ((sts = pmSetMode(PM_MODE_FORW, &opts.start, 0)) < 0) {
-	fprintf(stderr, "%s: pmSetMode failed: %s\n", pmGetProgname(), pmErrStr(sts));
+	fprintf(stderr, "%s: pmSetMode failed: %s\n", pmProgname, pmErrStr(sts));
 	exit(1);
     }
 
     if (lflag)
 	printlabel();
 
-    logspan = pmtimevalToReal(&opts.finish) - pmtimevalToReal(&opts.start);
+    logspan = __pmtimevalToReal(&opts.finish) - __pmtimevalToReal(&opts.start);
 
     /* check which timestamp print format we should be using */
     timespan = opts.finish;
@@ -1149,7 +1144,7 @@ main(int argc, char *argv[])
 		fprintf(stderr, "resetting for second iteration\n");
 	    if ((sts = pmSetMode(PM_MODE_FORW, &opts.start, 0)) < 0) {
 		fprintf(stderr, "%s: pmSetMode reset failed: %s\n",
-		    pmGetProgname(), pmErrStr(sts));
+		    pmProgname, pmErrStr(sts));
 		exit(1);
 	    }
 	}
@@ -1158,7 +1153,7 @@ main(int argc, char *argv[])
     }
 
     if (sts != PM_ERR_EOL) {
-	fprintf(stderr, "%s: fetch failed: %s\n", pmGetProgname(), pmErrStr(sts));
+	fprintf(stderr, "%s: fetch failed: %s\n", pmProgname, pmErrStr(sts));
 	exitstatus = 1;
     }
 
@@ -1167,7 +1162,7 @@ main(int argc, char *argv[])
 
     if (opts.optind >= argc) {	/* print all results */
 	if ((sts = pmTraversePMNS("", printsummary)) < 0) {
-	    fprintf(stderr, "%s: PMNS traversal failed: %s\n", pmGetProgname(), pmErrStr(sts));
+	    fprintf(stderr, "%s: PMNS traversal failed: %s\n", pmProgname, pmErrStr(sts));
 	    exit(1);
 	}
     }
@@ -1182,7 +1177,7 @@ main(int argc, char *argv[])
 	    }
 	    if ((sts = pmTraversePMNS(msp->metric, printsummary)) < 0)
 		fprintf(stderr, "%s: PMNS traversal failed for %s: %s\n",
-			pmGetProgname(), msp->metric, pmErrStr(sts));
+			pmProgname, msp->metric, pmErrStr(sts));
 	    pmFreeMetricSpec(msp);
 	}
     }

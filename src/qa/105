@@ -44,9 +44,7 @@ _filter_logger()
 {
     _filter_pmlogger_log \
     | sed \
-	-e '/AF event queue/d' \
-	-e '/Validating metrics after PMCD state change/d' \
-    # end
+	-e '/AF event queue/d'
 }
 
 _filter_dump()
@@ -72,7 +70,6 @@ s/value ".*"/value STRING/
 	-e '/pmcd\.pmlogger\.port/s/value .*/value PORT/' \
 	-e '/pmcd\.pmlogger\.host/s/value ".*/value "HOST"/' \
 	-e '/pmcd\.pmlogger\.archive/s/value ".*/value "PATH"/' \
-	-e '/<mark>$/d' \
     # end
 }
 
@@ -129,7 +126,7 @@ echo "log mandatory on 25 msec sample.long.one" \
 _filter_pmlc <$tmp.out
 
 _wait_pmlogger_end $logger_pid
-cat $tmp.err $tmp.log | tee -a $here/$seq.full | _filter_logger
+cat $tmp.err $tmp.log | _filter_logger
 
 echo
 if [ -s $tmp.0 ]

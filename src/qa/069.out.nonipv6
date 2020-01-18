@@ -1,4 +1,6 @@
 QA output created by 069
+Waiting for pmcd to terminate ...
+Starting pmcd ... 
 should be OK
 
 pmcd.numclients
@@ -21,7 +23,6 @@ and one endclient access violation for localhost and one endclient connection
 limit for each of OTHERHOST1 and OTHERHOST2
 Log for pmcd on HOST started DATE
 
-Warning: nports=1 from PMCD_PORT=$port in environment
 
 active agent dom   pid  in out ver protocol parameters
 ============ === ===== === === === ======== ==========

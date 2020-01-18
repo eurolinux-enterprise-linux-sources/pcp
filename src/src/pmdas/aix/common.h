@@ -21,6 +21,7 @@
 #include <unistd.h>
 
 #include "pmapi.h"
+#include "impl.h"
 #include "pmda.h"
 #include "./domain.h"
 

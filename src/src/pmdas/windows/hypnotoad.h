@@ -16,7 +16,7 @@
 #define HYPNOTOAD_H
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "pmda.h"
 #include "pdh.h"
 #include "pdhmsg.h"

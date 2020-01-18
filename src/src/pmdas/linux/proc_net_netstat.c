@@ -28,7 +28,7 @@ netstat_fields_t netstat_ip_fields[] = {
      .offset = &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_INTRUNCATEDPKTS] },
     { .field = "InMcastPkts",
      .offset = &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_INMCASTPKTS] },
-    { .field = "OutMcastPkts",
+    { .field = "OutMcastPkts ",
      .offset = &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_OUTMCASTPKTS] },
     { .field = "InBcastPkts",
      .offset = &_pm_proc_net_netstat.ip[_PM_NETSTAT_IPEXT_INBCASTPKTS] },
@@ -346,7 +346,7 @@ refresh_proc_net_netstat(proc_net_netstat_t *netstat)
 	    else if (strncmp(buf, "TcpExt:", 7) == 0)
 		get_fields(netstat_tcp_fields, header, buf);
 	    else
-		pmNotifyErr(LOG_ERR, "Unrecognised netstat row: %s\n", buf);
+		__pmNotifyErr(LOG_ERR, "Unrecognised netstat row: %s\n", buf);
 	}
     }
     fclose(fp);

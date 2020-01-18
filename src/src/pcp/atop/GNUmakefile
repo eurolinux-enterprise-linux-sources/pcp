@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2015,2019 Red Hat.
+# Copyright (c) 2015 Red Hat.
 # 
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
@@ -18,6 +18,7 @@ include $(TOPDIR)/src/include/builddefs
 CMDTARGET = pcp-atop
 DISTARGET = $(PCP_BINADM_DIR)/$(CMDTARGET)
 DISTLINKS = pcp-atopsar
+COMPATLNK = pmatop
 LLDFLAGS = -L$(TOPDIR)/src/libpcp_gui/src
 LLDLIBS = $(PCP_GUILIB) $(LIB_FOR_NCURSES) $(LIB_FOR_MATH)
 LCFLAGS = $(NCURSES_CFLAGS)
@@ -28,7 +29,6 @@ CFILES = \
 	atop.c \
 	atopsar.c \
 	deviate.c \
-	gpucom.c \
 	ifprop.c \
 	parseable.c \
 	photoproc.c \
@@ -44,7 +44,6 @@ CFILES = \
 
 HFILES = \
 	atop.h \
-	gpucom.h \
 	ifprop.h \
 	netstats.h \
 	parseable.h \
@@ -64,6 +63,7 @@ build-me: $(CMDTARGET) $(DISTLINKS)
 
 install: default
 	$(INSTALL) -m 755 $(CMDTARGET) $(DISTARGET)
+	$(INSTALL) -S $(DISTARGET) $(PCP_BIN_DIR)/$(COMPATLNK)
 	@for link in $(DISTLINKS); do \
 	    $(INSTALL) -S $(DISTARGET) $(PCP_BINADM_DIR)/$$link; \
 	done
@@ -100,8 +100,3 @@ photoproc.o:	procmetrics.h
 photosyst.o:	systmetrics.h
 ifprop.o:	ifpropmetrics.h
 various.o:	hostmetrics.h
-
-atop.o atopsar.o various.o:	$(TOPDIR)/src/include/pcp/libpcp.h
-
-check::	$(CFILES) $(HFILES)
-	$(CLINT) $^

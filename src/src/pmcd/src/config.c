@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016,2019 Red Hat.
+ * Copyright (c) 2012-2016 Red Hat.
  * Copyright (c) 1995-2005 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -17,7 +17,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "pmcd.h"
 #include <ctype.h>
 #include <sys/stat.h>
@@ -39,16 +39,12 @@
 /* Config file modification time */
 #if defined(HAVE_STAT_TIMESTRUC)
 static struct timestruc configFileTime;
-static struct timestruc accessFileTime;
 #elif defined(HAVE_STAT_TIMESPEC)
 static struct timespec  configFileTime;
-static struct timespec  accessFileTime;
 #elif defined(HAVE_STAT_TIMESPEC_T)
 static timespec_t       configFileTime;
-static timespec_t       accessFileTime;
 #elif defined(HAVE_STAT_TIME_T)
 static time_t   	configFileTime;
-static time_t   	accessFileTime;
 #else
 !bozo!
 #endif
@@ -129,7 +125,7 @@ GetNextLine(void)
 	szLineBuf = LINEBUF_SIZE;
 	linebuf = (char *)malloc(szLineBuf);
 	if (linebuf == NULL) {
-	    pmNoMem("pmcd config: GetNextLine init", szLineBuf, PM_FATAL_ERR);
+	    __pmNoMem("pmcd config: GetNextLine init", szLineBuf, PM_FATAL_ERR);
 	    /*NOTREACHED*/
 	}
     }
@@ -197,7 +193,7 @@ GetNextLine(void)
 	    if ((linebuf = realloc(linebuf, szLineBuf)) == NULL) {
 		static char	fallback[2];
 
-		pmNoMem("pmcd config: GetNextLine", szLineBuf, PM_RECOV_ERR);
+		__pmNoMem("pmcd config: GetNextLine", szLineBuf, PM_RECOV_ERR);
 		linebuf = fallback;
 		linebuf[0] = '\0';
 		scanError = 1;
@@ -279,7 +275,7 @@ PrintToken(FILE *stream)
  */
 
 static void
-FindNextToken(const char *source)
+FindNextToken(void)
 {
     static char	*rawToken;		/* Used in pathological quoting case */
     char	ch;
@@ -386,8 +382,8 @@ FindNextToken(const char *source)
 	    *token = 0;
 	    tokenend = token;
 	    fprintf(stderr,
-			 "%s config[line %d]: Error: unterminated quoted string\n",
-			 source, nLines);
+			 "pmcd config[line %d]: Error: unterminated quoted string\n",
+			 nLines);
 	    return;
 	}
 
@@ -426,11 +422,11 @@ FindNextToken(const char *source)
 /* Move to the next line of the input stream. */
 
 static void
-SkipLine(const char *source)
+SkipLine(void)
 {
     while (*token && *token != '\n')
-	FindNextToken(source);
-    FindNextToken(source);			/* Move over the newline */
+	FindNextToken();
+    FindNextToken();			/* Move over the newline */
 }
 
 /* From an argv, build a command line suitable for display in logs etc. */
@@ -458,7 +454,7 @@ BuildCmdLine(char **argv)
     if ((cmdLine = (char *)malloc(cmdLen)) == NULL) {
 	fprintf(stderr, "pmcd config[line %d]: Error: failed to build command line\n",
 		nLines);
-	pmNoMem("pmcd config: BuildCmdLine", cmdLen, PM_RECOV_ERR);
+	__pmNoMem("pmcd config: BuildCmdLine", cmdLen, PM_RECOV_ERR);
 	return NULL;
     }
     for (i = 0, p = cmdLine; argv[i] != NULL; i++) {
@@ -486,7 +482,7 @@ BuildCmdLine(char **argv)
  * on the current line.
  */
 char **
-BuildArgv(const char *source)
+BuildArgv(void)
 {
     int		nArgs;
     char	**result;
@@ -502,13 +498,12 @@ BuildArgv(const char *source)
 	    if (*token != '/')
 		result[nArgs] = CopyToken();
 	    else if ((result[nArgs] = CopyToken()) != NULL)
-		/* THREADSAFE - no locks acquired in __pmNativePath() */
-		result[nArgs] = __pmNativePath(result[nArgs]);
+		__pmNativePath(result[nArgs]);
 	}
 	if (result_new == NULL || result[nArgs] == NULL) {
-	    fprintf(stderr, "%s config[line %d]: Error: failed to build argument list\n",
-		    source, nLines);
-	    pmNoMem("pmcd config: build argv", nArgs * sizeof(char *),
+	    fprintf(stderr, "pmcd config[line %d]: Error: failed to build argument list\n",
+		    nLines);
+	    __pmNoMem("pmcd config: build argv", nArgs * sizeof(char *),
 		     PM_RECOV_ERR);
 	    if (result != NULL) {
 		while (nArgs >= 0) {
@@ -524,7 +519,7 @@ BuildArgv(const char *source)
 	    fprintf(stderr, "argv[%d] = '%s'\n", nArgs, result[nArgs]);
 
 	nArgs++;
-	FindNextToken(source);
+	FindNextToken();
     } while (*token && *token != '\n');
     result[nArgs] = NULL;
 
@@ -541,7 +536,7 @@ GetNewAgent(void)
     if (agent == NULL) {
 	agent = (AgentInfo*)malloc(sizeof(AgentInfo) * MIN_AGENTS_ALLOC);
 	if (agent == NULL) {
-	    pmNoMem("GetNewAgentIndex: malloc", sizeof(AgentInfo) * MIN_AGENTS_ALLOC, PM_FATAL_ERR);
+	    __pmNoMem("GetNewAgentIndex: malloc", sizeof(AgentInfo) * MIN_AGENTS_ALLOC, PM_FATAL_ERR);
 	    /*NOTREACHED*/
 	}
 	szAgents = MIN_AGENTS_ALLOC;
@@ -551,7 +546,7 @@ GetNewAgent(void)
 	agent = (AgentInfo*)
 	    realloc(agent, sizeof(AgentInfo) * 2 * szAgents);
 	if (agent == NULL) {
-	    pmNoMem("GetNewAgentIndex: realloc", sizeof(AgentInfo) * 2 * szAgents, PM_FATAL_ERR);
+	    __pmNoMem("GetNewAgentIndex: realloc", sizeof(AgentInfo) * 2 * szAgents, PM_FATAL_ERR);
 	    /*NOTREACHED*/
 	}
 	for (i = 0; i < nAgents; i++)
@@ -601,14 +596,14 @@ FreeAgent(AgentInfo *ap)
  * agent table if the spec has no errors.
  */
 static int
-ParseDso(const char *source, char *pmDomainLabel, int pmDomainId)
+ParseDso(char *pmDomainLabel, int pmDomainId)
 {
     char	*pathName;
     char	*entryPoint;
     AgentInfo	*newAgent;
     int		xlatePath = 0;
 
-    FindNextToken(source);
+    FindNextToken();
     if (*token == '\n') {
 	fprintf(stderr, "pmcd config[line %d]: Error: expected DSO entry point\n", nLines);
 	return -1;
@@ -616,25 +611,17 @@ ParseDso(const char *source, char *pmDomainLabel, int pmDomainId)
     if ((entryPoint = CopyToken()) == NULL) {
 	fprintf(stderr, "pmcd config[line %d]: Error: couldn't copy DSO entry point\n",
 			 nLines);
-	pmNoMem("pmcd config", tokenend - token + 1, PM_FATAL_ERR);
+	__pmNoMem("pmcd config", tokenend - token + 1, PM_FATAL_ERR);
 	/*NOTREACHED*/
     }
 
-    FindNextToken(source);
+    FindNextToken();
     if (*token == '\n') {
 	fprintf(stderr, "pmcd config[line %d]: Error: expected DSO pathname\n", nLines);
 	free(entryPoint);
 	return -1;
     }
-    /* expect an absolute path name */
-    if (*token == '/')
-	;
-#ifdef IS_MINGW
-    else if (token[1] == ':')
-	/* assume colon after single letter drive name */
-	;
-#endif
-    else {
+    if (*token != '/') {
 	if (token[strlen(token)-1] == '\n')
 	    token[strlen(token)-1] = '\0';
 	fprintf(stderr, "pmcd config[line %d]: Error: path \"%s\" to PMDA is not absolute\n", nLines, token);
@@ -645,13 +632,12 @@ ParseDso(const char *source, char *pmDomainLabel, int pmDomainId)
     if ((pathName = CopyToken()) == NULL) {
 	fprintf(stderr, "pmcd config[line %d]: Error: couldn't copy DSO pathname\n",
 			nLines);
-	pmNoMem("pmcd config", tokenend - token + 1, PM_FATAL_ERR);
+	__pmNoMem("pmcd config", tokenend - token + 1, PM_FATAL_ERR);
 	/*NOTREACHED*/
     }
-    /* THREADSAFE - no locks acquired in __pmNativePath() */
-    pathName = __pmNativePath(pathName);
+    __pmNativePath(pathName);
 
-    FindNextToken(source);
+    FindNextToken();
     if (*token != '\n') {
 	fprintf(stderr, "pmcd config[line %d]: Error: too many parameters for DSO\n",
 		     nLines);
@@ -680,13 +666,13 @@ ParseDso(const char *source, char *pmDomainLabel, int pmDomainId)
  * agent table if the spec has no errors.
  */
 static int
-ParseSocket(const char *source, char *pmDomainLabel, int pmDomainId)
+ParseSocket(char *pmDomainLabel, int pmDomainId)
 {
     int		addrDomain, port = -1;
     char	*socketName = NULL;
     AgentInfo	*newAgent;
 
-    FindNextToken(source);
+    FindNextToken();
     if (TokenIs("inet"))
 	addrDomain = AF_INET;
     else if (TokenIs("ipv6"))
@@ -695,27 +681,27 @@ ParseSocket(const char *source, char *pmDomainLabel, int pmDomainId)
 	addrDomain = AF_UNIX;
     else {
 	fprintf(stderr,
-		     "%s config[line %d]: Error: expected socket address domain (`inet', `ipv6', or `unix')\n",
-		     source, nLines);
+		     "pmcd config[line %d]: Error: expected socket address domain (`inet', `ipv6', or `unix')\n",
+		     nLines);
 	return -1;
     }
 
-    FindNextToken(source);
+    FindNextToken();
     if (*token == '\n') {
-	fprintf(stderr, "%s config[line %d]: Error: expected socket port name or number\n",
-		     source, nLines);
+	fprintf(stderr, "pmcd config[line %d]: Error: expected socket port name or number\n",
+		     nLines);
 	return -1;
     }
     else if (TokenIsNumber())
 	port = TokenNumVal();
     else
 	if ((socketName = CopyToken()) == NULL) {
-	    fprintf(stderr, "%s config[line %d]: Error: couldn't copy port name\n",
-			 source, nLines);
-	    pmNoMem("pmcd config", tokenend - token + 1, PM_FATAL_ERR);
+	    fprintf(stderr, "pmcd config[line %d]: Error: couldn't copy port name\n",
+			 nLines);
+	    __pmNoMem("pmcd config", tokenend - token + 1, PM_FATAL_ERR);
 	    /*NOTREACHED*/
 	}
-    FindNextToken(source);
+    FindNextToken();
 
     /* If an internet domain port name was specified, find the corresponding
      port number. */
@@ -728,8 +714,8 @@ ParseSocket(const char *source, char *pmDomainLabel, int pmDomainId)
 	    port = service->s_port;
 	else {
 	    fprintf(stderr,
-		"%s config[line %d]: Error: failed to get port number for port name %s\n",
-		source, nLines, socketName);
+		"pmcd config[line %d]: Error: failed to get port number for port name %s\n",
+		nLines, socketName);
 	    free(socketName);
 	    return -1;
 	}
@@ -748,10 +734,10 @@ ParseSocket(const char *source, char *pmDomainLabel, int pmDomainId)
     newAgent->ipc.socket.name = socketName;
     newAgent->ipc.socket.port = port;
     if (*token != '\n') {
-	newAgent->ipc.socket.argv = BuildArgv(source);
+	newAgent->ipc.socket.argv = BuildArgv();
 	if (newAgent->ipc.socket.argv == NULL) {
-	    fprintf(stderr, "%s config[line %d]: Error: building argv for \"%s\" agent.\n",
-			 source, nLines, newAgent->pmDomainLabel);
+	    fprintf(stderr, "pmcd config[line %d]: Error: building argv for \"%s\" agent.\n",
+			 nLines, newAgent->pmDomainLabel);
 	    FreeAgent(newAgent);
 	    nAgents--;
 	    return -1;
@@ -767,27 +753,27 @@ ParseSocket(const char *source, char *pmDomainLabel, int pmDomainId)
  * agent table if the spec has no errors.
  */
 static int
-ParsePipe(const char *source, char *pmDomainLabel, int pmDomainId)
+ParsePipe(char *pmDomainLabel, int pmDomainId)
 {
     int		i;
     AgentInfo	*newAgent;
     int notReady = 0;
 
-    FindNextToken(source);
+    FindNextToken();
     if (!TokenIs("binary")) {
 	fprintf(stderr,
-		     "%s config[line %d]: Error: pipe PDU type expected (`binary')\n",
-		     source, nLines);
+		     "pmcd config[line %d]: Error: pipe PDU type expected (`binary')\n",
+		     nLines);
 	return -1;
     }
 
     do {
 	i = 0;
-	FindNextToken(source);
+	FindNextToken();
 	if (*token == '\n') {
 	    fprintf(stderr,
-		     "%s config[line %d]: Error: command to create pipe agent expected.\n",
-		     source, nLines);
+		     "pmcd config[line %d]: Error: command to create pipe agent expected.\n",
+		     nLines);
 	    return -1;
 	} else if ((i = TokenIs ("notready"))) {
 	    notReady = 1;
@@ -803,11 +789,11 @@ ParsePipe(const char *source, char *pmDomainLabel, int pmDomainId)
     newAgent->outFd = -1;
     newAgent->pmDomainLabel = strdup(pmDomainLabel);
     newAgent->status.startNotReady = notReady;
-    newAgent->ipc.pipe.argv = BuildArgv(source);
+    newAgent->ipc.pipe.argv = BuildArgv();
 
     if (newAgent->ipc.pipe.argv == NULL) {
-	fprintf(stderr, "%s config[line %d]: Error: building argv for \"%s\" agent.\n",
-		     source, nLines, newAgent->pmDomainLabel);
+	fprintf(stderr, "pmcd config[line %d]: Error: building argv for \"%s\" agent.\n",
+		     nLines, newAgent->pmDomainLabel);
 	FreeAgent(newAgent);
 	nAgents--;
 	return -1;
@@ -818,15 +804,15 @@ ParsePipe(const char *source, char *pmDomainLabel, int pmDomainId)
 }
 
 static int
-ParseAccessSpec(const char *source, int allow, int *specOps, int *denyOps, int *maxCons, int recursion)
+ParseAccessSpec(int allow, int *specOps, int *denyOps, int *maxCons, int recursion)
 {
     int		op;			/* >0 for specific ops, 0 otherwise */
     int		haveOps = 0, haveAll = 0;
     int		haveComma = 0;
 
     if (*token == ';') {
-	fprintf(stderr, "%s config[line %d]: Error: empty or incomplete permissions list\n",
-		     source, nLines);
+	fprintf(stderr, "pmcd config[line %d]: Error: empty or incomplete permissions list\n",
+		     nLines);
 	return -1;
     }
 
@@ -841,18 +827,18 @@ ParseAccessSpec(const char *source, int allow, int *specOps, int *denyOps, int *
 	else if (TokenIs("all")) {
 	    if (haveOps) {
 		fprintf(stderr,
-			     "%s config[line %d]: Error: can't have \"all\" mixed with specific permissions\n",
-			     source, nLines);
+			     "pmcd config[line %d]: Error: can't have \"all\" mixed with specific permissions\n",
+			     nLines);
 		return -1;
 	    }
 	    haveAll = 1;
 	    if (recursion) {
 		fprintf(stderr,
-			     "%s config[line %d]: Error: can't have \"all\" within an \"all except\"\n",
-			     source, nLines);
+			     "pmcd config[line %d]: Error: can't have \"all\" within an \"all except\"\n",
+			     nLines);
 		return -1;
 	    }
-	    FindNextToken(source);
+	    FindNextToken();
 
 	    /* Any "all" statement specifies permissions for all operations
 	    * Start off with all operations in allow/disallowed state
@@ -863,8 +849,8 @@ ParseAccessSpec(const char *source, int allow, int *specOps, int *denyOps, int *
 		/* Now deal with exceptions by reversing the "allow" sense */
 		int sts;
 
-		FindNextToken(source);
-		sts = ParseAccessSpec(source, !allow, specOps, denyOps, maxCons, 1);
+		FindNextToken();
+		sts = ParseAccessSpec(!allow, specOps, denyOps, maxCons, 1);
 		if (sts < 0) return -1;
 	    }
 	    *specOps = PMCD_OP_ALL;		/* Do this AFTER any recursive call */
@@ -874,14 +860,14 @@ ParseAccessSpec(const char *source, int allow, int *specOps, int *denyOps, int *
 
 	    if (*maxCons) {
 		fprintf(stderr,
-			     "%s config[line %d]: Error: connection limit already specified\n",
-			     source, nLines);
+			     "pmcd config[line %d]: Error: connection limit already specified\n",
+			     nLines);
 		return -1;
 	    }
 	    if (recursion && !haveOps) {
 		fprintf(stderr,
-			     "%s config[line %d]: Error: connection limit may not immediately follow \"all except\"\n",
-			     source, nLines);
+			     "pmcd config[line %d]: Error: connection limit may not immediately follow \"all except\"\n",
+			     nLines);
 		return -1;
 	    }
 
@@ -896,34 +882,34 @@ ParseAccessSpec(const char *source, int allow, int *specOps, int *denyOps, int *
 	     */
 	    if (!(recursion ^ allow)) { /* disallow statement */
 		fprintf(stderr,
-			     "%s config[line %d]: Error: can't specify connection limit in a disallow statement\n",
-			     source, nLines);
+			     "pmcd config[line %d]: Error: can't specify connection limit in a disallow statement\n",
+			     nLines);
 		return -1;
 	    }
 	    if (unlimited)
 		*maxCons = -1;
 	    else {
-		FindNextToken(source);
+		FindNextToken();
 		if (!TokenIsNumber() || TokenNumVal() <= 0) {
 		    fprintf(stderr,
-				 "%s config[line %d]: Error: maximum connection limit must be a positive number\n",
-				 source, nLines);
+				 "pmcd config[line %d]: Error: maximum connection limit must be a positive number\n",
+				 nLines);
 		    return -1;
 		}
 		*maxCons = TokenNumVal();
-		FindNextToken(source);
+		FindNextToken();
 	    }
 	    if (!TokenIs("connections")) {
 		fprintf(stderr,
-			     "%s config[line %d]: Error: \"connections\" expected\n",
-			     source, nLines);
+			     "pmcd config[line %d]: Error: \"connections\" expected\n",
+			     nLines);
 		return -1;
 	    }
-	    FindNextToken(source);
+	    FindNextToken();
 	}
 	else {
-	    fprintf(stderr, "%s config[line %d]: Error: bad access specifier\n",
-			 source, nLines);
+	    fprintf(stderr, "pmcd config[line %d]: Error: bad access specifier\n",
+			 nLines);
 	    return -1;
 	}
 
@@ -931,8 +917,8 @@ ParseAccessSpec(const char *source, int allow, int *specOps, int *denyOps, int *
 	if (op) {
 	    if (haveAll) {
 		fprintf(stderr,
-			     "%s config[line %d]: Error: can't have \"all\" mixed with specific permissions\n",
-			     source, nLines);
+			     "pmcd config[line %d]: Error: can't have \"all\" mixed with specific permissions\n",
+			     nLines);
 		return -1;
 	    }
 	    haveOps = 1;
@@ -941,32 +927,32 @@ ParseAccessSpec(const char *source, int allow, int *specOps, int *denyOps, int *
 		*denyOps &= (~op);
 	    else
 		*denyOps |= op;
-	    FindNextToken(source);
+	    FindNextToken();
 	}
 	if (*token != ',' && *token != ';') {
 	    fprintf(stderr,
-			 "%s config[line %d]: Error: ',' or ';' expected in permission list\n",
-			 source, nLines);
+			 "pmcd config[line %d]: Error: ',' or ';' expected in permission list\n",
+			 nLines);
 	    return -1;
 	}
 	if (*token == ',') {
 	    haveComma = 1;
-	    FindNextToken(source);
+	    FindNextToken();
 	}
 	else
 	    haveComma = 0;
     }
     if (haveComma) {
 	fprintf(stderr,
-		     "%s config[line %d]: Error: misplaced (trailing) ',' in permission list\n",
-		     source, nLines);
+		     "pmcd config[line %d]: Error: misplaced (trailing) ',' in permission list\n",
+		     nLines);
 	return -1;
     }
     return 0;
 }
 
 static int
-ParseNames(const char *source, char ***namesp, const char *nametype)
+ParseNames(char ***namesp, const char *nametype)
 {
     static char	**names;
     static int	szNames;
@@ -982,23 +968,23 @@ ParseNames(const char *source, char ***namesp, const char *nametype)
 	    szNames += 8;
 	    need = szNames * (int)sizeof(char**);
 	    if ((names = (char **)realloc(names, need)) == NULL) {
-		pmNoMem("pmcd ParseNames name list", need, PM_FATAL_ERR);
+		__pmNoMem("pmcd ParseNames name list", need, PM_FATAL_ERR);
 		/*NOTREACHED*/
 	    }
 	}
 	if ((names[nnames++] = CopyToken()) == NULL) {
-	    pmNoMem("pmcd ParseNames name", tokenend - token, PM_FATAL_ERR);
+	    __pmNoMem("pmcd ParseNames name", tokenend - token, PM_FATAL_ERR);
 	    /*NOTREACHED*/
 	}
-	FindNextToken(source);
+	FindNextToken();
 	if (*token != ',' && *token != ':') {
 	    fprintf(stderr,
-		 "%s config[line %d]: Error: ',' or ':' expected after \"%s\"\n",
-		 source, nLines, names[nnames-1]);
+			 "pmcd config[line %d]: Error: ',' or ':' expected after \"%s\"\n",
+			 nLines, names[nnames-1]);
 	    return -1;
 	}
 	if (*token == ',') {
-	    FindNextToken(source);
+	    FindNextToken();
 	    another = 1;
 	}
 	else
@@ -1006,18 +992,18 @@ ParseNames(const char *source, char ***namesp, const char *nametype)
     }
     if (nnames == 0) {
 	fprintf(stderr,
-		"%s config[line %d]: Error: no %ss in allow/disallow statement\n",
-		source, nLines, nametype);
+		     "pmcd config[line %d]: Error: no %ss in allow/disallow statement\n",
+		     nLines, nametype);
 	return -1;
     }
     if (another) {
-	fprintf(stderr, "%s config[line %d]: Error: %s expected after ','\n",
-		source, nLines, nametype);
+	fprintf(stderr, "pmcd config[line %d]: Error: %s expected after ','\n",
+		     nLines, nametype);
 	return -1;
     }
     if (*token != ':') {
-	fprintf(stderr, "%s config[line %d]: Error: ':' expected after \"%s\"\n",
-		source, nLines, names[nnames-1]);
+	fprintf(stderr, "pmcd config[line %d]: Error: ':' expected after \"%s\"\n",
+		nLines, names[nnames-1]);
 	return -1;
     }
     *namesp = names;
@@ -1025,7 +1011,7 @@ ParseNames(const char *source, char ***namesp, const char *nametype)
 }
 
 static int
-ParseHosts(const char *source, int allow)
+ParseHosts(int allow)
 {
     int		sts;
     int		nhosts;
@@ -1036,11 +1022,11 @@ ParseHosts(const char *source, int allow)
     int		maxCons = 0;		/* Zero=>unspecified, -1=>unlimited */
     char	**hostnames;
 
-    if ((nhosts = ParseNames(source, &hostnames, "host")) < 0)
+    if ((nhosts = ParseNames(&hostnames, "host")) < 0)
 	goto error;
 
-    FindNextToken(source);
-    if (ParseAccessSpec(source, allow, &specOps, &denyOps, &maxCons, 0) < 0)
+    FindNextToken();
+    if (ParseAccessSpec(allow, &specOps, &denyOps, &maxCons, 0) < 0)
 	goto error;
 
     if (pmDebugOptions.appl1) {
@@ -1055,8 +1041,8 @@ ParseHosts(const char *source, int allow)
 	    if (sts == -EHOSTUNREACH || sts == -EHOSTDOWN)
 		fprintf(stderr, "Warning: the following access control specification will be ignored\n");
 	    fprintf(stderr,
-			 "%s config[line %d]: Warning: access control error for host '%s': %s\n",
-			 source, nLines, hostnames[i], pmErrStr(sts));
+			 "pmcd config[line %d]: Warning: access control error for host '%s': %s\n",
+			 nLines, hostnames[i], pmErrStr(sts));
 	    if (sts == -EHOSTUNREACH || sts == -EHOSTDOWN)
 		;
 	    else
@@ -1074,7 +1060,7 @@ error:
 }
 
 static int
-ParseUsers(const char *source, int allow)
+ParseUsers(int allow)
 {
     int		sts;
     int		nusers;
@@ -1085,11 +1071,11 @@ ParseUsers(const char *source, int allow)
     int		maxCons = 0;		/* Zero=>unspecified, -1=>unlimited */
     char	**usernames;
 
-    if ((nusers = ParseNames(source, &usernames, "user")) < 0)
+    if ((nusers = ParseNames(&usernames, "user")) < 0)
 	goto error;
 
-    FindNextToken(source);
-    if (ParseAccessSpec(source, allow, &specOps, &denyOps, &maxCons, 0) < 0)
+    FindNextToken();
+    if (ParseAccessSpec(allow, &specOps, &denyOps, &maxCons, 0) < 0)
 	goto error;
 
     if (pmDebugOptions.appl1) {
@@ -1102,8 +1088,8 @@ ParseUsers(const char *source, int allow)
     for (i = 0; i < nusers; i++) {
 	if ((sts = __pmAccAddUser(usernames[i], specOps, denyOps, maxCons)) < 0) {
 	    fprintf(stderr,
-			 "%s config[line %d]: Warning: access control error for user '%s': %s\n",
-			 source, nLines, usernames[i], pmErrStr(sts));
+			 "pmcd config[line %d]: Warning: access control error for user '%s': %s\n",
+			 nLines, usernames[i], pmErrStr(sts));
 	    goto error;
 	}
 	ok = 1;
@@ -1117,7 +1103,7 @@ error:
 }
 
 static int
-ParseGroups(const char *source, int allow)
+ParseGroups(int allow)
 {
     int		sts;
     int		ngroups;
@@ -1128,11 +1114,11 @@ ParseGroups(const char *source, int allow)
     int		maxCons = 0;		/* Zero=>unspecified, -1=>unlimited */
     char	**groupnames;
 
-    if ((ngroups = ParseNames(source, &groupnames, "group")) < 0)
+    if ((ngroups = ParseNames(&groupnames, "group")) < 0)
 	goto error;
 
-    FindNextToken(source);
-    if (ParseAccessSpec(source, allow, &specOps, &denyOps, &maxCons, 0) < 0)
+    FindNextToken();
+    if (ParseAccessSpec(allow, &specOps, &denyOps, &maxCons, 0) < 0)
 	goto error;
 
     if (pmDebugOptions.appl1) {
@@ -1145,8 +1131,8 @@ ParseGroups(const char *source, int allow)
     for (i = 0; i < ngroups; i++) {
 	if ((sts = __pmAccAddGroup(groupnames[i], specOps, denyOps, maxCons)) < 0) {
 	    fprintf(stderr,
-			 "%s config[line %d]: Warning: access control error for group '%s': %s\n",
-			 source, nLines, groupnames[i], pmErrStr(sts));
+			 "pmcd config[line %d]: Warning: access control error for group '%s': %s\n",
+			 nLines, groupnames[i], pmErrStr(sts));
 	    goto error;
 	}
 	ok = 1;
@@ -1160,7 +1146,7 @@ error:
 }
 
 static int
-ParseAccess(const char *source)
+ParseAccessControls(void)
 {
     int		sts = 0;
     int		tmp;
@@ -1168,118 +1154,117 @@ ParseAccess(const char *source)
     int		naccess = 0;
     int		need_creds = 0;
 
-    while (*token && !scanError) {
-	if (TokenIs("allow"))
-	    allow = 1;
-	else if (TokenIs("disallow"))
-	    allow = 0;
-	else {
-	    fprintf(stderr, "%s config[line %d]: Error: %s\n",
-		    source, nLines, "allow or disallow statement expected");
-	    sts = -1;
-	    while (*token && !scanError && *token != ';')
-		FindNextToken(source);
-	    if (*token && !scanError && *token == ';') {
-		FindNextToken(source);
-		continue;
-	    }
-	    return -1;
-	}
-	FindNextToken(source);
-	if (TokenIs("user") || TokenIs("users")) {
-	    FindNextToken(source);
-	    if ((tmp = ParseUsers(source, allow)) < 0)
-		sts = -1;
-	    else
-		need_creds = 1;
-	} else if (TokenIs("group") || TokenIs("groups")) {
-	    FindNextToken(source);
-	    if ((tmp = ParseGroups(source, allow)) < 0)
-		sts = -1;
-	    else
-		need_creds = 1;
-	} else if (TokenIs("host") || TokenIs("hosts")) {
-	    FindNextToken(source);
-	    if ((tmp = ParseHosts(source, allow)) < 0)
-		sts = -1;
-	} else {
-	    if ((tmp = ParseHosts(source, allow)) < 0)
-		sts = -1;
-	}
-	if (tmp > 0)
-	    naccess++;
-	while (*token && !scanError && *token != ';')
-	    FindNextToken(source);
-	if (!*token || scanError)
-	    return -1;
-	FindNextToken(source);
-    }
-    if (sts != 0)
-	return sts;
-
-    if (naccess == 0) {
-	fprintf(stderr, "%s config[line %d]: Error: %s\n",
-		source, nLines, "no valid statements in [access] section");
-	return -1;
-    }
-
-    if (need_creds)
-	__pmServerSetFeature(PM_SERVER_FEATURE_CREDS_REQD);
-    return 0;
-}
-
-static int
-ParseAccessControls(const char *source)
-{
     doingAccess = 1;
-
     /* This gets a little tricky, because the token may be "[access]", or
      * "[access" or "[".  "[" and "]" can't be made special characters until
      * the scanner knows it is in the access control section because the arg
      * lists for agents may contain them.
      */
     if (TokenIs("[access]"))
-	FindNextToken(source);
+	FindNextToken();
     else {
 	if (TokenIs("[")) {
-	    FindNextToken(source);
+	    FindNextToken();
 	    if (!TokenIs("access")) {
 		fprintf(stderr,
-			     "%s config[line %d]: Error: \"access\" keyword expected\n",
-			     source, nLines);
+			     "pmcd config[line %d]: Error: \"access\" keyword expected\n",
+			     nLines);
 		return -1;
 	    }
 	}
 	else if (!TokenIs("[access")) {
 	    fprintf(stderr,
-			 "%s config[line %d]: Error: \"access\" keyword expected\n",
-			 source, nLines);
+			 "pmcd config[line %d]: Error: \"access\" keyword expected\n",
+			 nLines);
 	    return -1;
 	}
-	FindNextToken(source);
+	FindNextToken();
 	if (*token != ']') {
-	    fprintf(stderr, "%s config[line %d]: Error: ']' expected\n",
-			    source, nLines);
+	    fprintf(stderr, "pmcd config[line %d]: Error: ']' expected\n", nLines);
 	    return -1;
 	}
-	FindNextToken(source);
+	FindNextToken();
+    }
+    while (*token && !scanError) {
+	if (TokenIs("allow"))
+	    allow = 1;
+	else if (TokenIs("disallow"))
+	    allow = 0;
+	else {
+	    fprintf(stderr,
+			 "pmcd config[line %d]: Error: allow or disallow statement expected\n",
+			 nLines);
+	    sts = -1;
+	    while (*token && !scanError && *token != ';')
+		FindNextToken();
+	    if (*token && !scanError && *token == ';') {
+		FindNextToken();
+		continue;
+	    }
+	    return -1;
+	}
+	FindNextToken();
+	if (TokenIs("user") || TokenIs("users")) {
+	    FindNextToken();
+	    if ((tmp = ParseUsers(allow)) < 0)
+		sts = -1;
+	    else
+		need_creds = 1;
+	} else if (TokenIs("group") || TokenIs("groups")) {
+	    FindNextToken();
+	    if ((tmp = ParseGroups(allow)) < 0)
+		sts = -1;
+	    else
+		need_creds = 1;
+	} else if (TokenIs("host") || TokenIs("hosts")) {
+	    FindNextToken();
+	    if ((tmp = ParseHosts(allow)) < 0)
+		sts = -1;
+	} else {
+	    if ((tmp = ParseHosts(allow)) < 0)
+		sts = -1;
+	}
+	if (tmp > 0)
+	    naccess++;
+	while (*token && !scanError && *token != ';')
+	    FindNextToken();
+	if (!*token || scanError)
+	    return -1;
+	FindNextToken();
+    }
+    if (sts != 0)
+	return sts;
+
+    if (naccess == 0) {
+	fprintf(stderr,
+		     "pmcd config[line %d]: Error: no valid statements in [access] section\n",
+		     nLines);
+	return -1;
     }
 
-    return ParseAccess("pmcd");
+    if (need_creds)
+	__pmServerSetFeature(PM_SERVER_FEATURE_CREDS_REQD);
+
+    if (pmDebugOptions.appl1)
+	__pmAccDumpLists(stderr);
+
+    return 0;
 }
 
 /* Parse the configuration file, creating the agent list. */
 static int
-ReadConfigFiles(FILE *configFile, FILE *accessFile)
+ReadConfigFile(FILE *configFile)
 {
-    const char	*source = "pmcd";
     char	*pmDomainLabel = NULL;
     int		i, pmDomainId;
     int		sts = 0;
 
     inputStream = configFile;
-    scanInit = scanError = doingAccess = nLines = 0;
-    FindNextToken(source);
+    scanInit = 0;
+    scanError = 0;
+    doingAccess = 0;
+    nLines = 0;
+    FindNextToken();
     while (*token && !scanError) {
 	if (*token == '\n')		/* It's a comment or blank line */
 	    goto doneLine;
@@ -1288,26 +1273,26 @@ ReadConfigFiles(FILE *configFile, FILE *accessFile)
 	    break;
 
 	if ((pmDomainLabel = CopyToken()) == NULL) {
-	    pmNoMem("pmcd config: domain label", tokenend - token + 1, PM_FATAL_ERR);
+	    __pmNoMem("pmcd config: domain label", tokenend - token + 1, PM_FATAL_ERR);
 	    /*NOTREACHED*/
 	}
 
-	FindNextToken(source);
+	FindNextToken();
 	if (TokenIsNumber()) {
 	    pmDomainId = TokenNumVal();
-	    FindNextToken(source);
+	    FindNextToken();
 	}
 	else {
 	    fprintf(stderr,
-			 "%s config[line %d]: Error: expected domain number for \"%s\" agent\n",
-			 source, nLines, pmDomainLabel);
+			 "pmcd config[line %d]: Error: expected domain number for \"%s\" agent\n",
+			 nLines, pmDomainLabel);
 	    sts = -1;
 	    goto doneLine;
 	}
 	if (pmDomainId < 0 || pmDomainId > MAXDOMID) {
 	    fprintf(stderr,
-			 "%s config[line %d]: Error: Illegal domain number (%d) for \"%s\" agent\n",
-			 source, nLines, pmDomainId, pmDomainLabel);
+			 "pmcd config[line %d]: Error: Illegal domain number (%d) for \"%s\" agent\n",
+			 nLines, pmDomainId, pmDomainLabel);
 	    sts = -1;
 	    goto doneLine;
 	}
@@ -1318,8 +1303,8 @@ ReadConfigFiles(FILE *configFile, FILE *accessFile)
 	for (i = 0; i < nAgents; i++)
 	    if (pmDomainId == agent[i].pmDomainId) {
 		fprintf(stderr,
-			     "%s config[line %d]: Error: domain number for \"%s\" agent clashes with \"%s\" agent\n",
-			     source, nLines, pmDomainLabel, agent[i].pmDomainLabel);
+			     "pmcd config[line %d]: Error: domain number for \"%s\" agent clashes with \"%s\" agent\n",
+			     nLines, pmDomainLabel, agent[i].pmDomainLabel);
 		sts = -1;
 		goto doneLine;
 	    }
@@ -1331,15 +1316,15 @@ ReadConfigFiles(FILE *configFile, FILE *accessFile)
 	 *  0 for success with a NewAgent structure allocated
 	 */
 	if (TokenIs("dso"))
-	    sts = ParseDso(source, pmDomainLabel, pmDomainId);
+	    sts = ParseDso(pmDomainLabel, pmDomainId);
 	else if (TokenIs("socket"))
-	    sts = ParseSocket(source, pmDomainLabel, pmDomainId);
+	    sts = ParseSocket(pmDomainLabel, pmDomainId);
 	else if (TokenIs("pipe"))
-	    sts = ParsePipe(source, pmDomainLabel, pmDomainId);
+	    sts = ParsePipe(pmDomainLabel, pmDomainId);
 	else {
 	    fprintf(stderr,
-			 "%s config[line %d]: Error: expected `dso', `socket' or `pipe'\n",
-			 source, nLines);
+			 "pmcd config[line %d]: Error: expected `dso', `socket' or `pipe'\n",
+			 nLines);
 	    sts = -1;
 	}
 doneLine:
@@ -1347,32 +1332,15 @@ doneLine:
 	    free(pmDomainLabel);
 	    pmDomainLabel = NULL;
 	}
-	SkipLine(source);
+	SkipLine();
     }
     if (scanError) {
-	fprintf(stderr, "%s config: Can't continue, giving up\n", source);
+	fprintf(stderr, "pmcd config: Can't continue, giving up\n");
 	sts = -1;
     }
-
-    /* parsing the (final) access section of main pmcd.conf file */
     if (*token == '[' && sts != -1)
-	if (ParseAccessControls(source) < 0)
+	if (ParseAccessControls() < 0)
 	    sts = -1;
-
-    /* parsing the (optional) pmcd.conf.access file contents now */
-    if (sts >= 0 && accessFile != NULL) {
-	scanInit = scanError = nLines = 0;
-	inputStream = accessFile;
-	doingAccess = 1;
-	source = "access";
-	FindNextToken(source);
-	if (ParseAccess(source) < 0)
-	    sts = -1;
-    }
-
-    if (pmDebugOptions.appl1)
-	__pmAccDumpLists(stderr);
-
     return sts;
 }
 
@@ -1668,7 +1636,7 @@ CreateRootAgentPOSIX(AgentInfo *aPtr)
 {
     int		sts, inFd, outFd = -1;
     char	*args;
-    int		pid;
+    pid_t	pid;
     static int	enabled;
 
     if (!enabled) {
@@ -1704,7 +1672,7 @@ CreateRootAgentPOSIX(AgentInfo *aPtr)
     pmcd_openfds_sethi(outFd);
     aPtr->outFd = outFd;
     aPtr->inFd = inFd;
-    return (pid_t)pid;
+    return pid;
 }
 
 static pid_t
@@ -1806,29 +1774,83 @@ CreateAgentPOSIX(AgentInfo *aPtr)
 static pid_t
 CreateAgentWin32(AgentInfo *aPtr)
 {
-    pid_t	pid;
-    char	*argv[2];
+    SECURITY_ATTRIBUTES saAttr;
+    PROCESS_INFORMATION piProcInfo;
+    STARTUPINFO siStartInfo;
+    HANDLE hChildStdinRd, hChildStdinWr, hChildStdoutRd, hChildStdoutWr;
+    BOOL bSuccess = FALSE;
+    LPTSTR command = NULL;
 
     if (aPtr->ipcType == AGENT_PIPE)
-	argv[0] = aPtr->ipc.pipe.commandLine;
+	command = (LPTSTR)aPtr->ipc.pipe.commandLine;
     else if (aPtr->ipcType == AGENT_SOCKET)
-	argv[0] = aPtr->ipc.socket.commandLine;
-    argv[1] = NULL;
+	command = (LPTSTR)aPtr->ipc.socket.commandLine;
 
+    // Set the bInheritHandle flag so pipe handles are inherited
+    saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+    saAttr.bInheritHandle = TRUE;
+    saAttr.lpSecurityDescriptor = NULL;
 
-    if ((pid = __pmProcessCreate(argv, &aPtr->outFd, &aPtr->inFd)) < (pid_t)0) {
+    // Create a pipe for the child process's STDOUT.
+    if (!CreatePipe(&hChildStdoutRd, &hChildStdoutWr, &saAttr, 0)) {
+	fprintf(stderr, "pmcd: stdout CreatePipe failed, \"%s\" agent: %s\n",
+			aPtr->pmDomainLabel, osstrerror());
+	return (pid_t)-1;
+    }
+    // Ensure the read handle to the pipe for STDOUT is not inherited.
+    if (!SetHandleInformation(hChildStdoutRd, HANDLE_FLAG_INHERIT, 0)) {
+	fprintf(stderr, "pmcd: stdout SetHandleInformation, \"%s\" agent: %s\n",
+			aPtr->pmDomainLabel, osstrerror());
+	return (pid_t)-1;
+    }
+
+    // Create a pipe for the child process's STDIN.
+    if (!CreatePipe(&hChildStdinRd, &hChildStdinWr, &saAttr, 0)) {
+	fprintf(stderr, "pmcd: stdin CreatePipe failed, \"%s\" agent: %s\n",
+			aPtr->pmDomainLabel, osstrerror());
+	return (pid_t)-1;
+    }
+    // Ensure the write handle to the pipe for STDIN is not inherited.
+    if (!SetHandleInformation(hChildStdinWr, HANDLE_FLAG_INHERIT, 0)) {
+	fprintf(stderr, "pmcd: stdin SetHandleInformation, \"%s\" agent: %s\n",
+			aPtr->pmDomainLabel, osstrerror());
+	return (pid_t)-1;
+    }
+
+    // Create the child process.
+
+    ZeroMemory(&piProcInfo, sizeof(PROCESS_INFORMATION));
+    ZeroMemory(&siStartInfo, sizeof(STARTUPINFO));
+    siStartInfo.cb = sizeof(STARTUPINFO);
+    siStartInfo.hStdOutput = hChildStdoutWr;
+    siStartInfo.hStdError = hChildStdoutWr;
+    siStartInfo.hStdInput = hChildStdinRd;
+    siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
+
+    bSuccess = CreateProcess(NULL, command,
+			NULL,          // process security attributes
+			NULL,          // primary thread security attributes
+			TRUE,          // handles are inherited
+			0,             // creation flags
+			NULL,          // use parent's environment
+			NULL,          // use parent's current directory
+			&siStartInfo,  // STARTUPINFO pointer
+			&piProcInfo);  // receives PROCESS_INFORMATION
+    if (!bSuccess) {
 	fprintf(stderr, "pmcd: CreateProcess for \"%s\" agent: %s: %s\n",
-			aPtr->pmDomainLabel, argv[0], osstrerror());
-    }
-    else {
-	pmcd_openfds_sethi(aPtr->inFd);
-	pmcd_openfds_sethi(aPtr->outFd);
-	/* do not muck with \n in PDU stream */
-	_setmode(aPtr->inFd, _O_BINARY);
-	_setmode(aPtr->outFd, _O_BINARY);
+			aPtr->pmDomainLabel, command, osstrerror());
+	return (pid_t)-1;
     }
 
-    return pid;
+    aPtr->inFd = _open_osfhandle((intptr_t)hChildStdinRd, _O_WRONLY);
+    aPtr->outFd = _open_osfhandle((intptr_t)hChildStdoutWr, _O_RDONLY);
+    pmcd_openfds_sethi(aPtr->outFd);
+
+    CloseHandle(piProcInfo.hProcess);
+    CloseHandle(piProcInfo.hThread);
+    CloseHandle(hChildStdoutRd);
+    CloseHandle(hChildStdinWr);
+    return piProcInfo.dwProcessId;
 }
 #endif
 
@@ -1979,7 +2001,7 @@ GetAgentDso(AgentInfo *aPtr)
 	free(dso->pathName);
 	dso->pathName = strdup(name);
 	if (dso->pathName == NULL) {
-	    pmNoMem("pmcd config: pathName", strlen(name), PM_FATAL_ERR);
+	    __pmNoMem("pmcd config: pathName", strlen(name), PM_FATAL_ERR);
 	    /*NOTREACHED*/
 	}
 	dso->xlatePath = 1;
@@ -2065,7 +2087,7 @@ GetAgentDso(AgentInfo *aPtr)
 
     if (dso->dispatch.comm.pmda_interface < PMDA_INTERFACE_2 ||
 	dso->dispatch.comm.pmda_interface > PMDA_INTERFACE_LATEST) {
-	pmNotifyErr(LOG_ERR,
+	__pmNotifyErr(LOG_ERR,
 		 "Unknown PMDA interface version (%d) used by DSO %s\n",
 		 dso->dispatch.comm.pmda_interface, aPtr->pmDomainLabel);
 #if defined(HAVE_DLOPEN)
@@ -2077,7 +2099,7 @@ GetAgentDso(AgentInfo *aPtr)
     if (dso->dispatch.comm.pmapi_version == PMAPI_VERSION_2)
 	aPtr->pduVersion = PDU_VERSION2;
     else {
-	pmNotifyErr(LOG_ERR,
+	__pmNotifyErr(LOG_ERR,
 		 "Unsupported PMAPI version (%d) used by DSO %s\n",
 		 dso->dispatch.comm.pmapi_version, aPtr->pmDomainLabel);
 #if defined(HAVE_DLOPEN)
@@ -2171,23 +2193,17 @@ ContactAgents(void)
 int
 VerifyConfig(char *fileName)
 {
-    char	accessPath[MAXPATHLEN];
-    FILE	*configFile, *accessFile;
+    FILE	*configFile;
     int		sts = -1;
 
     if ((configFile = fopen(fileName, "r")) == NULL) {
 	fprintf(stderr, "pmcd verify %s: %s\n", fileName, osstrerror());
 	return sts;
     }
-    pmsprintf(accessPath, sizeof(accessPath), "%s.access", fileName);
-    accessFile = fopen(accessPath, "r");
-
     if (__pmAccAddOp(PMCD_OP_FETCH) < 0 || __pmAccAddOp(PMCD_OP_STORE) < 0)
 	fprintf(stderr, "pmcd verify cannot create access ops structures\n");
     else
-	sts = ReadConfigFiles(configFile, accessFile);
-    if (accessFile)
-	fclose(accessFile);
+	sts = ReadConfigFile(configFile);
     fclose(configFile);
     return sts;
 }
@@ -2197,39 +2213,33 @@ ParseInitAgents(char *fileName)
 {
     int		sts;
     int		i;
-    char	accessPath[MAXPATHLEN];
-    FILE	*configFile, *accessFile;
+    FILE	*configFile;
     struct stat	statBuf;
     static int	firstTime = 1;
 
     memset(&configFileTime, 0, sizeof(configFileTime));
     configFile = fopen(fileName, "r");
     if (configFile == NULL)
-	fprintf(stderr, "%s: open %s: %s\n",
-			"ParseInitAgents", fileName, osstrerror());
+	fprintf(stderr, "ParseInitAgents: %s: %s\n", fileName, osstrerror());
     else if (stat(fileName, &statBuf) == -1)
-	fprintf(stderr, "%s: stat %s: %s\n",
-			"ParseInitAgents", fileName, osstrerror());
+	fprintf(stderr, "ParseInitAgents: stat(%s): %s\n",
+		     fileName, osstrerror());
     else {
 #if defined(HAVE_ST_MTIME_WITH_E) && defined(HAVE_STAT_TIME_T)
 	configFileTime = statBuf.st_mtime;
 	if (pmDebugOptions.appl0)
-	    fprintf(stderr, "%s: configFileTime=%ld sec\n",
-	        "ParseInitAgents", (long)configFileTime);
+	    fprintf(stderr, "ParseInitAgents: configFileTime=%ld sec\n",
+	        (long)configFileTime);
 #elif defined(HAVE_ST_MTIME_WITH_SPEC)
 	configFileTime = statBuf.st_mtimespec; /* struct assignment */
 	if (pmDebugOptions.appl0)
-	    fprintf(stderr, "%s: configFileTime=%ld.%09ld sec\n",
-			    "ParseInitAgents",
-			    (long)configFileTime.tv_sec,
-			    (long)configFileTime.tv_nsec);
+	    fprintf(stderr, "ParseInitAgents: configFileTime=%ld.%09ld sec\n",
+	        (long)configFileTime.tv_sec, (long)configFileTime.tv_nsec);
 #elif defined(HAVE_STAT_TIMESTRUC) || defined(HAVE_STAT_TIMESPEC) || defined(HAVE_STAT_TIMESPEC_T)
 	configFileTime = statBuf.st_mtim; /* struct assignment */
 	if (pmDebugOptions.appl0)
-	    fprintf(stderr, "%s: configFileTime=%ld.%09ld sec\n",
-			    "ParseInitAgents",
-			    (long)configFileTime.tv_sec,
-			    (long)configFileTime.tv_nsec);
+	    fprintf(stderr, "ParseInitAgents: configFileTime=%ld.%09ld sec\n",
+	        (long)configFileTime.tv_sec, (long)configFileTime.tv_nsec);
 #else
 !bozo!
 #endif
@@ -2237,48 +2247,14 @@ ParseInitAgents(char *fileName)
     if (configFile == NULL)
 	return -1;
 
-    memset(&accessFileTime, 0, sizeof(accessFileTime));
-    pmsprintf(accessPath, sizeof(accessPath), "%s.access", fileName);
-    accessFile = fopen(accessPath, "r");
-    if (accessFile == NULL)
-	/* do nothing, its optional */;
-    else if (stat(accessPath, &statBuf) == -1)
-	fprintf(stderr, "%s: stat %s: %s\n",
-			"ParseInitAgents", accessPath, osstrerror());
-    else {
-#if defined(HAVE_ST_MTIME_WITH_E) && defined(HAVE_STAT_TIME_T)
-	accessFileTime = statBuf.st_mtime;
-	if (pmDebugOptions.appl0)
-	    fprintf(stderr, "%s: accessFileTime=%ld sec\n",
-			    "ParseInitAgents", (long)accessFileTime);
-#elif defined(HAVE_ST_MTIME_WITH_SPEC)
-	accessFileTime = statBuf.st_mtimespec; /* struct assignment */
-	if (pmDebugOptions.appl0)
-	    fprintf(stderr, "%s: accessFileTime=%ld.%09ld sec\n",
-			    "ParseInitAgents",
-			    (long)accessFileTime.tv_sec,
-			    (long)accessFileTime.tv_nsec);
-#elif defined(HAVE_STAT_TIMESTRUC) || defined(HAVE_STAT_TIMESPEC) || defined(HAVE_STAT_TIMESPEC_T)
-	accessFileTime = statBuf.st_mtim; /* struct assignment */
-	if (pmDebugOptions.appl0)
-	    fprintf(stderr, "%s: accessFileTime=%ld.%09ld sec\n",
-			    "ParseInitAgents",
-			    (long)accessFileTime.tv_sec,
-			    (long)accessFileTime.tv_nsec);
-#else
-!bozo!
-#endif
-    }
-    if (firstTime &&
-	(__pmAccAddOp(PMCD_OP_FETCH) < 0 || __pmAccAddOp(PMCD_OP_STORE) < 0)) {
-	fprintf(stderr,
-		"ParseInitAgents: __pmAccAddOp: can't create access ops\n");
-	exit(1);
-    }
+    if (firstTime)
+	if (__pmAccAddOp(PMCD_OP_FETCH) < 0 || __pmAccAddOp(PMCD_OP_STORE) < 0) {
+	    fprintf(stderr,
+			 "ParseInitAgents: __pmAccAddOp: can't create access ops\n");
+	    exit(1);
+	}
 
-    sts = ReadConfigFiles(configFile, accessFile);
-    if (accessFile)
-	fclose(accessFile);
+    sts = ReadConfigFile(configFile);
     fclose(configFile);
 
     /* If pmcd is restarting, don't create/contact the agents until the results
@@ -2406,8 +2382,7 @@ ParseRestartAgents(char *fileName)
 {
     int		sts;
     int		i, j;
-    char	afileName[MAXPATHLEN];
-    struct stat	statBuf, astatBuf = {0};
+    struct stat	statBuf;
     AgentInfo	*oldAgent;
     int		oldNAgents;
     AgentInfo	*ap;
@@ -2469,52 +2444,32 @@ ParseRestartAgents(char *fileName)
     HarvestAgents(0);
 
     if (stat(fileName, &statBuf) == -1) {
-	fprintf(stderr, "%s: stat %s: %s\n",
-			"ParseRestartAgents", fileName, osstrerror());
+	fprintf(stderr, "ParseRestartAgents: stat(%s): %s\n",
+		     fileName, osstrerror());
 	fprintf(stderr, "Configuration left unchanged\n");
 	return;
     }
-    pmsprintf(afileName, sizeof(afileName), "%s.access", fileName);
-    (void)stat(afileName, &astatBuf);	/* all zeroes on failure */
 
     /* If the config file's modification time hasn't changed, just try to
      * restart any deceased agents
      */
 #if defined(HAVE_ST_MTIME_WITH_SPEC)
     if (pmDebugOptions.appl0)
-	fprintf(stderr, "%s: "
-		"new configFileTime=%ld.%09ld accessFileTime=%ld.%09ld sec\n",
-		"ParseRestartAgents",
-		(long)statBuf.st_mtimespec.tv_sec,
-		(long)statBuf.st_mtimespec.tv_nsec,
-		(long)astatBuf.st_mtimespec.tv_sec,
-		(long)astatBuf.st_mtimespec.tv_nsec);
+	fprintf(stderr, "ParseRestartAgents: new configFileTime=%ld.%09ld sec\n",
+	    (long)statBuf.st_mtimespec.tv_sec, (long)statBuf.st_mtimespec.tv_nsec);
     if (statBuf.st_mtimespec.tv_sec == configFileTime.tv_sec &&
-	statBuf.st_mtimespec.tv_nsec == configFileTime.tv_nsec &&
-	astatBuf.st_mtimespec.tv_sec == accessFileTime.tv_sec &&
-	astatBuf.st_mtimespec.tv_nsec == accessFileTime.tv_nsec)
+        statBuf.st_mtimespec.tv_nsec == configFileTime.tv_nsec)
 #elif defined(HAVE_STAT_TIMESPEC_T) || defined(HAVE_STAT_TIMESTRUC) || defined(HAVE_STAT_TIMESPEC)
     if (pmDebugOptions.appl0)
-	fprintf(stderr, "%s: "
-		"new configFileTime=%ld.%09ld accessFileTime=%ld.%09ld sec\n",
-		"ParseRestartAgents",
-		(long)statBuf.st_mtim.tv_sec,
-		(long)statBuf.st_mtim.tv_nsec,
-		(long)astatBuf.st_mtim.tv_sec,
-		(long)astatBuf.st_mtim.tv_nsec);
+	fprintf(stderr, "ParseRestartAgents: new configFileTime=%ld.%09ld sec\n",
+	    (long)statBuf.st_mtim.tv_sec, (long)statBuf.st_mtim.tv_nsec);
     if (statBuf.st_mtim.tv_sec == configFileTime.tv_sec &&
-	statBuf.st_mtim.tv_nsec == configFileTime.tv_nsec &&
-	astatBuf.st_mtim.tv_sec == accessFileTime.tv_sec &&
-	astatBuf.st_mtim.tv_nsec == accessFileTime.tv_nsec)
+        statBuf.st_mtim.tv_nsec == configFileTime.tv_nsec)
 #elif defined(HAVE_STAT_TIME_T)
     if (pmDebugOptions.appl0)
-	fprintf(stderr, "%s: "
-		"new configFileTime=%ld accessFileTime=%ld sec\n",
-		"ParseRestartAgents",
-		(long)configFileTime,
-		(long)accessFileTime);
-    if (statBuf.st_mtime == configFileTime &&
-	astatBuf.st_mtime == accessFileTime)
+	fprintf(stderr, "ParseRestartAgents: new configFileTime=%ld sec\n",
+	    (long)configFileTime);
+    if (statBuf.st_mtime == configFileTime)
 #else
 !bozo!
 #endif

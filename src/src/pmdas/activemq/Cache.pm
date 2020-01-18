@@ -14,7 +14,7 @@
 
 use strict;
 
-package PCP::Cache;
+package Cache;
 
 sub new {
     my $class = shift;

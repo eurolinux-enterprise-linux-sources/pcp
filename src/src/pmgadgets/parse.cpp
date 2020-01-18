@@ -14,6 +14,7 @@
  */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 #include <setjmp.h>
 #include <values.h>
 #include "global.h"
@@ -63,15 +64,7 @@ public:
     char	*inst;                   // instance name (may be NULL)
 };
 
-int AddMetrics(double a, QList<MetricData*>&b, QedGadget *c)
-{
-    /* TODO */
-    (void)a;
-    (void)b;
-    (void)c;
-
-    return 0;
-}
+int AddMetrics(double a, QList<MetricData*>&b, QedGadget *c) { return 0; /* TODO */ }
 
 typedef struct {
     int		id;
@@ -1336,7 +1329,7 @@ Parse(void)
     }
     if (nErrors) {
 	pmprintf("%s: configuration file has errors "
-		"(%d lines parsed, %d errors)\n", pmGetProgname(), nLines, nErrors);
+		"(%d lines parsed, %d errors)\n", pmProgname, nLines, nErrors);
 	pmflush();
 	return -1;
     }

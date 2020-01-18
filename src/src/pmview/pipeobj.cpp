@@ -117,14 +117,14 @@ PipeObj::finishedAdd ()
 	    if (colSpec->_scale)
 		pmprintf(
 		    "%s: Warning: Color scale cannot be applied to pipe\n",
-		    pmGetProgname());
+		    pmProgname);
 	    else {
 		for (int i = 0; i < colSpec->_list.size(); i++)
 		    _metrics.add(*(colSpec->_list)[i]);
 	    }
 	} else {
 	    pmprintf("%s: Warning: No colours specified for pipe"
-		     "defaulting to blue.\n", pmGetProgname());
+		     "defaulting to blue.\n", pmProgname);
 	}
 
 	_metrics.resolveColors(MetricList::perValue);
@@ -140,7 +140,7 @@ PipeObj::finishedAdd ()
 	BaseObj::add(_stack);
 	ViewObj::theNumModObjects++;
     } else {
-	pmprintf("%s: Error: no metrics for pipe\n", pmGetProgname());
+	pmprintf("%s: Error: no metrics for pipe\n", pmProgname);
     }
 
     SoBaseColor * color = new SoBaseColor;

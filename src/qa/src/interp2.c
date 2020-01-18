@@ -7,7 +7,7 @@
  */
 
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
 
 static void
 mung(struct timeval *start, struct timeval *end,
@@ -32,9 +32,8 @@ static void
 printstamp(struct timeval *tp)
 {
     static struct tm	*tmp;
-    time_t		clock = (time_t)tp->tv_sec;
 
-    tmp = localtime(&clock);
+    tmp = localtime(&tp->tv_sec);
     printf("%02d:%02d:%02d.%03d", tmp->tm_hour, tmp->tm_min, tmp->tm_sec, (int)(tp->tv_usec/1000));
 }
 
@@ -59,14 +58,14 @@ main(int argc, char **argv)
     pmID	pmid[3];
     char	*name[] = { "sample.seconds", "sample.drift", "sample.milliseconds" };
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "a:D:n:?")) != EOF) {
 	switch (c) {
 
 	case 'a':	/* archive name */
 	    if (ahtype != 0) {
-		fprintf(stderr, "%s: at most one of -a and/or -h allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a and/or -h allowed\n", pmProgname);
 		errflag++;
 	    }
 	    ahtype = PM_CONTEXT_ARCHIVE;
@@ -77,7 +76,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -102,28 +101,28 @@ Options\n\
   -a   archive	  metrics source is an archive log\n\
   -D   debugspec  standard PCP debugging options\n\
   -n   namespace  use an alternative PMNS\n",
-		pmGetProgname());
+		pmProgname);
 	exit(1);
     }
 
     if (namespace != PM_NS_DEFAULT && (sts = pmLoadASCIINameSpace(namespace, 1)) < 0) {
-	printf("%s: Cannot load namespace from \"%s\": %s\n", pmGetProgname(), namespace, pmErrStr(sts));
+	printf("%s: Cannot load namespace from \"%s\": %s\n", pmProgname, namespace, pmErrStr(sts));
 	exit(1);
     }
 
     if (ahtype == 0) {
-	fprintf(stderr, "%s: -a is not optional!\n", pmGetProgname());
+	fprintf(stderr, "%s: -a is not optional!\n", pmProgname);
 	exit(1);
     }
     if ((sts = pmNewContext(ahtype, host)) < 0) {
 	fprintf(stderr, "%s: Cannot open archive \"%s\": %s\n",
-	    pmGetProgname(), host, pmErrStr(sts));
+	    pmProgname, host, pmErrStr(sts));
 	exit(1);
     }
 
     if ((sts = pmGetArchiveLabel(&label)) < 0) {
 	fprintf(stderr, "%s: Cannot get archive label record: %s\n",
-	    pmGetProgname(), pmErrStr(sts));
+	    pmProgname, pmErrStr(sts));
 	exit(1);
     }
 

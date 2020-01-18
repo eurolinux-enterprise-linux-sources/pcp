@@ -7,7 +7,7 @@ use lib dirname (__FILE__);
 use Test::More;
 use Test::Magpie qw(mock when verify);
 
-use PCP::RESTClient;
+use RESTClient;
 
 BEGIN {
     plan(tests => 4)

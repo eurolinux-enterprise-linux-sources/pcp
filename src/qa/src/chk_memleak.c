@@ -8,7 +8,7 @@
 
 #include <sys/time.h>
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
 
 static int	vflag = 0;
 static int	tflag = 0;
@@ -29,7 +29,7 @@ main(int argc, char **argv)
     unsigned long last_memusage = 0;
     unsigned long memusage;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "Li:h:a:D:n:tv")) != EOF) {
 	switch (c) {
@@ -54,7 +54,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -79,13 +79,13 @@ main(int argc, char **argv)
     }
 
     if (errflag) {
-	printf("Usage: %s %s\n", pmGetProgname(), usage);
+	printf("Usage: %s %s\n", pmProgname, usage);
 	exit(1);
     }
 
     if (namespace != PM_NS_DEFAULT) {
 	if ((sts = pmLoadASCIINameSpace(namespace, 1)) < 0) {
-	    printf("%s: Cannot load namespace from \"%s\": %s\n", pmGetProgname(), namespace, pmErrStr(sts));
+	    printf("%s: Cannot load namespace from \"%s\": %s\n", pmProgname, namespace, pmErrStr(sts));
 	    exit(1);
 	}
     }
@@ -94,19 +94,19 @@ main(int argc, char **argv)
 	switch (contype) {
 	case PM_CONTEXT_LOCAL:
 	    if ((c = pmNewContext(PM_CONTEXT_LOCAL, NULL)) < 0) {
-		printf("%s: Cannot create local context: %s\n", pmGetProgname(), pmErrStr(c));
+		printf("%s: Cannot create local context: %s\n", pmProgname, pmErrStr(c));
 		exit(1);
 	    }
 	    break;
 	case PM_CONTEXT_ARCHIVE:
 	    if ((c = pmNewContext(PM_CONTEXT_ARCHIVE, archive)) < 0) {
-		printf("%s: Cannot connect to archive \"%s\": %s\n", pmGetProgname(), archive, pmErrStr(c));
+		printf("%s: Cannot connect to archive \"%s\": %s\n", pmProgname, archive, pmErrStr(c));
 		exit(1);
 	    }
 	    break;
 	case PM_CONTEXT_HOST:
 	    if ((c = pmNewContext(PM_CONTEXT_HOST, host)) < 0) {
-		printf("%s: Cannot connect to host \"%s\": %s\n", pmGetProgname(), host, pmErrStr(c));
+		printf("%s: Cannot connect to host \"%s\": %s\n", pmProgname, host, pmErrStr(c));
 		exit(1);
 	    }
 	    break;

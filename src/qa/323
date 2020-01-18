@@ -50,7 +50,8 @@ $sudo rm -f $PCP_VAR_DIR/config/$iam/$iam.conf
 # timing is real tricky here ...
 echo
 echo "=== install $iam agent ===" | tee -a $here/$seq.full
-echo '3
+echo 'b
+3
 y
 null exit 0
 slow sleep 3

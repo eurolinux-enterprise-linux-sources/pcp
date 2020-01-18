@@ -17,7 +17,7 @@
 
 #include <inttypes.h>
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 
 #if defined(HAVE_PTHREAD_H)
 #include <pthread.h>
@@ -162,7 +162,7 @@ pmtracebegin(const char *tag)
 	hash.pad = 0;
 	if ((hash.tag = strdup(tag)) == NULL)
 	    b_sts = -oserror();
-	pmtimevalNow(&hash.start);
+	__pmtimevalNow(&hash.start);
 	if (b_sts >= 0) {
 	    hash.inprogress = 1;
 	    b_sts = __pmhashinsert(&_pmtable, tag, &hash);
@@ -180,7 +180,7 @@ pmtracebegin(const char *tag)
 	fprintf(stderr, "pmtracebegin: updating transaction '%s' "
 			"(id=0x%" PRIx64 ")\n", tag, hash.id);
 #endif
-	pmtimevalNow(&hptr->start);
+	__pmtimevalNow(&hptr->start);
 	hptr->inprogress = 1;
     }
 
@@ -206,7 +206,7 @@ pmtraceend(const char *tag)
     if ((len = strlen(tag)+1) >= MAXTAGNAMELEN)
 	return PMTRACE_ERR_TAGLENGTH;
 
-    pmtimevalNow(&now);
+    __pmtimevalNow(&now);
 
     /* give just enough info for comparison routine */
     hash.tag = (char *)tag;
@@ -230,7 +230,7 @@ pmtraceend(const char *tag)
 			"(id=0x%" PRIx64 ")\n", tag, hash.id);
 #endif
 	hptr->inprogress = 0;
-	hptr->data = pmtimevalSub(&now, &hptr->start);
+	hptr->data = __pmtimevalSub(&now, &hptr->start);
 
 	if (sts >= 0 && _pmtimedout) {
 	    sts = _pmtracereconnect();
@@ -559,7 +559,7 @@ _pmtraceupdatewait(void)
 #endif
 		    break;
 		}
-		if ((backoff = (int *)realloc(backoff, (n_backoff + 1) * 
+		if ((backoff = (int *)realloc(backoff, n_backoff * 
 						sizeof(backoff[0]))) == NULL)
 		    break;
 		backoff[n_backoff++] = val;
@@ -727,7 +727,7 @@ _pmauxtraceconnect(void)
 	if (*endptr != '\0' || timesec < 0.0)
 	    fprintf(stderr, "trace warning: bogus PCP_TRACE_TIMEOUT.");
 	else {
-	    pmtimevalFromReal(timesec, &timeout);
+	    __pmtimevalFromReal(timesec, &timeout);
 	}
     }
     if (getenv(TRACE_ENV_NOAGENT) != NULL)

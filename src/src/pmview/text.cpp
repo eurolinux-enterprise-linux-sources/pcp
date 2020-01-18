@@ -21,6 +21,9 @@
 #include "main.h"
 #include "text.h"
 
+#include <iostream>
+using namespace std;
+
 const char     		*Text::theHeightStr = "gjpqy|_";
 
 SoFont			*Text::theSmallFont = (SoFont *)0;
@@ -105,8 +108,10 @@ Text::Text(const QString &theString,
 	_root->addChild(theLargeFont->copy());
 	break;
     default:
-	if (pmDebugOptions.appl1)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_APPL1)
 	    cerr << "Text::Text: Illegal size specified" << endl;
+#endif
 	_fontSize = medium;
 	_root->addChild(theMediumFont->copy());
     }
@@ -114,7 +119,8 @@ Text::Text(const QString &theString,
     _translation->translation.setValue(0.0, 0.0, 0.0);
     _root->addChild(_translation);
 
-    if (pmDebugOptions.appl1) {
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_APPL1) {
 	SoSeparator *sep = new SoSeparator;
 	_root->addChild(sep);
 	SoBaseColor *col = new SoBaseColor;
@@ -126,6 +132,7 @@ Text::Text(const QString &theString,
 	cube->height.setValue(20);
 	sep->addChild(cube);
     }
+#endif
 
     if (_dir != vertical) {
 
@@ -168,10 +175,13 @@ Text::Text(const QString &theString,
 	box.getSize(x, y, z);
 
 	if (x < 0.0 || y < 0.0 || z < 0.0) {
-	    if (pmDebugOptions.appl2)
+#ifdef PCP_DEBUG
+	    if (pmDebug & DBG_TRACE_APPL2) {
 	    	cerr << "Text::Text: Bogus bounding box returned for \""
 		     << theString << "\": x = " << x << ", y = " << y
 		     << ", z = " << z << endl;
+	    }
+#endif
 	    x = 0.0;
 	    y = 0.0;
 	    z = 0.0;
@@ -182,10 +192,13 @@ Text::Text(const QString &theString,
 
 	const char *hasLow = strpbrk((const char *)theString.toLatin1(), theHeightStr);
 
-	if (pmDebugOptions.appl1)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_APPL1) {
 	    cerr << "Text::Text: " << theString << ": width = " 
 		 << _width << " height = " << _depth << " low = " 
 		 << ((hasLow != (char *)0) ? 1 : 0) << endl;
+	}
+#endif
 
 	switch(_dir) {
 	case left:
@@ -225,9 +238,11 @@ Text::Text(const QString &theString,
 	    _depth += 2;
 	    break;
 	default:
-	    if (pmDebugOptions.appl1)
+#ifdef PCP_DEBUG
+	    if (pmDebug & DBG_TRACE_APPL1)
 		cerr << "Text::Text: Illegal direction specified (" 
 		     << (int)_dir << ")" << endl;
+#endif
 	    break;
 	}
     }

@@ -1,4 +1,5 @@
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 #include <pcp/trace.h>
 #include <stdio.h>
 #include <stdlib.h>

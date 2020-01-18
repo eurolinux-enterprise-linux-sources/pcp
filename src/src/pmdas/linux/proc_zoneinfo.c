@@ -1,8 +1,8 @@
 /*
  * Linux zoneinfo Cluster
  *
- * Copyright (c) 2016-2017,2019 Fujitsu.
- * Copyright (c) 2017-2018 Red Hat.
+ * Copyright (c) 2016-2017 Fujitsu.
+ * Copyright (c) 2017 Red Hat.
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -18,30 +18,24 @@
 #include "proc_zoneinfo.h"
 
 static void
-extract_zone_protection(const char *bp, int node, const char *zonetype,
-			const char *instname, pmInDom protected)
+extract_zone_protection(const char *bp, const char *instname, pmInDom protected)
 {
-    zoneprot_entry_t *prot;
-    char *endp, prot_name[64];
-    unsigned long long value;
-    unsigned int lowmem;
+    char *endp, protected_name[64];
+    unsigned long long value, *vp;
+    unsigned int index;
     int sts;
 
-    for (lowmem = 0;; lowmem++) {
+    for (index = 0;; index++) {
 	value = (strtoul(bp, &endp, 10) << _pm_pageshift) / 1024;
-	pmsprintf(prot_name, sizeof(prot_name),
-		 "%s::lowmem_reserved%u", instname, lowmem);
+	pmsprintf(protected_name, sizeof(protected_name),
+		 "%s::lowmem_reserved%u", instname, index);
+	protected_name[sizeof(protected_name)-1] = '\0';
 	/* replace existing value if one exists, else need space for new one */
-	prot = NULL;
-	sts = pmdaCacheLookupName(protected, prot_name, NULL, (void **)&prot);
-	if ((sts < 0 && prot == NULL) &&
-	    (prot = (zoneprot_entry_t *)calloc(1, sizeof(*prot))) == NULL)
+	sts = pmdaCacheLookupName(protected, protected_name, NULL, (void **)&vp);
+	if (sts < 0 && (vp = (unsigned long long *)malloc(sizeof(*vp))) == NULL)
 	    continue;
-	prot->node = node;
-	prot->value = value;
-	prot->lowmem = lowmem;
-	pmsprintf(prot->zone, ZONE_NAMELEN, "%s", zonetype);
-	pmdaCacheStore(protected, PMDA_CACHE_ADD, prot_name, (void *)prot);
+	*vp = value;
+	pmdaCacheStore(protected, PMDA_CACHE_ADD, protected_name, (void *)vp);
 	if (*endp != ',')
 	    break;
 	bp = endp + 2;   /* skip comma and space, then continue */
@@ -54,7 +48,7 @@ refresh_proc_zoneinfo(pmInDom indom, pmInDom protection_indom)
     int node, values;
     zoneinfo_entry_t *info;
     unsigned long long value;
-    char zonetype[ZONE_NAMELEN];
+    char zonetype[32];
     char instname[64];
     char buf[BUFSIZ];
     static int setup;
@@ -70,12 +64,13 @@ refresh_proc_zoneinfo(pmInDom indom, pmInDom protection_indom)
     if ((fp = linux_statsfile("/proc/zoneinfo", buf, sizeof(buf))) == NULL)
 	return -oserror();
 
-    while ((!feof(fp)) && fgets(buf, sizeof(buf), fp) != NULL) {
+    while (fgets(buf, sizeof(buf), fp) != NULL) {
 	if (strncmp(buf, "Node", 4) != 0)
 	    continue;
 	if (sscanf(buf, "Node %d, zone   %s", &node, zonetype) != 2)
 	    continue;
 	pmsprintf(instname, sizeof(instname), "%s::node%u", zonetype, node);
+	instname[sizeof(instname)-1] = '\0';
 	values = 0;
 	info = NULL;
 	if (pmdaCacheLookupName(indom, instname, NULL, (void **)&info) < 0 ||
@@ -84,15 +79,9 @@ refresh_proc_zoneinfo(pmInDom indom, pmInDom protection_indom)
 	    info = (zoneinfo_entry_t *)calloc(1, sizeof(zoneinfo_entry_t));
 	    changed = 1;
 	}
-	info->node = node;
-	pmsprintf(info->zone, ZONE_NAMELEN, "%s", zonetype);
 	/* inner loop to extract all values for this node */
-        while ((!feof(fp)) && values < ZONE_VALUES + 1 && fgets(buf, sizeof(buf), fp) != NULL) {
-            if (strncmp(buf, "Node", 4) == 0){
-                fseek(fp, -(long)(strlen(buf)), 1);
-                break;
-            }            
-            if ((sscanf(buf, "  pages free %llu", &value)) == 1) {
+	while (values < ZONE_VALUES + 1 && fgets(buf, sizeof(buf), fp) != NULL) {
+	    if ((sscanf(buf, "  pages free %llu", &value)) == 1) {
 		info->values[ZONE_FREE] = (value << _pm_pageshift) / 1024;
 		values++;
 		continue;
@@ -324,8 +313,7 @@ refresh_proc_zoneinfo(pmInDom indom, pmInDom protection_indom)
                 continue;
             }
             else if (strncmp(buf, "        protection: (", 20) == 0) {
-		extract_zone_protection(buf+20+1, node, zonetype,
-				instname, protection_indom);
+		extract_zone_protection(buf+20+1, instname, protection_indom);
 		values++;
 		continue;
             }

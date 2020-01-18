@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2018 Red Hat.
+ * Copyright (c) 2013-2017 Red Hat.
  * 
  * This library is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as published
@@ -12,8 +12,10 @@
  * License for more details.
  */
 
+#include <sys/stat.h> 
+
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #define SOCKET_INTERNAL
 #include "internal.h"
 #if defined(HAVE_GETPEERUCRED)
@@ -58,7 +60,7 @@ static int	*portlist;
  * The unix domain socket we're willing to listen for clients on,
  * from -s (or env)
  */
-static char *localSocketPath;
+static const char *localSocketPath;
 static int   localSocketFd = -EPROTO;
 static const char *serviceSpec;
 
@@ -107,7 +109,7 @@ __pmPMCDAddPorts(int **ports, int nports)
     if ((env = getenv("PMCD_PORT")) != NULL)		/* THREADSAFE */
 	/*
 	 * THREADSAFE because __pmAddPorts acquires no locks (other than
-	 * on the fatal pmNoMem() path)
+	 * on the fatal __pmNoMem() path)
 	 */
 	new_nports = __pmAddPorts(env, ports, nports);		/* THREADSAFE */
     PM_UNLOCK(__pmLock_extcall);
@@ -141,7 +143,7 @@ __pmProxyAddPorts(int **ports, int nports)
     if ((env = getenv("PMPROXY_PORT")) != NULL)		/* THREADSAFE */
 	/*
 	 * THREADSAFE because __pmAddPorts acquires no locks (other than
-	 * on the fatal pmNoMem() path)
+	 * on the fatal __pmNoMem() path)
 	 */
 	new_nports = __pmAddPorts(env, ports, nports);		/* THREADSAFE */
     PM_UNLOCK(__pmLock_extcall);
@@ -175,7 +177,7 @@ __pmWebdAddPorts(int **ports, int nports)
     if ((env = getenv("PMWEBD_PORT")) != NULL)		/* THREADSAFE */
 	/*
 	 * THREADSAFE because __pmAddPorts acquires no locks (other than
-	 * on the fatal pmNoMem() path)
+	 * on the fatal __pmNoMem() path)
 	 */
 	new_nports = __pmAddPorts(env, ports, nports);		/* THREADSAFE */
     PM_UNLOCK(__pmLock_extcall);
@@ -200,7 +202,7 @@ __pmAddPorts(const char *portstr, int **ports, int nports)
      * It is the responsibility of the caller to free this memory.
      *
      * If sufficient memory cannot be allocated, then this function
-     * calls pmNoMem() and does not return.
+     * calls __pmNoMem() and does not return.
      */
     char	*endptr, *p = (char *)portstr;
     size_t	size;
@@ -216,7 +218,7 @@ __pmAddPorts(const char *portstr, int **ports, int nports)
 
 	size = (nports + 1) * sizeof(int);
 	if ((*ports = (int *)realloc(*ports, size)) == NULL)
-	    pmNoMem("__pmAddPorts: cannot grow port list", size, PM_FATAL_ERR);
+	    __pmNoMem("__pmAddPorts: cannot grow port list", size, PM_FATAL_ERR);
 	(*ports)[nports++] = port;
 	if (*endptr == '\0')
 	    break;
@@ -241,9 +243,9 @@ __pmServerAddInterface(const char *address)
     /* one (of possibly several) IP addresses for client requests */
     intflist = (char **)realloc(intflist, nintf * sizeof(char *));
     if (intflist == NULL)
-	pmNoMem("AddInterface: cannot grow interface list", size, PM_FATAL_ERR);
+	__pmNoMem("AddInterface: cannot grow interface list", size, PM_FATAL_ERR);
     if ((intf = strdup(address)) == NULL)
-	pmNoMem("AddInterface: cannot strdup interface", strlen(address), PM_FATAL_ERR);
+	__pmNoMem("AddInterface: cannot strdup interface", strlen(address), PM_FATAL_ERR);
     intflist[nintf++] = intf;
     return nintf;
 }
@@ -251,12 +253,10 @@ __pmServerAddInterface(const char *address)
 void
 __pmServerSetLocalSocket(const char *path)
 {
-    if (localSocketPath != NULL)
-	free(localSocketPath);
     if (path != NULL && *path != '\0')
 	localSocketPath = strdup(path);
     else
-	localSocketPath = strdup(__pmPMCDLocalSocketDefault());
+	localSocketPath = __pmPMCDLocalSocketDefault();
 }
 
 void
@@ -275,7 +275,7 @@ pidonexit(void)
 
     if (serviceSpec) {
 	pmsprintf(pidpath, sizeof(pidpath), "%s%c%s.pid",
-	    pmGetConfig("PCP_RUN_DIR"), pmPathSeparator(), serviceSpec);
+	    pmGetConfig("PCP_RUN_DIR"), __pmPathSeparator(), serviceSpec);
 	unlink(pidpath);
     }
 }
@@ -290,7 +290,7 @@ __pmServerCreatePIDFile(const char *spec, int verbose)
 	__pmServerSetServiceSpec(spec);
 
     pmsprintf(pidpath, sizeof(pidpath), "%s%c%s.pid",
-	     pmGetConfig("PCP_RUN_DIR"), pmPathSeparator(), spec);
+	     pmGetConfig("PCP_RUN_DIR"), __pmPathSeparator(), spec);
 
     if ((pidfile = fopen(pidpath, "w")) == NULL) {
 	if (verbose)
@@ -333,7 +333,7 @@ GrowRequestPorts(void)
     need = szReqPorts * sizeof(ReqPortInfo);
     reqPorts = (ReqPortInfo*)realloc(reqPorts, need);
     if (reqPorts == NULL) {
-	pmNoMem("GrowRequestPorts: can't grow request port array",
+	__pmNoMem("GrowRequestPorts: can't grow request port array",
 		need, PM_FATAL_ERR);
     }
 }
@@ -365,8 +365,8 @@ AddRequestPort(const char *address, int port)
     return nReqPorts;   /* success */
 }
 
-int
-__pmServerSetupRequestPorts(void)
+static int
+SetupRequestPorts(void)
 {
     int	i, n;
 
@@ -377,9 +377,9 @@ __pmServerSetupRequestPorts(void)
 		break;
 	}
 	if (n < nport) {
-	    pmNotifyErr(LOG_WARNING,
+	    __pmNotifyErr(LOG_WARNING,
 		"%s: duplicate client request port (%d) will be ignored\n",
-                     pmGetProgname(), portlist[n]);
+                     pmProgname, portlist[n]);
 	    portlist[n] = -1;
 	}
     }
@@ -400,7 +400,7 @@ __pmServerSetupRequestPorts(void)
 	    }
 	}
     }
-    return nport;
+    return 0;
 }
 
 static const char *
@@ -457,7 +457,7 @@ OpenRequestSocket(int port, const char *address, int *family,
 
     if (isUnix) {
 	if ((myAddr = __pmSockAddrAlloc()) == NULL) {
-	    pmNoMem("OpenRequestSocket: can't allocate socket address",
+	    __pmNoMem("OpenRequestSocket: can't allocate socket address",
 		      sizeof(*myAddr), PM_FATAL_ERR);
 	}
 
@@ -476,21 +476,21 @@ OpenRequestSocket(int port, const char *address, int *family,
 	 */
 	if (address == NULL || strcmp(address, "INADDR_ANY") == 0) {
 	    if ((myAddr = __pmSockAddrAlloc()) == NULL) {
-		pmNoMem("OpenRequestSocket: can't allocate socket address",
+		__pmNoMem("OpenRequestSocket: can't allocate socket address",
 			  sizeof(*myAddr), PM_FATAL_ERR);
 	    }
 	    __pmSockAddrInit(myAddr, *family, INADDR_ANY, 0);
 	}
 	else if (strcmp(address, "INADDR_LOOPBACK") == 0) {
 	    if ((myAddr = __pmSockAddrAlloc()) == NULL) {
-		pmNoMem("OpenRequestSocket: can't allocate socket address",
+		__pmNoMem("OpenRequestSocket: can't allocate socket address",
 			  sizeof(*myAddr), PM_FATAL_ERR);
 	    }
 	    __pmSockAddrInit(myAddr, *family, INADDR_LOOPBACK, 0);
 	}
 	else {
 	    if ((myAddr = __pmStringToSockAddr(address)) == NULL) {
-		pmNotifyErr(LOG_ERR, "OpenRequestSocket(%d, %s) invalid address\n",
+		__pmNotifyErr(LOG_ERR, "OpenRequestSocket(%d, %s) invalid address\n",
 			      port, address);
 		goto fail;
 	    }
@@ -504,14 +504,14 @@ OpenRequestSocket(int port, const char *address, int *family,
 	else if (*family == AF_INET6)
 	    fd = __pmCreateIPv6Socket();
 	else {
-	    pmNotifyErr(LOG_ERR, "OpenRequestSocket(%d, %s) invalid address family: %d\n",
+	    __pmNotifyErr(LOG_ERR, "OpenRequestSocket(%d, %s) invalid address family: %d\n",
 			  port, address, *family);
 	    goto fail;
 	}
     }
 
     if (fd < 0) {
-	pmNotifyErr(LOG_ERR, "OpenRequestSocket(%d, %s, %s) __pmCreateSocket: %s\n",
+	__pmNotifyErr(LOG_ERR, "OpenRequestSocket(%d, %s, %s) __pmCreateSocket: %s\n",
 		port, address, AddressFamily(*family), netstrerror_r(errmsg, sizeof(errmsg)));
 	goto fail;
     }
@@ -521,7 +521,7 @@ OpenRequestSocket(int port, const char *address, int *family,
 #ifndef IS_MINGW
     if (__pmSetSockOpt(fd, SOL_SOCKET, SO_REUSEADDR, (char *)&one,
 		       (__pmSockLen)sizeof(one)) < 0) {
-	pmNotifyErr(LOG_ERR,
+	__pmNotifyErr(LOG_ERR,
 		      "OpenRequestSocket(%d, %s, %s) __pmSetSockOpt(SO_REUSEADDR): %s\n",
 		      port, address, AddressFamily(*family), netstrerror_r(errmsg, sizeof(errmsg)));
 	goto fail;
@@ -529,7 +529,7 @@ OpenRequestSocket(int port, const char *address, int *family,
 #else
     if (__pmSetSockOpt(fd, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (char *)&one,
 		       (__pmSockLen)sizeof(one)) < 0) {
-	pmNotifyErr(LOG_ERR,
+	__pmNotifyErr(LOG_ERR,
 		      "OpenRequestSocket(%d, %s, %s) __pmSetSockOpt(EXCLUSIVEADDRUSE): %s\n",
 		      port, address, AddressFamily(*family), netstrerror_r(errmsg, sizeof(errmsg)));
 	goto fail;
@@ -539,14 +539,14 @@ OpenRequestSocket(int port, const char *address, int *family,
     /* and keep alive please - bad networks eat fds */
     if (__pmSetSockOpt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *)&one,
 		(__pmSockLen)sizeof(one)) < 0) {
-	pmNotifyErr(LOG_ERR,
+	__pmNotifyErr(LOG_ERR,
 		"OpenRequestSocket(%d, %s, %s) __pmSetSockOpt(SO_KEEPALIVE): %s\n",
 		port, address, AddressFamily(*family), netstrerror_r(errmsg, sizeof(errmsg)));
 	goto fail;
     }
 
     /*
-     * Attempts to make daemon restart (especially pmcd) have increased
+     * Attempts to make daemon restart (especailly pmcd) have increased
      * the probability of trying to reuse a socket before the last use
      * has been completely torn down ... so be prepared to try this a
      * few times (4 x 250msec)
@@ -566,10 +566,10 @@ OpenRequestSocket(int port, const char *address, int *family,
     __pmSockAddrFree(myAddr);
     myAddr = NULL;
     if (sts < 0) {
-	pmNotifyErr(LOG_ERR, "OpenRequestSocket(%d, %s, %s) __pmBind: %s\n",
+	__pmNotifyErr(LOG_ERR, "OpenRequestSocket(%d, %s, %s) __pmBind: %s\n",
 		port, address, AddressFamily(*family), netstrerror_r(errmsg, sizeof(errmsg)));
 	if (neterror() == EADDRINUSE)
-	    pmNotifyErr(LOG_ERR, "%s may already be running\n", pmGetProgname());
+	    __pmNotifyErr(LOG_ERR, "%s may already be running\n", pmProgname);
 	goto fail;
     }
 
@@ -581,7 +581,7 @@ OpenRequestSocket(int port, const char *address, int *family,
 	 */
 	sts = chmod(address, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 	if (sts != 0) {
-	    pmNotifyErr(LOG_ERR,
+	    __pmNotifyErr(LOG_ERR,
 		"OpenRequestSocket(%d, %s, %s) chmod(%s): %s\n",
 		port, address, AddressFamily(*family), address, netstrerror_r(errmsg, sizeof(errmsg)));
 	    goto fail;
@@ -590,7 +590,7 @@ OpenRequestSocket(int port, const char *address, int *family,
 
     sts = __pmListen(fd, backlog);	/* Max. pending connection requests */
     if (sts < 0) {
-	pmNotifyErr(LOG_ERR, "OpenRequestSocket(%d, %s, %s) __pmListen: %s\n",
+	__pmNotifyErr(LOG_ERR, "OpenRequestSocket(%d, %s, %s) __pmListen: %s\n",
 		port, address, AddressFamily(*family), netstrerror_r(errmsg, sizeof(errmsg)));
 	goto fail;
     }
@@ -622,7 +622,7 @@ static int
 OpenRequestPorts(__pmFdSet *fdset, int backlog)
 {
     int i, fd, family, success = 0, maximum = -1;
-    int with_ipv6 = strcmp(pmGetAPIConfig("ipv6"), "true") == 0;
+    int with_ipv6 = strcmp(__pmGetAPIConfig("ipv6"), "true") == 0;
 
     for (i = 0; i < nReqPorts; i++) {
 	ReqPortInfo	*rp = &reqPorts[i];
@@ -694,8 +694,8 @@ OpenRequestPorts(__pmFdSet *fdset, int backlog)
 	    success = 1;
 	}
 #else
-	pmNotifyErr(LOG_ERR, "%s: unix domain sockets are not supported\n",
-		      pmGetProgname());
+	__pmNotifyErr(LOG_ERR, "%s: unix domain sockets are not supported\n",
+		      pmProgname);
 #endif
     }
 #endif
@@ -703,19 +703,9 @@ OpenRequestPorts(__pmFdSet *fdset, int backlog)
     if (success)
 	return maximum;
 
-    pmNotifyErr(LOG_ERR, "%s: can't open any request ports, exiting\n",
-		pmGetProgname());
+    __pmNotifyErr(LOG_ERR, "%s: can't open any request ports, exiting\n",
+		pmProgname);
     return -1;
-}
-
-int
-__pmServerGetRequestPort(int index, const char **address, int *port)
-{
-    if (index < 0 || index >= nReqPorts)
-	return -EINVAL;
-    *address = reqPorts[index].address;
-    *port = reqPorts[index].port;
-    return 0;
 }
 
 int
@@ -723,7 +713,7 @@ __pmServerOpenRequestPorts(__pmFdSet *fdset, int backlog)
 {
     int sts;
 
-    if ((sts = __pmServerSetupRequestPorts()) < 0)
+    if ((sts = SetupRequestPorts()) < 0)
 	return sts;
     return OpenRequestPorts(fdset, backlog);
 }
@@ -750,8 +740,8 @@ __pmServerCloseRequestPorts(void)
 	/* We must remove the socket file. */
 	if (unlink(localSocketPath) != 0 && oserror() != ENOENT) {
 	    char	errmsg[PM_MAXERRMSGLEN];
-	    pmNotifyErr(LOG_ERR, "%s: can't unlink %s (uid=%d,euid=%d): %s",
-			  pmGetProgname(), localSocketPath, getuid(), geteuid(),
+	    __pmNotifyErr(LOG_ERR, "%s: can't unlink %s (uid=%d,euid=%d): %s",
+			  pmProgname, localSocketPath, getuid(), geteuid(),
 			  osstrerror_r(errmsg, sizeof(errmsg)));
 	}
     }
@@ -781,7 +771,6 @@ __pmServerAddNewClients(__pmFdSet *fdset, __pmServerCallback NewClient)
     }
 }
 
-#if defined(HAVE_STRUCT_UCRED) || defined(HAVE_GETPEEREID) || defined(HAVE_GETPEERUCRED)
 static int
 SetCredentialAttrs(__pmHashCtl *attrs, unsigned int pid, unsigned int uid, unsigned int gid)
 {
@@ -807,7 +796,6 @@ SetCredentialAttrs(__pmHashCtl *attrs, unsigned int pid, unsigned int uid, unsig
 
     return 0;
 }
-#endif
 
 /*
  * Set local connection credentials into given hash structure
@@ -865,10 +853,10 @@ __pmServerDumpRequestPorts(FILE *stream)
 
     fprintf(stream, "%s request port(s):\n"
 	  "  sts fd   port  family address\n"
-	  "  === ==== ===== ====== =======\n", pmGetProgname());
+	  "  === ==== ===== ====== =======\n", pmProgname);
 
     if (localSocketFd != -EPROTO)
-	fprintf(stream, "  %-3s %4d %5s %-6s %s\n",
+	fprintf(stderr, "  %-3s %4d %5s %-6s %s\n",
 		(localSocketFd != -1) ? "ok" : "err",
 		localSocketFd, "", "unix",
 		localSocketPath);
@@ -877,7 +865,7 @@ __pmServerDumpRequestPorts(FILE *stream)
 	ReqPortInfo *rp = &reqPorts[i];
 	for (j = 0; j < FAMILIES; j++) {
 	    if (rp->fds[j] != -EPROTO)
-		fprintf(stream, "  %-3s %4d %5d %-6s %s\n",
+		fprintf(stderr, "  %-3s %4d %5d %-6s %s\n",
 		    (rp->fds[j] != -1) ? "ok" : "err",
 		    rp->fds[j], rp->port, RequestFamilyString(j),
 		    rp->address ? rp->address : "(any address)");
@@ -892,7 +880,7 @@ __pmServerRequestPortString(int fd, char *buffer, size_t sz)
 
     if (fd == localSocketFd) {
 	pmsprintf(buffer, sz, "%s unix request socket %s",
-		 pmGetProgname(), localSocketPath);
+		 pmProgname, localSocketPath);
 	return buffer;
     }
 
@@ -901,7 +889,7 @@ __pmServerRequestPortString(int fd, char *buffer, size_t sz)
 	for (j = 0; j < FAMILIES; j++) {
 	    if (fd == rp->fds[j]) {
 		pmsprintf(buffer, sz, "%s %s request socket %s",
-			pmGetProgname(), RequestFamilyString(j), rp->address);
+			pmProgname, RequestFamilyString(j), rp->address);
 		return buffer;
 	    }
 	}
@@ -1092,7 +1080,7 @@ __pmServerHasFeature(__pmServerFeature query)
 
     switch (query) {
     case PM_SERVER_FEATURE_IPV6:
-	sts = (strcmp(pmGetAPIConfig("ipv6"), "true") == 0);
+	sts = (strcmp(__pmGetAPIConfig("ipv6"), "true") == 0);
 	break;
     case PM_SERVER_FEATURE_LOCAL:
     case PM_SERVER_FEATURE_DISCOVERY:
@@ -1127,7 +1115,7 @@ __pmServerStart(int argc, char **argv, int flags)
 #endif
 
     if ((childpid = fork()) < 0)
-	pmNotifyErr(LOG_ERR, "__pmServerStart: fork");
+	__pmNotifyErr(LOG_ERR, "__pmServerStart: fork");
 	/* but keep going */
     else if (childpid > 0) {
 	/* parent, let her exit, but avoid ugly "Log finished" messages */
@@ -1137,12 +1125,12 @@ __pmServerStart(int argc, char **argv, int flags)
 
     /* not a process group leader, lose controlling tty */
     if (setsid() == -1)
-	pmNotifyErr(LOG_WARNING, "__pmServerStart: setsid");
+	__pmNotifyErr(LOG_WARNING, "__pmServerStart: setsid");
 	/* but keep going */
 
     if (flags & 1)
 	close(0);
     /* don't close other fd's -- we know that only good ones are open! */
-    /* don't chdir("/") -- we may still need to call pmOpenLog() */
+    /* don't chdir("/") -- we may still need to call __pmOpenLog() */
 }
 #endif

@@ -13,12 +13,8 @@ RC_FILE		= pmtime.rc
 RESOURCES	= pmtime.qrc
 CONFIG		+= qt warn_on
 INCLUDEPATH	+= ../include ../libpcp_qwt/src ../libpcp_qmc/src
-CONFIG(release, release|debug) {
-DESTDIR	= build/release
-}
-CONFIG(debug, release|debug) {
-DESTDIR	= build/debug
-}
+release:DESTDIR	= build/debug
+debug:DESTDIR	= build/release
 LIBS		+= -L../libpcp/src
 LIBS		+= -L../libpcp_qwt/src -L../libpcp_qwt/src/$$DESTDIR
 LIBS		+= -L../libpcp_qmc/src -L../libpcp_qmc/src/$$DESTDIR
@@ -26,6 +22,4 @@ LIBS		+= -lpcp_qwt -lpcp_qmc -lpcp
 win32:LIBS	+= -lwsock32 -liphlpapi
 QT		+= network widgets
 QMAKE_INFO_PLIST = pmtime.info
-QMAKE_CFLAGS	+= $$(CFLAGS)
-QMAKE_CXXFLAGS	+= $$(CFLAGS) $$(CXXFLAGS)
-QMAKE_LFLAGS	+= $$(LDFLAGS)
+QMAKE_CXXFLAGS	+= $$(PCP_CFLAGS)

@@ -5,7 +5,9 @@
  */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 #include <pcp/pmda.h>
+#include <arpa/inet.h>
 
 static int histo[128];
 static int vflag = 0;
@@ -134,7 +136,7 @@ main(int argc, char **argv)
     int		lflag = 0;
     char	*usage = "[-D debug] [-dkl]";
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:dklv")) != EOF) {
 	switch (c) {
@@ -143,7 +145,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -172,7 +174,7 @@ main(int argc, char **argv)
     }
 
     if (errflag || optind != argc) {
-	fprintf(stderr, "Usage: %s %s\n", pmGetProgname(), usage);
+	fprintf(stderr, "Usage: %s %s\n", pmProgname, usage);
 	exit(1);
     }
 

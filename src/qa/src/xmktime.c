@@ -6,7 +6,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
 
 time_t	xx[] = { 8*60*60, 825042862, -1 };
 

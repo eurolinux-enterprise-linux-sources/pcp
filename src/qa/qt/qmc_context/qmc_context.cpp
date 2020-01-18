@@ -16,7 +16,7 @@ main(int argc, char* argv[])
     char	buf[MAXHOSTNAMELEN];
     QString	source;
 
-    pmSetProgname(argv[0]);
+    pmProgname = basename(argv[0]);
 
     while ((c = getopt(argc, argv, "D:?")) != EOF) {
 	switch (c) {
@@ -24,7 +24,7 @@ main(int argc, char* argv[])
 	    sts = pmSetDebug(optarg);
             if (sts < 0) {
 		pmprintf("%s: unrecognized debug options specification (%s)\n",
-			 pmGetProgname(), optarg);
+			 pmProgname, optarg);
                 fail = 1;
             }
             break;
@@ -36,7 +36,7 @@ main(int argc, char* argv[])
     }
 
     if (fail) {
-	pmprintf("Usage: %s\n", pmGetProgname());
+	pmprintf("Usage: %s\n", pmProgname);
 	pmflush();
 	exit(1);
     }
@@ -50,7 +50,7 @@ main(int argc, char* argv[])
     QmcSource *src1 = QmcSource::getSource(PM_CONTEXT_ARCHIVE, source, false);
     if (src1->status() < 0) {
 	pmprintf("%s: Error: Unable to create context to \"%s\": %s\n",
-		pmGetProgname(), (const char *)source.toLatin1(),
+		pmProgname, (const char *)source.toLatin1(),
 		pmErrStr(src1->status()));
 	pmflush();
 	fail = 1;
@@ -74,7 +74,7 @@ main(int argc, char* argv[])
     sts = context1.lookupInDom("hinv.ncpu", indomIndex);
     if (sts < 0) {
 	pmprintf("%s: Error: hinv.ncpu: %s\n",
-		 pmGetProgname(), pmErrStr(sts));
+		 pmProgname, pmErrStr(sts));
 	pmflush();
 	fail = 1;
     }
@@ -82,20 +82,20 @@ main(int argc, char* argv[])
 	sts = context1.lookupPMID("hinv.ncpu", pmid);
 	if (sts < 0) {
 	    pmprintf("%s: Error: hinv.ncpu PMID: %s\n",
-		 pmGetProgname(), pmErrStr(sts));
+		 pmProgname, pmErrStr(sts));
 	    pmflush();
 	    fail = 1;
 	}
 	desc = &context1.desc(pmid);
 	if (desc->status() < 0) {
 	    pmprintf("%s: Error: hinv.ncpu descriptor: %s\n",
-		     pmGetProgname(), pmErrStr(desc->status()));
+		     pmProgname, pmErrStr(desc->status()));
 	    pmflush();
 	    fail = 1;
 	}
 	else if (indomIndex < UINT_MAX) {
 	    pmprintf("%s: Error: hinv.ncpu indom is not NULL\n",
-		     pmGetProgname());
+		     pmProgname);
 	    pmflush();
 	    fail = 1;
 	}
@@ -104,7 +104,7 @@ main(int argc, char* argv[])
     sts = context1.lookupInDom("hinv.cputype", indomIndex);
     if (sts < 0) {
 	pmprintf("%s: Error: hinv.cputype: %s\n",
-		 pmGetProgname(), pmErrStr(sts));
+		 pmProgname, pmErrStr(sts));
 	pmflush();
 	fail = 1;
     }
@@ -112,7 +112,7 @@ main(int argc, char* argv[])
 	sts = context1.lookupPMID("hinv.cputype", pmid);
 	if (sts < 0) {
 	    pmprintf("%s: Error: hinv.cputype PMID: %s\n",
-		pmGetProgname(), pmErrStr(sts));
+		pmProgname, pmErrStr(sts));
 	    pmflush();
 	    fail = 1;
 	}
@@ -120,13 +120,13 @@ main(int argc, char* argv[])
 	indom = &context1.indom(indomIndex);
 	if (desc->status() < 0) {
 	    pmprintf("%s: Error: hinv.cputype descriptor: %s\n",
-		     pmGetProgname(), pmErrStr(desc->status()));
+		     pmProgname, pmErrStr(desc->status()));
 	    pmflush();
 	    fail = 1;
 	}
 	else if (indom->status() < 0) {
 	    pmprintf("%s: Error: hinv.cputype indom: %s\n",
-		     pmGetProgname(), pmErrStr(indom->status()));
+		     pmProgname, pmErrStr(indom->status()));
 	    pmflush();
 	    fail = 1;
 	}
@@ -137,7 +137,7 @@ main(int argc, char* argv[])
     sts = context1.lookupInDom("hinv.map.cpu", indomIndex);
     if (sts < 0) {
 	pmprintf("%s: Error: hinv.map.cpu: %s\n",
-		 pmGetProgname(), pmErrStr(sts));
+		 pmProgname, pmErrStr(sts));
 	pmflush();
 	fail = 1;
     }
@@ -145,7 +145,7 @@ main(int argc, char* argv[])
 	sts = context1.lookupPMID("hinv.map.cpu", pmid);
 	if (sts < 0) {
 	    pmprintf("%s: Error: hinv.map.cpu PMID: %s\n",
-		pmGetProgname(), pmErrStr(sts));
+		pmProgname, pmErrStr(sts));
 	    pmflush();
 	    fail = 1;
 	}
@@ -155,19 +155,19 @@ main(int argc, char* argv[])
 
 	if (desc->status() < 0) {
 	    pmprintf("%s: Error: hinv.map.cpu descriptor: %s\n",
-		     pmGetProgname(), pmErrStr(desc->status()));
+		     pmProgname, pmErrStr(desc->status()));
 	    pmflush();
 	    fail = 1;
 	}
 	else if (indom2->status() < 0) {
 	    pmprintf("%s: Error: hinv.map.cpu indom: %s\n",
-		     pmGetProgname(), pmErrStr(indom2->status()));
+		     pmProgname, pmErrStr(indom2->status()));
 	    pmflush();
 	    fail = 1;
 	}
 	else if (indom != indom2) {
 	    pmprintf("%s: Error: hinv.cputype and hinv.map.cpu indoms are not the same\n",
-		     pmGetProgname());
+		     pmProgname);
 	    pmflush();
 	    fail = 1;
 	}
@@ -176,7 +176,7 @@ main(int argc, char* argv[])
     sts = context1.lookupInDom("hinv.ncpu", indomIndex);
     if (sts < 0) {
 	pmprintf("%s: Error: hinv.ncpu: %s\n",
-		 pmGetProgname(), pmErrStr(sts));
+		 pmProgname, pmErrStr(sts));
 	pmflush();
 	fail = 1;
     }
@@ -184,7 +184,7 @@ main(int argc, char* argv[])
 	sts = context1.lookupPMID("hinv.ncpu", pmid);
 	if (sts < 0) {
 	    pmprintf("%s: Error: hinv.ncpu PMID: %s\n",
-		pmGetProgname(), pmErrStr(sts));
+		pmProgname, pmErrStr(sts));
 	    pmflush();
 	    fail = 1;
 	}
@@ -193,13 +193,13 @@ main(int argc, char* argv[])
 
 	if (desc->status() < 0) {
 	    pmprintf("%s: Error: hinv.ncpu descriptor: %s\n",
-		     pmGetProgname(), pmErrStr(desc->status()));
+		     pmProgname, pmErrStr(desc->status()));
 	    pmflush();
 	    fail = 1;
 	}
 	else if (indomIndex < UINT_MAX) {
 	    pmprintf("%s: Error: hinv.ncpu indom is not NULL\n",
-		     pmGetProgname());
+		     pmProgname);
 	    pmflush();
 	    fail = 1;
 	}
@@ -213,7 +213,7 @@ main(int argc, char* argv[])
 
     if (src2->status() >= 0) {
 	pmprintf("%s: Error: Able to create context to \"%s\": %s\n",
-		pmGetProgname(), (const char *)source.toLatin1(),
+		pmProgname, (const char *)source.toLatin1(),
 		pmErrStr(src1->status()));
 	pmflush();
 	fail = 1;
@@ -223,7 +223,7 @@ main(int argc, char* argv[])
 
     if (context2.handle() >= 0) {
 	pmprintf("%s: Error: Created a valid context to an invalid host\n",
-		 pmGetProgname());
+		 pmProgname);
 	fail = 1;
     }
 

@@ -4,6 +4,9 @@
 #
 # NEW VERSION for YYYYDDMM style naming convention (see also 530)
 #
+# NOTE - THIS TEST WILL FAIL IF RUN IN THE FIRST 5 MINUTES AFTER
+# MIDNIGHT - c'est la vie, I'm afraid.
+#
 # Copyright (c) 2008 Silicon Graphics, Inc.  All Rights Reserved.
 #
 
@@ -20,16 +23,12 @@ echo "QA output created by $seq"
 # Don't run if this happened in the last 2 days.
 #
 now_hr=`pmdate '%H'`
-now_min=`pmdate '%M'`
 now_hr_2=`pmdate -2d '%H'`
-[ $now_hr != $now_hr_2 ] && \
-_notrun "timezone change? now = ${now_hr}H:??M, 2 days ago = ${now_hr_2}H:??M"
-
-# This test is also unstable when run close to the new day boundary.
-# Don't run if within 10 minutes of midnight.
-#
-[ "$now_hr" = "00" -a $now_min -lt 10 ] && \
-_notrun "current time - $now_hr:$now_min - is too close to midnight"
+if [ "$now_hr" != "$now_hr_2" ]
+then
+    _notrun "timezone change? now = ${now_hr}H:??M, 2 days ago = ${now_hr_2}H:??M"
+    # NOTREACHED
+fi
 
 _filter()
 {
@@ -48,10 +47,10 @@ _filter()
 	# OpenBSD-style fmt
         # -w width
 	cmd="fmt -w 76"
-    elif fmt --help 2>&1 | grep '.-[mg] ' >/dev/null
+    elif fmt --help 2>&1 | grep '.-m ' >/dev/null
     then
 	# NetBSD's version of fmt is different (may apply to other variants) ...
-	cmd="fmt -g 74 -m 75"
+	cmd="fmt -g 76 -m 77"
     else
 	echo "Warning: no clue how to set max line length for fmt(1)"
 	cmd="fmt"
@@ -161,7 +160,7 @@ LOCALHOSTNAME	n   n	'"$tmp"'	./config'
     echo
     echo "=== [$verbose_text] regular show ==="
     echo "=== [$verbose_text] regular show ===" >>$seq.full
-    $sudo $PCP_BINADM_DIR/pmlogger_daily -o -x forever -c $tmp/control -k 3 $verbose -l $tmp.log
+    $sudo $PCP_BINADM_DIR/pmlogger_daily -o -c $tmp/control -k 3 $verbose -l $tmp.log
 
     $sudo cat $tmp.log | _filter
     ls -lt $tmp >>$seq.full
@@ -174,7 +173,7 @@ LOCALHOSTNAME	n   n	'"$tmp"'	./config'
     do
 	mv $tmp/$yesterday.$ext $tmp/save.$ext
     done
-    $sudo $PCP_BINADM_DIR/pmlogger_daily -o -x forever -c $tmp/control -k 2 $verbose -l $tmp.log
+    $sudo $PCP_BINADM_DIR/pmlogger_daily -o -c $tmp/control -k 2 $verbose -l $tmp.log
     $sudo cat $tmp.log | _filter
     ls -lt $tmp >>$seq.full
     ls $tmp | sed -f $tmp/sed | tee -a $seq.full | LC_COLLATE=POSIX sort
@@ -187,7 +186,7 @@ LOCALHOSTNAME	n   n	'"$tmp"'	./config'
 	cp archives/arch_a.$ext $tmp/$yesterday.17.18.$ext
 	mv $tmp/save.$ext $tmp/$yesterday.$ext
     done
-    $sudo $PCP_BINADM_DIR/pmlogger_daily -o -x forever -c $tmp/control -k 2 $verbose -l $tmp.log
+    $sudo $PCP_BINADM_DIR/pmlogger_daily -o -c $tmp/control -k 2 $verbose -l $tmp.log
     $sudo cat $tmp.log | _filter
     ls -lt $tmp >>$seq.full
     ls $tmp | sed -f $tmp/sed | tee -a $seq.full | LC_COLLATE=POSIX sort

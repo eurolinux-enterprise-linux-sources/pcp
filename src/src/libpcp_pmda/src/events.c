@@ -15,7 +15,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "pmda.h"
 
 typedef struct {
@@ -37,7 +37,6 @@ check_buf(bufctl_t *bp, int need)
 {
     int		offset = bp->bptr - bp->baddr;
     int		er_offset = (char *)bp->berp - bp->baddr;
-    char	*tmp_baddr;
 
     while (bp->blen == 0 || &bp->bptr[need] >= &bp->baddr[bp->blen-1]) {
 	if (bp->blen == 0)
@@ -45,12 +44,8 @@ check_buf(bufctl_t *bp, int need)
 	    bp->blen = 512;
 	else
 	    bp->blen *= 2;
-	if ((tmp_baddr = (char *)realloc(bp->baddr, bp->blen)) == NULL) {
-	    free(bp->baddr);
-	    bp->baddr = NULL;
+	if ((bp->baddr = (char *)realloc(bp->baddr, bp->blen)) == NULL)
 	    return -oserror();
-	}
-	bp->baddr = tmp_baddr;
 	bp->bptr = &bp->baddr[offset];
 	bp->berp = (void *)&bp->baddr[er_offset];
     }
@@ -61,7 +56,6 @@ static int
 event_array(void)
 {
     int		i;
-    bufctl_t	*tmp_bufs;
 
     for (i = 0; i < nbuf; i++) {
 	if (bufs[i].bstate == B_FREE)
@@ -70,14 +64,11 @@ event_array(void)
 
     if (i == nbuf) {
 	nbuf++;
-	tmp_bufs = (bufctl_t *)realloc(bufs, nbuf*sizeof(bufs[0]));
-	if (tmp_bufs == NULL) {
-	    free(bufs);
-	    bufs = NULL;
+	bufs = (bufctl_t *)realloc(bufs, nbuf*sizeof(bufs[0]));
+	if (bufs == NULL) {
 	    nbuf = 0;
 	    return -oserror();
 	}
-	bufs = tmp_bufs;
     }
 
     bufs[i].bptr = bufs[i].baddr = NULL;

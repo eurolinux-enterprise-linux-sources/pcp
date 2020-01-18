@@ -17,6 +17,7 @@ include $(TOPDIR)/src/include/builddefs
 HFILES = metrics.h
 CFILES  = collectl2pcp.c cpu.c disk.c net.c load.c timestamp.c util.c \
           metrics.c header.c generic.c proc.c
+LSRCFILES = pmdesc.c
 
 CMDTARGET = collectl2pcp
 LLDLIBS = -L$(TOPDIR)/src/libpcp_import/src -lpcp_import $(PCPLIB)
@@ -44,8 +45,3 @@ pmdesc: pmdesc.o
 default_pcp:    default
 
 install_pcp:    install
-
-collectl2pcp.o:	$(TOPDIR)/src/include/pcp/libpcp.h
-
-check::	$(CFILES) $(HFILES)
-	$(CLINT) $^

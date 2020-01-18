@@ -2,7 +2,7 @@
 # PCP QA Test No. 1132
 # Exercise pcp2xlsx.
 #
-# Copyright (c) 2017-2018 Red Hat.
+# Copyright (c) 2017 Red Hat.
 #
 
 seq=`basename $0`
@@ -14,8 +14,8 @@ $python -c "from pcp import pmapi" >/dev/null 2>&1
 [ $? -eq 0 ] || _notrun "python pcp pmapi module not installed"
 $python -c "from collections import OrderedDict" >/dev/null 2>&1
 [ $? -eq 0 ] || _notrun "python collections OrderedDict module not installed"
-$python -c "import openpyxl" >/dev/null 2>&1
-[ $? -eq 0 ] || _notrun "python openpyxl module not installed"
+$python -c "import xlsxwriter" >/dev/null 2>&1
+[ $? -eq 0 ] || _notrun "python xlsxwriter module not installed"
 
 which unzip >/dev/null 2>&1 || _notrun "unzip not installed"
 which pcp2xlsx >/dev/null 2>&1 || _notrun "pcp2xlsx not installed"
@@ -30,7 +30,6 @@ _unzip_filter()
     sed \
        -e "s|Archive:.*||g" \
        -e "s|[ ]*$||g" \
-       -e 's/^\([ 	]*\)extracting:/\1 inflating:/' \
     #end
 }
 
@@ -68,24 +67,9 @@ unzip $tmp.outfile | _unzip_filter
 _xlsx_filter docProps/core.xml
 _path_filter xl/worksheets/sheet1.xml
 cd $tmp.dir
-
-# openpyxl produced XML changes across versions to we do just a basic
-# sanity check here that the expected data are present in the sheet file
-fail=0
-check_strings="/usr/lib/systemd/systemd mem.util.used kernel.all.sysfork"
-echo checking output
-for str in $(echo $check_metrics | tr ' ' '\n'); do
-	grep $str ref/xl/sharedStrings.xml > /dev/null 2>&1
-	[ $? -ne 0 ] && fail=1
-	grep $str ref/xl/sharedStrings.xml > /dev/null 2>&1
-	[ $? -ne 0 ] && fail=1
-done
-if [ $fail -eq 1 ]; then
-	echo expected data not found in the sheet file
-else
-	echo output ok
-fi
-
+echo "--- diffing outputs - no output expected"
+diff -purN ref run
+echo "--- end of diff"
 cd $here
 rm -f $tmp.outfile
 

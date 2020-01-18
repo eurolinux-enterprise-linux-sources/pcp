@@ -1,6 +1,5 @@
 #!gmake
 #
-# Copyright (c) 2015-2018 Red Hat.
 # Copyright (c) 1997-2002 Silicon Graphics, Inc.  All Rights Reserved.
 #
 # NB: this file is renamed GNUmakefile upon installation into $PCP_VAR_DIR/testsuite.
@@ -16,7 +15,7 @@ include $(PCP_INC_DIR)/builddefs
 
 SUBDIRS = src pmdas cisco gluster pconf sadist collectl nfsclient named \
 	  archives badarchives views qt linux unbound cifs gpfs lustre ganglia \
-	  java mmv postfix perl json slurm tmparch sheet smart
+	  postfix perl json slurm tmparch sheet
 ifeq "$(PMDA_PERFEVENT)" "true"
 SUBDIRS += perfevent
 endif
@@ -24,7 +23,7 @@ ifeq "$(HAVE_PYTHON)" "true"
 SUBDIRS += secure mic haproxy lio prometheus
 endif
 
-default default_pcp setup: $(SUBDIRS) localconfig qa_hosts
+default default_pcp setup: $(SUBDIRS) localconfig new remake check qa_hosts
 	$(QA_SUBDIRS_MAKERULE)
 
 LDIRT += 051.work 134.full.* \

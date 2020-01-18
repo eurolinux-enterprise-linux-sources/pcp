@@ -62,12 +62,12 @@ void
 aix_init(pmdaInterface *dp)
 {
     if (_isDSO) {
-	int sep = pmPathSeparator();
+	int sep = __pmPathSeparator();
 	pmsprintf(mypath, sizeof(mypath), "%s%c" "aix" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
 	pmdaDSO(dp, PMDA_INTERFACE_3, "AIX DSO", mypath);
     } else {
-	pmSetProcessIdentity(username);
+	__pmSetProcessIdentity(username);
     }
 
     if (dp->status != 0)
@@ -100,16 +100,16 @@ pmdaOptions     opts = {
 int
 main(int argc, char **argv)
 {
-    int			sep = pmPathSeparator();
+    int			sep = __pmPathSeparator();
     pmdaInterface	desc;
 
     _isDSO = 0;
-    pmSetProgname(argv[0]);
-    pmGetUsername(&username);
+    __pmSetProgname(argv[0]);
+    __pmGetUsername(&username);
 
     pmsprintf(mypath, sizeof(mypath), "%s%c" "aix" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-    pmdaDaemon(&desc, PMDA_INTERFACE_3, pmGetProgname(), AIX, "aix.log", mypath);
+    pmdaDaemon(&desc, PMDA_INTERFACE_3, pmProgname, AIX, "aix.log", mypath);
 
     pmdaGetOptions(argc, argv, &opts, &desc);
     if (opts.errors) {

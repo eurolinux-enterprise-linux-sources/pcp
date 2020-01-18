@@ -19,6 +19,7 @@
 #include <QValidator>
 #include <QActionGroup>
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 #include "pmtime.h"
 #include "aboutdialog.h"
 #include "seealsodialog.h"
@@ -129,7 +130,7 @@ void PmTimeLive::play()
 {
     console->post("PmTimeLive::play");
     setControl(PmTime::ForwardState);
-    pmtimevalNow(&my.pmtime.position);
+    __pmtimevalNow(&my.pmtime.position);
     displayPosition();
     emit vcrModePulse(&my.pmtime, 0);
     if (!my.timer->isActive())
@@ -147,13 +148,13 @@ void PmTimeLive::stop()
     console->post("PmTimeLive::stop stopped time");
     setControl(PmTime::StoppedState);
     my.timer->stop();
-    pmtimevalNow(&my.pmtime.position);
+    __pmtimevalNow(&my.pmtime.position);
     emit vcrModePulse(&my.pmtime, 0);
 }
 
 void PmTimeLive::updateTime()
 {
-    pmtimevalNow(&my.pmtime.position);
+    __pmtimevalNow(&my.pmtime.position);
     displayPosition();
     emit timePulse(&my.pmtime);
 }
@@ -162,10 +163,8 @@ void PmTimeLive::displayPosition()
 {
     QString text;
     char ctimebuf[32], msecbuf[5];
-    time_t time;
 
-    time = my.pmtime.position.tv_sec;
-    pmCtime(&time, ctimebuf);
+    pmCtime((const time_t *)&my.pmtime.position.tv_sec, ctimebuf);
     text = tr(ctimebuf);
     if (my.showYear == false)
 	text.remove(19, 5);
@@ -300,10 +299,8 @@ void PmTimeLive::addTimezone(const char *string)
 	my.tzActions = new QActionGroup(this);
 	connect(my.tzActions, SIGNAL(triggered(QAction *)) , this,
 				SLOT(setTimezone(QAction *)));
-#if QT_VERSION < QT_VERSION_CHECK(5,0,0)
 	connect(my.tzActions, SIGNAL(selected(QAction *)) , this,
 				SLOT(setTimezone(QAction *)));
-#endif
     }
     my.tzActions->addAction(tzAction);
     optionsTimezoneAction->addActions(my.tzActions->actions());

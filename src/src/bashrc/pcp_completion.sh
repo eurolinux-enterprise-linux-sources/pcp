@@ -13,39 +13,27 @@ _pcp_complete()
     # Register arguments
     case $cmd in
     pcp2elasticsearch)
-        all_args="ahLKcCeVHGASTOstRrIijJ4589nNvP0qQbByYgXxp"
-        arg_regex="-[ahKceASTOstZiJ489NP0qQbByYgXxp]"
-    ;;
-    pcp2graphite)
-        all_args="ahLKcCeVHGASTOstRrIijJ4589nNvP0qQbByYgpXEx"
-        arg_regex="-[ahKceASTOstZiJ489NP0qQbByYgpXEx]"
-    ;;
-    pcp2influxdb)
-        all_args="ahLKcCeVHGASTOstRrIijJ4589nNvP0qQbByYgxUEX"
-        arg_regex="-[ahKceASTOstZiJ489NP0qQbByYgxUEX]"
+        all_args="ahLKcCeVHGASTOstrIivPqbygXx"
+        arg_regex="-[ahKceASTOstZiPqbygXx]"
     ;;
     pcp2json)
-        all_args="ahLKcCeVHGASTOstRrZzrIijJ4589nNvP0qQbByYFfxXE"
-        arg_regex="-[ahKceASTOstZiJ489NP0qQbByYFf]"
-    ;;
-    pcp2spark)
-        all_args="ahLKcCeVHGASTOstRrZzrIijJ4589nNvP0qQbByYgp"
-        arg_regex="-[ahKceASTOstZiJ489NP0qQbByYgp]"
+        all_args="ahLKcCeVHGASTOstZzrIivPqbyFfXx"
+        arg_regex="-[ahKceASTOstZiPqbygFf]"
     ;;
     pcp2xlsx)
-        all_args="ahLKcCeVHGASTOstRrZzrIivP045qQbByYFf"
-        arg_regex="-[ahKceASTOstZiP04qQbByYgFf]"
+        all_args="ahLKcCeVHGASTOstZzrIivPqbyFf"
+        arg_regex="-[ahKceASTOstZiPqbygFf]"
     ;;
     pcp2xml)
-        all_args="ahLKcCeVHGASTOstRrZzrIijJ4589nNvP0qQbByYFfXx"
-        arg_regex="-[ahKceASTOstZiJ489NP0qQbByYgFf]"
+        all_args="ahLKcCeVHGASTOstZzrIivPqbyFfXx"
+        arg_regex="-[ahKceASTOstZiPqbygFf]"
     ;;
     pcp2zabbix)
-        all_args="ahLKcCeVHGASTOstRrIijJ4589nNvP0qQbByYgpXExl"
-        arg_regex="-[ahKceASTOstiJ489NP0qQbByYgpXEx]"
+        all_args="ahLKcCeVHGASTOstrIivPqbygpXEx"
+        arg_regex="-[ahKceASTOstZiPqbygpXEx]"
     ;;
     pmdumplog)
-        all_args="adehiLlmnrSsTtVvxZz"
+        all_args="adiLlmnrSsTtVvxZz"
         arg_regex="-[nSTvZ]"
     ;;
     pmdumptext)
@@ -57,40 +45,24 @@ _pcp_complete()
         arg_regex="-[AafhiKnOpSsTtUwxZ]"
     ;;
     pminfo)
-        all_args="abcdFfhIKLlMmNnOsTtVvxZz"
+        all_args="abcdFfhKLMmNnOTtVvxZz"
         arg_regex="-[abchKNnOZ]"
-    ;;
-    pmlogcheck)
-        all_args="lnSTvwZz"
-        arg_regex="-[nSTZ]"
-    ;;
-    pmlogextract)
-        all_args="cdfmSsTvwZz"
-        arg_regex="-[cSsTvZ]"
     ;;
     pmlogsummary)
         all_args="aBbFfHIilMmNnpSTVvxZz"
         arg_regex="-[BnpSTZ]"
     ;;
     pmprobe)
-        all_args="abdfFhIiKLnOVvZz"
-        arg_regex="-[abhKnOZ]"
+        all_args="adfFhIiKLnOVvZz"
+        arg_regex="-[ahKnOZ]"
     ;;
     pmrep)
-        all_args="0123456789AaBbCcdEeFfGgHhIiJjKkLlNnOoPpQqRrSsTtUuVvWwXxYyZz"
-        arg_regex="-[04689ABabcEeFfhiJKlNOoPQqSsTtWwXYyZ]"
-    ;;
-    pmseries)
-        all_args="acdFghIiLlMmnpqSsV"
-        arg_regex="-[cghp]"
+        all_args="AabCcdEeFfGHhIiKkLlOoPpqrSsTtUuVvwXxyZz"
+        arg_regex="-[AabcEeFfhiKlOoPqSsTtwXyZ]"
     ;;
     pmstore)
-        all_args="FfhiKLnV"
+        all_args="fhiKLnV"
         arg_regex="-[hiKn]"
-    ;;
-    pmstat)
-        all_args="AagHhLlnOPpSsTtVxZz"
-        arg_regex="-[AaHhnOpSsTtZ]"
     ;;
     pmval)
         all_args="AadfghiKLnOprSsTtUvVwxZz"
@@ -100,7 +72,7 @@ _pcp_complete()
 
     # Complete
     pytool=0
-    [[ "pcp2elasticsearch pcp2graphite pcp2influxdb pcp2json pcp2spark pcp2xlsx pcp2xml pcp2zabbix pmrep" =~ $cmd ]] && pytool=1
+    [[ "pcp2elasticsearch pcp2json pcp2xlsx pcp2xml pcp2zabbix pmrep" =~ $cmd ]] && pytool=1
     if [[ "$cur" == -* ]]; then
         # Arguments
         local comp=( $(echo $all_args | sed -e 's,.\{1\},-& ,g') )
@@ -130,15 +102,12 @@ _pcp_complete()
         done < $conf
         [[ "$cur" == : ]] && cur=
         COMPREPLY=( $(compgen -W "${sets[*]}" -- "$cur") )
-    elif [[ $cmd == pmseries && ! "${COMP_WORDS[$((COMP_CWORD-1))]}" =~ $arg_regex ]]; then
-        # pmseries(1) metric names
-        COMPREPLY=( $(compgen -W '$(command pmseries -m 2> /dev/null)' -- "$cur") )
     elif [[ ! "${COMP_WORDS[$((COMP_CWORD-1))]}" =~ $arg_regex ]]; then
-        # Metric names
-        if [[ ($cmd != pmlogsummary && $cmd != pmstat) || \
+        # Metrics
+        if [[ $cmd != pmlogsummary || \
             ( $COMP_CWORD > 1 && ${COMP_WORDS[$((COMP_CWORD-1))]} != -* && ${COMP_WORDS[$((COMP_CWORD-2))]} != -* ) ]]; then
             COMPREPLY=( $(compgen -W '$(command pminfo 2> /dev/null)' -- "$cur") )
         fi
     fi
 }
-complete -F _pcp_complete -o default pcp2elasticsearch pcp2graphite pcp2influxdb pcp2json pcp2spark pcp2xlsx pcp2xml pcp2zabbix pmdumplog pmdumptext pmevent pminfo pmlogcheck pmlogextract pmlogsummary pmprobe pmrep pmseries pmstat pmstore pmval
+complete -F _pcp_complete -o default pcp2elasticsearch pcp2json pcp2xlsx pcp2xml pcp2zabbix pmdumplog pmdumptext pmevent pminfo pmlogsummary pmprobe pmrep pmstore pmval

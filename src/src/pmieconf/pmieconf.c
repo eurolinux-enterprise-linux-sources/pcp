@@ -16,6 +16,7 @@
 #include <ctype.h>
 #include <sys/param.h>
 #include "pmapi.h"
+#include "impl.h"
 #include "rules.h"
 
 #define MAXSYMLEN	(MAXPATHLEN+1)
@@ -323,7 +324,7 @@ write_pmie(void)
     char	*msg;
     dep_t	*list;
 
-    if ((msg = write_pmiefile(pmGetProgname(), autocreate)) != NULL) {
+    if ((msg = write_pmiefile(pmProgname, autocreate)) != NULL) {
 	error(msg);
 	return 1;
     }
@@ -331,7 +332,7 @@ write_pmie(void)
 	if (interactive)
 	    pprintf("  Warning - some rules have been deprecated:\n");
 	else
-	    pprintf("%s: some rules have been deprecated:\n", pmGetProgname());
+	    pprintf("%s: some rules have been deprecated:\n", pmProgname);
 	for (i = 0; i < count; i++) {
 	    pprintf("    %s (deprecated, %s)\n", list[i].name, list[i].reason);
 	    free(list[i].name);
@@ -698,7 +699,7 @@ interact(void)
 	    inbuf[n][0] = '\0';
 	if (interactive) {
 	    setio(0);
-	    printf("\n%s> ", pmGetProgname());
+	    printf("\n%s> ", pmProgname);
 	    fflush(stdout);
 	}
 
@@ -791,7 +792,7 @@ main(int argc, char **argv)
     }
 
     if (force && opts.optind < argc) {
-	pmprintf("%s: cannot use -F option with a command\n", pmGetProgname());
+	pmprintf("%s: cannot use -F option with a command\n", pmProgname);
 	opts.optind = argc;
 	opts.errors++;
     }
@@ -802,7 +803,7 @@ main(int argc, char **argv)
 	interactive = 0;
     }
     if (opts.optind < argc) {
-	pmprintf("%s: too many arguments\n", pmGetProgname());
+	pmprintf("%s: too many arguments\n", pmProgname);
 	opts.errors++;
     }
 
@@ -821,7 +822,7 @@ main(int argc, char **argv)
 
     if (rulecount <= 1) {
 	fprintf(stderr, "%s: no rules were found using rule path: %s\n",
-		pmGetProgname(), get_rules());
+		pmProgname, get_rules());
 	exit(1);
     }
 

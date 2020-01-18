@@ -19,6 +19,7 @@
 . $PCP_SHARE_DIR/lib/pmdaproc.sh
 
 iam=sample
+pmda_interface=2
 pmns_dupok=true		# we have duplicate names in our PMNS
 
 # Do it for sample
@@ -54,8 +55,11 @@ sed -e 's/sample/sampledso/' -e 's/SAMPLE/SAMPLEDSO/' <pmns >$__tmp.pmns
 pmns_source=$__tmp.pmns
 pmns_name=sampledso
 
-sed -e 's/sample/sampledso/' -e 's/SAMPLE/SAMPLEDSO/' <help >dsohelp
-help_source=dsohelp
+if $do_pmda
+then
+    sed -e 's/sample/sampledso/' -e 's/SAMPLE/SAMPLEDSO/' <help >dsohelp
+    help_source=dsohelp
+fi
 
 dso_opt=true
 daemon_opt=false

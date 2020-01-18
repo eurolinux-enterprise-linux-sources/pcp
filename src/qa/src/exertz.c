@@ -3,6 +3,7 @@
  */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 int
 main(int argc, char **argv)
@@ -28,7 +29,7 @@ main(int argc, char **argv)
     int		tzh2;
     char	s[28];
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
     setlinebuf(stdout);
 
     now = 24 * 60 * 60;		/* epoch + 1 day */
@@ -42,7 +43,7 @@ main(int argc, char **argv)
 
 	case 'a':	/* archive name */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a and/or -h allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a and/or -h allowed\n", pmProgname);
 		errflag++;
 	    }
 	    type = PM_CONTEXT_ARCHIVE;
@@ -51,7 +52,7 @@ main(int argc, char **argv)
 
 	case 'c':	/* configfile */
 	    if (configfile != (char *)0) {
-		fprintf(stderr, "%s: at most one -c option allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one -c option allowed\n", pmProgname);
 		errflag++;
 	    }
 	    configfile = optarg;
@@ -61,7 +62,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -72,7 +73,7 @@ main(int argc, char **argv)
 
 	case 'h':	/* contact PMCD on this hostname */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a and/or -h allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a and/or -h allowed\n", pmProgname);
 		errflag++;
 	    }
 	    host = optarg;
@@ -90,7 +91,7 @@ main(int argc, char **argv)
 	case 's':	/* sample count */
 	    samples = (int)strtol(optarg, &endnum, 10);
 	    if (*endnum != '\0' || samples <= 0.0) {
-		fprintf(stderr, "%s: -s requires numeric argument\n", pmGetProgname());
+		fprintf(stderr, "%s: -s requires numeric argument\n", pmProgname);
 		errflag++;
 	    }
 	    break;
@@ -98,7 +99,7 @@ main(int argc, char **argv)
 	case 't':	/* delta seconds (double) */
 	    delta = strtod(optarg, &endnum);
 	    if (*endnum != '\0' || delta <= 0.0) {
-		fprintf(stderr, "%s: -t requires floating point argument\n", pmGetProgname());
+		fprintf(stderr, "%s: -t requires floating point argument\n", pmProgname);
 		errflag++;
 	    }
 	    break;
@@ -109,7 +110,7 @@ main(int argc, char **argv)
 
 	case 'z':	/* timezone from host */
 	    if (tz != (char *)0) {
-		fprintf(stderr, "%s: at most one of -Z and/or -z allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -Z and/or -z allowed\n", pmProgname);
 		errflag++;
 	    }
 	    tzhost = optarg;
@@ -117,7 +118,7 @@ main(int argc, char **argv)
 
 	case 'Z':	/* $TZ timezone */
 	    if (tzhost != (char *)0) {
-		fprintf(stderr, "%s: at most one of -Z and/or -z allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -Z and/or -z allowed\n", pmProgname);
 		errflag++;
 	    }
 	    tz = optarg;
@@ -147,19 +148,19 @@ Options\n\
   -V 	          verbose/diagnostic output\n\
   -z   host       set reporting timezone to local time for host\n\
   -Z   timezone   set reporting timezone\n",
-		pmGetProgname());
+		pmProgname);
 	exit(1);
     }
 
     if (logfile != (char *)0) {
-	pmOpenLog(pmGetProgname(), logfile, stderr, &sts);
-	if (sts != 1) {
-	    fprintf(stderr, "%s: Could not open logfile \"%s\"\n", pmGetProgname(), logfile);
+	__pmOpenLog(pmProgname, logfile, stderr, &sts);
+	if (sts < 0) {
+	    fprintf(stderr, "%s: Could not open logfile \"%s\"\n", pmProgname, logfile);
 	}
     }
 
     if (namespace != PM_NS_DEFAULT && (sts = pmLoadASCIINameSpace(namespace, 1)) < 0) {
-	printf("%s: Cannot load namespace from \"%s\": %s\n", pmGetProgname(), namespace, pmErrStr(sts));
+	printf("%s: Cannot load namespace from \"%s\": %s\n", pmProgname, namespace, pmErrStr(sts));
 	exit(1);
     }
 
@@ -171,10 +172,10 @@ Options\n\
     if ((sts = pmNewContext(type, host)) < 0) {
 	if (type == PM_CONTEXT_HOST)
 	    fprintf(stderr, "%s: Cannot connect to PMCD on host \"%s\": %s\n",
-		pmGetProgname(), host, pmErrStr(sts));
+		pmProgname, host, pmErrStr(sts));
 	else
 	    fprintf(stderr, "%s: Cannot open archive \"%s\": %s\n",
-		pmGetProgname(), host, pmErrStr(sts));
+		pmProgname, host, pmErrStr(sts));
 	exit(1);
     }
     if (tzhost == (char *)0 && tz == (char *)0)
@@ -185,22 +186,22 @@ Options\n\
 	    pmLogLabel	label;
 	    if ((sts = pmGetArchiveLabel(&label)) < 0) {
 		fprintf(stderr, "%s: Cannot get archive label record: %s\n",
-		    pmGetProgname(), pmErrStr(sts));
+		    pmProgname, pmErrStr(sts));
 		exit(1);
 	    }
 	    if (strcmp(tzhost, label.ll_hostname) != 0) {
 		fprintf(stderr, "%s: mismatched host name between -z (%s) and archive (%s)\n",
-		    pmGetProgname(), tzhost, label.ll_hostname);
+		    pmProgname, tzhost, label.ll_hostname);
 		exit(1);
 	    }
 	}
 	else if (strcmp(tzhost, host) != 0) {
-	    fprintf(stderr, "%s: -z and -h must agree on the name of the host\n", pmGetProgname());
+	    fprintf(stderr, "%s: -z and -h must agree on the name of the host\n", pmProgname);
 	    exit(1);
 	}
 	if ((tzh = pmNewContextZone()) < 0) {
 	    fprintf(stderr, "%s: Cannot set context timezone: %s\n",
-		pmGetProgname(), pmErrStr(tzh));
+		pmProgname, pmErrStr(tzh));
 	    exit(1);
 	}
     }
@@ -208,7 +209,7 @@ Options\n\
     if (tz != (char *)0) {
 	if ((tzh = pmNewZone(tz)) < 0) {
 	    fprintf(stderr, "%s: Cannot set timezone to \"%s\": %s\n",
-		pmGetProgname(), tz, pmErrStr(tzh));
+		pmProgname, tz, pmErrStr(tzh));
 	    exit(1);
 	}
     }

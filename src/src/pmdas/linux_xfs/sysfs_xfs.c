@@ -17,6 +17,7 @@
  */
 
 #include "pmapi.h"
+#include "impl.h"
 #include "pmda.h"
 #include "sysfs_xfs.h"
 #include <sys/stat.h>

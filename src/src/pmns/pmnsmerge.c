@@ -19,7 +19,7 @@
 #include <ctype.h>
 #include <sys/stat.h>
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "pmnsutil.h"
 
 static FILE		*outf;		/* output */
@@ -81,7 +81,7 @@ sortargs(char **argv, int argc)
     for (i = 0; i <argc; i++) {
 	if ((f = fopen(argv[i], "r")) == NULL) {
 	    fprintf(stderr, "%s: Error: cannot open input PMNS file \"%s\"\n",
-		pmGetProgname(), argv[i]);
+		pmProgname, argv[i]);
 	    exit(1);
 	}
 	tab[i].fname = strdup(argv[i]);
@@ -161,7 +161,7 @@ addpmns(__pmnsNode *base, char *name, __pmnsNode *p)
 	/* complete match */
 	if (np->pmid != p->pmid) {
 	    fprintf(stderr, "%s: Warning: performance metric \"%s\" has multiple PMIDs.\n... using PMID %s and ignoring PMID",
-		pmGetProgname(), fullname, pmIDStr(np->pmid));
+		pmProgname, fullname, pmIDStr(np->pmid));
 	    fprintf(stderr, " %s\n",
 		pmIDStr(p->pmid));
 	}
@@ -221,14 +221,14 @@ main(int argc, char **argv)
 	    break;
 
 	case 'd':	/* duplicate PMIDs are OK */
-	    fprintf(stderr, "%s: Warning: -d deprecated, duplicate PMNS names allowed by default\n", pmGetProgname());
+	    fprintf(stderr, "%s: Warning: -d deprecated, duplicate PMNS names allowed by default\n", pmProgname);
 	    dupok = 1;
 		break;
 
 	case 'D':	/* debug options */
 	    if ((sts = pmSetDebug(opts.optarg)) < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), opts.optarg);
+		    pmProgname, opts.optarg);
 		opts.errors++;
 	    }
 	    break;
@@ -266,7 +266,7 @@ main(int argc, char **argv)
     }
     else if (access(argv[argc-1], F_OK) == 0) {
 	fprintf(stderr, "%s: Error: output PMNS file \"%s\" already exists!\nYou must either remove it first, or use -f\n",
-		pmGetProgname(), argv[argc-1]);
+		pmProgname, argv[argc-1]);
 	exit(1);
     }
 
@@ -279,7 +279,7 @@ main(int argc, char **argv)
     __pmSetSignalHandler(SIGTERM, SIG_IGN);
 
     if ((outf = fopen(argv[argc-1], "w+")) == NULL) {
-	fprintf(stderr, "%s: Error: cannot create output PMNS file \"%s\": %s\n", pmGetProgname(), argv[argc-1], osstrerror());
+	fprintf(stderr, "%s: Error: cannot create output PMNS file \"%s\": %s\n", pmProgname, argv[argc-1], osstrerror());
 	exit(1);
     }
 
@@ -293,7 +293,7 @@ main(int argc, char **argv)
 
 	if ((sts = pmLoadASCIINameSpace(argv[j], dupok)) < 0) {
 	    fprintf(stderr, "%s: Error: pmLoadASCIINameSpace(%s, %d): %s\n",
-		pmGetProgname(), argv[j], dupok, pmErrStr(sts));
+		pmProgname, argv[j], dupok, pmErrStr(sts));
 	    exit(1);
 	}
 	{
@@ -325,7 +325,7 @@ main(int argc, char **argv)
      */
     if ((sts = pmLoadASCIINameSpace(argv[argc-1], dupok)) < 0) {
 	fprintf(stderr, "%s: Error: pmLoadASCIINameSpace(%s, %d): %s\n",
-	    pmGetProgname(), argv[argc-1], dupok, pmErrStr(sts));
+	    pmProgname, argv[argc-1], dupok, pmErrStr(sts));
 	exit(1);
     }
 

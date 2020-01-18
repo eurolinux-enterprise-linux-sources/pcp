@@ -7,7 +7,7 @@
 
 #include <ctype.h>
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
 
 int
 main(int argc, char **argv)
@@ -24,7 +24,7 @@ main(int argc, char **argv)
     pmID		pmidlist[1];
     pmResult		*res;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:h:")) != EOF) {
 	switch (c) {
@@ -33,7 +33,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -50,13 +50,13 @@ main(int argc, char **argv)
     }
 
     if (errflag || optind != argc-2) {
-	printf("Usage: %s %s\n", pmGetProgname(), usage);
+	printf("Usage: %s %s\n", pmProgname, usage);
 	exit(1);
     }
 
     if ((sts = pmNewContext(type, host)) < 0) {
 	printf("%s: Cannot connect to PMCD on host \"%s\": %s\n",
-	    pmGetProgname(), host, pmErrStr(sts));
+	    pmProgname, host, pmErrStr(sts));
 	exit(1);
     }
 

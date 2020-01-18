@@ -26,6 +26,8 @@
 .ft 3
 #include <pcp/pmapi.h>
 .br
+#include <pcp/impl.h>
+.br
 #include <pcp/pmda.h>
 .sp
 cc ... \-lpcp_pmda \-lpcp
@@ -86,20 +88,20 @@ typedef struct {
     union {
         struct {                              /* PMDA_INTERFACE_2 or _3 */
             pmdaExt *ext;
-            int (*profile)(pmProfile *, pmdaExt *);
+            int (*profile)(__pmProfile *, pmdaExt *);
             int (*fetch)(int, pmID *, pmResult **, pmdaExt *);
             int (*desc)(pmID, pmDesc *, pmdaExt *);
-            int (*instance)(pmInDom, int, char *, pmInResult **, pmdaExt *);
+            int (*instance)(pmInDom, int, char *, __pmInResult **, pmdaExt *);
             int (*text)(int, int, char **, pmdaExt *);
             int (*store)(pmResult *, pmdaExt *);
         } two, three;
 
         struct {                              /* PMDA_INTERFACE_4 or _5 */
             pmdaExt *ext;
-            int     (*profile)(pmProfile *, pmdaExt *);
+            int     (*profile)(__pmProfile *, pmdaExt *);
             int     (*fetch)(int, pmID *, pmResult **, pmdaExt *);
             int     (*desc)(pmID, pmDesc *, pmdaExt *);
-            int     (*instance)(pmInDom, int, char *, pmInResult **, pmdaExt *);
+            int     (*instance)(pmInDom, int, char *, __pmInResult **, pmdaExt *);
             int     (*text)(int, int, char **, pmdaExt *);
             int     (*store)(pmResult *, pmdaExt *);
             int     (*pmid)(char *, pmID *, pmdaExt *);
@@ -109,10 +111,10 @@ typedef struct {
 
         struct {                              /* PMDA_INTERFACE_6 */
             pmdaExt *ext;
-            int     (*profile)(pmProfile *, pmdaExt *);
+            int     (*profile)(__pmProfile *, pmdaExt *);
             int     (*fetch)(int, pmID *, pmResult **, pmdaExt *);
             int     (*desc)(pmID, pmDesc *, pmdaExt *);
-            int     (*instance)(pmInDom, int, char *, pmInResult **, pmdaExt *);
+            int     (*instance)(pmInDom, int, char *, __pmInResult **, pmdaExt *);
             int     (*text)(int, int, char **, pmdaExt *);
             int     (*store)(pmResult *, pmdaExt *);
             int     (*pmid)(char *, pmID *, pmdaExt *);
@@ -252,7 +254,7 @@ For some PMDAs this is inappropriate, e.g. the
 .B pmResult
 is statically allocated, or contains a hybrid of pinned PDU buffer
 information and dynamically allocated information.
-.B pmdaSetResultCallBack
+.B pmdaSetResultCallback
 may be used to define an alternative
 .B callback
 from

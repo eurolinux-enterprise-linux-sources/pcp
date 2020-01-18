@@ -1,7 +1,14 @@
 QA output created by 348
 
 === kvm agent installation ===
-Updating the Performance Metrics Name Space (PMNS) ...
+You will need to choose an appropriate configuration for installation of
+the "kvm" Performance Metrics Domain Agent (PMDA).
+
+  collector	collect performance statistics on this system
+  monitor	allow this system to monitor local and/or remote systems
+  both		collector and monitor configuration for this system
+
+Please enter c(ollector) or m(onitor) or b(oth) [b] Updating the Performance Metrics Name Space (PMNS) ...
 Terminate PMDA if already installed ...
 [...install files, make output...]
 Updating the PMCD control file, and notifying PMCD ...
@@ -10,6 +17,7 @@ Check kvm metrics have appeared ... X metrics and Y values
 === validate values ===
 
 === check values ===
+kvm.efer_reload is in range
 kvm.exits is in range
 kvm.fpu_reload is in range
 kvm.halt_exits is in range
@@ -48,3 +56,6 @@ kvm ... done
 Updating the PMCD control file, and notifying PMCD ...
 [...removing files...]
 Check kvm metrics have gone away ... OK
+Waiting for pmcd to terminate ...
+Starting pmcd ... 
+Starting pmlogger ... 

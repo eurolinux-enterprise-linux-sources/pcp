@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013,2016-2018 Red Hat.
+ * Copyright (c) 2013,2016 Red Hat.
  * Copyright (c) 1995 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This library is free software; you can redistribute it and/or modify it
@@ -14,7 +14,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "pmda.h"
 #include "internal.h"
 #include "fault.h"
@@ -37,24 +37,6 @@ __pmRecvText(int fd, __pmContext *ctxp, int timeout, char **buffer)
 	__pmUnpinPDUBuf(pb);
 
     return sts;
-}
-
-/*
- * Fallback to one-line, if possible, when no long-form text available
- */
-static int
-fallbacktext(int type, char *buffer)
-{
-    if ((type & PM_TEXT_DIRECT) != 0)
-	return 0;
-    if ((type & PM_TEXT_HELP) == 0)
-	return 0;
-    if (buffer == NULL || buffer[0] == '\0') {
-	type &= ~PM_TEXT_HELP;
-	type |= PM_TEXT_ONELINE;
-	return type;
-    }
-    return 0;
 }
 
 static int
@@ -80,8 +62,11 @@ again_host:
 	else {
 	    PM_FAULT_POINT("libpcp/" __FILE__ ":1", PM_FAULT_TIMEOUT);
 	    sts = __pmRecvText(fd, ctxp, tout, buffer);
-	    if (sts == 0 && ((type = fallbacktext(type, *buffer)) != 0)) {
+	    if (sts == 0 && (*buffer)[0] == '\0' && (type & PM_TEXT_HELP)) {
+		/* fall back to one-line, if possible */
 		free(*buffer);
+		type &= ~PM_TEXT_HELP;
+		type |= PM_TEXT_ONELINE;
 		goto again_host;
 	    }
 	}
@@ -98,22 +83,24 @@ again_host:
 		    pmda->version.four.ext->e_context = ctx;
 again_local:
 	    sts = pmda->version.any.text(ident, type, buffer, pmda->version.any.ext);
-	    if (sts == 0 && ((type = fallbacktext(type, *buffer)) != 0))
+	    if (sts == 0 && (*buffer)[0] == '\0' && (type & PM_TEXT_HELP)) {
+		/* fall back to one-line, if possible */
+		type &= ~PM_TEXT_HELP;
+		type |= PM_TEXT_ONELINE;
 		goto again_local;
-	    if (sts == 0)
-	        /* Points into PMDAs local text - return a copy */
+	    }
+	    if (sts == 0) {
+		/*
+		 * PMDAs don't malloc the buffer but the caller will
+		 * free it, so malloc and copy
+		 */
 		*buffer = strdup(*buffer);
+	    }
 	}
     }
     else {
-	*buffer = NULL;
-again_archive:
-	sts = __pmLogLookupText(ctxp->c_archctl, ident, type, buffer);
-	if (sts == PM_ERR_TEXT && (type = fallbacktext(type, *buffer)) != 0)
-	    goto again_archive;
-	if (sts == 0)
-	    /* Points into archive hash tables - return a copy */
-	    *buffer = strdup(*buffer);
+	/* assume PM_CONTEXT_ARCHIVE -- this is an error */
+	sts = PM_ERR_NOTHOST;
     }
 
     PM_UNLOCK(ctxp->c_lock);

@@ -18,9 +18,9 @@
  */
 
 #include "pmapi.h"
+#include "impl.h"
 #include "trace.h"
 #include "trace_dev.h"
-#include <limits.h>
 
 /*
  * PDU for all trace data updates (TRACE_PDU_DATA)

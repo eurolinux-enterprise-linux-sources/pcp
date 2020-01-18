@@ -1,5 +1,5 @@
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
 
 static struct timeval	start;
 
@@ -36,7 +36,7 @@ onevent(int afid, void *data)
 	fputc('\n', stderr);
     }
 
-    elapsed = pmtimevalSub(&now, &start);
+    elapsed = __pmtimevalSub(&now, &start);
 
     if (afid == reg[2])
 	printf("event %d callback\n", afid);
@@ -94,7 +94,7 @@ main(int argc, char **argv)
     struct timeval	delta = { 2, 500000 };
     struct timeval	now;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:?")) != EOF) {
 	switch (c) {
@@ -103,7 +103,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -121,7 +121,7 @@ main(int argc, char **argv)
 \n\
 Options\n\
   -D debug	standard PCP debug options\n",
-		pmGetProgname());
+		pmProgname);
 	exit(1);
     }
 

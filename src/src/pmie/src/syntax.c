@@ -20,6 +20,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 #include "pmapi.h"
+#include "impl.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -179,7 +180,7 @@ report(char *msg)
 {
     LexIn *x = lin;
 
-    fprintf(stderr, "%s: %s - ", pmGetProgname(), msg);
+    fprintf(stderr, "%s: %s - ", pmProgname, msg);
     if (x) {
         fprintf(stderr, "near line %d of ", x->lno);
         if (x->stream) {
@@ -569,22 +570,6 @@ domainExpr(int op, int dom, Expr *arg)
         }
         tdom = -1;
 	dom = 2;
-    }
-
-    /*
-     * the sum_* and avg_* operators require an arithmetic expression
-     */
-    if (op == CND_SUM_HOST || op == CND_AVG_HOST) {
-	if (arg->metrics->desc.type != PM_TYPE_32 && arg->metrics->desc.type != PM_TYPE_U32 &&
-	    arg->metrics->desc.type != PM_TYPE_64 && arg->metrics->desc.type != PM_TYPE_U64 &&
-	    arg->metrics->desc.type != PM_TYPE_FLOAT &&
-	    arg->metrics->desc.type != PM_TYPE_DOUBLE) {
-            synerr();
-	    fprintf(stderr, "arithmetic (not %s) operand required for aggregate operator\n",
-		pmTypeStr(arg->metrics->desc.type));
-	    freeExpr(arg);
-	    return NULL;
-	}
     }
 
     if (op == CND_COUNT_HOST) {

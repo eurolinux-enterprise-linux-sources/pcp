@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
 
 int
 main(int argc, char **argv)

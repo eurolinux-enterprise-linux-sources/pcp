@@ -6,6 +6,7 @@
 
 #include <unistd.h>
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 static void checkMetric(const char *);
 
@@ -31,14 +32,14 @@ main(int argc, char **argv)
     double	delta = 1.0;
     char	*endnum;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "a:c:D:h:l:Ln:s:t:U:VzZ:?")) != EOF) {
 	switch (c) {
 
 	case 'a':	/* archive name */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmProgname);
 		errflag++;
 	    }
 	    type = PM_CONTEXT_ARCHIVE;
@@ -47,7 +48,7 @@ main(int argc, char **argv)
 
 	case 'c':	/* configfile */
 	    if (configfile != NULL) {
-		fprintf(stderr, "%s: at most one -c option allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one -c option allowed\n", pmProgname);
 		errflag++;
 	    }
 	    configfile = optarg;
@@ -57,14 +58,14 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
 
 	case 'h':	/* contact PMCD on this hostname */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmProgname);
 		errflag++;
 	    }
 	    host = optarg;
@@ -73,7 +74,7 @@ main(int argc, char **argv)
 
 	case 'L':	/* LOCAL, no PMCD */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmProgname);
 		errflag++;
 	    }
 	    host = NULL;
@@ -93,7 +94,7 @@ main(int argc, char **argv)
 	case 's':	/* sample count */
 	    samples = (int)strtol(optarg, &endnum, 10);
 	    if (*endnum != '\0' || samples < 0) {
-		fprintf(stderr, "%s: -s requires numeric argument\n", pmGetProgname());
+		fprintf(stderr, "%s: -s requires numeric argument\n", pmProgname);
 		errflag++;
 	    }
 	    break;
@@ -101,14 +102,14 @@ main(int argc, char **argv)
 	case 't':	/* delta seconds (double) */
 	    delta = strtod(optarg, &endnum);
 	    if (*endnum != '\0' || delta <= 0.0) {
-		fprintf(stderr, "%s: -t requires floating point argument\n", pmGetProgname());
+		fprintf(stderr, "%s: -t requires floating point argument\n", pmProgname);
 		errflag++;
 	    }
 	    break;
 
 	case 'U':	/* uninterpolated archive log */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmProgname);
 		errflag++;
 	    }
 	    type = PM_CONTEXT_ARCHIVE;
@@ -122,7 +123,7 @@ main(int argc, char **argv)
 
 	case 'z':	/* timezone from host */
 	    if (tz != NULL) {
-		fprintf(stderr, "%s: at most one of -Z and/or -z allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -Z and/or -z allowed\n", pmProgname);
 		errflag++;
 	    }
 	    zflag++;
@@ -130,7 +131,7 @@ main(int argc, char **argv)
 
 	case 'Z':	/* $TZ timezone */
 	    if (zflag) {
-		fprintf(stderr, "%s: at most one of -Z and/or -z allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -Z and/or -z allowed\n", pmProgname);
 		errflag++;
 	    }
 	    tz = optarg;
@@ -144,7 +145,7 @@ main(int argc, char **argv)
     }
 
     if (zflag && type == 0) {
-	fprintf(stderr, "%s: -z requires an explicit -a, -h or -U option\n", pmGetProgname());
+	fprintf(stderr, "%s: -z requires an explicit -a, -h or -U option\n", pmProgname);
 	errflag++;
     }
 
@@ -166,19 +167,19 @@ Options\n\
   -V            verbose/diagnostic output\n\
   -z            set reporting timezone to local time for host from -a, -h or -U\n\
   -Z timezone   set reporting timezone\n",
-		pmGetProgname());
+		pmProgname);
 	exit(1);
     }
 
     if (logfile != NULL) {
-	pmOpenLog(pmGetProgname(), logfile, stderr, &sts);
-	if (sts != 1) {
-	    fprintf(stderr, "%s: Could not open logfile \"%s\"\n", pmGetProgname(), logfile);
+	__pmOpenLog(pmProgname, logfile, stderr, &sts);
+	if (sts < 0) {
+	    fprintf(stderr, "%s: Could not open logfile \"%s\"\n", pmProgname, logfile);
 	}
     }
 
     if (pmnsfile != PM_NS_DEFAULT && (sts = pmLoadASCIINameSpace(pmnsfile, 1)) < 0) {
-	printf("%s: Cannot load namespace from \"%s\": %s\n", pmGetProgname(), 
+	printf("%s: Cannot load namespace from \"%s\": %s\n", pmProgname, 
 	       pmnsfile, pmErrStr(sts));
 	exit(1);
     }
@@ -191,22 +192,22 @@ Options\n\
     if ((sts = pmNewContext(type, host)) < 0) {
 	if (type == PM_CONTEXT_HOST)
 	    fprintf(stderr, "%s: Cannot connect to PMCD on host \"%s\": %s\n",
-		pmGetProgname(), host, pmErrStr(sts));
+		pmProgname, host, pmErrStr(sts));
 	else
 	    fprintf(stderr, "%s: Cannot open archive \"%s\": %s\n",
-		pmGetProgname(), host, pmErrStr(sts));
+		pmProgname, host, pmErrStr(sts));
 	exit(1);
     }
 
     if (type == PM_CONTEXT_ARCHIVE) {
 	if ((sts = pmGetArchiveLabel(&label)) < 0) {
 	    fprintf(stderr, "%s: Cannot get archive label record: %s\n",
-		pmGetProgname(), pmErrStr(sts));
+		pmProgname, pmErrStr(sts));
 	    exit(1);
 	}
 	if (mode != PM_MODE_INTERP) {
 	    if ((sts = pmSetMode(mode, &label.ll_start, 0)) < 0) {
-		fprintf(stderr, "%s: pmSetMode: %s\n", pmGetProgname(), pmErrStr(sts));
+		fprintf(stderr, "%s: pmSetMode: %s\n", pmProgname, pmErrStr(sts));
 		exit(1);
 	    }
 	}
@@ -216,7 +217,7 @@ Options\n\
     if (zflag) {
 	if ((tzh = pmNewContextZone()) < 0) {
 	    fprintf(stderr, "%s: Cannot set context timezone: %s\n",
-		pmGetProgname(), pmErrStr(tzh));
+		pmProgname, pmErrStr(tzh));
 	    exit(1);
 	}
 	if (type == PM_CONTEXT_ARCHIVE)
@@ -228,7 +229,7 @@ Options\n\
     else if (tz != NULL) {
 	if ((tzh = pmNewZone(tz)) < 0) {
 	    fprintf(stderr, "%s: Cannot set timezone to \"%s\": %s\n",
-		pmGetProgname(), tz, pmErrStr(tzh));
+		pmProgname, tz, pmErrStr(tzh));
 	    exit(1);
 	}
 	printf("Note: timezone set to \"TZ=%s\"\n\n", tz);
@@ -239,14 +240,14 @@ Options\n\
     /* non-flag args are argv[optind] ... argv[argc-1] */
     if (optind == argc) {
 	if ((sts = pmTraversePMNS(NULL, checkMetric)) < 0) {
-	    fprintf(stderr, "%s: pmTraversePMNS: %s\n", pmGetProgname(), pmErrStr(sts));
+	    fprintf(stderr, "%s: pmTraversePMNS: %s\n", pmProgname, pmErrStr(sts));
 	    exit(1);
 	}
     }
     else
     while (optind < argc) {
 	if ((sts = pmTraversePMNS(argv[optind], checkMetric)) < 0) {
-	    fprintf(stderr, "%s: pmTraversePMNS: %s\n", pmGetProgname(), pmErrStr(sts));
+	    fprintf(stderr, "%s: pmTraversePMNS: %s\n", pmProgname, pmErrStr(sts));
 	    exit(1);
 	}
 	optind++;
@@ -269,12 +270,12 @@ checkMetric(const char *metric)
     nameList[0] = (char *)metric;
 
     if ((sts = pmLookupName(1, nameList, pmidList)) < 0) {
-	fprintf(stderr, "%s: pmLookupName: %s\n", pmGetProgname(), pmErrStr(sts));
+	fprintf(stderr, "%s: pmLookupName: %s\n", pmProgname, pmErrStr(sts));
 	exit(1);
     }
 
     if ((sts = pmLookupDesc(pmidList[0], &desc)) < 0) {
-	fprintf(stderr, "%s: pmLookupDesc: %s\n", pmGetProgname(), pmErrStr(sts));
+	fprintf(stderr, "%s: pmLookupDesc: %s\n", pmProgname, pmErrStr(sts));
 	exit(1);
     }
 
@@ -282,7 +283,7 @@ checkMetric(const char *metric)
 	return;
     
     if ((sts = pmFetch(1, pmidList, &result)) < 0) {
-	fprintf(stderr, "%s: pmfetch: %s\n", pmGetProgname(), pmErrStr(sts));
+	fprintf(stderr, "%s: pmfetch: %s\n", pmProgname, pmErrStr(sts));
 	exit(1);
     }
 

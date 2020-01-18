@@ -1078,15 +1078,15 @@ sub sysstat_values
 	for my $i (0 .. $#{$result}) {
 	    my $statistic_num = $result->[$i][0];
 	    my $statistic_name = $result->[$i][1];
-	    my $pmID_item_num = $sysstat_map{$statistic_name};
+	    my $pmid_item_num = $sysstat_map{$statistic_name};
 
-	    if (defined($pmID_item_num)) {
+	    if (defined($pmid_item_num)) {
 		#
 		# pull out the current array of values, and insert this value
 		# at the offset specific to the mapped PMID item number, such
 		# that a subsequent fetch callback can quickly look it up.
 		#
-		$varray[$pmID_item_num] = $result->[$i][2];
+		$varray[$pmid_item_num] = $result->[$i][2];
 	    } else {
 		#$pmda->log("New v\$sysstat statistic name: $statistic_name");
 	    }

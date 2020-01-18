@@ -16,6 +16,7 @@
  */
 
 #include "pmapi.h"
+#include "impl.h"
 #include "pmda.h"
 #include "domain.h"
 #ifdef HAVE_REGEX_H
@@ -80,14 +81,14 @@ mailq_histogram(char *option)
     q = strtok(option, ",");
     while (q != NULL) {
 	if ((sts = pmParseInterval((const char *)q, &tv, &errmsg)) < 0) {
-	    pmprintf("%s: bad historgram bins argument:\n%s\n", pmGetProgname(), errmsg);
+	    pmprintf("%s: bad historgram bins argument:\n%s\n", pmProgname, errmsg);
 	    free(errmsg);
 	    return -EINVAL;
 	}
 	numhisto++;
 	histo = (histo_t *)realloc(histo, numhisto * sizeof(histo[0]));
 	if (histo == NULL)
-	    pmNoMem("histo", numhisto * sizeof(histo[0]), PM_FATAL_ERR);
+	    __pmNoMem("histo", numhisto * sizeof(histo[0]), PM_FATAL_ERR);
 	histo[numhisto-1].delay = tv.tv_sec;
 	q = strtok(NULL, ",");
     }
@@ -109,16 +110,17 @@ compare_delay(const void *a, const void *b)
 static int
 mailq_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 {
+    __pmID_int	*idp = (__pmID_int *)&(mdesc->m_desc.pmid);
     int		b;
 
-    if (pmID_cluster(mdesc->m_desc.pmid) == 0) {
-	if (pmID_item(mdesc->m_desc.pmid) == 0) {	/* mailq.length */
+    if (idp->cluster == 0) {
+	if (idp->item == 0) {			/* mailq.length */
 	    if (inst == PM_IN_NULL)
 		atom->ul = queue;
 	    else
 		return PM_ERR_INST;
 	}
-	else if (pmID_item(mdesc->m_desc.pmid) == 1) {	/* mailq.deferred */
+	else if (idp->item == 1) {		/* mailq.deferred */
 	    /* inst is unsigned, so always >= 0 */
 	    for (b = 0; b < numhisto; b++) {
 		if (histo[b].delay == inst) break;
@@ -166,14 +168,14 @@ mailq_fetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *pmda)
 
 	if (chdir(queuedir) < 0) {
 	    if (warn == 0) {
-		pmNotifyErr(LOG_ERR, "chdir(\"%s\") failed: %s\n",
+		__pmNotifyErr(LOG_ERR, "chdir(\"%s\") failed: %s\n",
 		    queuedir, osstrerror());
 		warn = 1;
 	    }
 	}
 	else {
 	    if (warn == 1) {
-		pmNotifyErr(LOG_INFO, "chdir(\"%s\") success\n", queuedir);
+		__pmNotifyErr(LOG_INFO, "chdir(\"%s\") success\n", queuedir);
 		warn = 0;
 	    }
 
@@ -219,7 +221,7 @@ mailq_fetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *pmda)
 		free(list);
 	}
 	if (chdir(startdir) < 0) {
-	    pmNotifyErr(LOG_ERR, "chdir(\"%s\") failed: %s\n",
+	    __pmNotifyErr(LOG_ERR, "chdir(\"%s\") failed: %s\n",
 			startdir, osstrerror());
 	}
     }
@@ -236,7 +238,7 @@ mailq_init(pmdaInterface *dp)
     if (dp->status != 0)
 	return;
 
-    pmSetProcessIdentity(username);
+    __pmSetProcessIdentity(username);
     dp->version.two.fetch = mailq_fetch;
     pmdaSetFetchCallBack(dp, mailq_fetchCallBack);
     pmdaInit(dp, indomtab, sizeof(indomtab)/sizeof(indomtab[0]), metrictab,
@@ -269,24 +271,24 @@ pmdaOptions	opts = {
 int
 main(int argc, char **argv)
 {
-    int			sep = pmPathSeparator();
+    int			sep = __pmPathSeparator();
     int			c;
     int			i;
     char		namebuf[30];
     char		mypath[MAXPATHLEN];
 
-    pmSetProgname(argv[0]);
-    pmGetUsername(&username);
+    __pmSetProgname(argv[0]);
+    __pmGetUsername(&username);
 
     if (getcwd(startdir, sizeof(startdir)) == NULL) {
 	fprintf(stderr, "%s: getcwd() failed: %s\n",
-	    pmGetProgname(), pmErrStr(-oserror()));
+	    pmProgname, pmErrStr(-oserror()));
 	exit(1);
     }
 
     pmsprintf(mypath, sizeof(mypath), "%s%c" "mailq" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-    pmdaDaemon(&dispatch, PMDA_INTERFACE_2, pmGetProgname(), MAILQ,
+    pmdaDaemon(&dispatch, PMDA_INTERFACE_2, pmProgname, MAILQ,
 		"mailq.log", mypath);
 
     while ((c = pmdaGetOptions(argc, argv, &opts, &dispatch)) != EOF) {
@@ -302,7 +304,7 @@ main(int argc, char **argv)
 	    if (c != 0) {
 		regerror(c, &mq_regex, mypath, sizeof(mypath));
 		pmprintf("%s: cannot compile regular expression: %s\n",
-			pmGetProgname(), mypath);
+			pmProgname, mypath);
 		opts.errors++;
 	    }
 	    break;
@@ -327,7 +329,7 @@ main(int argc, char **argv)
 	numhisto = 7;
 	histo = (histo_t *)malloc(numhisto * sizeof(histo[0]));
 	if (histo == NULL) {
-	     pmNoMem("histo", numhisto * sizeof(histo[0]), PM_FATAL_ERR);
+	     __pmNoMem("histo", numhisto * sizeof(histo[0]), PM_FATAL_ERR);
 	}
 	histo[0].delay = 7 * 24 * 3600;
 	histo[1].delay = 3 * 24 * 3600;
@@ -342,7 +344,7 @@ main(int argc, char **argv)
 	numhisto++;
 	histo = (histo_t *)realloc(histo, numhisto * sizeof(histo[0]));
 	if (histo == NULL) {
-	     pmNoMem("histo", numhisto * sizeof(histo[0]), PM_FATAL_ERR);
+	     __pmNoMem("histo", numhisto * sizeof(histo[0]), PM_FATAL_ERR);
 	}
 	histo[numhisto-1].delay = 0;
 	qsort(histo, numhisto, sizeof(histo[0]), compare_delay);
@@ -350,7 +352,7 @@ main(int argc, char **argv)
 
     _delay = (pmdaInstid *)malloc(numhisto * sizeof(_delay[0]));
     if (_delay == NULL)
-	pmNoMem("_delay", numhisto * sizeof(_delay[0]), PM_FATAL_ERR);
+	__pmNoMem("_delay", numhisto * sizeof(_delay[0]), PM_FATAL_ERR);
 
     for (i = 0; i < numhisto; i++) {
 	time_t	tmp;
@@ -383,7 +385,7 @@ main(int argc, char **argv)
 	}
 	_delay[i].i_name = strdup(namebuf);
 	if (_delay[i].i_name == NULL) {
-	     pmNoMem("_delay[i].i_name", strlen(namebuf), PM_FATAL_ERR);
+	     __pmNoMem("_delay[i].i_name", strlen(namebuf), PM_FATAL_ERR);
 	}
     }
 

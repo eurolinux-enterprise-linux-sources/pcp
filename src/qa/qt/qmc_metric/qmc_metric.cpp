@@ -21,7 +21,7 @@ changeConf(const char* str)
     pmsprintf(name, sizeof(name), "%s/pmdas/simple/simple.conf", pmGetConfig("PCP_VAR_DIR"));
     fp = fopen(name, "w");
     if (fp == NULL) {
-	cerr << pmGetProgname() << ": /var/pcp/pmdas/simple/simple.conf: "
+	cerr << pmProgname << ": /var/pcp/pmdas/simple/simple.conf: "
 	     << strerror(errno) << endl;
 	exit(1);
 	/*NOTREACHED*/
@@ -37,7 +37,7 @@ main(int argc, char* argv[])
     int		sts = 0;
     int		c;
 
-    pmSetProgname(argv[0]);
+    pmProgname = basename(argv[0]);
 
     while ((c = getopt(argc, argv, "D:?")) != EOF) {
 	switch (c) {
@@ -45,7 +45,7 @@ main(int argc, char* argv[])
 	    sts = pmSetDebug(optarg);
             if (sts < 0) {
 		pmprintf("%s: unrecognized debug options specification (%s)\n",
-			 pmGetProgname(), optarg);
+			 pmProgname, optarg);
                 sts = 1;
             }
             break;
@@ -57,7 +57,7 @@ main(int argc, char* argv[])
     }
 
     if (sts) {
-	pmprintf("Usage: %s\n", pmGetProgname());
+	pmprintf("Usage: %s\n", pmProgname);
 	pmflush();
 	exit(1);
         /*NOTREACHED*/
@@ -116,7 +116,7 @@ main(int argc, char* argv[])
 
     if (bogus_metric->status() >= 0) {
 	pmprintf("%s: Error: bogus.metric was not invalid!\n",
-		 pmGetProgname());
+		 pmProgname);
 	pmflush();
 	sts = 1;
     }
@@ -127,7 +127,7 @@ main(int argc, char* argv[])
     
     if (bogus_inst->status() >= 0) {
 	pmprintf("%s: Error: kernel.all.load[2] was not invalid!\n",
-		 pmGetProgname());
+		 pmProgname);
 	pmflush();
 	sts = 1;
     }

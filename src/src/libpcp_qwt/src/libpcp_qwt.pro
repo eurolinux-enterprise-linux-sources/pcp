@@ -2,19 +2,13 @@ TARGET		= pcp_qwt
 TEMPLATE	= lib
 VERSION		= 6.1.4
 CONFIG		+= qt staticlib warn_on
-CONFIG(release, release|debug) {
-DESTDIR = build/release
-}
-CONFIG(build, release|debug) {
-DESTDIR   = build/debug
-}
+release:DESTDIR = build/debug
+debug:DESTDIR   = build/release
 QT		= core gui network svg
 greaterThan(QT_MAJOR_VERSION, 4) {
 QT		+= concurrent printsupport
 }
-QMAKE_CFLAGS	+= $$(CFLAGS)
-QMAKE_CXXFLAGS	+= $$(CFLAGS) $$(CXXFLAGS)
-QMAKE_LFLAGS	+= $$(LDFLAGS)
+QMAKE_CXXFLAGS	+= $$(PCP_CFLAGS)
 
 HEADERS	+= \
 	qwt.h \

@@ -12,7 +12,7 @@
  * for more details.
  */
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 
 enum {
     PCP_SIGHUP  = 1,
@@ -42,7 +42,7 @@ main(int argc, char **argv)
     char	name[64];
     int		sig, error = 0;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     if (argc != 3)
 	error++;
@@ -52,7 +52,7 @@ main(int argc, char **argv)
 	error++;
 
     if (error) {
-	fprintf(stderr, "Usage: %s <HUP|USR1|TERM|KILL> <PID>\n", pmGetProgname());
+	fprintf(stderr, "Usage: %s <HUP|USR1|TERM|KILL> <PID>\n", pmProgname);
 	return 2;
     }
 
@@ -63,7 +63,7 @@ main(int argc, char **argv)
 
     if (!__pmProcessExists(pid)) {
 	fprintf(stderr, "%s: OpenEvent(%s) failed on PID %" FMT_PID " (%ld)\n",
-			pmGetProgname(), name, pid, GetLastError());
+			pmProgname, name, pid, GetLastError());
 	return 1;
     }
 
@@ -71,12 +71,12 @@ main(int argc, char **argv)
     HANDLE h = OpenEvent(EVENT_MODIFY_STATE, FALSE, TEXT(name));
     if (!h) {
 	fprintf(stderr, "%s: OpenEvent(%s) failed on PID %" FMT_PID " (%ld)\n",
-			pmGetProgname(), name, pid, GetLastError());
+			pmProgname, name, pid, GetLastError());
 	return 1;
     }
     if (!SetEvent(h)) {
 	fprintf(stderr, "%s: SetEvent(%s) failed on PID %" FMT_PID " (%ld)\n",
-			pmGetProgname(), name, pid, GetLastError());
+			pmProgname, name, pid, GetLastError());
 	return 1;
     }
 

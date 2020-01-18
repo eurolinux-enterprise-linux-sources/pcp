@@ -5,6 +5,7 @@
  */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 #include <pcp/fault.h>
 #include <string.h>
 #include <errno.h>
@@ -44,7 +45,7 @@ main(int argc, char *argv[])
     int		errflag = 0;
     char	*usage = "[-D debug]";
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:")) != EOF) {
 	switch (c) {
@@ -53,7 +54,7 @@ main(int argc, char *argv[])
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -66,7 +67,7 @@ main(int argc, char *argv[])
     }
 
     if (errflag || optind != argc) {
-	fprintf(stderr, "Usage: %s %s\n", pmGetProgname(), usage);
+	fprintf(stderr, "Usage: %s %s\n", pmProgname, usage);
 	exit(1);
     }
 

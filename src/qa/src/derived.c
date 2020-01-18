@@ -12,6 +12,7 @@
  * License for more details.
  */
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 static pmLongOptions longopts[] = {
     PMOPT_DEBUG,
@@ -40,14 +41,14 @@ main(int argc, char **argv)
 	/* non-flag args are argv[optind] ... argv[argc-1] */
 	name = expr = argv[opts.optind];
 	if ((name = strsep(&expr, "=")) == NULL) {
-	    fprintf(stderr, "%s: invalid name=expr \"%s\"\n", pmGetProgname(), name);
+	    fprintf(stderr, "%s: invalid name=expr \"%s\"\n", pmProgname, name);
 	    return 1;
 	}
 
 	if (pmRegisterDerivedMetric(name, expr, &errmsg) < 0) {
-	    fprintf(stderr, "%s: %s", pmGetProgname(), errmsg);
+	    fprintf(stderr, "%s: %s", pmProgname, errmsg);
 	} else {
-	    printf("%s: registered \"%s\" as: \"%s\"\n", pmGetProgname(), name, expr);
+	    printf("%s: registered \"%s\" as: \"%s\"\n", pmProgname, name, expr);
 	}
 	opts.optind++;
     }

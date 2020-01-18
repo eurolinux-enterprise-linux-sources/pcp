@@ -15,7 +15,7 @@
 
 #include "pmtime.h"
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "pmda.h"
 
 #include <ctype.h>
@@ -103,9 +103,8 @@ getNewContext(int type, char *host, int quiet)
 
     sts = pmCreateFetchGroup(&s->pmfg, type, host);
     if (sts < 0) {
-	if (!quiet)
-	    fprintf(stderr, "%s: Cannot create fetchgroup: %s\n",
-		    pmGetProgname(), pmErrStr(sts));
+	fprintf(stderr, "%s: Cannot create fetchgroup: %s\n",
+		pmProgname, pmErrStr(sts));
 	goto fail;
     }
 
@@ -200,7 +199,7 @@ getNewContext(int type, char *host, int quiet)
     if (i != num_items)
 	return s;
 
-    fprintf(stderr, "%s: %s: Cannot resolve any metrics.\n", pmGetProgname(), host);
+    fprintf(stderr, "%s: %s: Cannot resolve any metrics.\n", pmProgname, host);
     pmDestroyFetchGroup(s->pmfg);
 
 fail:
@@ -218,9 +217,9 @@ saveContextHostName(struct statsrc *s)
 
     if ((length = strlen(name)) == 0)
 	fprintf(stderr, "%s: Warning: pmGetContextHostName(%d) failed\n",
-		pmGetProgname(), ctx);
+		pmProgname, ctx);
     if ((name = strdup(name)) == NULL)
-	pmNoMem("context name", length + 1, PM_FATAL_ERR);
+	__pmNoMem("context name", length + 1, PM_FATAL_ERR);
     return name;
 }
 
@@ -378,12 +377,12 @@ main(int argc, char *argv[])
     }
 
     if (argc != opts.optind) {
-	pmprintf("%s: too many options\n", pmGetProgname());
+	pmprintf("%s: too many options\n", pmProgname);
 	opts.errors++;
     }
 
     if (pauseFlag && (opts.context != PM_CONTEXT_ARCHIVE)) {
-	pmprintf("%s: -P can only be used with archives\n", pmGetProgname());
+	pmprintf("%s: -P can only be used with archives\n", pmProgname);
 	opts.errors++;
     }
 
@@ -420,7 +419,7 @@ main(int argc, char *argv[])
 		}
 	    }
 	} else {
-	    pmNoMem("contexts", nameCount * sizeof(struct statsrc *), PM_FATAL_ERR);
+	    __pmNoMem("contexts", nameCount * sizeof(struct statsrc *), PM_FATAL_ERR);
 	}
     } else {
 	/*
@@ -439,7 +438,7 @@ main(int argc, char *argv[])
     }
 
     if (!ctxCount) {
-	fprintf(stderr, "%s: No place to get data from!\n", pmGetProgname());
+	fprintf(stderr, "%s: No place to get data from!\n", pmProgname);
 	exit(1);
     }
 

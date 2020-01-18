@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 Red Hat.
+ * Copyright (c) 2012-2017 Red Hat.
  * Copyright (c) 1997,2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This library is free software; you can redistribute it and/or modify it
@@ -19,36 +19,6 @@
  * Platform and environment customization
  */
 #include "platform_defs.h"
-
-#include <time.h>
-#include <fcntl.h>
-#include <dirent.h>
-#include <signal.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/param.h>
-#include <sys/time.h>
-#ifdef HAVE_SYS_SOCKET_H
-#include <sys/socket.h>
-#endif
-#ifdef HAVE_SYS_SELECT_H
-#include <sys/select.h>
-#endif
-#ifdef HAVE_NETINET_TCP_H
-#include <netinet/tcp.h>
-#endif
-#ifdef HAVE_NETINET_IN_H
-#include <netinet/in.h>
-#endif
-#ifdef HAVE_ARPA_INET_H
-#include <arpa/inet.h> 
-#endif
-#ifdef HAVE_NETDB_H
-#include <netdb.h>
-#endif
-#ifdef HAVE_SYS_STAT_H
-#include <sys/stat.h>
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -101,14 +71,12 @@ typedef struct pmUnits {
 
 /* pmUnits.scaleSpace */
 #define PM_SPACE_BYTE	0	/* bytes */
-#define PM_SPACE_KBYTE	1	/* kibibytes (1024) */
-#define PM_SPACE_MBYTE	2	/* mebibytes (1024^2) */
-#define PM_SPACE_GBYTE	3	/* gibibytes (1024^3) */
-#define PM_SPACE_TBYTE	4	/* tebibytes (1024^4) */
-#define PM_SPACE_PBYTE	5	/* pebibytes (1024^5) */
-#define PM_SPACE_EBYTE	6	/* exbibytes (1024^6) */
-#define PM_SPACE_ZBYTE	7	/* zebibytes (1024^7) */
-#define PM_SPACE_YBYTE	8	/* yobibytes (1024^8) */
+#define PM_SPACE_KBYTE	1	/* Kilobytes (1024) */
+#define PM_SPACE_MBYTE	2	/* Megabytes (1024^2) */
+#define PM_SPACE_GBYTE	3	/* Gigabytes (1024^3) */
+#define PM_SPACE_TBYTE	4	/* Terabytes (1024^4) */
+#define PM_SPACE_PBYTE	5	/* Petabytes (1024^5) */
+#define PM_SPACE_EBYTE	6	/* Exabytes  (1024^6) */
 /* pmUnits.scaleTime */
 #define PM_TIME_NSEC	0	/* nanoseconds */
 #define PM_TIME_USEC	1	/* microseconds */
@@ -219,8 +187,6 @@ typedef struct pmDesc {
 #define PM_ERR_LOGCHANGEUNITS	(-PM_ERR_BASE-62)   /* The units of a metric have changed in an archive */
 #define PM_ERR_NEEDCLIENTCERT	(-PM_ERR_BASE-63)   /* PMCD requires a client certificate */
 #define PM_ERR_BADDERIVE	(-PM_ERR_BASE-64)   /* Derived metric definition failed */
-#define PM_ERR_NOLABELS		(-PM_ERR_BASE-65)   /* No support for label metadata */
-#define PM_ERR_PMDAFENCED	(-PM_ERR_BASE-66)   /* PMDA is currently fenced and unable to respond to requests */
 
 /* retired PM_ERR_CTXBUSY (-PM_ERR_BASE-97) Context is busy */
 #define PM_ERR_TOOSMALL		(-PM_ERR_BASE-98)   /* Insufficient elements in list */
@@ -388,42 +354,6 @@ PCP_CALL extern int pmAddProfile(pmInDom, int, int *);
  */
 PCP_CALL extern int pmDelProfile(pmInDom, int, int *);
 
-/*
- * Profile entry (per instance domain)
- * Only the PMDAs and pmcd need to know about this.
- */
-typedef struct pmInDomProfile {
-    pmInDom	indom;			/* instance domain */
-    int		state;			/* include all or exclude all */
-    int		instances_len;		/* length of instances array */
-    int		*instances;		/* array of instances */
-} pmInDomProfile;
-
-/* Internal instance profile states: state in pmInDomProfile */
-#define PM_PROFILE_INCLUDE 0	/* include all, exclude some */
-#define PM_PROFILE_EXCLUDE 1	/* exclude all, include some */
-
-/*
- * Instance profile for all domains
- * Only the PMDAs and pmcd need to know about this.
- */
-typedef struct pmProfile {
-    int			state;			/* default global state */
-    int			profile_len;		/* length of profile array */
-    pmInDomProfile	*profile;		/* array of instance profiles */
-} pmProfile;
-
-/*
- * Result structure for instance domain queries
- * Only the PMDAs and pmcd need to know about this.
- */
-typedef struct pmInResult {
-    pmInDom	indom;		/* instance domain */
-    int		numinst;	/* may be 0 */
-    int		*instlist;	/* instance ids, may be NULL */
-    char	**namelist;	/* instance names, may be NULL */
-} pmInResult;
-
 /* 
  * ---------- Collection services ---------- 
  *
@@ -529,15 +459,10 @@ PCP_CALL extern int pmFetch(int, pmID *, pmResult **);
  * PMCD state changes returned as pmFetch function result for PM_CONTEXT_HOST
  * contexts, i.e. when communicating with PMCD
  */
-#define PMCD_ADD_AGENT		(1<<0)
-#define PMCD_RESTART_AGENT	(1<<1)
-#define PMCD_DROP_AGENT		(1<<2)
-
 #define PMCD_NO_CHANGE		0
-#define PMCD_AGENT_CHANGE	\
-	(PMCD_ADD_AGENT | PMCD_RESTART_AGENT | PMCD_DROP_AGENT)
-#define PMCD_LABEL_CHANGE	(1<<3)
-#define PMCD_NAMES_CHANGE	(1<<4)
+#define PMCD_ADD_AGENT		1
+#define PMCD_RESTART_AGENT	2
+#define PMCD_DROP_AGENT		4
 
 /*
  * Variant that is used to return a pmResult from an archive
@@ -545,80 +470,18 @@ PCP_CALL extern int pmFetch(int, pmID *, pmResult **);
 PCP_CALL extern int pmFetchArchive(pmResult **);
 
 /*
- * Support for metric values annotated with name:value pairs (labels).
- *
- * The full set of labels for a given metric instance is the union of
- * those found at the levels: source (host/archive), domain (agent),
- * indom, metric, and finally instances (individual metric values).
- *
- * Individual labels can be intrinsic to a metric value (i.e. they
- * form an inherent part of its identity like the pmDesc metadata)
- * or extrinsic (i.e. they are simply optional annotations).
- */
-typedef struct pmLabel {
-    unsigned int	name : 16;	/* label name offset in JSONB string */
-    unsigned int	namelen : 8;	/* length of name excluding the null */
-    unsigned int	flags : 8;	/* information about this label */
-    unsigned int	value : 16;	/* offset of the label value */
-    unsigned int	valuelen : 16;	/* length of value in bytes */
-} pmLabel;
-
-/* Bits for the flags field (above) */
-#define PM_LABEL_OPTIONAL	(1<<7)
-
-typedef struct pmLabelSet {
-    unsigned int 	inst;		/* PM_IN_NULL or the instance ID */
-    int			nlabels;	/* count of labels or error code */
-    char		*json;		/* JSON formatted labels string */
-    unsigned int	jsonlen : 16;	/* JSON string length byte count */
-    unsigned int	padding : 16;	/* zero, reserved for future use */
-    pmLabel		*labels;	/* indexing into the JSON string */
-} pmLabelSet;
-
-#define PM_MAXLABELS		((1<<8)-1)
-#define PM_MAXLABELJSONLEN	((1<<16)-1)
-
-/* These identify label set classes. */
-#define PM_LABEL_CONTEXT	(1<<0)
-#define PM_LABEL_DOMAIN		(1<<1)
-#define PM_LABEL_INDOM		(1<<2)
-#define PM_LABEL_CLUSTER	(1<<3)
-#define PM_LABEL_ITEM		(1<<4)
-#define PM_LABEL_INSTANCES	(1<<5)
-
-PCP_CALL extern int pmGetContextLabels(pmLabelSet **);
-PCP_CALL extern int pmGetDomainLabels(int, pmLabelSet **);
-PCP_CALL extern int pmGetInDomLabels(pmInDom, pmLabelSet **);
-PCP_CALL extern int pmGetClusterLabels(pmID, pmLabelSet **);
-PCP_CALL extern int pmGetItemLabels(pmID, pmLabelSet **);
-PCP_CALL extern int pmGetInstancesLabels(pmInDom, pmLabelSet **);
-
-PCP_CALL extern int pmLookupLabels(pmID, pmLabelSet **);
-
-/*
- * The full set is formed by merging labels from all levels of the
- * hierarchy using the precedence rules described in pmLookupLabels(3).
- */
-PCP_CALL extern int pmMergeLabels(char **, int, char *, int);
-PCP_CALL extern int pmMergeLabelSets(pmLabelSet **, int, char *, int,
-		int (*filter)(const pmLabel *, const char *, void *), void *);
-
-/* Free a labelset array */
-PCP_CALL extern void pmFreeLabelSets(pmLabelSet *, int);
-
-/*
  * struct timeval is sometimes 2 x 64-bit ... we use a 2 x 32-bit format for
  * PDUs, internally within libpcp and for (external) archive logs
  */
-typedef struct pmTimeval {
+typedef struct __pmTimeval {
     __int32_t	tv_sec;		/* seconds since Jan. 1, 1970 */
     __int32_t	tv_usec;	/* and microseconds */
-} pmTimeval;
+} __pmTimeval;
 
-typedef struct pmTimespec {
+typedef struct __pmTimespec {
     __int64_t	tv_sec;		/* seconds since Jan. 1, 1970 */
     __int64_t	tv_nsec;	/* and nanoseconds */
-} pmTimespec;
+} __pmTimespec;
 
 /*
  * Label Record at the start of every log file - as exported above
@@ -627,7 +490,7 @@ typedef struct pmTimespec {
  *	it may vary on different hosts ... we use PM_LOG_MAXHOSTLEN instead, and
  *	size this to be the same as MAXHOSTNAMELEN in IRIX 5.3
  * NOTE	that the struct timeval means we have another struct (__pmLogLabel)
- *	for internal use that has a pmTimeval in place of the struct timeval.
+ *	for internal use that has a __pmTimeval in place of the struct timeval.
  */
 #define PM_TZ_MAXLEN	40
 #define PM_LOG_MAXHOSTLEN		64
@@ -652,6 +515,7 @@ PCP_CALL extern int pmGetArchiveEnd(struct timeval *);
 
 /* Free result buffer */
 PCP_CALL extern void pmFreeResult(pmResult *);
+PCP_CALL extern void pmFreeHighResResult(pmHighResResult *);
 
 /* Value extract from pmValue and type conversion */
 PCP_CALL extern int pmExtractValue(int, const pmValue *, int, pmAtomValue *, int);
@@ -679,20 +543,8 @@ PCP_CALL extern int pmStore(const pmResult *);
 /* Get help and descriptive text */
 PCP_CALL extern int pmLookupText(pmID, int, char **);
 PCP_CALL extern int pmLookupInDomText(pmInDom, int, char **);
-#define PM_TEXT_ONELINE		1
-#define PM_TEXT_HELP		2
-
-/*
- * For the help text PDUs, the type (PM_TEXT_ONELINE or PM_TEXT_HELP)
- * is 'or'd with the following to encode the request for a PMID or
- * a pmInDom.  Default is to fallback to ONELINE if HELP unavailable;
- * the (internal) PM_TEXT_DIRECT flag disables this behaviour.
- * Note the values must therefore be (a) bit fields and (b) different
- *	to the public macros PM_TEXT_* in pmapi.h 
- */
-#define PM_TEXT_PMID	4
-#define PM_TEXT_INDOM	8
-#define PM_TEXT_DIRECT	16
+#define PM_TEXT_ONELINE	1
+#define PM_TEXT_HELP	2
 
 /*
  * Some handy formatting routines for messages, and other output
@@ -776,9 +628,6 @@ PCP_CALL extern int pmsprintf(char *, size_t, const char *, ...) __PM_PRINTFLIKE
  */
 PCP_CALL extern char *pmGetConfig(const char *);
 PCP_CALL extern char *pmGetOptionalConfig(const char *);
-
-/* Ditto for library features */
-PCP_CALL extern const char *pmGetAPIConfig(const char *);
 
 PCP_CALL extern int pmGetVersion(void);
 
@@ -905,6 +754,7 @@ PCP_CALL extern int pmGetVersion(void);
 #define PM_OPTFLAG_QUIET	(1<<13)	/* silence getopt errors */
 
 struct pmOptions;
+#define __pmOptions pmOptions /* backwards-compatible */
 typedef int (*pmOptionOverride)(int, struct pmOptions *);
 
 typedef struct pmLongOptions {
@@ -1002,14 +852,14 @@ typedef struct pmEventParameter {
 } pmEventParameter;
 
 typedef struct pmEventRecord {
-    pmTimeval		er_timestamp;	/* must be 2 x 32-bit format */
+    __pmTimeval		er_timestamp;	/* must be 2 x 32-bit format */
     unsigned int	er_flags;	/* event record characteristics */
     int			er_nparams;	/* number of er_param[] entries */
     pmEventParameter	er_param[1];
 } pmEventRecord;
 
 typedef struct pmHighResEventRecord {
-    pmTimespec	er_timestamp;	/* must be 2 x 64-bit format */
+    __pmTimespec	er_timestamp;	/* must be 2 x 64-bit format */
     unsigned int	er_flags;	/* event record characteristics */
     int			er_nparams;	/* number of er_param[] entries */
     pmEventParameter	er_param[1];
@@ -1091,138 +941,6 @@ PCP_CALL extern int pmDestroyFetchGroup(pmFG);
 /* libpcp debug/tracing */
 PCP_CALL extern int pmSetDebug(const char *);
 PCP_CALL extern int pmClearDebug(const char *);
-
-/*
- * New style ...
- * Note that comments are important ... these are extracted and
- * built into pmdbg.h.
- */
-typedef struct {
-    int	pdu;		/* PDU traffic at the Xmit and Recv level */
-    int	fetch;		/* Results from pmFetch */
-    int	profile;	/* Changes and xmits for instance profile */
-    int	value;		/* Metric value extraction and conversion */
-    int	context;	/* Changes to PMAPI contexts */
-    int	indom;		/* Low-level instance profile xfers */
-    int	pdubuf;		/* PDU buffer operations */
-    int	log;		/* Archive log manipulations */
-    int	logmeta;	/* Archive metadata operations */
-    int	optfetch;	/* optFetch magic */
-    int	af;		/* Asynchronous event scheduling */
-    int	appl0;		/* Application-specific flag 0 */
-    int	appl1;		/* Application-specific flag 1 */
-    int	appl2;		/* Application-specific flag 2 */
-    int	pmns;		/* PMNS operations */
-    int	libpmda;	/* PMDA operations in libpcp_pmda */
-    int	timecontrol;	/* Time control API */
-    int	pmc;		/* Metrics class operations */
-    int	derive;		/* Derived metrics functionality */
-    int	lock;		/* Synchronization and lock tracing */
-    int	interp;		/* Interpolate mode for archives */
-    int	config;		/* Configuration parameters */
-    int	pmapi;		/* PMAPI call tracing */
-    int	fault;		/* Fault injection tracing */
-    int	auth;		/* Authentication tracing */
-    int	discovery;	/* Service discovery tracing */
-    int	attr;		/* Connection attribute handling */
-    int	http;		/* Trace HTTP operations in libpcp_web */
-    int	desperate;	/* Verbose/Desperate level (developers only) */
-/* new ones start here, no DBG_TRACE_xxx macro and no backwards compatibility */
-    int	deprecated;	/* Report use of deprecated services */
-    int	exec;	 	/* __pmProcessExec and related calls */
-    int labels;		/* Metric label metadata operations */
-    int series;		/* Time series tracing */
-    int	libweb;		/* Trace services from libpcp_web */
-    int	appl3;		/* Application-specific flag 3 */
-    int	appl4;		/* Application-specific flag 4 */
-    int	appl5;		/* Application-specific flag 5 */
-} pmdebugoptions_t;
-
-PCP_DATA extern pmdebugoptions_t	pmDebugOptions;
-
-/*
- * Startup handling:
- * set/get program name, as used in pmNotifyErr() ... default is "pcp"
- */
-PCP_CALL extern void pmSetProgname(const char *);
-PCP_CALL extern char *pmGetProgname(void);
-
-/*
- * Special case PMIDs
- *   Domain DYNAMIC_PMID (number 511) is reserved for PMIDs representing
- *   the root of a dynamic subtree in the PMNS (and in this case the real
- *   domain number is encoded in the cluster field and the item field is
- *   zero).
- *   Domain DYNAMIC_PMID is also reserved for the PMIDs of derived metrics
- *   and in this case the item field is non-zero.  If a derived metric is
- *   written to a PCP archive, then the top bit is set in the cluster field
- *   (to disambiguate this from derived metics that must be evaluted on
- *   the pmFetch() path).
- */
-#define DYNAMIC_PMID	511
-#define IS_DYNAMIC_ROOT(x) (pmID_domain(x) == DYNAMIC_PMID && pmID_item(x) == 0)
-#define IS_DERIVED(x) (pmID_domain(x) == DYNAMIC_PMID && (pmID_cluster(x) & 2048) == 0 && pmID_item(x) != 0)
-
-/*
- * pmID helper functions
- */
-PCP_CALL extern pmID pmID_build(unsigned int, unsigned int, unsigned int);
-PCP_CALL extern unsigned int pmID_domain(pmID);
-PCP_CALL extern unsigned int pmID_cluster(pmID);
-PCP_CALL extern unsigned int pmID_item(pmID);
-
-/*
- * pmInDom helper functions
- */
-PCP_CALL extern pmInDom pmInDom_build(unsigned int, unsigned int);
-PCP_CALL extern unsigned int pmInDom_domain(pmInDom);
-PCP_CALL extern unsigned int pmInDom_serial(pmInDom);
-
-/*
- * Create a diagnostic log file (not an archive)
- */
-PCP_CALL extern FILE *pmOpenLog(const char *, const char *, FILE *, int *);
-
-/*
- * no mem today, my love has gone away ....
- */
-PCP_CALL extern void pmNoMem(const char *, size_t, int);
-#define PM_FATAL_ERR 1
-#define PM_RECOV_ERR 0
-
-/* standard error, warning and info wrapper for syslog(3) */
-PCP_CALL extern void pmNotifyErr(int, const char *, ...) __PM_PRINTFLIKE(2,3);
-/* make pmNotifyErr also add entries to syslog */
-PCP_CALL extern void pmSyslog(int);
-
-PCP_CALL extern void pmPrintDesc(FILE *, const pmDesc *);
-PCP_CALL extern void pmPrintLabelSets(FILE *, int, int, pmLabelSet *, int);
-
-/* struct timeval manipulations */
-PCP_CALL extern void pmtimevalNow(struct timeval *);
-PCP_CALL extern void pmtimevalInc(struct timeval *, const struct timeval *);
-PCP_CALL extern void pmtimevalDec(struct timeval *, const struct timeval *);
-PCP_CALL extern double pmtimevalAdd(const struct timeval *, const struct timeval *);
-PCP_CALL extern double pmtimevalSub(const struct timeval *, const struct timeval *);
-PCP_CALL extern double pmtimevalToReal(const struct timeval *);
-PCP_CALL extern void pmtimevalFromReal(double, struct timeval *);
-PCP_CALL extern void pmPrintStamp(FILE *, const struct timeval *);
-PCP_CALL extern void pmPrintHighResStamp(FILE *, const struct timespec *);
-
-/* filesystem path name separator */
-PCP_CALL extern int pmPathSeparator(void);
-
-/* platform independent set process identity */
-PCP_CALL extern int pmSetProcessIdentity(const char *);
-
-/*
- * get special PCP user name (for pmSetProcessIdentity() use) ...
- * default is "pcp"
- */
-PCP_CALL extern int pmGetUsername(char **);
-
-/* DSO PMDA helpers */
-PCP_CALL extern char *pmSpecLocalPMDA(const char *);
 
 #ifdef __cplusplus
 }

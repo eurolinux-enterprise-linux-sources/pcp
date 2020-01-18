@@ -14,7 +14,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "internal.h"
 
 /*
@@ -43,7 +43,6 @@ __pmSendTextReq(int fd, int from, int ident, int type)
     else /* (type & PM_TEXT_INDOM) */
 	pp->ident = __htonpmInDom((pmInDom)ident);
 
-    type &= ~PM_TEXT_DIRECT;
     pp->type = htonl(type);
 
     sts = __pmXmitPDU(fd, (__pmPDU *)pp);
@@ -125,7 +124,7 @@ int
 __pmDecodeText(__pmPDU *pdubuf, int *ident, char **buffer)
 {
     text_t	*pp;
-    char	*pduend, *bp;
+    char	*pduend;
     int		buflen;
 
     pp = (text_t *)pdubuf;
@@ -147,10 +146,9 @@ __pmDecodeText(__pmPDU *pdubuf, int *ident, char **buffer)
 	return PM_ERR_IPC;
     if (pduend - (char *)pp < sizeof(text_t) - sizeof(pp->buffer) + buflen)
 	return PM_ERR_IPC;
-    if ((bp = (char *)malloc(buflen+1)) == NULL)
+    if ((*buffer = (char *)malloc(buflen+1)) == NULL)
 	return -oserror();
-    strncpy(bp, pp->buffer, buflen);
-    bp[buflen] = '\0';
-    *buffer = bp;
+    strncpy(*buffer, pp->buffer, buflen);
+    (*buffer)[buflen] = '\0';
     return 0;
 }

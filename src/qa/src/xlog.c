@@ -8,7 +8,7 @@
 
 #include <ctype.h>
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
 
 static int	vflag;
 static int	numpmid;
@@ -97,7 +97,7 @@ main(int argc, char **argv)
     pmLogLabel	loglabel;
     pmLogLabel	duplabel;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "a:D:n:v")) != EOF) {
 	switch (c) {
@@ -110,7 +110,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -131,33 +131,33 @@ main(int argc, char **argv)
     }
 
     if (errflag) {
-	printf("Usage: %s %s\n", pmGetProgname(), usage);
+	printf("Usage: %s %s\n", pmProgname, usage);
 	exit(1);
     }
 
     if (namespace != PM_NS_DEFAULT && (sts = pmLoadASCIINameSpace(namespace, 1)) < 0) {
-	printf("%s: Cannot load namespace from \"%s\": %s\n", pmGetProgname(), namespace, pmErrStr(sts));
+	printf("%s: Cannot load namespace from \"%s\": %s\n", pmProgname, namespace, pmErrStr(sts));
 	exit(1);
     }
 
     if ((ctx[0] = pmNewContext(PM_CONTEXT_ARCHIVE, archive)) < 0) {
-	printf("%s: Cannot connect to archive \"%s\": %s\n", pmGetProgname(), archive, pmErrStr(ctx[0]));
+	printf("%s: Cannot connect to archive \"%s\": %s\n", pmProgname, archive, pmErrStr(ctx[0]));
 	exit(1);
     }
     if ((sts = pmGetArchiveLabel(&loglabel)) < 0) {
-	printf("%s: pmGetArchiveLabel(%d): %s\n", pmGetProgname(), ctx[0], pmErrStr(sts));
+	printf("%s: pmGetArchiveLabel(%d): %s\n", pmProgname, ctx[0], pmErrStr(sts));
 	exit(1);
     }
     if ((sts = pmSetMode(PM_MODE_INTERP, &loglabel.ll_start, 5)) < 0) {
-	printf("%s: pmSetMode: %s\n", pmGetProgname(), pmErrStr(sts));
+	printf("%s: pmSetMode: %s\n", pmProgname, pmErrStr(sts));
 	exit(1);
     }
     if ((ctx[1] = pmDupContext()) < 0) {
-	printf("%s: Cannot dup context: %s\n", pmGetProgname(), pmErrStr(ctx[1]));
+	printf("%s: Cannot dup context: %s\n", pmProgname, pmErrStr(ctx[1]));
 	exit(1);
     }
     if ((sts = pmGetArchiveLabel(&duplabel)) < 0) {
-	printf("%s: pmGetArchiveLabel(%d): %s\n", pmGetProgname(), ctx[1], pmErrStr(sts));
+	printf("%s: pmGetArchiveLabel(%d): %s\n", pmProgname, ctx[1], pmErrStr(sts));
 	exit(1);
     }
     if (loglabel.ll_magic != duplabel.ll_magic ||

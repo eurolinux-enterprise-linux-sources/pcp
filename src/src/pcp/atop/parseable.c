@@ -26,30 +26,26 @@
 void 	print_CPU();
 void 	print_cpu();
 void 	print_CPL();
-void 	print_GPU();
 void 	print_MEM();
 void 	print_SWP();
 void 	print_PAG();
-void 	print_PSI();
 void 	print_LVM();
 void 	print_MDD();
 void 	print_DSK();
-void 	print_NFM();
-void 	print_NFC();
-void 	print_NFS();
+void	print_NFM();
+void	print_NFC();
+void	print_NFS();
 void 	print_NET();
-void 	print_IFB();
 
 void 	print_PRG();
 void 	print_PRC();
 void 	print_PRM();
 void 	print_PRD();
 void 	print_PRN();
-void 	print_PRE();
 
 /*
 ** table with possible labels and the corresponding
-** print-function for parseable output
+** print-function for parseable output.
 */
 struct labeldef {
 	char	*label;
@@ -61,11 +57,9 @@ static struct labeldef	labeldef[] = {
 	{ "CPU",	0,	print_CPU },
 	{ "cpu",	0,	print_cpu },
 	{ "CPL",	0,	print_CPL },
-	{ "GPU",	0,	print_GPU },
 	{ "MEM",	0,	print_MEM },
 	{ "SWP",	0,	print_SWP },
 	{ "PAG",	0,	print_PAG },
-	{ "PSI",	0,	print_PSI },
 	{ "LVM",	0,	print_LVM },
 	{ "MDD",	0,	print_MDD },
 	{ "DSK",	0,	print_DSK },
@@ -73,14 +67,12 @@ static struct labeldef	labeldef[] = {
 	{ "NFC",	0,	print_NFC },
 	{ "NFS",	0,	print_NFS },
 	{ "NET",	0,	print_NET },
-	{ "IFB",	0,	print_IFB },
 
 	{ "PRG",	0,	print_PRG },
 	{ "PRC",	0,	print_PRC },
 	{ "PRM",	0,	print_PRM },
 	{ "PRD",	0,	print_PRD },
 	{ "PRN",	0,	print_PRN },
-	{ "PRE",	0,	print_PRE },
 };
 
 static int	numlabels = sizeof labeldef/sizeof(struct labeldef);
@@ -163,7 +155,9 @@ parsedef(char *pd)
 */
 char
 parseout(double timed, double delta,
-	 struct devtstat *devtstat, struct sstat *sstat,
+	 struct sstat *ss, struct tstat *ts, struct tstat **proclist,
+	 int ndeviat, int ntask, int nactproc,
+         int totproc, int totrun, int totslpi, int totslpu, int totzomb,
 	 int nexit, unsigned int noverflow, int flags)
 {
 	register int	i;
@@ -198,8 +192,7 @@ parseout(double timed, double delta,
 			/*
 			** call a selected print-function
 			*/
-			(labeldef[i].prifunc)(header, sstat,
-				devtstat->taskall, devtstat->ntaskall);
+			(labeldef[i].prifunc)(header, ss, ts, ndeviat);
 		}
 	}
 
@@ -261,13 +254,7 @@ print_CPU(char *hp, struct sstat *ss, struct tstat *ps, int nact)
         maxfreq = ss->cpu.cpu[0].freqcnt.maxfreq;
         calc_freqscale(maxfreq, cnt, ticks, &freq, &freqperc);
 
-	if (ss->cpu.all.instr == 1)
-	{
-        	ss->cpu.all.instr = 0;
-        	ss->cpu.all.cycle = 0;
-	}
-
-	printf("%s %u %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %d %lld %lld\n",
+	printf("%s %u %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld %d\n",
 			hp,
 			hertz,
 	        	ss->cpu.nrcpu,
@@ -281,9 +268,7 @@ print_CPU(char *hp, struct sstat *ss, struct tstat *ps, int nact)
         		ss->cpu.all.steal,
         		ss->cpu.all.guest,
                         freq,
-                        freqperc,
-        		ss->cpu.all.instr,
-        		ss->cpu.all.cycle
+                        freqperc
                         );
 }
 
@@ -306,7 +291,7 @@ print_cpu(char *hp, struct sstat *ss, struct tstat *ps, int nact)
                 calc_freqscale(maxfreq, cnt, ticks, &freq, &freqperc);
 
 		printf("%s %u %d %lld %lld %lld "
-		       "%lld %lld %lld %lld %lld %lld %lld %d %lld %lld\n",
+		       "%lld %lld %lld %lld %lld %lld %lld %d\n",
 			hp, hertz, i,
 	        	ss->cpu.cpu[i].stime,
         		ss->cpu.cpu[i].utime,
@@ -318,10 +303,7 @@ print_cpu(char *hp, struct sstat *ss, struct tstat *ps, int nact)
         		ss->cpu.cpu[i].steal,
         		ss->cpu.cpu[i].guest,
                         freq,
-                        freqperc,
-        		ss->cpu.cpu[i].instr,
-        		ss->cpu.cpu[i].cycle
-			);
+                        freqperc);
 	}
 }
 
@@ -336,28 +318,6 @@ print_CPL(char *hp, struct sstat *ss, struct tstat *ps, int nact)
 	        	ss->cpu.lavg15,
 	        	ss->cpu.csw,
 	        	ss->cpu.devint);
-}
-
-void
-print_GPU(char *hp, struct sstat *ss, struct tstat *ps, int nact)
-{
-	int	i;
-
-	for (i=0; i < ss->gpu.nrgpus; i++)
-	{
-		printf("%s %d %s %s %d %d %lld %lld %lld %lld %lld %lld\n",
-			hp, i,
-	        	ss->gpu.gpu[i].busid,
-	        	ss->gpu.gpu[i].type,
-	        	ss->gpu.gpu[i].gpupercnow,
-	        	ss->gpu.gpu[i].mempercnow,
-	        	ss->gpu.gpu[i].memtotnow,
-	        	ss->gpu.gpu[i].memusenow,
-	        	ss->gpu.gpu[i].samples,
-	        	ss->gpu.gpu[i].gpuperccum,
-	        	ss->gpu.gpu[i].memperccum,
-	        	ss->gpu.gpu[i].memusecum);
-	}
 }
 
 void
@@ -398,7 +358,7 @@ print_SWP(char *hp, struct sstat *ss, struct tstat *ps, int nact)
 void
 print_PAG(char *hp, struct sstat *ss, struct tstat *ps, int nact)
 {
-	printf("%s %u %lld %lld %lld %lld %lld\n",
+	printf(	"%s %u %lld %lld %lld %lld %lld\n",
 			hp,
 			pagesize,
 			ss->mem.pgscans,
@@ -406,24 +366,6 @@ print_PAG(char *hp, struct sstat *ss, struct tstat *ps, int nact)
 			(long long)0,
 			ss->mem.swins,
 			ss->mem.swouts);
-}
-
-void
-print_PSI(char *hp, struct sstat *ss, struct tstat *ps, int nact)
-{
-	printf("%s %c %.1f %.1f %.1f %llu %.1f %.1f %.1f %llu "
-	       "%.1f %.1f %.1f %llu %.1f %.1f %.1f %llu %.1f %.1f %.1f %llu\n",
-		hp, ss->psi.present ? 'y' : 'n',
-                ss->psi.cpusome.avg10, ss->psi.cpusome.avg60,
-                ss->psi.cpusome.avg300, ss->psi.cpusome.total,
-                ss->psi.memsome.avg10, ss->psi.memsome.avg60,
-                ss->psi.memsome.avg300, ss->psi.memsome.total,
-                ss->psi.memfull.avg10, ss->psi.memfull.avg60,
-                ss->psi.memfull.avg300, ss->psi.memfull.total,
-                ss->psi.iosome.avg10, ss->psi.iosome.avg60,
-                ss->psi.iosome.avg300, ss->psi.iosome.total,
-                ss->psi.iofull.avg10, ss->psi.iofull.avg60,
-                ss->psi.iofull.avg300, ss->psi.iofull.total);
 }
 
 void
@@ -463,41 +405,23 @@ print_MDD(char *hp, struct sstat *ss, struct tstat *ps, int nact)
 }
 
 void
-print_DSK(char *hp, struct sstat *ss, struct tstat *ps, int nact)
-{
-	register int	i;
-
-        for (i=0; ss->dsk.dsk[i].name[0]; i++)
-	{
-		printf(	"%s %s %lld %lld %lld %lld %lld\n",
-			hp,
-			ss->dsk.dsk[i].name,
-			ss->dsk.dsk[i].io_ms,
-			ss->dsk.dsk[i].nread,
-			ss->dsk.dsk[i].nrsect,
-			ss->dsk.dsk[i].nwrite,
-			ss->dsk.dsk[i].nwsect);
-	}
-}
-
-void
 print_NFM(char *hp, struct sstat *ss, struct tstat *ps, int nact)
 {
 	register int	i;
 
-        for (i=0; i < ss->nfs.nfsmounts.nrmounts; i++)
+        for (i=0; i < ss->nfs.nrmounts; i++)
 	{
 		printf("%s %s %lld %lld %lld %lld %lld %lld %lld %lld\n",
 			hp,
-			ss->nfs.nfsmounts.nfsmnt[i].mountdev,
-			ss->nfs.nfsmounts.nfsmnt[i].bytestotread,
-			ss->nfs.nfsmounts.nfsmnt[i].bytestotwrite,
-			ss->nfs.nfsmounts.nfsmnt[i].bytesread,
-			ss->nfs.nfsmounts.nfsmnt[i].byteswrite,
-			ss->nfs.nfsmounts.nfsmnt[i].bytesdread,
-			ss->nfs.nfsmounts.nfsmnt[i].bytesdwrite,
-			ss->nfs.nfsmounts.nfsmnt[i].pagesmread,
-			ss->nfs.nfsmounts.nfsmnt[i].pagesmwrite);
+			ss->nfs.nfsmnt[i].mountdev,
+			ss->nfs.nfsmnt[i].bytestotread,
+			ss->nfs.nfsmnt[i].bytestotread,
+			ss->nfs.nfsmnt[i].bytesread,
+			ss->nfs.nfsmnt[i].byteswrite,
+			ss->nfs.nfsmnt[i].bytesdread,
+			ss->nfs.nfsmnt[i].bytesdwrite,
+			ss->nfs.nfsmnt[i].pagesmread,
+			ss->nfs.nfsmnt[i].pagesmwrite);
 	}
 }
 
@@ -520,8 +444,8 @@ print_NFS(char *hp, struct sstat *ss, struct tstat *ps, int nact)
 	        "%lld %lld %lld %lld %lld\n",
 			hp,
 			ss->nfs.server.rpccnt,
-			ss->nfs.server.rpcread,
-			ss->nfs.server.rpcwrite,
+			ss->nfs.client.rpcread,
+			ss->nfs.client.rpcwrite,
 			ss->nfs.server.nrbytes,
 			ss->nfs.server.nwbytes,
 			ss->nfs.server.rpcbadfmt,
@@ -534,6 +458,24 @@ print_NFS(char *hp, struct sstat *ss, struct tstat *ps, int nact)
 			ss->nfs.server.rchits,
 			ss->nfs.server.rcmiss,
 			ss->nfs.server.rcnoca);
+}
+
+void
+print_DSK(char *hp, struct sstat *ss, struct tstat *ps, int nact)
+{
+	register int	i;
+
+        for (i=0; ss->dsk.dsk[i].name[0]; i++)
+	{
+		printf(	"%s %s %lld %lld %lld %lld %lld\n",
+			hp,
+			ss->dsk.dsk[i].name,
+			ss->dsk.dsk[i].io_ms,
+			ss->dsk.dsk[i].nread,
+			ss->dsk.dsk[i].nrsect,
+			ss->dsk.dsk[i].nwrite,
+			ss->dsk.dsk[i].nwsect);
+	}
 }
 
 void
@@ -573,69 +515,43 @@ print_NET(char *hp, struct sstat *ss, struct tstat *ps, int nact)
 	}
 }
 
-void
-print_IFB(char *hp, struct sstat *ss, struct tstat *ps, int nact)
-{
-	register int 	i;
-
-	for (i=0; i < ss->ifb.nrports; i++)
-	{
-		printf(	"%s %s %hd %hd %lld %lld %lld %lld %lld\n",
-			hp,
-			ss->ifb.ifb[i].ibname,
-			ss->ifb.ifb[i].portnr,
-			ss->ifb.ifb[i].lanes,
-			ss->ifb.ifb[i].rate,
-			ss->ifb.ifb[i].rcvb,
-			ss->ifb.ifb[i].sndb,
-			ss->ifb.ifb[i].rcvp,
-			ss->ifb.ifb[i].sndp);
-	}
-}
-
 /*
 ** print functions for process-level statistics
 */
 void
 print_PRG(char *hp, struct sstat *ss, struct tstat *ps, int nact)
 {
-	register int i, exitcode;
+	register int i;
 
 	for (i=0; i < nact; i++, ps++)
 	{
-		if (ps->gen.excode & 0xff)	// killed by signal?
-			exitcode = (ps->gen.excode & 0x7f) + 256;
-		else
-			exitcode = (ps->gen.excode >>   8) & 0xff;
-
 		printf("%s %d (%s) %c %d %d %d %d %d %ld (%s) %d %d %d %d "
- 		       "%d %d %d %d %d %d %ld %c %d %d %s\n",
-			hp,
-			ps->gen.pid,
-			ps->gen.name,
-			ps->gen.state,
-			ps->gen.ruid,
-			ps->gen.rgid,
-			ps->gen.tgid,
-			ps->gen.nthr,
-			exitcode,
-			ps->gen.btime,
-			ps->gen.cmdline,
-			ps->gen.ppid,
-			ps->gen.nthrrun,
-			ps->gen.nthrslpi,
-			ps->gen.nthrslpu,
-			ps->gen.euid,
-			ps->gen.egid,
-			ps->gen.suid,
-			ps->gen.sgid,
-			ps->gen.fsuid,
-			ps->gen.fsgid,
-			ps->gen.elaps,
-			ps->gen.isproc ? 'y':'n',
-			ps->gen.vpid,
-			ps->gen.ctid,
-			ps->gen.container[0] ? ps->gen.container:"-");
+ 		       "%d %d %d %d %d %d %ld %c %d %d\n",
+				hp,
+				ps->gen.pid,
+				ps->gen.name,
+				ps->gen.state,
+				ps->gen.ruid,
+				ps->gen.rgid,
+				ps->gen.tgid,
+				ps->gen.nthr,
+				ps->gen.excode,
+				ps->gen.btime,
+				ps->gen.cmdline,
+				ps->gen.ppid,
+				ps->gen.nthrrun,
+				ps->gen.nthrslpi,
+				ps->gen.nthrslpu,
+				ps->gen.euid,
+				ps->gen.egid,
+				ps->gen.suid,
+				ps->gen.sgid,
+				ps->gen.fsuid,
+				ps->gen.fsgid,
+				ps->gen.elaps,
+				ps->gen.isproc ? 'y':'n',
+				ps->gen.vpid,
+				ps->gen.ctid);
 	}
 }
 
@@ -659,7 +575,7 @@ print_PRC(char *hp, struct sstat *ss, struct tstat *ps, int nact)
 				ps->cpu.rtprio,
 				ps->cpu.policy,
 				ps->cpu.curcpu,
-				ps->cpu.sleepavg,
+				0, /* ps->cpu.sleepavg - not in kernel now */
 				ps->gen.tgid,
 				ps->gen.isproc ? 'y':'n');
 	}
@@ -738,28 +654,5 @@ print_PRN(char *hp, struct sstat *ss, struct tstat *ps, int nact)
 				ps->net.udprcv, ps->net.udprsz,
 				0,              0,
 				ps->gen.tgid,   ps->gen.isproc ? 'y':'n');
-	}
-}
-
-void
-print_PRE(char *hp, struct sstat *ss, struct tstat *ps, int nact)
-{
-	register int i;
-
-	for (i=0; i < nact; i++, ps++)
-	{
-		printf("%s %d (%s) %c %c %d %x %d %d %lld %lld %lld\n",
-				hp,
-				ps->gen.pid,
-				ps->gen.name,
-				ps->gen.state,
-				ps->gpu.state == '\0' ? 'N':ps->gpu.state,
-				ps->gpu.nrgpus,
-				ps->gpu.gpulist,
-				ps->gpu.gpubusy,
-				ps->gpu.membusy,
-				ps->gpu.memnow,
-				ps->gpu.memcum,
-				ps->gpu.sample);
 	}
 }

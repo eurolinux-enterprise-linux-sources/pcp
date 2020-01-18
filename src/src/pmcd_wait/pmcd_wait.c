@@ -15,7 +15,7 @@
 
 #include <limits.h>
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 
 /* possible exit states */
 #define EXIT_STS_SUCCESS 	0
@@ -48,7 +48,7 @@ PrintTimeout(void)
     if (verbose) {
 	fprintf(stderr, "%s: Failed to connect to PMCD on host \"%s\""
 		" in %ld seconds\n",
-		pmGetProgname(), hostname, delta);
+		pmProgname, hostname, delta);
     }
 }
 
@@ -69,7 +69,7 @@ main(int argc, char **argv)
     }
 
     if (opts.optind < argc) {
-	pmprintf("%s: Too many arguments\n", pmGetProgname());
+	pmprintf("%s: Too many arguments\n", pmProgname);
 	opts.errors++;
     }
 
@@ -77,7 +77,7 @@ main(int argc, char **argv)
 	delta = opts.interval.tv_sec;
 	if (delta <= 0) {
 	    pmprintf("%s: -t argument must be at least 1 second\n",
-		pmGetProgname());
+		pmProgname);
 	    opts.errors++;
 	}
     }
@@ -88,11 +88,7 @@ main(int argc, char **argv)
     }
 
     if (opts.nhosts == 0)
-#if defined(HAVE_STRUCT_SOCKADDR_UN)
-	hostname = "unix:";
-#else
 	hostname = "local:";
-#endif
     else
 	hostname = opts.hosts[0];
 
@@ -100,7 +96,7 @@ main(int argc, char **argv)
     if (sts < 0) {
 	if (verbose) {
 	    fprintf(stderr, "%s: Failed to create env string: %s\n",
-		pmGetProgname(), osstrerror());
+		pmProgname, osstrerror());
 	}
 	exit(EXIT_STS_UNIXERR);
     }
@@ -108,7 +104,7 @@ main(int argc, char **argv)
     if (sts != 0) {
 	if (verbose) {
 	    fprintf(stderr, "%s: Failed to set PMCD_CONNECT_TIMEOUT: %s\n",
-		pmGetProgname(), osstrerror());
+		pmProgname, osstrerror());
 	}
 	exit(EXIT_STS_UNIXERR);
     }
@@ -138,7 +134,7 @@ main(int argc, char **argv)
 	else {
 	    if (verbose) {
 		fprintf(stderr, "%s: Cannot connect to PMCD on host \"%s\": %s\n",
-			pmGetProgname(), hostname, pmErrStr(sts));
+			pmProgname, hostname, pmErrStr(sts));
 	    }
 	    if (sts > PM_ERR_BASE)
 		exit(EXIT_STS_UNIXERR);

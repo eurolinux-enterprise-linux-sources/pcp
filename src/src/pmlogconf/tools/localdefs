@@ -4,22 +4,16 @@ FILES = \
 	atop-summary \
 	atop-httpstats \
 	atop-nfsclient \
-	atop-perfevent \
 	atop-hotproc \
-	atop-gpustats \
-	atop-infiniband \
 	collectl \
 	collectl-summary \
 	collectl-interrupts \
 	dmcache \
-	dstat \
-	dstat-summary \
 	free \
 	free-summary \
 	hotproc \
 	iostat \
 	ip \
-	ipcs \
 	mpstat \
 	mpstat-summary \
 	mpstat-interrupts \

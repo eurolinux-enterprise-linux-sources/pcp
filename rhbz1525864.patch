@@ -1,0 +1,25 @@
+diff -Naurp pcp-3.12.2.orig/src/pmdas/perfevent/configparser.l pcp-3.12.2/src/pmdas/perfevent/configparser.l
+--- pcp-3.12.2.orig/src/pmdas/perfevent/configparser.l	2017-09-06 06:00:26.000000000 +1000
++++ pcp-3.12.2/src/pmdas/perfevent/configparser.l	2018-01-30 08:05:25.603971547 +1100
+@@ -289,6 +289,10 @@ static void set_pmcsetting_derived_scale
+     if (context_derived)
+     {
+         setting_lists = config->derivedArr[config->nDerivedEntries-1].setting_lists;
++        if (NULL == setting_lists)
++        {
++            return;
++        }
+         while (setting_lists->next)
+         {
+             setting_lists = setting_lists->next;
+@@ -318,6 +322,10 @@ static void set_pmcsetting_cpuconfig(con
+     if (context_derived)
+     {
+         setting_lists = config->derivedArr[config->nDerivedEntries-1].setting_lists;
++        if (NULL == setting_lists)
++        {
++            return;
++        }
+         while (setting_lists->next)
+         {
+             setting_lists = setting_lists->next;

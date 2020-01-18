@@ -23,7 +23,7 @@ trace()
     summary=$2
 
     echo "Raw dump:"
-    pmdumplog -dilmst $archive
+    pmdumplog -a $archive
     echo
     echo "Summary:"
     cat $summary

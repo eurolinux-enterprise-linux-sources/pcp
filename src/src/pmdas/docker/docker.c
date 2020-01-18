@@ -15,7 +15,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "pmda.h"
 #include "pmjson.h"
 #include "domain.h"
@@ -478,12 +478,13 @@ docker_store(pmResult *result, pmdaExt *pmda)
 
     for (i = 0; i < result->numpmid; i++) {
 	pmValueSet *vsp = result->vset[i];
+	__pmID_int *idp = (__pmID_int *)&(vsp->pmid);
 	pmAtomValue av;
  
-	if (pmID_cluster(vsp->pmid) != CLUSTER_CONTROL)
+	if (idp->cluster != CLUSTER_CONTROL)
 	    return PM_ERR_PMID;
 
-	switch (pmID_item(vsp->pmid)) {
+	switch (idp->item) {
 	case 0:
 	    if (pmExtractValue(vsp->valfmt, &vsp->vlist[0], PM_TYPE_U64, &av, PM_TYPE_U64) < 0)
 		return PM_ERR_VALUE;
@@ -504,7 +505,7 @@ docker_store(pmResult *result, pmdaExt *pmda)
 static int
 docker_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 {
-    unsigned int	item = pmID_item(mdesc->m_desc.pmid);
+    __pmID_int		*idp = (__pmID_int *)&(mdesc->m_desc.pmid);
     int			sts = 0;
     char		*name;
     json_metric_desc	*local_metrics;
@@ -512,7 +513,7 @@ docker_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 
     pthread_mutex_lock(&stats_mutex);
 
-    switch (pmID_cluster(mdesc->m_desc.pmid)) {
+    switch (idp->cluster) {
     case CLUSTER_BASIC:
 
 	indom = INDOM(CONTAINERS_INDOM);
@@ -524,27 +525,27 @@ docker_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 		break;
 	    }
 	}
-	switch (item) {
+	switch (idp->item) {
 	case 0:		/* docker.pid */
-	    atom->ll = local_metrics[item].values.l;
+	    atom->ll = local_metrics[idp->item].values.l;
 	    sts = PMDA_FETCH_STATIC;
 	    break;
 	case 1:             /* docker.name */
-	    atom->cp = *local_metrics[item].values.cp == '/' ?
-			local_metrics[item].values.cp + 1 :
-			local_metrics[item].values.cp;
+	    atom->cp = *local_metrics[idp->item].values.cp == '/' ?
+			local_metrics[idp->item].values.cp + 1 :
+			local_metrics[idp->item].values.cp;
 	    sts = PMDA_FETCH_STATIC;
 	    break;
 	case 2:             /* docker.running */
-	    atom->ul = (local_metrics[item].values.ll & CONTAINER_FLAG_RUNNING) != 0;
+	    atom->ul = (local_metrics[idp->item].values.ll & CONTAINER_FLAG_RUNNING) != 0;
 	    sts = PMDA_FETCH_STATIC;
 	    break;
 	case 3:                /* docker.paused */
-	    atom->ul = local_metrics[item].values.ll;
+	    atom->ul = local_metrics[idp->item].values.ll;
 	    sts = PMDA_FETCH_STATIC;
 	    break;
 	case 4:                /* docker.restarting */
-	    atom->ul = local_metrics[item].values.ll;
+	    atom->ul = local_metrics[idp->item].values.ll;
 	    sts = PMDA_FETCH_STATIC;
 	    break;
 	default:
@@ -554,7 +555,7 @@ docker_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	break;
 
     case CLUSTER_VERSION:
-	switch (item) {
+	switch (idp->item) {
 	case 0:               /* docker.version */
 	case 1:               /* docker.os */
 	case 2:               /* docker.kernel */
@@ -562,7 +563,7 @@ docker_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	case 4:               /* docker.commit */
 	case 5:               /* docker.arch */
 	case 6:               /* docker.apiversion */
-	    if ((atom->cp = version_metrics[item].values.cp) == NULL)
+	    if ((atom->cp = version_metrics[idp->item].values.cp) == NULL)
 		sts = PMDA_FETCH_NOVALUES;
 	    else
 		sts = PMDA_FETCH_STATIC;
@@ -583,8 +584,8 @@ docker_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 		break;
 	    }
 	}
-	if (item <= 48) {
-	    atom->ull = local_metrics[item].values.ull;
+	if (idp->item <= 48) {
+	    atom->ull = local_metrics[idp->item].values.ull;
 	    sts = PMDA_FETCH_STATIC;
 	}
 	else {
@@ -593,7 +594,7 @@ docker_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	break;
 
     case CLUSTER_CONTROL:
-	switch (item) {
+	switch (idp->item) {
 	case 0:
 	    pthread_mutex_lock(&refresh_mutex);
 	    atom->ull = thread_freq;
@@ -630,7 +631,7 @@ notready(void)
 	else
 	    sleep(1);
 	if (iterations++ > 30) { /* Complain every 30 seconds. */
-	    pmNotifyErr(LOG_WARNING, "notready waited too long");
+	    __pmNotifyErr(LOG_WARNING, "notready waited too long");
 	    iterations = 0; /* XXX: or exit? */
 	}
     }
@@ -653,7 +654,7 @@ docker_fetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *pmda)
 }
 
 static int
-docker_instance(pmInDom id, int i, char *name, pmInResult **in, pmdaExt *pmda)
+docker_instance(pmInDom id, int i, char *name, __pmInResult **in, pmdaExt *pmda)
 {
     int local_ready;
 
@@ -706,7 +707,7 @@ grab_values(char *json_query, pmInDom indom, char *local_path, json_metric_desc 
 			&http_data.json[0], sizeof(http_data.json),
 			json_query, strlen(json_query))) < 0) {
 	if (pmDebugOptions.appl1)
-	    pmNotifyErr(LOG_ERR, "HTTP fetch (stats) failed\n");
+	    __pmNotifyErr(LOG_ERR, "HTTP fetch (stats) failed\n");
 	return 0; // failed
     }
     http_data.json_len = strlen(http_data.json);
@@ -721,15 +722,14 @@ grab_values(char *json_query, pmInDom indom, char *local_path, json_metric_desc 
     if (sts != PMDA_CACHE_INACTIVE && sts != PMDA_CACHE_ACTIVE) {
 	if (pmDebugOptions.attr) {
 	    fprintf(stderr, "%s: adding docker container %s\n",
-		    pmGetProgname(), local_path);
+		    pmProgname, local_path);
 	}
 	if (!(local_metrics = calloc(json_size, sizeof(json_metric_desc)))) {
 	    if (pmDebugOptions.attr) {
 		fprintf(stderr, "%s: cannot allocate container %s space\n",
-			pmGetProgname(), local_path);
+			pmProgname, local_path);
 	    }
-	    sts = -ENOMEM;
-	    goto unlock;
+	    return 0;
 	}
     }
     memcpy(local_metrics, json, (sizeof(json_metric_desc)*json_size));
@@ -817,15 +817,15 @@ refresh_insts(char *path)
     if ((rundir = opendir(path)) == NULL) {
 	if (pmDebugOptions.attr)
 	    fprintf(stderr, "%s: skipping docker path %s\n",
-		    pmGetProgname(), path);
+		    pmProgname, path);
 	return;
     }
     refresh_version(path);
     while ((drp = readdir(rundir)) != NULL) {
 	if (*(local_path = &drp->d_name[0]) == '.') {
 	    if (pmDebugOptions.attr)
-		pmNotifyErr(LOG_DEBUG, "%s: skipping %s\n",
-			      pmGetProgname(), drp->d_name);
+		__pmNotifyErr(LOG_DEBUG, "%s: skipping %s\n",
+			      pmProgname, drp->d_name);
 	    continue;
 	}
 	refresh_basic(local_path);
@@ -865,19 +865,19 @@ docker_init(pmdaInterface *dp)
     int         i, sts;
     int        *loop = (int*)1;
     if (isDSO) {
-	int sep = pmPathSeparator();
+	int sep = __pmPathSeparator();
 	pmsprintf(mypath, sizeof(mypath), "%s%c" "docker" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
 	pmdaDSO(dp, PMDA_INTERFACE_6, "docker DSO", mypath);
     } else {
-	pmSetProcessIdentity(username);
+	__pmSetProcessIdentity(username);
     }
 
     if (dp->status != 0)
 	return;
     
     if ((http_client = pmhttpNewClient()) == NULL) {
-	pmNotifyErr(LOG_ERR, "HTTP client creation failed\n");
+	__pmNotifyErr(LOG_ERR, "HTTP client creation failed\n");
 	exit(1);
     }
 
@@ -898,11 +898,11 @@ docker_init(pmdaInterface *dp)
     docker_setup();
     sts = pthread_create(&docker_query_thread, NULL, docker_background_loop, loop);
     if (sts != 0) {
-	pmNotifyErr(LOG_DEBUG, "docker_init: Cannot spawn new thread: %d\n", sts);
+	__pmNotifyErr(LOG_DEBUG, "docker_init: Cannot spawn new thread: %d\n", sts);
 	dp->status = sts;
     }
     else
-	pmNotifyErr(LOG_DEBUG, "docker_init: properly spawned new thread");
+	__pmNotifyErr(LOG_DEBUG, "docker_init: properly spawned new thread");
     
 }
  
@@ -926,7 +926,7 @@ static pmdaOptions opts = {
 int
 main(int argc, char **argv)
 {
-    int			sep = pmPathSeparator();
+    int			sep = __pmPathSeparator();
     pmdaInterface	dispatch;
     int			qaflag = 0;
     int			c, err = 0;
@@ -935,7 +935,7 @@ main(int argc, char **argv)
 
     pmsprintf(mypath, sizeof(mypath), "%s%c" "docker" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-    pmdaDaemon(&dispatch, PMDA_INTERFACE_6, pmGetProgname(), DOCKER,
+    pmdaDaemon(&dispatch, PMDA_INTERFACE_6, pmProgname, DOCKER,
 		"docker.log", mypath);
 
     while ((c = pmdaGetOpt(argc, argv, "CD:d:l:U:?", &dispatch, &err)) != EOF) {

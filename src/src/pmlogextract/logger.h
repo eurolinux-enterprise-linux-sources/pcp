@@ -1,38 +1,38 @@
 /*
- * Copyright (c) 2018 Red Hat.
  * Copyright (c) 2004 Silicon Graphics, Inc.  All Rights Reserved.
- *
+ * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
  * Free Software Foundation; either version 2 of the License, or (at your
  * option) any later version.
- *
+ * 
  * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
  * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * for more details.
+ * 
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  *
  * common data structures for pmlogextract
  */
 
-#ifndef PCP_LOGGER_H
-#define PCP_LOGGER_H
+#ifndef _LOGGER_H
+#define _LOGGER_H
 
 #include "pmapi.h"
-#include "libpcp.h"
 
 /*
  *  list of pdu's to write out at start of time window
  */
-typedef struct reclist {
+typedef struct _reclist_t {
     __pmPDU		*pdu;		/* PDU ptr */
-    pmTimeval		stamp;		/* for indom and label records */
+    __pmTimeval		stamp;		/* for indom records */
     pmDesc		desc;
-    unsigned int	written : 16;	/* written PDU status */
-    unsigned int	sorted : 16;	/* sorted indom status */
-    unsigned int	nrecs;		/* indom array record size */
-    struct reclist	*recs;		/* time-sorted array of records */
-    struct reclist	*next;		/* ptr to next reclist_t record */
+    int			written;	/* written status */
+    struct _reclist_t	*ptr;		/* ptr to record in another reclist */
+    struct _reclist_t	*next;		/* ptr to next reclist_t record */
 } reclist_t;
 
 /*
@@ -47,9 +47,6 @@ typedef struct {
     pmResult	*_Nresult;
     int		eof[2];
     int		mark;		/* need EOL marker */
-    int		recnum;
-    int64_t	pmcd_pid;	/* from prologue/epilogue records */
-    int32_t	pmcd_seqnum;	/* from prologue/epilogue records */
 } inarch_t;
 
 extern inarch_t	*inarch;	/* input archive control(s) */
@@ -106,13 +103,11 @@ extern int	yyparse(void);
 extern void	dometric(const char *);
 
 /* log I/O helper routines */
-extern int _pmLogGet(__pmArchCtl *, int, __pmPDU **);
+extern int _pmLogGet(__pmLogCtl *, int, __pmPDU **);
 extern int _pmLogPut(__pmFILE *, __pmPDU *);
 extern pmUnits ntoh_pmUnits(pmUnits);
 #define ntoh_pmInDom(indom) ntohl(indom)
 #define ntoh_pmID(pmid) ntohl(pmid)
-#define ntoh_pmLabelType(ltype) ntohl(ltype)
-#define ntoh_pmTextType(ltype) ntohl(ltype)
 
 /* internal routines */
 extern void insertresult(rlist_t **, pmResult *);
@@ -120,4 +115,4 @@ extern pmResult *searchmlist(pmResult *);
 extern void abandon_extract(void);
 
 
-#endif /* PCP_LOGGER_H */
+#endif /* _LOGGER_H */

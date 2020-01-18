@@ -1,9 +1,24 @@
 QA output created by 778
+Waiting for pmcd to terminate ...
 
 === postgresql agent installation ===
-Check postgresql metrics have appeared ... X warnings, Y metrics and Z values
+You will need to choose an appropriate configuration for installation of
+the "postgresql" Performance Metrics Domain Agent (PMDA).
+
+  collector	collect performance statistics on this system
+  monitor	allow this system to monitor local and/or remote systems
+  both		collector and monitor configuration for this system
+
+Please enter c(ollector) or m(onitor) or b(oth) [b] Updating the Performance Metrics Name Space (PMNS) ...
+Terminate PMDA if already installed ...
+[...install files, make output...]
+Updating the PMCD control file, and notifying PMCD ...
+Starting pmcd ... 
+Check postgresql metrics have appeared ... X metrics and Y values
 
 === check values with pmie ===
+DATE: postgresql.active.xlog_current_location_offset: OK
+DATE: postgresql.stat.activity.datid: OK
 DATE: postgresql.stat.all_indexes.idx_tup_read: OK
 DATE: postgresql.stat.all_tables.idx_tup_fetch: OK
 DATE: postgresql.stat.database.tup_returned: OK
@@ -17,6 +32,7 @@ validate values ...
 
 === pg_stat_activity ===
 client_port: match
+backend_start: match
 
 === pg_stat_bgwriter ===
 checkpoints_timed: match
@@ -56,3 +72,6 @@ postgresql ... done
 Updating the PMCD control file, and notifying PMCD ...
 [...removing files...]
 Check postgresql metrics have gone away ... OK
+Waiting for pmcd to terminate ...
+Starting pmcd ... 
+Starting pmlogger ... 

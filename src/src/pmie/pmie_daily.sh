@@ -1,6 +1,6 @@
 #! /bin/sh
 #
-# Copyright (c) 2013-2016,2018 Red Hat.
+# Copyright (c) 2013-2016 Red Hat.
 # Copyright (c) 2007 Aconex.  All Rights Reserved.
 # Copyright (c) 1995-2000,2003 Silicon Graphics, Inc.  All Rights Reserved.
 #
@@ -19,7 +19,6 @@
 
 . $PCP_DIR/etc/pcp.env
 . $PCP_SHARE_DIR/lib/rc-proc.sh
-. $PCP_SHARE_DIR/lib/utilproc.sh
 
 # added to handle problem when /var/log/pcp is a symlink, as first
 # reported by Micah_Altman@harvard.edu in Nov 2001
@@ -213,24 +212,13 @@ done
 
 [ $# -ne 0 ] && _usage
 
-if $SHOWME
-then
-    :
-else
-    # Salt away previous log, if any ...
-    #
-    _save_prev_file "$PROGLOG"
-    # After argument checking, everything must be logged to ensure no mail is
-    # accidentally sent from cron.  Close stdout and stderr, then open stdout
-    # as our logfile and redirect stderr there too.  Create the log file with
-    # correct ownership first.
-    #
-    # Exception ($SHOWME, above) is for -N where we want to see the output.
-    #
-    touch "$PROGLOG"
-    chown $PCP_USER:$PCP_GROUP "$PROGLOG" >/dev/null 2>&1
-    exec 1>"$PROGLOG" 2>&1
-fi
+# after argument checking, everything must be logged to ensure no mail is
+# accidentally sent from cron.  Close stdout and stderr, then open stdout
+# as our logfile and redirect stderr there too.
+#
+[ -f "$PROGLOG" ] && mv "$PROGLOG" "$PROGLOG.prev"
+exec 1>"$PROGLOG"
+exec 2>&1
 
 if [ ! -f "$CONTROL" ]
 then
@@ -413,13 +401,7 @@ s/^\([A-Za-z][A-Za-z0-9_]*\)=/export \1; \1=/p
 	    continue
 	fi
 
-	if cd "$dir" >/dev/null 2>&1
-	then
-	    :
-	else
-	    _error "cannot chdir to directory ($dir) for pmie log file"
-	    continue
-	fi
+	cd "$dir"
 	dir=`$PWDCMND`
 	$SHOWME && echo "+ cd $dir"
 

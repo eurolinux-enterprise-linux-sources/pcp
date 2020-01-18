@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013,2019 Red Hat.
+ * Copyright (c) 2012-2013 Red Hat.
  * Copyright (c) 1995-2002 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -14,7 +14,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "pmcd.h"
 #include <assert.h>
 
@@ -52,7 +52,7 @@ SplitResult(pmResult *res)
 	aFreq = (int *)malloc((nAgents + 1) * sizeof(int));
 	resIndex = (int *)malloc((nAgents + 1) * sizeof(int));
 	if (aFreq == NULL || resIndex == NULL) {
-	    pmNoMem("SplitResult.freq", 2 * (nAgents + 1) * sizeof(int), PM_FATAL_ERR);
+	    __pmNoMem("SplitResult.freq", 2 * (nAgents + 1) * sizeof(int), PM_FATAL_ERR);
 	}
     }
 
@@ -81,7 +81,7 @@ SplitResult(pmResult *res)
     need = nGood + 1 + ((aFreq[nAgents]) ? 1 : 0);
     need *= sizeof(pmResult *);
     if ((results = (pmResult **) malloc(need)) == NULL) {
-	pmNoMem("SplitResult.results", need, PM_FATAL_ERR);
+	__pmNoMem("SplitResult.results", need, PM_FATAL_ERR);
     }
     j = 0;
     for (i = 0; i <= nAgents; i++)
@@ -89,7 +89,7 @@ SplitResult(pmResult *res)
 	    need = (int)sizeof(pmResult) + (aFreq[i] - 1) * (int)sizeof(pmValueSet *);
 	    results[j] = (pmResult *) malloc(need);
 	    if (results[j] == NULL) {
-		pmNoMem("SplitResult.domain", need, PM_FATAL_ERR);
+		__pmNoMem("SplitResult.domain", need, PM_FATAL_ERR);
 	    }
 	    results[j]->numpmid = aFreq[i];
 	    j++;
@@ -97,7 +97,7 @@ SplitResult(pmResult *res)
 
     /* Make the "end of list" pmResult */
     if ((results[j] = (pmResult *) malloc(sizeof(pmResult))) == NULL) {
-	pmNoMem("SplitResult.domain", sizeof(pmResult), PM_FATAL_ERR);
+	__pmNoMem("SplitResult.domain", sizeof(pmResult), PM_FATAL_ERR);
     }
     results[j]->numpmid = 0;
 
@@ -153,7 +153,7 @@ DoStore(ClientInfo *cp, __pmPDU* pb)
     __pmFD_ZERO(&waitFds);
     for (i = 0; dResult[i]->numpmid > 0; i++) {
 	int fd;
-	ap = pmcd_agent(((__pmID_int *)&dResult[i]->vset[0]->pmid)->domain);
+	ap = FindDomainAgent(((__pmID_int *)&dResult[i]->vset[0]->pmid)->domain);
 	/* If it's in a "good" list, pmID has agent that is connected */
 	assert(ap != NULL);
 
@@ -210,7 +210,7 @@ DoStore(ClientInfo *cp, __pmPDU* pb)
 	    s = __pmSelectRead(maxFd+1, &readyFds, &timeout);
 
 	    if (s == 0) {
-		pmNotifyErr(LOG_INFO, "DoStore: select timeout");
+		__pmNotifyErr(LOG_INFO, "DoStore: select timeout");
 
 		/* Timeout, terminate agents that haven't responded */
 		for (i = 0; i < nAgents; i++) {
@@ -226,7 +226,7 @@ DoStore(ClientInfo *cp, __pmPDU* pb)
 		if (neterror() == EINTR)
 		    goto retry;
 		/* this is not expected to happen! */
-		pmNotifyErr(LOG_ERR, "DoStore: fatal select failure: %s\n",
+		__pmNotifyErr(LOG_ERR, "DoStore: fatal select failure: %s\n",
 			netstrerror());
 		Shutdown();
 		exit(1);

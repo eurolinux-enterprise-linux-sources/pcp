@@ -13,7 +13,7 @@
 # 
 use strict;
 
-package PCP::RESTClient;
+package RESTClient;
 use JSON;
 
 sub new {

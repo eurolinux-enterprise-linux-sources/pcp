@@ -62,6 +62,7 @@ cp * $PCP_PMDAS_DIR/idiot
 
 $sudo ./Remove >/dev/null 2>&1
 cat <<End-of-File | $sudo ./Install >$tmp.out 2>&1
+both
 dso
 End-of-File
 
@@ -102,6 +103,7 @@ done
 
 $sudo ./Remove >/dev/null 2>&1
 cat <<End-of-File | $sudo ./Install >$tmp.out 2>&1
+both
 dso
 End-of-File
 

@@ -24,6 +24,7 @@ TARGETS = $(CMDTARGET1) $(CMDTARGET2)
 LLDLIBS	= $(PCPLIB)
 LDIRT	= pmnsmap.h mylog.* runme.sh *.o $(TARGETS)
 CONFIGS	= pmnsmap.spec pmlogger.config
+LSRCFILES = README GNUmakefile.install $(CONFIGS)
 DEMODIR	= $(PCP_DEMOS_DIR)/pmclient
 
 default:	$(TARGETS)
@@ -58,9 +59,3 @@ pmnsmap.h:	pmgenmap.sh pmnsmap.spec
 default_pcp:	default
 
 install_pcp:	install
-
-pmclient.o pmclient_fg.o:	$(TOPDIR)/src/include/pcp/libpcp.h
-
-check::	$(CFILES)
-	$(CLINT) $(CFILES)
-	$(PYLINT) $(PYFILES)

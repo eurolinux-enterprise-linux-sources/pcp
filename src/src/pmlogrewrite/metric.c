@@ -16,7 +16,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "logger.h"
 #include <assert.h>
 
@@ -29,12 +29,12 @@ start_metric(pmID pmid)
     metricspec_t	*mp;
     int			sts;
 
-    if (pmDebugOptions.appl4)
+    if (pmDebugOptions.appl0 && pmDebugOptions.appl1)
 	fprintf(stderr, "start_metric(%s)", pmIDStr(pmid));
 
     for (mp = metric_root; mp != NULL; mp = mp->m_next) {
 	if (pmid == mp->old_desc.pmid) {
-	    if (pmDebugOptions.appl4)
+	    if (pmDebugOptions.appl0 && pmDebugOptions.appl1)
 		fprintf(stderr, " -> %s\n", mp->old_name);
 	    break;
 	}
@@ -77,7 +77,7 @@ start_metric(pmID pmid)
 	mp->new_desc = mp->old_desc;
 	mp->flags = 0;
 	mp->ip = NULL;
-	if (pmDebugOptions.appl4)
+	if (pmDebugOptions.appl0 && pmDebugOptions.appl1)
 	    fprintf(stderr, " -> %s [new entry]\n", mp->old_name);
     }
 
@@ -182,7 +182,7 @@ do_desc(void)
 	    }
 	    if (i == numnames) {
 		fprintf(stderr, "%s: Botch: old name %s not found in list of %d names for pmid %s ...",
-			pmGetProgname(), mp->old_name, numnames, pmIDStr(mp->old_desc.pmid));
+			pmProgname, mp->old_name, numnames, pmIDStr(mp->old_desc.pmid));
 		for (i = 0; i < numnames; i++) {
 		    if (i > 0) fputc(',', stderr);
 		    fprintf(stderr, " %s", names[i]);
@@ -202,9 +202,9 @@ do_desc(void)
 	    desc.units = mp->new_desc.units;	/* struct assignment */
 	break;
     }
-    if ((sts = __pmLogPutDesc(&outarch.archctl, &desc, numnames, names)) < 0) {
+    if ((sts = __pmLogPutDesc(&outarch.logctl, &desc, numnames, names)) < 0) {
 	fprintf(stderr, "%s: Error: __pmLogPutDesc: %s (%s): %s\n",
-		pmGetProgname(), names[0], pmIDStr(desc.pmid), pmErrStr(sts));
+		pmProgname, names[0], pmIDStr(desc.pmid), pmErrStr(sts));
 	abandon();
 	/*NOTREACHED*/
     }

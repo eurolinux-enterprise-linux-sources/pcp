@@ -3,7 +3,7 @@
  */
 
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
 #include <assert.h>
 #include <math.h>
 #include "localconfig.h"
@@ -12,7 +12,7 @@
 /* Test pdubuf bounds checking logic. */
 
 #define INT sizeof(int)
-#define INTALIGN(p) ((void*) ((__psint_t)(p) & (~ (INT-1))))
+#define INTALIGN(p) ((void*) ((unsigned long)(p) & (~ (INT-1))))
 
 int main ()
 {

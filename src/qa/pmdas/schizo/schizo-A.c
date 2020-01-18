@@ -8,6 +8,7 @@
 #include <syslog.h>
 #include <errno.h>
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 #include <pcp/pmda.h>
 #include "domain.h"
 
@@ -65,14 +66,13 @@ static pmdaMetric metrictab[] = {
 static int
 schizo_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 {
-    unsigned int	cluster = pmID_cluster(mdesc->m_desc.pmid);
-    unsigned int	item = pmID_item(mdesc->m_desc.pmid);
+    __pmID_int		*idp = (__pmID_int *)&(mdesc->m_desc.pmid);
 
-    pmNotifyErr(LOG_DEBUG, "schizo_fetch: %d.%d[%d]\n",
-		  cluster, item, inst);
+    __pmNotifyErr(LOG_DEBUG, "schizo_fetch: %d.%d[%d]\n",
+		  idp->cluster, idp->item, inst);
 
-    if (cluster == 0) {
-	switch (item) {
+    if (idp->cluster == 0) {
+	switch (idp->item) {
 	case 0:					/* version */
 	    atom->cp = "A";
 	    break;
@@ -89,13 +89,13 @@ schizo_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    return PM_ERR_PMID;
 	}
     }
-    else if (cluster == 1) {
-	switch(item) {
+    else if (idp->cluster == 1) {
+	switch(idp->item) {
 	case 1:					/* data1 */
 	case 2:					/* data2 */
 	case 3:					/* data3 */
 	case 4:					/* data4 */
-	    atom->l = inst*item;
+	    atom->l = inst*idp->item;
 	    break;
 
 	default:
@@ -126,7 +126,7 @@ schizo_init(pmdaInterface *dp)
 static void
 usage(void)
 {
-    fprintf(stderr, "Usage: %s [options]\n\n", pmGetProgname());
+    fprintf(stderr, "Usage: %s [options]\n\n", pmProgname);
     fputs("Options:\n"
 	  "  -d domain    use domain (numeric) for metrics domain of PMDA\n"
 	  "  -l logfile   write log into logfile rather than using default log name\n"
@@ -145,16 +145,16 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-    int			sep = pmPathSeparator();
+    int			sep = __pmPathSeparator();
     int			err = 0;
     pmdaInterface	dispatch;
     char		helppath[MAXPATHLEN];
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
     pmsprintf(helppath, sizeof(helppath),
 		"%s%c" "testsuite" "%c" "pmdas" "%c" "schizo" "%c" "help",
 		pmGetConfig("PCP_VAR_DIR"), sep, sep, sep, sep);
-    pmdaDaemon(&dispatch, PMDA_INTERFACE_4, pmGetProgname(), SCHIZO,
+    pmdaDaemon(&dispatch, PMDA_INTERFACE_4, pmProgname, SCHIZO,
 		"schizo.log", helppath);
 
     if (pmdaGetOpt(argc, argv, "D:d:h:i:l:pu:6:?", &dispatch, &err) != EOF)

@@ -24,7 +24,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "pmda.h"
 #include "internal.h"
 #include "fault.h"
@@ -131,9 +131,7 @@ __pmIsPmnsLock(void *lock)
 void
 init_pmns_lock(void)
 {
-#ifdef PM_MULTI_THREAD
     __pmInitMutex(&pmns_lock);
-#endif
 }
 
 /*
@@ -341,7 +339,7 @@ pmGetPMNSLocation_ctx(__pmContext *ctxp)
 		    fd = ctxp->c_pmcd->pc_fd;
 		    if (version < 0) {
 			char	errmsg[PM_MAXERRMSGLEN];
-			pmNotifyErr(LOG_ERR, 
+			__pmNotifyErr(LOG_ERR, 
 				"pmGetPMNSLocation: version lookup failed "
 				"(context=%d, fd=%d): %s", 
 				n, fd, pmErrStr_r(sts, errmsg, sizeof(errmsg)));
@@ -351,7 +349,7 @@ pmGetPMNSLocation_ctx(__pmContext *ctxp)
 			pmns_location = PMNS_REMOTE;
 		    }
 		    else {
-			pmNotifyErr(LOG_ERR, 
+			__pmNotifyErr(LOG_ERR, 
 				"pmGetPMNSLocation: bad host PDU version "
 				"(context=%d, fd=%d, ver=%d)",
 				n, fd, version);
@@ -374,7 +372,7 @@ pmGetPMNSLocation_ctx(__pmContext *ctxp)
 			PM_TPD(curr_pmns) = ctxp->c_archctl->ac_log->l_pmns; 
 		    }
 		    else {
-			pmNotifyErr(LOG_ERR, "pmGetPMNSLocation: bad archive "
+			__pmNotifyErr(LOG_ERR, "pmGetPMNSLocation: bad archive "
 				"version (context=%d, ver=%d)",
 				n, version); 
 			pmns_location = PM_ERR_NOPMNS;
@@ -382,7 +380,7 @@ pmGetPMNSLocation_ctx(__pmContext *ctxp)
 		    break;
 
 		default: 
-		    pmNotifyErr(LOG_ERR, "pmGetPMNSLocation: bogus context "
+		    __pmNotifyErr(LOG_ERR, "pmGetPMNSLocation: bogus context "
 				"type: %d", ctxp->c_type); 
 		    pmns_location = PM_ERR_NOPMNS;
 		    break;
@@ -551,7 +549,7 @@ lex(int reset)
 	    }
 	    else {
 		/* the normal case ... */
-		int	sep = pmPathSeparator();
+		int	sep = __pmPathSeparator();
 		char	*bin_dir = pmGetOptionalConfig("PCP_BINADM_DIR");
 		char	path[MAXPATHLEN];
 
@@ -843,7 +841,7 @@ backname(__pmnsNode *np, char **name)
 
 	xl = (int)strlen(xp->name);
 	nch -= xl;
-	memcpy(&p[nch], xp->name, xl);
+	strncpy(&p[nch], xp->name, xl);
 	xp = xp->parent;
 	if (xp->parent == NULL)
 	    break;
@@ -1360,7 +1358,7 @@ getfname(const char *filename)
 	}
 	else {
 	    static char repname[MAXPATHLEN];
-	    int sep = pmPathSeparator();
+	    int sep = __pmPathSeparator();
 
 	    if ((def_pmns = pmGetOptionalConfig("PCP_VAR_DIR")) == NULL)
 		return NULL;
@@ -1685,7 +1683,7 @@ pmUnloadNameSpace(void)
  * current context is not locked.
  */
 int
-pmLookupName_ctx(__pmContext *ctxp, int derive_locked, int numpmid, char *namelist[], pmID pmidlist[])
+pmLookupName_ctx(__pmContext *ctxp, int numpmid, char *namelist[], pmID pmidlist[])
 {
     int		pmns_location;
     int		sts = 0;
@@ -1785,7 +1783,7 @@ pmLookupName_ctx(__pmContext *ctxp, int derive_locked, int numpmid, char *nameli
 	     */
 	    xname = strdup(namelist[i]);
 	    if (xname == NULL) {
-		pmNoMem("pmLookupName", strlen(namelist[i])+1, PM_RECOV_ERR);
+		__pmNoMem("pmLookupName", strlen(namelist[i])+1, PM_RECOV_ERR);
 		sts = -oserror();
 		continue;
 	    }
@@ -1934,7 +1932,7 @@ PM_FAULT_POINT("libpcp/" __FILE__ ":1", PM_FAULT_TIMEOUT);
 	nfail = 0;
 	for (i = 0; i < numpmid; i++) {
 	    if (pmidlist[i] == PM_ID_NULL) {
-		lsts = __dmgetpmid(derive_locked, namelist[i], &pmidlist[i]);
+		lsts = __dmgetpmid(namelist[i], &pmidlist[i]);
 		if (lsts < 0) {
 		    nfail++;
 		}
@@ -1999,7 +1997,7 @@ int
 pmLookupName(int numpmid, char *namelist[], pmID pmidlist[])
 {
     int	sts;
-    sts = pmLookupName_ctx(NULL, PM_NOT_LOCKED, numpmid, namelist, pmidlist);
+    sts = pmLookupName_ctx(NULL, numpmid, namelist, pmidlist);
     return sts;
 }
 
@@ -2090,12 +2088,12 @@ stitch_list(int *num, char ***offspring, int **statuslist, int x_num, char **x_o
 	}
     }
     if ((n_offspring = (char **)malloc(need)) == NULL) {
-	pmNoMem("pmGetChildrenStatus: n_offspring", need, PM_FATAL_ERR);
+	__pmNoMem("pmGetChildrenStatus: n_offspring", need, PM_FATAL_ERR);
 	/*NOTREACHED*/
     }
     if (statuslist != NULL) {
 	if ((n_statuslist = (int *)malloc(n_num*sizeof(n_statuslist[0]))) == NULL) {
-	    pmNoMem("pmGetChildrenStatus: n_statuslist", n_num*sizeof(n_statuslist[0]), PM_FATAL_ERR);
+	    __pmNoMem("pmGetChildrenStatus: n_statuslist", n_num*sizeof(n_statuslist[0]), PM_FATAL_ERR);
 	    /*NOTREACHED*/
 	}
     }
@@ -2207,7 +2205,7 @@ getchildren(__pmContext *ctxp, int needlocks, const char *name, char ***offsprin
 		char	*xname = strdup(name);
 		char	*xp;
 		if (xname == NULL) {
-		    pmNoMem("pmGetChildrenStatus", strlen(name)+1, PM_RECOV_ERR);
+		    __pmNoMem("pmGetChildrenStatus", strlen(name)+1, PM_RECOV_ERR);
 		    num = -oserror();
 		    goto report;
 		}
@@ -2379,7 +2377,7 @@ check:
     /*
      * see if there are derived metrics that qualify
      */
-    dm_num = __dmchildren(ctxp, PM_NOT_LOCKED, name, &dm_offspring, &dm_statuslist);
+    dm_num = __dmchildren(ctxp, name, &dm_offspring, &dm_statuslist);
 
     if (pmDebugOptions.derive) {
 	char	errmsg[PM_MAXERRMSGLEN];
@@ -2565,7 +2563,7 @@ pmNameID(pmID pmid, char **name)
 
 	if (c_type == PM_CONTEXT_LOCAL) {
 	    /* have PM_CONTEXT_LOCAL ... try to ship request to PMDA */
-	    int		domain = pmID_domain(pmid);
+	    int		domain = pmid_domain(pmid);
 	    __pmDSO	*dp;
 
 	    if ((dp = __pmLookupDSO(domain)) == NULL)
@@ -2740,7 +2738,7 @@ pmNameAll_ctx(__pmContext *ctxp, pmID pmid, char ***namelist)
 
 	if (c_type == PM_CONTEXT_LOCAL) {
 	    /* have PM_CONTEXT_LOCAL ... try to ship request to PMDA */
-	    int		domain = pmID_domain(pmid);
+	    int		domain = pmid_domain(pmid);
 	    __pmDSO	*dp;
 
 	    if ((dp = __pmLookupDSO(domain)) == NULL)
@@ -2854,7 +2852,7 @@ TraversePMNS_local(__pmContext *ctxp, char *name, int *numnames, char ***namelis
 	for (j = 0; j < nchildren; j++) {
 	    size_t size = strlen(name) + 1 + strlen(enfants[j]) + 1;
 	    if ((newname = (char *)malloc(size)) == NULL) {
-		pmNoMem("pmTraversePMNS_local: newname", size, PM_FATAL_ERR);
+		__pmNoMem("pmTraversePMNS_local: newname", size, PM_FATAL_ERR);
 		/*NOTREACHED*/
 	    }
 	    if (*name == '\0')
@@ -2877,7 +2875,7 @@ TraversePMNS_local(__pmContext *ctxp, char *name, int *numnames, char ***namelis
 	    *sz_namelist = 128;
 	    *namelist = (char **)malloc(*sz_namelist * sizeof((*namelist)[0]));
 	    if (*namelist == NULL) {
-		pmNoMem("pmTraversePMNS_local: initial namelist", *sz_namelist * sizeof((*namelist)[0]), PM_FATAL_ERR);
+		__pmNoMem("pmTraversePMNS_local: initial namelist", *sz_namelist * sizeof((*namelist)[0]), PM_FATAL_ERR);
 		/*NOTREACHED*/
 	    }
 	}
@@ -2886,27 +2884,22 @@ TraversePMNS_local(__pmContext *ctxp, char *name, int *numnames, char ***namelis
 	    *sz_namelist *= 2;
 	    namelist_new = (char **)realloc(*namelist, *sz_namelist * sizeof((*namelist)[0]));
 	    if (namelist_new == NULL) {
-		pmNoMem("pmTraversePMNS_local: double namelist", *sz_namelist * sizeof((*namelist)[0]), PM_FATAL_ERR);
+		__pmNoMem("pmTraversePMNS_local: double namelist", *sz_namelist * sizeof((*namelist)[0]), PM_FATAL_ERR);
 		/*NOTREACHED*/
 	    }
 	    *namelist = namelist_new;
 	}
 	(*namelist)[*numnames] = strdup(name);
-	if ((*namelist)[*numnames] == NULL) {
-	    pmNoMem("pmTraversePMNS_local: strdup name", strlen(name)+1, PM_FATAL_ERR);
-	    /*NOTREACHED*/
-	}
 	(*numnames)++;
     }
 
-    return sts < 0 ? sts : *numnames;
+    return sts;
 }
 
 static int
 TraversePMNS(const char *name, void(*func)(const char *), void(*func_r)(const char *, void *), void *closure)
 {
     int		sts;
-    int		numnames = 0;
     int		pmns_location;
     __pmContext  *ctxp;
     ctx_ctl_t	ctx_ctl = { NULL, 0, 0 };
@@ -2927,6 +2920,7 @@ TraversePMNS(const char *name, void(*func)(const char *), void(*func_r)(const ch
     }
 
     if (pmns_location == PMNS_LOCAL || pmns_location == PMNS_ARCHIVE) {
+	int	numnames = 0;
 	char	**namelist = NULL;
 	int	sz_namelist = 0;
 	int	i;
@@ -2977,6 +2971,7 @@ TraversePMNS(const char *name, void(*func)(const char *), void(*func_r)(const ch
 	    goto pmapi_return;
 	}
 	else {
+	    int		numnames;
 	    int		i;
 	    int		xtra;
 	    char	**namelist;
@@ -3010,6 +3005,7 @@ PM_FAULT_POINT("libpcp/" __FILE__ ":4", PM_FAULT_TIMEOUT);
 			else
 			    (*func_r)(namelist[i], closure);
 		    }
+		    numnames = sts;
 		    free(namelist);
 		}
 		else {
@@ -3067,7 +3063,7 @@ pmapi_return:
     if (ctx_ctl.need_ctx_unlock)
 	PM_UNLOCK(ctx_ctl.ctxp->c_lock);
 
-    return sts < 0 ? sts : numnames;
+    return sts;
 }
 
 int

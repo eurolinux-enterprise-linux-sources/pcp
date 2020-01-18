@@ -7,32 +7,8 @@
 #include <assert.h>
 #include <strings.h>
 #include <pcp/pmapi.h>
+#include <pcp/impl.h> /* for __pmPathSeparator */
 #include <pthread.h>
-#include "libpcp.h"
-
-__pmMutex	biglock;
-
-/* largely stolen from __pmInitMutex() in libpcp */
-void
-initmutex(void)
-{
-    int			sts;
-    pthread_mutexattr_t	attr;
-
-    if ((sts = pthread_mutexattr_init(&attr)) != 0) {
-	fprintf(stderr, "pthread_mutexattr_init failed: %d\n", sts);
-	exit(4);
-    }
-    if ((sts = pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK)) != 0) {
-	fprintf(stderr, "pthread_mutexattr_settype failed: %d\n", sts);
-	exit(4);
-    }
-    if ((sts = pthread_mutex_init(&biglock, &attr)) != 0) {
-	fprintf(stderr, "pthread_mutex_init failed: %d\n", sts);
-	exit(4);
-    }
-    pthread_mutexattr_destroy(&attr);
-}
 
 
 void _pcp_warn(int sts, const char* file, int line)
@@ -42,10 +18,8 @@ void _pcp_warn(int sts, const char* file, int line)
     if (sts == 0)
         return;
 
-    PM_LOCK(biglock);
     fprintf(stderr, "warn fail %s:%d %d %s\n", file, line, sts, pmErrStr_r(sts, message, sizeof(message)));
     fflush(stderr);
-    PM_UNLOCK(biglock);
 }
 
 
@@ -67,7 +41,7 @@ thread_fn(void *data)
     int rc, rc2;
     pmAtomValue ncpu;
 
-    if (rindex (work->host_or_archive_name, pmPathSeparator()) != NULL) /* path name? */
+    if (rindex (work->host_or_archive_name, __pmPathSeparator()) != NULL) /* path name? */
         rc = pmCreateFetchGroup(&fg, PM_CONTEXT_ARCHIVE, work->host_or_archive_name);
     else
         rc = pmCreateFetchGroup(&fg, PM_CONTEXT_HOST, work->host_or_archive_name);
@@ -102,21 +76,13 @@ main(int argc, char **argv)
     pthread_t *tids;
     int i;
     int rc;
-
-    initmutex();
     
     tids = malloc(sizeof(pthread_t) * argc);
     assert (tids != NULL);
     work = malloc(sizeof(struct workitem) * argc);
     assert (work != NULL);
 
-#ifdef PARANOID
-    /*
-     * don't really need this ... test will finish normally
-     * on its own ... and it does not work for Windows
-     */
-    alarm (60); /* somewhat longer than $PMCD_CONNECT_TIMEOUT */
-#endif
+    alarm (30); /* somewhat longer than $PMCD_CONNECT_TIMEOUT */
     
     for (i=0; i<argc-1; i++) {
         work[i].host_or_archive_name = argv[i+1];

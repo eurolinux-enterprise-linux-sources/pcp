@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 Red Hat.
+ * Copyright (c) 2012-2016 Red Hat.
  * Copyright (c) 1995-2001 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -17,7 +17,7 @@
 #define _PMCD_H
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "pmda.h"
 
 /*
@@ -92,8 +92,7 @@ typedef struct {
 	    restartKeep : 1,		/* Keep agent if set during restart */
 	    notReady : 1,		/* Agent not ready to process PDUs */
 	    startNotReady : 1,		/* Agent starts in non-ready state */
-	    fenced : 1,			/* Agent fenced; no sampling */
-	    unused : 7,			/* Zero-padded, unused space */
+	    unused : 8,			/* Zero-padded, unused space */
 	    flags : 16;			/* Agent-supplied connection flags */
     } status;
     int		reason;			/* if ! connected */
@@ -110,7 +109,7 @@ PMCD_DATA extern int		nAgents;	/* Number of agents in array */
 /*
  * DomainId-to-AgentIndex map
  * 9 bits of DomainId, max value is 510 because 511 is special (see
- * DYNAMIC_PMID in libpcp.h)
+ * DYNAMIC_PMID in impl.h)
  */
 #define MAXDOMID	510
 extern int		mapdom[];	/* the map */
@@ -145,7 +144,7 @@ extern int		AgentDied;	/* for updating mapdom[] */
 #define REASON_NOSTART	4
 #define REASON_PROTOCOL	8
 
-PMCD_CALL extern AgentInfo *pmcd_agent(int);
+extern AgentInfo *FindDomainAgent(int);
 extern void CleanupAgent(AgentInfo *, int, int);
 extern int HarvestAgents(unsigned int);
 
@@ -157,9 +156,6 @@ PMCD_DATA extern int	pmcd_timeout;
 
 /* timeout for credentials */
 extern int	_creds_timeout;
-
-/* flag for context label changes */
-extern int	labelChanged;
 
 /* global PMCD PMDA variables */
 
@@ -206,7 +202,6 @@ extern int pmcd_load_libpcp_pmda(void);
 extern int DoFetch(ClientInfo *, __pmPDU *);
 extern int DoProfile(ClientInfo *, __pmPDU *);
 extern int DoDesc(ClientInfo *, __pmPDU *);
-extern int DoLabel(ClientInfo *, __pmPDU *);
 extern int DoInstance(ClientInfo *, __pmPDU *);
 extern int DoText(ClientInfo *, __pmPDU *);
 extern int DoStore(ClientInfo *, __pmPDU *);
@@ -225,8 +220,7 @@ extern int VerifyConfig(char *);
 extern int ParseInitAgents(char *);
 extern void ParseRestartAgents(char *);
 extern void PrintAgentInfo(FILE *);
-extern void CheckLabelChange(void);
-extern void MarkStateChanges(unsigned int);
+extern void MarkStateChanges(int);
 extern void CleanupClient(ClientInfo *, int);
 extern int ClientsAttributes(AgentInfo *);
 extern int AgentsAttributes(int);
@@ -242,9 +236,6 @@ PMCD_CALL extern void pmcd_openfds_sethi(int);
 /* Explicitly requested hostname (pmcd.hostname metric) */
 PMCD_DATA extern char *pmcd_hostname;
 
-/* Current context label set (pmcd.labels metric) */
-PMCD_DATA extern char *pmcd_labels;
-
 /* Counter of SIGHUPs received and responded to by pmcd */
 PMCD_DATA extern unsigned pmcd_sighups;
 
@@ -255,8 +246,5 @@ PMCD_DATA extern pid_t pmcd_pid;
  * incremented each time a PMDA is started or restarted
  */
 PMCD_DATA extern int pmcd_seqnum;
-
-/* Flag indicating whether agents are currently fenced */
-PMCD_DATA extern int pmcd_fenced;
 
 #endif /* _PMCD_H */

@@ -9,6 +9,7 @@
  */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 int
 main(int argc, char *argv[])
@@ -25,7 +26,7 @@ main(int argc, char *argv[])
     char	*endnum;
     int		errflag = 0;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:hp:?")) != EOF) {
 	switch (c) {
@@ -34,7 +35,7 @@ main(int argc, char *argv[])
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -46,7 +47,7 @@ main(int argc, char *argv[])
 	case 'p':
 	    port = (int)strtol(optarg, &endnum, 10);
 	    if (*endnum != '\0') {
-		fprintf(stderr, "%s: port argument must be a numeric internet port number\n", pmGetProgname());
+		fprintf(stderr, "%s: port argument must be a numeric internet port number\n", pmProgname);
 		exit(1);
 	    }
 	    break;
@@ -59,7 +60,7 @@ main(int argc, char *argv[])
     }
 
     if (errflag || optind != argc) {
-	fprintf(stderr, "Usage: %s [-D debugspec] [-h] [-p port]\n", pmGetProgname());
+	fprintf(stderr, "Usage: %s [-D debugspec] [-h] [-p port]\n", pmProgname);
 	exit(1);
     }
 
@@ -97,21 +98,13 @@ main(int argc, char *argv[])
 
     newfd = accept(fd, (struct sockaddr *)0, 0);
     if (newfd < 0) {
-	fprintf(stderr, "%s: accept: %s\n", pmGetProgname(), strerror(errno));
+	fprintf(stderr, "%s: accept: %s\n", pmProgname, strerror(errno));
 	exit(1);
     }
 
     if (hang) {
 	/* wait for a signal ... */
-#ifndef IS_MINGW
 	pause();
-#else
-	/*
-	 * punt ... looks like a signal will get us back from here
-	 * (at least it works in one test case with SIGINT)
-	 */
-	SleepEx(INFINITE, TRUE);
-#endif
 	exit(0);
     }
 
@@ -125,7 +118,7 @@ main(int argc, char *argv[])
 	 * socket.
 	 */
 	if (errno != ECONNRESET)
-	    fprintf(stderr, "%s: read error: %s\n", pmGetProgname(), pmErrStr(-errno));
+	    fprintf(stderr, "%s: read error: %s\n", pmProgname, pmErrStr(-errno));
     }
 
     exit(0);

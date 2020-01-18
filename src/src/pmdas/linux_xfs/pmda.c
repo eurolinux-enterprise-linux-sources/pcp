@@ -16,7 +16,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "pmda.h"
 #include "indom.h"
 #include "domain.h"
@@ -1336,14 +1336,14 @@ xfs_refresh(pmdaExt *pmda, int *need_refresh)
 }
 
 static int
-xfs_instance(pmInDom indom, int inst, char *name, pmInResult **result, pmdaExt *pmda)
+xfs_instance(pmInDom indom, int inst, char *name, __pmInResult **result, pmdaExt *pmda)
 {
+    __pmInDom_int	*indomp = (__pmInDom_int *)&indom;
     int			need_refresh[NUM_CLUSTERS] = { 0 };
-    unsigned int	serial = pmInDom_serial(indom);
 
-    if (serial == DEVICES_INDOM)
+    if (indomp->serial == DEVICES_INDOM)
 	need_refresh[CLUSTER_PERDEV]++;
-    else if (serial == FILESYS_INDOM || serial == QUOTA_PRJ_INDOM)
+    if (indomp->serial == FILESYS_INDOM || indomp->serial == QUOTA_PRJ_INDOM)
 	need_refresh[CLUSTER_QUOTA]++;
     xfs_refresh(pmda, need_refresh);
     return pmdaInstance(indom, inst, name, result, pmda);
@@ -1352,15 +1352,14 @@ xfs_instance(pmInDom indom, int inst, char *name, pmInResult **result, pmdaExt *
 static int
 xfs_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 {
-    unsigned int	cluster = pmID_cluster(mdesc->m_desc.pmid);
-    unsigned int	item = pmID_item(mdesc->m_desc.pmid);
+    __pmID_int		*idp = (__pmID_int *)&(mdesc->m_desc.pmid);
     unsigned long long 	offset;
     struct sysfs_xfs	*xfs;
     struct filesys	*fs;
     int			sts;
 
-    if (mdesc->m_user != NULL && cluster != CLUSTER_PERDEV) {
-	if ((cluster == CLUSTER_XFS || cluster == CLUSTER_XFSBUF) &&
+    if (mdesc->m_user != NULL && idp->cluster != CLUSTER_PERDEV) {
+	if ((idp->cluster == CLUSTER_XFS || idp->cluster == CLUSTER_XFSBUF) &&
 	    sysfs_xfs.errcode != 0) {
 	    /* no values available for XFS metrics */
 	    return 0;
@@ -1381,10 +1380,10 @@ xfs_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	}
     }
     else
-    switch (cluster) {
+    switch (idp->cluster) {
 
     case CLUSTER_XFS:
-	switch (item) {
+	switch (idp->item) {
 	case 79: /* xfs.control.reset */
 	    atom->ul = 0;
 	    break;
@@ -1419,14 +1418,14 @@ xfs_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	break;
 
     case CLUSTER_QUOTA:
-	if (item <= 5) {
+	if (idp->item <= 5) {
 	    sts = pmdaCacheLookup(INDOM(FILESYS_INDOM), inst, NULL,
 					(void **)&fs);
 	    if (sts < 0)
 		return sts;
 	    if (sts != PMDA_CACHE_ACTIVE)
 		return PM_ERR_INST;
-	    switch (item) {
+	    switch (idp->item) {
 	    case 0:	/* quota.state.project.accounting */
 		atom->ul = !!(fs->flags & FSF_QUOT_PROJ_ACC);
 		break;
@@ -1437,7 +1436,7 @@ xfs_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 		return PM_ERR_PMID;
 	    }
 	}
-	else if (item <= 13) {
+	else if (idp->item <= 13) {
 	    struct project *pp;
 	    sts = pmdaCacheLookup(INDOM(QUOTA_PRJ_INDOM), inst, NULL,
 					(void **)&pp);
@@ -1445,7 +1444,7 @@ xfs_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 		return sts;
 	    if (sts != PMDA_CACHE_ACTIVE)
 		return PM_ERR_INST;
-	    switch (item) {
+	    switch (idp->item) {
 	    case 6:	/* quota.project.space.hard */
 		atom->ull = pp->space_hard >> 1; /* BBs to KB */
 		break;
@@ -1488,9 +1487,9 @@ xfs_fetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *pmda)
     int		i, need_refresh[NUM_CLUSTERS] = { 0 };
 
     for (i = 0; i < numpmid; i++) {
-	unsigned int	cluster = pmID_cluster(pmidlist[i]);
-	if (cluster >= MIN_CLUSTER && cluster < NUM_CLUSTERS)
-	    need_refresh[cluster]++;
+	__pmID_int *idp = (__pmID_int *)&(pmidlist[i]);
+	if (idp->cluster >= MIN_CLUSTER && idp->cluster < NUM_CLUSTERS)
+	    need_refresh[idp->cluster]++;
     }
 
     xfs_refresh(pmda, need_refresh);
@@ -1501,14 +1500,14 @@ static int
 xfs_text(int ident, int type, char **buf, pmdaExt *pmda)
 {
     if ((type & PM_TEXT_PMID) == PM_TEXT_PMID) {
-	pmID	pmid = (pmID)ident;
+	__pmID_int	*idp = (__pmID_int *)&ident;
 
 	/* share per-device help text with globals */
-	if (pmID_cluster(pmid) == CLUSTER_PERDEV) {
-	    if (pmID_item(pmid) >= 140 && pmID_item(pmid) <= 148)
-		ident = (int)pmID_build(pmID_domain(pmid), CLUSTER_XFSBUF, pmID_item(pmid));
+	if (idp->cluster == CLUSTER_PERDEV) {
+	    if (idp->item >= 140 && idp->item <= 148)
+		idp->cluster = CLUSTER_XFSBUF;
 	    else
-		ident = (int)pmID_build(pmID_domain(pmid), CLUSTER_XFS, pmID_item(pmid));
+		idp->cluster = CLUSTER_XFS;
 	}
     }
     return pmdaText(ident, type, buf, pmda);
@@ -1544,11 +1543,13 @@ xfs_store(pmResult *result, pmdaExt *pmda)
     int		i;
     int		sts = 0;
     pmValueSet	*vsp;
+    __pmID_int	*pmidp;
 
     for (i = 0; i < result->numpmid && !sts; i++) {
 	vsp = result->vset[i];
+	pmidp = (__pmID_int *)&vsp->pmid;
 
-	if (pmID_cluster(vsp->pmid) == CLUSTER_XFS && pmID_item(vsp->pmid) == 79) {
+	if (pmidp->cluster == CLUSTER_XFS && pmidp->item == 79) {
 	    if ((sts = xfs_zero(vsp)) < 0)
 		break;
 	} else {
@@ -1570,7 +1571,7 @@ xfs_init(pmdaInterface *dp)
 
     if (_isDSO) {
 	char helppath[MAXPATHLEN];
-	int sep = pmPathSeparator();
+	int sep = __pmPathSeparator();
 	pmsprintf(helppath, sizeof(helppath), "%s%c" "xfs" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
 	pmdaDSO(dp, PMDA_INTERFACE_3, "XFS DSO", helppath);
@@ -1614,15 +1615,15 @@ pmdaOptions     opts = {
 int
 main(int argc, char **argv)
 {
-    int			sep = pmPathSeparator();
+    int			sep = __pmPathSeparator();
     pmdaInterface	dispatch;
     char		helppath[MAXPATHLEN];
 
     _isDSO = 0;
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
     pmsprintf(helppath, sizeof(helppath), "%s%c" "xfs" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-    pmdaDaemon(&dispatch, PMDA_INTERFACE_3, pmGetProgname(), XFS, "xfs.log", helppath);
+    pmdaDaemon(&dispatch, PMDA_INTERFACE_3, pmProgname, XFS, "xfs.log", helppath);
 
     pmdaGetOptions(argc, argv, &opts, &dispatch);
     if (opts.errors) {

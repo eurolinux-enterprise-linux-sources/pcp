@@ -9,6 +9,8 @@ VIEWS	= clustervis dkvis mpvis nfsvis osvis weblogvis webpingvis webvis
 LOGGERS	= config.dkvis config.mpvis config.nfsvis config.osvis \
 	  config.weblogvis config.webpingvis config.webvis
 
+LSRCFILES = $(VIEWS) $(LOGGERS) pmview-args
+
 default build-me:
 
 include $(BUILDRULES)

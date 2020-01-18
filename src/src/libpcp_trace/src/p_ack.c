@@ -13,6 +13,7 @@
  */
 
 #include "pmapi.h"
+#include "impl.h"
 #include "trace.h"
 #include "trace_dev.h"
 

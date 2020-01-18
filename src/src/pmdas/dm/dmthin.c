@@ -1,7 +1,7 @@
 /*
  * Device Mapper PMDA - Thin Provisioning (dm-thin) Stats
  *
- * Copyright (c) 2015,2018 Red Hat.
+ * Copyright (c) 2015 Red Hat.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -15,7 +15,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "pmda.h"
 
 #include "indom.h"
@@ -68,7 +68,7 @@ dm_thin_pool_fetch(int item, struct pool_stats *pool_stats, pmAtomValue *atom)
             atom->cp = pool_stats->no_space_mode;
             break;
     }
-    return PMDA_FETCH_STATIC;
+    return 1;
 }
 
 /*
@@ -92,7 +92,7 @@ dm_thin_vol_fetch(int item, struct vol_stats *vol_stats, pmAtomValue *atom)
             atom->ull = vol_stats->high_mapped_sector;
             break;
     }
-    return PMDA_FETCH_STATIC;
+    return 1;
 }
 
 /*

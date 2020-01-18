@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014,2018 Red Hat.
+ * Copyright (c) 2014 Red Hat.
  * Copyright (c) 1999,2004 Silicon Graphics, Inc.  All Rights Reserved.
  * This code contributed by Michal Kara (lemming@arthur.plbohnice.cz)
  * 
@@ -17,26 +17,37 @@
 #include "linux.h"
 #include "proc_net_tcp.h"
 
-static int
-refresh_tcpconn_stats(tcpconn_stats_t *conn, const char *path)
+#define MYBUFSZ (1<<14) /*16k*/
+
+int
+refresh_proc_net_tcp(proc_net_tcp_t *proc_net_tcp)
 {
-    char		buf[BUFSIZ]; 
-    char		*q, *p = buf;
-    FILE		*fp;
-    ssize_t		got = 0;
-    ptrdiff_t		remnant = 0;
-    unsigned int	n;
+    FILE *fp;
+    char buf[MYBUFSZ]; 
+    char *p = buf;
+    char *q;
+    unsigned int n;
+    ssize_t got = 0;
+    ptrdiff_t remnant = 0;
 
-    memset(conn, 0, sizeof(*conn));
+    memset(proc_net_tcp, 0, sizeof(*proc_net_tcp));
 
-    if ((fp = linux_statsfile(path, buf, sizeof(buf))) == NULL)
+    if ((fp = linux_statsfile("/proc/net/tcp", buf, sizeof(buf))) == NULL)
 	return -oserror();
 
+    /* skip header */
+    if (fgets(buf, sizeof(buf), fp) == NULL) {
+    	/* oops, no header! */
+	fclose(fp);
+	return -oserror();
+    }
     for (buf[0]='\0';;) {
 	q = strchrnul(p, '\n');
 	if (*q == '\n') {
-	    if (1 == sscanf(p, " %*s %*s %*s %x", &n) && n < _PM_TCP_LAST)
-		conn->stat[n]++;
+	    if (1 == sscanf(p, " %*s %*s %*s %x", &n)
+		&& n < _PM_TCP_LAST) {
+		proc_net_tcp->stat[n]++;
+            }
 	    p = q + 1;
 	    continue;
 	}
@@ -44,7 +55,7 @@ refresh_tcpconn_stats(tcpconn_stats_t *conn, const char *path)
 	if (remnant > 0 && p != buf) 
 	    memmove(buf, p, remnant);
 
-	got = read(fileno(fp), buf + remnant, BUFSIZ - remnant - 1);
+	got = read(fileno(fp), buf + remnant, MYBUFSZ - remnant - 1);
 	if (got <= 0)
 	    break;
 
@@ -54,16 +65,4 @@ refresh_tcpconn_stats(tcpconn_stats_t *conn, const char *path)
 
     fclose(fp);
     return 0;
-}
-
-int
-refresh_proc_net_tcp(proc_net_tcp_t *proc_net_tcp)
-{
-    return refresh_tcpconn_stats(proc_net_tcp, "/proc/net/tcp");
-}
-
-int
-refresh_proc_net_tcp6(proc_net_tcp6_t *proc_net_tcp6)
-{
-    return refresh_tcpconn_stats(proc_net_tcp6, "/proc/net/tcp6");
 }

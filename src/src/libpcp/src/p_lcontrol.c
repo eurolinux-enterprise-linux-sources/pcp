@@ -14,7 +14,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "internal.h"
 
 /*
@@ -132,7 +132,7 @@ __pmDecodeLogControl(const __pmPDU *pdubuf, pmResult **request, int *control, in
 	return PM_ERR_IPC;
     need = sizeof(pmResult) + (numpmid - 1) * sizeof(pmValueSet *);
     if ((req = (pmResult *)malloc(need)) == NULL) {
-	pmNoMem("__pmDecodeLogControl.req", need, PM_RECOV_ERR);
+	__pmNoMem("__pmDecodeLogControl.req", need, PM_RECOV_ERR);
 	return -oserror();
     }
     req->numpmid = numpmid;
@@ -162,7 +162,7 @@ __pmDecodeLogControl(const __pmPDU *pdubuf, pmResult **request, int *control, in
 		goto corrupt;
 	}
 	if ((vsp = (pmValueSet *)malloc(need)) == NULL) {
-	    pmNoMem("__pmDecodeLogControl.vsp", need, PM_RECOV_ERR);
+	    __pmNoMem("__pmDecodeLogControl.vsp", need, PM_RECOV_ERR);
 	    sts = -oserror();
 	    i--;
 	    goto corrupt;

@@ -25,8 +25,6 @@
 #include <qmc_metric.h>
 #include <qmc_context.h>
 
-#include "libpcp.h"
-
 // Temporary buffer
 static char buffer[256];
 
@@ -211,7 +209,7 @@ traverse(const char *str, double scale)
     sts = pmParseMetricSpec((char *)str, 0, (char *)0, &theMetric, &msg);
     if (sts < 0) {
 	pmprintf("%s: Error: Unable to parse metric spec:\n%s\n", 
-		 pmGetProgname(), msg);
+		 pmProgname, msg);
 	free(msg);
 	return sts;
     }
@@ -236,7 +234,7 @@ traverse(const char *str, double scale)
 	    doMetricType = PM_CONTEXT_LOCAL;
 	else {
 	    pmprintf("%s: Error: invalid metric source (%d): %s\n",
-			 pmGetProgname(), theMetric->isarch, theMetric->metric);
+			 pmProgname, theMetric->isarch, theMetric->metric);
 	    sts = -1;
 	}
 	doMetricSource = theMetric->source;
@@ -249,7 +247,7 @@ traverse(const char *str, double scale)
 		sts = -1;
 	    else if (sts < 0) {
 		pmprintf("%s: Error: %s: %s\n",
-			 pmGetProgname(), theMetric->metric, pmErrStr(sts));
+			 pmProgname, theMetric->metric, pmErrStr(sts));
 	    }
 	}
     }
@@ -284,7 +282,7 @@ parseConfig(QString const& configName, FILE *configFile)
 	last = &buf[len-1];
 	if (*last != '\n' && !feof(configFile)) {
 	    pmprintf("%s: Line %d of %s was too long, skipping.\n",
-	    	     pmGetProgname(), line, (const char *)configName.toLatin1());
+	    	     pmProgname, line, (const char *)configName.toLatin1());
 	    while(buf[len-1] != '\n') {
 	    	if (fgets(buf, sizeof(buf), configFile) == NULL)
 		    break;
@@ -314,7 +312,7 @@ parseConfig(QString const& configName, FILE *configFile)
 
 	    if (*msg != '\0') {
 	    	pmprintf("%s: Line %d of %s has an illegal scaling factor, assuming 0.\n",
-			 pmGetProgname(), line, (const char *)configName.toLatin1());
+			 pmProgname, line, (const char *)configName.toLatin1());
 		err++;
 		scale = 0.0;
 	    }
@@ -341,7 +339,7 @@ dumpTime(struct timeval const &curPos)
     char	*p;
 
     if (timeOffsetFlag) {
-	double	o = pmtimevalSub(&curPos, &logStartTime);
+	double	o = __pmtimevalSub(&curPos, &logStartTime);
 	if (o < 10)
 	    pmsprintf(buffer, sizeof(buffer), "%.2f ", o);
 	else if (o < 100)
@@ -633,7 +631,7 @@ dumpHeader()
 static int
 getXTBintervalFromTimeval(int *mode, struct timeval *tval)
 {
-    double tmp_ival = pmtimevalToReal(tval);
+    double tmp_ival = __pmtimevalToReal(tval);
 
     if (tmp_ival > SECS_IN_24_DAYS) {
 	*mode = (*mode & 0x0000ffff) | PM_XTB_SET(PM_TIME_SEC);
@@ -648,14 +646,14 @@ getXTBintervalFromTimeval(int *mode, struct timeval *tval)
 static struct timeval
 tadd(struct timeval t1, struct timeval t2)
 {
-    pmtimevalInc(&t1, &t2);
+    __pmtimevalInc(&t1, &t2);
     return t1;
 }
 
 static struct timeval
 tsub(struct timeval t1, struct timeval t2)
 {
-    pmtimevalDec(&t1, &t2);
+    __pmtimevalDec(&t1, &t2);
     return t1;
 }
 
@@ -675,7 +673,7 @@ sleeptill(struct timeval sched)
     struct timespec delay;	/* interval to sleep */
     struct timespec left;	/* remaining sleep time */
 
-    pmtimevalNow(&curr);
+    __pmtimevalNow(&curr);
     tospec(tsub(sched, curr), &delay);
     for (;;) {		/* loop to catch early wakeup by nanosleep */
 	sts = nanosleep(&delay, &left);
@@ -761,7 +759,7 @@ main(int argc, char *argv[])
 		}
 	    }
 	    else if (strlen(opts.optarg) > 1) {
-		pmprintf("%s: delimiter must be one character\n", pmGetProgname());
+		pmprintf("%s: delimiter must be one character\n", pmProgname);
 		opts.errors++;
 	    }
 	    else
@@ -779,7 +777,7 @@ main(int argc, char *argv[])
 	case 'F':	// Fixed width values
 	    if (shortFlag) {
 		pmprintf("%s: -F and -G options may not be used together\n",
-			 pmGetProgname());
+			 pmProgname);
 		opts.errors++;
 	    }
 	    else
@@ -789,12 +787,12 @@ main(int argc, char *argv[])
 	case 'G':	// Shortest format
 	    if (descFlag) {
 		pmprintf("%s: -F and -G may not be used together\n", 
-			 pmGetProgname());
+			 pmProgname);
 		opts.errors++;
 	    }
 	    else if (niceFlag) {
 		pmprintf("%s: -i and -G may not be used together\n",
-			 pmGetProgname());
+			 pmProgname);
 		opts.errors++;
 	    }
 	    else
@@ -808,12 +806,12 @@ main(int argc, char *argv[])
 	case 'i':	// abbreviate metric names
 	    if (precFlag) {
 		pmprintf("%s: -i and -P may not be used together\n",
-			 pmGetProgname());
+			 pmProgname);
 		opts.errors++;
 	    }
 	    else if (shortFlag) {
 		pmprintf("%s: -i and -G may not be used together\n",
-			 pmGetProgname());
+			 pmProgname);
 		opts.errors++;
 	    }
 	    else
@@ -848,12 +846,12 @@ main(int argc, char *argv[])
         case 'P':       // precision
 	    if (widthFlag) {
 		pmprintf("%s: -P and -w may not be used together\n",
-			 pmGetProgname());
+			 pmProgname);
 		opts.errors++;
 	    }
 	    else if (niceFlag) {
 		pmprintf("%s: -i and -P may not be used together\n",
-			 pmGetProgname());
+			 pmProgname);
 		opts.errors++;
 	    }
 	    else {
@@ -861,7 +859,7 @@ main(int argc, char *argv[])
 		precFlag = true;
 		if (*endnum != '\0' || precision < 0) {
 		    pmprintf("%s: -P requires a positive numeric argument\n",
-			     pmGetProgname());
+			     pmProgname);
 		    opts.errors++;
 		}
 	    }
@@ -876,7 +874,7 @@ main(int argc, char *argv[])
 	    repeatLines = (int)strtol(opts.optarg, &endnum, 10);
             if (*endnum != '\0' || repeatLines <= 0) {
                 pmprintf("%s: -R requires a positive numeric argument\n",
-			 pmGetProgname());
+			 pmProgname);
                 opts.errors++;
             }
             break;
@@ -892,7 +890,7 @@ main(int argc, char *argv[])
         case 'w':       // width
 	    if (precFlag) {
 		pmprintf("%s: -P and -w may not be used together\n",
-			 pmGetProgname());
+			 pmProgname);
 		opts.errors++;
 	    }
 	    else {
@@ -900,11 +898,11 @@ main(int argc, char *argv[])
 		widthFlag = true;
 		if (*endnum != '\0' || width < 0) {
 		    pmprintf("%s: -w requires a positive numeric argument\n",
-			     pmGetProgname());
+			     pmProgname);
 		    opts.errors++;
 		}
 		else if (width < 3) {
-		    pmprintf("%s: -w must be greater than 2\n", pmGetProgname());
+		    pmprintf("%s: -w must be greater than 2\n", pmProgname);
 		    opts.errors++;
 		}
 	    }
@@ -914,7 +912,7 @@ main(int argc, char *argv[])
 
     if (opts.context == PM_CONTEXT_HOST) {
 	if (opts.nhosts > 1) {
-	    pmprintf("%s: only one host may be specified\n", pmGetProgname());
+	    pmprintf("%s: only one host may be specified\n", pmProgname);
 	    opts.errors++;
 	}
     }
@@ -997,7 +995,7 @@ main(int argc, char *argv[])
 	else {
 	    configFile = fopen((const char *)configName.toLatin1(), "r");
 	    if (configFile == NULL) {
-		pmprintf("%s: Unable to open %s: %s\n", pmGetProgname(),
+		pmprintf("%s: Unable to open %s: %s\n", pmProgname,
 			(const char *)configName.toLatin1(), strerror(errno));
 	    	pmflush();
 		exit(1);
@@ -1006,7 +1004,7 @@ main(int argc, char *argv[])
     }
     else if (configName.length()) {
 	pmprintf("%s: configuration file cannot be specified with metrics\n",
-		 pmGetProgname());
+		 pmProgname);
 	exit(1);
     }
     
@@ -1021,13 +1019,13 @@ main(int argc, char *argv[])
     }
 
     if (metrics.size() == 0 || numValues == 0) {
-	pmprintf("%s: no valid metrics, exiting.\n", pmGetProgname());
+	pmprintf("%s: no valid metrics, exiting.\n", pmProgname);
 	pmflush();
 	exit(1);
     }
     else if (opts.errors)
         pmprintf("%s: Warning: Some metrics ignored, continuing with valid metrics\n",
-		 pmGetProgname());
+		 pmProgname);
 
     pmflush();
 
@@ -1048,7 +1046,7 @@ main(int argc, char *argv[])
     else if (opts.timezone) {
 	sts = group->useTZ(opts.timezone);
         if ((sts = pmNewZone(opts.timezone)) < 0) {
-	    pmprintf("%s: cannot set timezone to \"%s\": %s\n", pmGetProgname(),
+	    pmprintf("%s: cannot set timezone to \"%s\": %s\n", pmProgname,
 			opts.timezone, pmErrStr(sts));
 	    pmflush();
 	    exit(1);
@@ -1069,7 +1067,7 @@ main(int argc, char *argv[])
 	sts = putenv(strdup((const char *)tzEnv.toLatin1()));
 	if (sts < 0) {
 	    pmprintf("%s: Warning: Unable to set timezone in environment\n",
-		     pmGetProgname());
+		     pmProgname);
 	    sts = 0;
 	}
 	else if (pmDebugOptions.appl0)
@@ -1078,7 +1076,7 @@ main(int argc, char *argv[])
     }
 
     if (isLive) {
-	pmtimevalNow(&logStartTime);
+	__pmtimevalNow(&logStartTime);
 	logEndTime.tv_sec = INT_MAX;
 	logEndTime.tv_usec = INT_MAX;
     }
@@ -1087,7 +1085,7 @@ main(int argc, char *argv[])
 
 	logStartTime = group->logStart();
 	logEndTime = group->logEnd();
-	if (pmtimevalToReal(&logEndTime) <= pmtimevalToReal(&logStartTime)) {
+	if (__pmtimevalToReal(&logEndTime) <= __pmtimevalToReal(&logStartTime)) {
 	    logEndTime.tv_sec = INT_MAX;
 	    logEndTime.tv_usec = INT_MAX;	
 	}
@@ -1095,8 +1093,8 @@ main(int argc, char *argv[])
 
     if (pmDebugOptions.appl0) {
         cerr << "main: start = "
-             << pmtimevalToReal(&logStartTime) << ", end = "
-             << pmtimevalToReal(&logEndTime)
+             << __pmtimevalToReal(&logStartTime) << ", end = "
+             << __pmtimevalToReal(&logEndTime)
              << endl;
     }
 
@@ -1110,15 +1108,15 @@ main(int argc, char *argv[])
 	exit(1);
     }
 
-    pos = pmtimevalToReal(&opts.origin);
-    endTime = pmtimevalToReal(&opts.finish);
-    delay = (int)(pmtimevalToReal(&opts.interval) * 1000.0);
+    pos = __pmtimevalToReal(&opts.origin);
+    endTime = __pmtimevalToReal(&opts.finish);
+    delay = (int)(__pmtimevalToReal(&opts.interval) * 1000.0);
 
     if (endTime < pos && opts.finish_optarg == NULL)
 	endTime = DBL_MAX;
 
     if (pmDebugOptions.appl0) {
-	cerr << "main: realStartTime = " << pmtimevalToReal(&opts.start)
+	cerr << "main: realStartTime = " << __pmtimevalToReal(&opts.start)
 	     << ", endTime = " << endTime << ", pos = " << pos 
 	     << ", delay = " << delay << endl;
     }
@@ -1257,7 +1255,7 @@ main(int argc, char *argv[])
 	if (isLive)
 	    sleeptill(opts.origin);
 
-	pos = pmtimevalToReal(&opts.origin);
+	pos = __pmtimevalToReal(&opts.origin);
 	lines++;
 	if (repeatLines > 0 && repeatLines == lines) {
 	    cout << endl;

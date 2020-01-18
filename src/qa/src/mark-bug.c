@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 char *namelist[2] = {"hinv.ncpu", "irix.kernel.all.cpu.idle"};
 pmID pmidlist[2];
@@ -47,16 +48,15 @@ main(int argc, char **argv)
     struct timeval appStart;
     struct timeval appEnd;
     struct timeval appOffset;
-    time_t	clock;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "a:A:c:D:h:l:Ln:O:s:S:t:T:U:VzZ:?")) != EOF) {
 	switch (c) {
 
 	case 'a':	/* archive name */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmProgname);
 		errflag++;
 	    }
 	    type = PM_CONTEXT_ARCHIVE;
@@ -69,7 +69,7 @@ main(int argc, char **argv)
 
 	case 'c':	/* configfile */
 	    if (configfile != NULL) {
-		fprintf(stderr, "%s: at most one -c option allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one -c option allowed\n", pmProgname);
 		errflag++;
 	    }
 	    configfile = optarg;
@@ -79,14 +79,14 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
 
 	case 'h':	/* contact PMCD on this hostname */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmProgname);
 		errflag++;
 	    }
 	    host = optarg;
@@ -95,7 +95,7 @@ main(int argc, char **argv)
 
 	case 'L':	/* LOCAL, no PMCD */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmProgname);
 		errflag++;
 	    }
 	    host = NULL;
@@ -119,7 +119,7 @@ main(int argc, char **argv)
 	case 's':	/* sample count */
 	    samples = (int)strtol(optarg, &endnum, 10);
 	    if (*endnum != '\0' || samples < 0) {
-		fprintf(stderr, "%s: -s requires numeric argument\n", pmGetProgname());
+		fprintf(stderr, "%s: -s requires numeric argument\n", pmProgname);
 		errflag++;
 	    }
 	    break;
@@ -131,7 +131,7 @@ main(int argc, char **argv)
 	case 't':	/* delta seconds (double) */
 	    delta = strtod(optarg, &endnum);
 	    if (*endnum != '\0' || delta <= 0.0) {
-		fprintf(stderr, "%s: -t requires floating point argument\n", pmGetProgname());
+		fprintf(stderr, "%s: -t requires floating point argument\n", pmProgname);
 		errflag++;
 	    }
 	    break;
@@ -142,7 +142,7 @@ main(int argc, char **argv)
 
 	case 'U':	/* uninterpolated archive log */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmProgname);
 		errflag++;
 	    }
 	    type = PM_CONTEXT_ARCHIVE;
@@ -156,7 +156,7 @@ main(int argc, char **argv)
 
 	case 'z':	/* timezone from host */
 	    if (tz != NULL) {
-		fprintf(stderr, "%s: at most one of -Z and/or -z allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -Z and/or -z allowed\n", pmProgname);
 		errflag++;
 	    }
 	    zflag++;
@@ -164,7 +164,7 @@ main(int argc, char **argv)
 
 	case 'Z':	/* $TZ timezone */
 	    if (zflag) {
-		fprintf(stderr, "%s: at most one of -Z and/or -z allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -Z and/or -z allowed\n", pmProgname);
 		errflag++;
 	    }
 	    tz = optarg;
@@ -178,7 +178,7 @@ main(int argc, char **argv)
     }
 
     if (zflag && type == 0) {
-	fprintf(stderr, "%s: -z requires an explicit -a, -h or -U option\n", pmGetProgname());
+	fprintf(stderr, "%s: -z requires an explicit -a, -h or -U option\n", pmProgname);
 	errflag++;
     }
 
@@ -204,19 +204,19 @@ Options\n\
   -V            verbose/diagnostic output\n\
   -z            set reporting timezone to local time for host from -a, -h or -U\n\
   -Z timezone   set reporting timezone\n",
-		pmGetProgname());
+		pmProgname);
 	exit(1);
     }
 
     if (logfile != NULL) {
-	pmOpenLog(pmGetProgname(), logfile, stderr, &sts);
-	if (sts != 1) {
-	    fprintf(stderr, "%s: Could not open logfile \"%s\"\n", pmGetProgname(), logfile);
+	__pmOpenLog(pmProgname, logfile, stderr, &sts);
+	if (sts < 0) {
+	    fprintf(stderr, "%s: Could not open logfile \"%s\"\n", pmProgname, logfile);
 	}
     }
 
     if (pmnsfile != PM_NS_DEFAULT && (sts = pmLoadNameSpace(pmnsfile)) < 0) {
-	printf("%s: Cannot load namespace from \"%s\": %s\n", pmGetProgname(), 
+	printf("%s: Cannot load namespace from \"%s\": %s\n", pmProgname, 
 	       pmnsfile, pmErrStr(sts));
 	exit(1);
     }
@@ -229,29 +229,29 @@ Options\n\
     if ((sts = pmNewContext(type, host)) < 0) {
 	if (type == PM_CONTEXT_HOST)
 	    fprintf(stderr, "%s: Cannot connect to PMCD on host \"%s\": %s\n",
-		pmGetProgname(), host, pmErrStr(sts));
+		pmProgname, host, pmErrStr(sts));
 	else
 	    fprintf(stderr, "%s: Cannot open archive \"%s\": %s\n",
-		pmGetProgname(), host, pmErrStr(sts));
+		pmProgname, host, pmErrStr(sts));
 	exit(1);
     }
 
     if (type == PM_CONTEXT_ARCHIVE) {
 	if ((sts = pmGetArchiveLabel(&label)) < 0) {
 	    fprintf(stderr, "%s: Cannot get archive label record: %s\n",
-		pmGetProgname(), pmErrStr(sts));
+		pmProgname, pmErrStr(sts));
 	    exit(1);
 	}
 	if (mode != PM_MODE_INTERP) {
 	    if ((sts = pmSetMode(mode, &label.ll_start, 0)) < 0) {
-		fprintf(stderr, "%s: pmSetMode: %s\n", pmGetProgname(), pmErrStr(sts));
+		fprintf(stderr, "%s: pmSetMode: %s\n", pmProgname, pmErrStr(sts));
 		exit(1);
 	    }
 	}
   	startTime = label.ll_start;
 	sts = pmGetArchiveEnd(&endTime);
 	if (sts < 0) {
-	    fprintf(stderr, "%s: pmGetArchiveEnd: %s\n", pmGetProgname(),
+	    fprintf(stderr, "%s: pmGetArchiveEnd: %s\n", pmProgname,
 		    pmErrStr(sts));
 	    exit(1);
 	}
@@ -264,7 +264,7 @@ Options\n\
     if (zflag) {
 	if ((tzh = pmNewContextZone()) < 0) {
 	    fprintf(stderr, "%s: Cannot set context timezone: %s\n",
-		pmGetProgname(), pmErrStr(tzh));
+		pmProgname, pmErrStr(tzh));
 	    exit(1);
 	}
 	if (type == PM_CONTEXT_ARCHIVE)
@@ -276,7 +276,7 @@ Options\n\
     else if (tz != NULL) {
 	if ((tzh = pmNewZone(tz)) < 0) {
 	    fprintf(stderr, "%s: Cannot set timezone to \"%s\": %s\n",
-		pmGetProgname(), tz, pmErrStr(tzh));
+		pmProgname, tz, pmErrStr(tzh));
 	    exit(1);
 	}
 	printf("Note: timezone set to \"TZ=%s\"\n\n", tz);
@@ -292,7 +292,7 @@ Options\n\
 
     if (align != NULL && type != PM_CONTEXT_ARCHIVE) {
 	fprintf(stderr, "%s: -A option only supported for PCP archives, alignment request ignored\n",
-		pmGetProgname());
+		pmProgname);
 	align = NULL;
     }
 
@@ -301,34 +301,32 @@ Options\n\
 			    &endnum);
 
     if (sts < 0) {
-	fprintf(stderr, "%s: %s\n", pmGetProgname(), endnum);
+	fprintf(stderr, "%s: %s\n", pmProgname, endnum);
 	exit(1);
     }
 
     if ((sts = pmLookupName(2, namelist, pmidlist)) < 0) {
-	fprintf(stderr, "%s: pmLookupName failed: %s\n", pmGetProgname(), pmErrStr(sts));
+	fprintf(stderr, "%s: pmLookupName failed: %s\n", pmProgname, pmErrStr(sts));
 	exit(1);
     }
 
     /* goto the start */
     if ((sts = pmSetMode(PM_MODE_INTERP, &appStart, (int)(delta * 1000))) < 0) {
-	fprintf(stderr, "%s: pmSetMode failed: %s\n", pmGetProgname(), pmErrStr(sts));
+	fprintf(stderr, "%s: pmSetMode failed: %s\n", pmProgname, pmErrStr(sts));
 	exit(1);
     }
 
-    clock = (time_t)appStart.tv_sec;
-    pmCtime(&clock, timebuf);
+    pmCtime(&appStart.tv_sec, timebuf);
     printf("archive %s\nstartTime: %19.19s.%06d\n",
 	    host, timebuf, (int)appStart.tv_usec);
-    clock = (time_t)appEnd.tv_sec;
-    pmCtime(&clock, timebuf);
+    pmCtime(&appEnd.tv_sec, timebuf);
     printf("endTime  : %19.19s.%06d\nsamples=%d delta=%dms\n",
 	    timebuf, (int)appEnd.tv_usec, samples, (int)(delta * 1000));
 
     /* play forwards over the mark */
     for (i=0; i < samples; i++) {
 	if ((sts = pmFetch(2, pmidlist, &result)) < 0) {
-	    fprintf(stderr, "%s: pmFetch failed: %s\n", pmGetProgname(), pmErrStr(sts));
+	    fprintf(stderr, "%s: pmFetch failed: %s\n", pmProgname, pmErrStr(sts));
 	    exit(1);
 	}
 	check_result("forwards ", result);
@@ -338,13 +336,13 @@ Options\n\
 
     /* rewind back over the mark */
     if ((sts = pmSetMode(PM_MODE_INTERP, &curpos, (int)(delta * -1000))) < 0) {
-	fprintf(stderr, "%s: pmSetMode failed: %s\n", pmGetProgname(), pmErrStr(sts));
+	fprintf(stderr, "%s: pmSetMode failed: %s\n", pmProgname, pmErrStr(sts));
 	exit(1);
     }
 
     for (i=0; i < samples; i++) {
 	if ((sts = pmFetch(2, pmidlist, &result)) < 0) {
-	    fprintf(stderr, "%s: pmFetch failed: %s\n", pmGetProgname(), pmErrStr(sts));
+	    fprintf(stderr, "%s: pmFetch failed: %s\n", pmProgname, pmErrStr(sts));
 	    exit(1);
 	}
 
@@ -360,27 +358,26 @@ static void
 check_result(char *title, pmResult *result)
 {
     int		err= 0;
-    time_t	clock = (time_t)result->timestamp.tv_sec;
     if (result->numpmid != 2) {
-	pmCtime(&clock, timebuf);
+	pmCtime(&result->timestamp.tv_sec, timebuf);
 	printf("%s @ %19.19s.%06d numpmid=%d\n", title,
 		timebuf, (int)result->timestamp.tv_usec, result->numpmid);
 	err++;
     }
     if (result->numpmid >= 1 && result->vset[0]->numval != 1) {
-	pmCtime(&clock, timebuf);
+	pmCtime(&result->timestamp.tv_sec, timebuf);
 	printf("%s @ %19.19s.%06d vset[0]->numval=%d\n", title,
 		timebuf, (int)result->timestamp.tv_usec, result->vset[0]->numval);
 	err++;
     }
     if (result->numpmid >= 2 && result->vset[1]->numval != 1) {
-	pmCtime(&clock, timebuf);
+	pmCtime(&result->timestamp.tv_sec, timebuf);
 	printf("%s @ %19.19s.%06d vset[1]->numval=%d\n", title,
 		timebuf, (int)result->timestamp.tv_usec, result->vset[1]->numval);
 	err++;
     }
     if (err == 0) {
-	pmCtime(&clock, timebuf);
+	pmCtime(&result->timestamp.tv_sec, timebuf);
 	printf("fetch OK %s @ %19.19s.%06d\n", title,
 		timebuf, (int)result->timestamp.tv_usec);
     }

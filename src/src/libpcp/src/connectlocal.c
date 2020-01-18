@@ -17,7 +17,7 @@
  *
  * atexit_installed is protected by the __pmLock_libpcp mutex.
  *
- * pmSpecLocalPMDA() uses buffer[], but this routine is only called
+ * __pmSpecLocalPMDA() uses buffer[], but this routine is only called
  * from main() in single-threaded apps like pminfo, pmprobe, pmval
  * and pmevent ... so we can ignore any multi-threading issues,
  * especially as buffer[] is only used on an error handling code path.
@@ -36,15 +36,14 @@
  * The same arguments apply to EndLocalContext() and __pmConnectLocal().
  *
  * __pmLocalPMDA() is a mixed bag, sharing some of the justification from
- * pmSpecLocalPMDA() and some from __pmConnectLocal().
+ * __pmSpecLocalPMDA() and some from __pmConnectLocal().
  *
  * Because __pmConnectLocal() is not going to be used in a multi-threaded
  * environment, the call to the thread-unsafe dlerror() is OK.
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
-#include "internal.h"
+#include "impl.h"
 #include "pmda.h"
 #include <ctype.h>
 #include <sys/stat.h>
@@ -101,7 +100,7 @@ build_dsotab(void)
 	return -oserror();
     }
     if ((config = malloc(sbuf.st_size+1)) == NULL) {
-	pmNoMem("build_dsotbl:", sbuf.st_size+1, PM_RECOV_ERR);
+	__pmNoMem("build_dsotbl:", sbuf.st_size+1, PM_RECOV_ERR);
 	fclose(configFile);
 	return -oserror();
     }
@@ -343,10 +342,10 @@ __pmConnectLocal(__pmHashCtl *attrs)
 	 */
 	if ((path = __pmFindPMDA(dp->name)) == NULL) {
 	    pmsprintf(pathbuf, sizeof(pathbuf), "%s%c%s",
-			pmdas, pmPathSeparator(), dp->name);
+			pmdas, __pmPathSeparator(), dp->name);
 	    if ((path = __pmFindPMDA(pathbuf)) == NULL) {
 		pmsprintf(pathbuf, sizeof(pathbuf), "%s%c%s.%s",
-			    pmdas, pmPathSeparator(), dp->name, DSO_SUFFIX);
+			    pmdas, __pmPathSeparator(), dp->name, DSO_SUFFIX);
 		if ((path = __pmFindPMDA(pathbuf)) == NULL) {
 		    pmsprintf(pathbuf, sizeof(pathbuf), "%s.%s", dp->name, DSO_SUFFIX);
 		    if ((path = __pmFindPMDA(pathbuf)) == NULL) {
@@ -507,7 +506,7 @@ __pmLocalPMDA(int op, int domain, const char *name, const char *init)
     switch (op) {
 	case PM_LOCAL_ADD:
 	    if ((dsotab = (__pmDSO *)realloc(dsotab, (numdso+1)*sizeof(__pmDSO))) == NULL) {
-		pmNoMem("__pmLocalPMDA realloc", (numdso+1)*sizeof(__pmDSO), PM_FATAL_ERR);
+		__pmNoMem("__pmLocalPMDA realloc", (numdso+1)*sizeof(__pmDSO), PM_FATAL_ERR);
 		/*NOTREACHED*/
 	    }
 	    dsotab[numdso].domain = domain;
@@ -518,7 +517,7 @@ __pmLocalPMDA(int op, int domain, const char *name, const char *init)
 	    else {
 		if ((dsotab[numdso].name = strdup(name)) == NULL) {
 		    sts = -oserror();
-		    pmNoMem("__pmLocalPMDA name", strlen(name)+1, PM_RECOV_ERR);
+		    __pmNoMem("__pmLocalPMDA name", strlen(name)+1, PM_RECOV_ERR);
 		    return sts;
 		}
 	    }
@@ -529,7 +528,7 @@ __pmLocalPMDA(int op, int domain, const char *name, const char *init)
 	    else {
 		if ((dsotab[numdso].init = strdup(init)) == NULL) {
 		    sts = -oserror();
-		    pmNoMem("__pmLocalPMDA init", strlen(init)+1, PM_RECOV_ERR);
+		    __pmNoMem("__pmLocalPMDA init", strlen(init)+1, PM_RECOV_ERR);
 		    return sts;
 		}
 	    }
@@ -598,7 +597,7 @@ __pmLocalPMDA(int op, int domain, const char *name, const char *init)
  *	- init (name of DSO's initialization routine)
  */
 char *
-pmSpecLocalPMDA(const char *spec)
+__pmSpecLocalPMDA(const char *spec)
 {
     int		op;
     int		domain = -1;
@@ -610,7 +609,8 @@ pmSpecLocalPMDA(const char *spec)
     char	*ap;
 
     if ((arg = sbuf = strdup(spec)) == NULL) {
-	pmNoMem("pmSpecLocalPMDA dup spec", strlen(spec)+1, PM_RECOV_ERR);
+	sts = -oserror();
+	__pmNoMem("__pmSpecLocalPMDA dup spec", strlen(spec)+1, PM_RECOV_ERR);
 	return "strdup failed";
     }
     if (strncmp(arg, "add", 3) == 0) {

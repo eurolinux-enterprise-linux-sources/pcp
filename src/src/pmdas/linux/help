@@ -2,8 +2,8 @@
 # Copyright (c) 2000,2004-2008 Silicon Graphics, Inc.  All Rights Reserved.
 # Portions Copyright (c) International Business Machines Corp., 2002
 # Portions Copyright (c) 2007-2009 Aconex.  All Rights Reserved.
+# Portions Copyright (c) 2013-2017 Red Hat.
 # Portions Copyright (c) 2016-2017 Fujitsu.
-# Portions Copyright (c) 2013-2019 Red Hat.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
@@ -35,7 +35,6 @@
 @ 60.1 set of all disks
 @ 60.2 load averages for 1, 5, and 15 minutes
 @ 60.3 set of network interfaces
-@ 60.4 set of interrupt lines
 @ 60.5 mounted block-device-backed filesystem
 @ 60.6 swap devices
 @ 60.7 network filesystem (NFS) v2 operations
@@ -63,10 +62,6 @@
 The scsi tape instance domain includes st[0-9]+ devices, but not any of the
 derived devices such as nst0, nst0a, st0l, st0m and so forth. The derived
 devices all share the same statistics in the kernel as the st devices.
-@ 60.35 serial devices (aka ttys)
-@ 60.36 set of soft interrupts
-@ 60.37 pressure time averages for 10 seconds, 1 minute and 5 minutes
-
 
 @ kernel.uname.release release level of the running kernel
 Release level of the running kernel as reported via the release[]
@@ -248,9 +243,6 @@ Count of read requests that were merged with an already queued read request.
 @ disk.dev.write_merge per-disk count of merged write requests
 Count of write requests that were merged with an already queued write request.
 
-@ disk.dev.capacity per-disk physical device capacity
-Total space presented by each block device, from /proc/partitions.
-
 @ disk.dm.read per-device-mapper device read operations
 @ disk.dm.write per-device-mapper device write operations
 @ disk.dm.total per-device-mapper device total (read+write) operations
@@ -319,9 +311,6 @@ It is suitable mainly for use in calculations with other metrics,
 e.g. mirroring the results from existing performance tools:
 
  iostat.dm.await = delta(disk.dm.total_rawactive) / delta(disk.dm.total)
-
-@ disk.dm.capacity per-device-mapper physical device capacity
-Total space presented by each device mapper device, from /proc/partitions.
 
 @ hinv.map.dmname per-device-mapper device persistent name mapping to dm-[0-9]*
 
@@ -395,9 +384,6 @@ e.g. mirroring the results from existing performance tools:
  iostat.md.await = delta(disk.md.total_rawactive) / delta(disk.md.total)
 
 @ disk.md.status per-multi-device "mdadm --test --detail <device>" return code
-@ disk.md.capacity per-multi-device device capacity
-Total space presented by each multi-device device, from /proc/partitions.
-
 @ hinv.map.mdname per-multi-device device persistent name mapping to md[0-9]*
 
 @ disk.all.read_merge total count of merged read requests, summed for all disks
@@ -585,9 +571,6 @@ average of the number of outstanding I/Os for a disk partition.
 When divided by the number of completed I/Os for a disk partition
 (disk.partitions.total), the value represents the stochastic average of
 the I/O response (or wait) time for that disk partition.
-
-@ disk.partitions.capacity per-disk-partition capacity
-Total space presented by each disk partition, from /proc/partitions.
 
 @ swap.pagesin pages read from swap devices due to demand for physical memory
 @ swap.pagesout pages written to swap devices due to demand for physical memory
@@ -847,10 +830,6 @@ from /proc/vmstat
 @ mem.vmstat.pgrefill_movable movable mem pages inspected in refill_inactive_zone
 Count of movable mem pages inspected in refill_inactive_zone since boot,
 from /proc/vmstat
-@ mem.vmstat.pgsteal_direct mem pages directly reclaimed
-Count of mem pages directly reclaimed since boot, from /proc/vmstat
-@ mem.vmstat.pgsteal_kswapd mem pages reclaimed by kswapd
-Count of mem pages reclaimed by kswapd since boot, from /proc/vmstat
 @ mem.vmstat.pgsteal_high high mem pages reclaimed
 Count of high mem pages reclaimed since boot, from /proc/vmstat
 @ mem.vmstat.pgsteal_normal normal mem pages reclaimed
@@ -885,15 +864,6 @@ since Linux 3.4
 @ mem.vmstat.pgsteal_direct_movable movable mem pages reclaimed
 Count of movable mem pages reclaimed since boot, from /proc/vmstat
 since Linux 2.6.23
-@ mem.vmstat.pgscan_direct directly scanned mem pages
-Count of mem pages scanned directly since boot, from /proc/vmstat
-since Linux 3.4
-@ mem.vmstat.pgscan_direct_throttle throttled direct scanned mem pages
-Count of throttled mem pages scanned directly since boot, from /proc/vmstat
-since Linux 3.4
-@ mem.vmstat.pgscan_kswapd mem pages scanned by kswapd
-Count of mem pages scanned by kswapd since boot, from /proc/vmstat
-since Linux 3.4
 @ mem.vmstat.pgscan_kswapd_high high mem pages scanned by kswapd
 Count of high mem pages scanned by kswapd since boot, from /proc/vmstat
 @ mem.vmstat.pgscan_kswapd_normal normal mem pages scanned by kswapd
@@ -1003,9 +973,6 @@ Count of huge TLB page buddy allocation successes, from /proc/vmstat
 @ mem.vmstat.nr_vmscan_immediate_reclaim prioritise for reclaim when writeback ends
 @ mem.vmstat.numa_pages_migrated count of NUMA page migrations
 @ mem.vmstat.numa_pte_updates count of NUMA page table entry updates
-@ mem.vmstat.numa_huge_pte_updates count of NUMA huge page table entry updates
-@ mem.vmstat.numa_hint_faults count of page migrations from NUMA PTE fault hints
-@ mem.vmstat.numa_hint_faults_local count of NUMA PTE fault hints satisfied locally
 @ mem.vmstat.pglazyfreed count of pages lazily freed
 @ mem.vmstat.pgmigrate_fail count of unsuccessful NUMA page migrations
 @ mem.vmstat.pgmigrate_success count of successful NUMA page migrations
@@ -1107,9 +1074,7 @@ each NUMA node.
 @ swap.used swap used metric from /proc/meminfo
 @ swap.free swap free metric from /proc/meminfo
 @ kernel.all.load 1, 5 and 15 minute load average
-@ kernel.all.nusers number of user sessions on the system (including root)
-@ kernel.all.nroots number of root user sessions on the system (only root)
-@ kernel.all.nsessions number of utmp sessions (login records)
+@ kernel.all.nusers number of user sessions on system
 @ kernel.all.cpu.user total user CPU time from /proc/stat for all CPUs, including guest CPU time
 @ kernel.all.cpu.vuser total user CPU time from /proc/stat for all CPUs, excluding guest CPU time
 @ kernel.all.cpu.intr total interrupt CPU time from /proc/stat for all CPUs
@@ -1226,8 +1191,6 @@ See also network.interface.speed for the Megabytes/second value.
 @ network.interface.duplex value one for half or two for full duplex interface
 @ network.interface.up boolean for whether interface is currently up or down
 @ network.interface.running boolean for whether interface has resources allocated
-@ network.interface.wireless boolean for whether interface is wireless
-@ network.interface.type sysfs interface name assignment type value
 @ network.interface.inet_addr string INET interface address (ifconfig style)
 @ network.interface.ipv6_addr string IPv6 interface address (ifconfig style)
 @ network.interface.ipv6_scope string IPv6 interface scope (ifconfig style)
@@ -1349,28 +1312,6 @@ to maintain capacity for other less active flows.
 @ network.udplite6.rcvbuferrors count of udplite6 receive buffer errors
 @ network.udplite6.sndbuferrors count of udplite6 send buffer errors
 @ network.udplite6.incsumerrors count of udplite6 in checksum errors
-@ network.tcpconn6.established Number of established tcp6 connections
-@ network.tcpconn6.syn_sent Number of SYN_SENT tcp6 connections
-@ network.tcpconn6.syn_recv Number of SYN_RECV tcp6 connections
-@ network.tcpconn6.fin_wait1 Number of FIN_WAIT1 tcp6 connections
-@ network.tcpconn6.fin_wait2 Number of FIN_WAIT2 tcp6 connections
-@ network.tcpconn6.time_wait Number of TIME_WAIT tcp6 connections
-@ network.tcpconn6.close Number of CLOSE tcp6 connections
-@ network.tcpconn6.close_wait Number of CLOSE_WAIT tcp6 connections
-@ network.tcpconn6.last_ack Number of LAST_ACK tcp6 connections
-@ network.tcpconn6.listen Number of LISTEN tcp6 connections
-@ network.tcpconn6.closing Number of CLOSING tcp6 connections
-
-@ network.rawconn.count Number of raw socket connections
-@ network.rawconn6.count Number of raw6 socket connections
-@ network.udpconn.established Number of established udp connections
-@ network.udpconn.listen Number of udp connections in listen state
-@ network.udpconn6.established Number of established udp6 connections
-@ network.udpconn6.listen Number of udp6 connections in listen state
-@ network.unix.datagram.count Number of datagram unix domain sockets
-@ network.unix.stream.established Number of established unix domain socket streams
-@ network.unix.stream.listen Number of unix domain socket streams in listen state
-@ network.unix.stream.count Number of unix domain socket streams
 
 @ hinv.physmem total system memory metric from /proc/meminfo
 @ hinv.pagesize Memory page size
@@ -1715,8 +1656,7 @@ See also the kernel.uname.* metrics
 @ kernel.all.hz value of HZ (jiffies/second) for the currently running kernel
 @ kernel.all.uptime time the current kernel has been running
 @ kernel.all.idletime time the current kernel has been idle since boot
-@ kernel.all.lastpid most recently allocated process identifier
-@ kernel.all.pid_max maximum process identifier from /proc/sys/kernel/pid_max
+@ kernel.all.lastpid most recently allocated process id
 @ kernel.all.runnable total number of processes in the (per-CPU) run queues
 @ kernel.all.nprocs total number of processes (lightweight)
 @ mem.slabinfo.objects.active number of active objects in each cache
@@ -1759,8 +1699,6 @@ See also the kernel.uname.* metrics
 @ ipc.msg.perms access permissions (from msgctl(..,MSG_STAT,..))
 @ ipc.msg.msgsz used size in bytes (from msgctl(..,MSG_STAT,..))
 @ ipc.msg.messages number of messages currently queued (from msgctl(..,MSG_STAT,..))
-@ ipc.msg.last_send_pid last process to send on each message queue
-@ ipc.msg.last_recv_pid last process to recv on each message queue
 @ ipc.shm.max_segsz maximum shared segment size in bytes (from shmctl(..,IPC_INFO,..))
 @ ipc.shm.min_segsz minimum shared segment size in bytes (from shmctl(..,IPC_INFO,..))
 @ ipc.shm.max_seg maximum number of shared segments in system (from shmctl(..,IPC_INFO,..))
@@ -1778,29 +1716,14 @@ See also the kernel.uname.* metrics
 @ ipc.shm.segsz size of segment (bytes) (from shmctl(.., SHM_STAT, ..))
 @ ipc.shm.nattch no. of current attaches (from shmctl(.., SHM_STAT, ..))
 @ ipc.shm.status share memory segment status (from shmctl(.., SHM_STAT, ..))
-The string value may contain the space-separated values "dest" (a shared memory
-segment marked for destruction on last detach) and "locked" or the empty string.
-@ ipc.shm.creator_pid process creating each shared memory segment
-@ ipc.shm.last_access_pid process last accessing each shared memory segment
 
 @ vfs.files.count number of in-use file structures
 @ vfs.files.free number of available file structures
 @ vfs.files.max hard maximum on number of file structures
 @ vfs.inodes.count number of in-use inode structures
 @ vfs.inodes.free number of available inode structures
-@ vfs.dentry.count number of in-use directory entry structures
-@ vfs.dentry.free number of available directory entry structures
-@ vfs.aio.count number of in-use asynchronous IO structures
-@ vfs.aio.max hard maximum on number of asynchronous IO structures
-@ vfs.locks.posix.read number of POSIX locks held for reading
-@ vfs.locks.posix.write number of POSIX locks held for writing
-@ vfs.locks.posix.count number of POSIX lock structures
-@ vfs.locks.flock.read number of advisory file locks held for reading
-@ vfs.locks.flock.write number of advisory file locks held for writing
-@ vfs.locks.flock.count number of advisory file lock structures
-@ vfs.locks.lease.read number of file leases held for reading
-@ vfs.locks.lease.write number of file leases held for writing
-@ vfs.locks.lease.count number of file lease structures
+@ vfs.dentry.count number of in-use dentry structures
+@ vfs.dentry.free number of available dentry structures
 
 @ sysfs.kernel.uevent_seqnum counter of the number of uevents processed by the udev subsystem
 
@@ -1822,54 +1745,3 @@ For writes it means not all data made it to tape.
 @ tape.dev.write_byte_cnt number of bytes written to the tape drive
 @ tape.dev.write_cnt number of write requests issued to the tape drive
 @ tape.dev.write_ns cummulative amount of time spent waiting for write requests to complete
-
-@ tty.serial.rx Number of receive interrupts for current serial line.
-@ tty.serial.tx Number of transmit interrupts for current serial line.
-@ tty.serial.frame Number of frame errors for current serial line.
-@ tty.serial.parity Number of parity errors for current serial line.
-@ tty.serial.brk Number of breaks for current serial line.
-@ tty.serial.overrun Number of overrun errors for current serial line.
-@ tty.serial.irq IRQ number.
-
-@ kernel.all.pressure.cpu.some.avg Percentage of time runnable processes delayed for CPU resources
-Indicates the time in which at least some tasks stalled on CPU resources.
-The ratios are tracked as recent trends over ten second, one minute,
-and five minute windows.
-Pressure stall information (PSI) from /proc/pressure/cpu.
-@ kernel.all.pressure.cpu.some.total Total time processes stalled for CPU resources
-Indicates the time in which at least some tasks stalled on CPU resources.
-Pressure stall information (PSI) from /proc/pressure/cpu.
-
-@ kernel.all.pressure.memory.some.avg Percentage of time runnable processes delayed for memory resources
-Indicates the time in which at least some tasks stalled on memory resources.
-The ratios are tracked as recent trends over ten second, one minute,
-and five minute windows.
-Pressure stall information (PSI) from /proc/pressure/memory.
-@ kernel.all.pressure.memory.some.total Total time processes stalled for memory resources
-The CPU time for which at least some tasks stalled on memory resources.
-Pressure stall information (PSI) from /proc/pressure/memory.
-@ kernel.all.pressure.memory.full.avg Percentage of time all work is delayed from memory pressure
-Indicates the time in which all tasks stalled on memory resources.
-The ratios are tracked as recent trends over ten second, one minute,
-and five minute windows.
-Pressure stall information (PSI) from /proc/pressure/memory.
-@ kernel.all.pressure.memory.full.total Total time when all tasks stall on memory resources
-The CPU time for which all tasks stalled on memory resources.
-Pressure stall information (PSI) from /proc/pressure/memory.
-
-@ kernel.all.pressure.io.some.avg Percentage of time runnable processes delayed for IO resources
-Indicates the time in which at least some tasks stalled on IO resources.
-The ratios are tracked as recent trends over ten second, one minute,
-and five minute windows.
-Pressure stall information (PSI) from /proc/pressure/io.
-@ kernel.all.pressure.io.some.total Total time processes stalled for IO resources
-The CPU time in which at least some tasks stalled on IO resources.
-Pressure stall information (PSI) from /proc/pressure/io.
-@ kernel.all.pressure.io.full.avg Percentage of time all work is delayed from IO pressure
-Indicates the time in which all tasks stalled on IO resources.
-The ratios are tracked as recent trends over ten second, one minute,
-and five minute windows.
-Pressure stall information (PSI) from /proc/pressure/io.
-@ kernel.all.pressure.io.full.total Total time when all tasks stall on IO resources
-The CPU time in which all tasks stalled on IO resources.
-Pressure stall information (PSI) from /proc/pressure/io.

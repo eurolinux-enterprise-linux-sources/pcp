@@ -49,6 +49,9 @@ Installation
 
 	# ./Install
 
+    and choose both the "collector" and "monitor" installation
+    configuration options.
+
     You will be prompted for the necessary information to set up
     the summary agent.
 

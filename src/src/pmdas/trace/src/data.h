@@ -61,8 +61,6 @@ typedef struct {
     unsigned int	level;		/* controls reporting level */
 } ringbuf_t;
 
-void debuglibrary(void);
-
-extern int somedebug;
+void debuglibrary(int);
 
 #endif	/* TRACE_DATA_H */

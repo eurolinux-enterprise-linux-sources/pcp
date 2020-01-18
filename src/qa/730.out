@@ -84,24 +84,19 @@ cgroup.blkio.dev.throttle.io_serviced.sync
 cgroup.blkio.dev.throttle.io_serviced.total
 cgroup.blkio.dev.throttle.io_serviced.write
 cgroup.blkio.dev.time
-cgroup.blkio.id.container
-cgroup.cpuacct.id.container
 cgroup.cpuacct.stat.system
 cgroup.cpuacct.stat.user
 cgroup.cpuacct.usage
 cgroup.cpuacct.usage_percpu
 cgroup.cpusched.cfs_period
 cgroup.cpusched.cfs_quota
-cgroup.cpusched.id.container
 cgroup.cpusched.periods
 cgroup.cpusched.shares
 cgroup.cpusched.throttled
 cgroup.cpusched.throttled_time
 cgroup.cpuset.cpus
-cgroup.cpuset.id.container
 cgroup.cpuset.mems
 cgroup.memory.failcnt
-cgroup.memory.id.container
 cgroup.memory.limit
 cgroup.memory.stat.active_anon
 cgroup.memory.stat.active_file
@@ -141,7 +136,6 @@ cgroup.memory.usage
 cgroup.mounts.count
 cgroup.mounts.subsys
 cgroup.netclass.classid
-cgroup.netclass.id.container
 cgroup.subsys.count
 cgroup.subsys.enabled
 cgroup.subsys.hierarchy
@@ -220,35 +214,35 @@ cgroup.blkio.all.io_queued.write
 
 cgroup.blkio.all.io_service_bytes.async
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 409065984
     inst [N or "/libvirt"] value 0
     inst [N or "/libvirt/lxc"] value 0
 
 cgroup.blkio.all.io_service_bytes.read
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 1054750208
     inst [N or "/libvirt"] value 0
     inst [N or "/libvirt/lxc"] value 0
 
 cgroup.blkio.all.io_service_bytes.sync
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 1184346624
     inst [N or "/libvirt"] value 0
     inst [N or "/libvirt/lxc"] value 0
 
 cgroup.blkio.all.io_service_bytes.total
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 1593412608
     inst [N or "/libvirt"] value 0
     inst [N or "/libvirt/lxc"] value 0
 
 cgroup.blkio.all.io_service_bytes.write
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 538662400
     inst [N or "/libvirt"] value 0
     inst [N or "/libvirt/lxc"] value 0
@@ -367,35 +361,35 @@ cgroup.blkio.all.sectors
 
 cgroup.blkio.all.throttle.io_service_bytes.async
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 3211584000
     inst [N or "/libvirt"] value 0
     inst [N or "/libvirt/lxc"] value 0
 
 cgroup.blkio.all.throttle.io_service_bytes.read
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 2095242240
     inst [N or "/libvirt"] value 0
     inst [N or "/libvirt/lxc"] value 0
 
 cgroup.blkio.all.throttle.io_service_bytes.sync
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 0
     inst [N or "/libvirt"] value 0
     inst [N or "/libvirt/lxc"] value 0
 
 cgroup.blkio.all.throttle.io_service_bytes.total
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 3211584000
     inst [N or "/libvirt"] value 0
     inst [N or "/libvirt/lxc"] value 0
 
 cgroup.blkio.all.throttle.io_service_bytes.write
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 1116341760
     inst [N or "/libvirt"] value 0
     inst [N or "/libvirt/lxc"] value 0
@@ -554,7 +548,7 @@ cgroup.blkio.dev.io_queued.write
 
 cgroup.blkio.dev.io_service_bytes.async
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 0
     inst [N or "/::dm-1"] value 0
     inst [N or "/::dm-2"] value 0
@@ -565,7 +559,7 @@ cgroup.blkio.dev.io_service_bytes.async
 
 cgroup.blkio.dev.io_service_bytes.read
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 0
     inst [N or "/::dm-1"] value 0
     inst [N or "/::dm-2"] value 0
@@ -576,7 +570,7 @@ cgroup.blkio.dev.io_service_bytes.read
 
 cgroup.blkio.dev.io_service_bytes.sync
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 0
     inst [N or "/::dm-1"] value 0
     inst [N or "/::dm-2"] value 0
@@ -587,7 +581,7 @@ cgroup.blkio.dev.io_service_bytes.sync
 
 cgroup.blkio.dev.io_service_bytes.total
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 0
     inst [N or "/::dm-1"] value 0
     inst [N or "/::dm-2"] value 0
@@ -598,7 +592,7 @@ cgroup.blkio.dev.io_service_bytes.total
 
 cgroup.blkio.dev.io_service_bytes.write
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 0
     inst [N or "/::dm-1"] value 0
     inst [N or "/::dm-2"] value 0
@@ -785,7 +779,7 @@ cgroup.blkio.dev.sectors
 
 cgroup.blkio.dev.throttle.io_service_bytes.async
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 967549952
     inst [N or "/::dm-1"] value 1318912
     inst [N or "/::dm-2"] value 367479296
@@ -796,7 +790,7 @@ cgroup.blkio.dev.throttle.io_service_bytes.async
 
 cgroup.blkio.dev.throttle.io_service_bytes.read
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 693777408
     inst [N or "/::dm-1"] value 1318912
     inst [N or "/::dm-2"] value 118300672
@@ -807,7 +801,7 @@ cgroup.blkio.dev.throttle.io_service_bytes.read
 
 cgroup.blkio.dev.throttle.io_service_bytes.sync
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 0
     inst [N or "/::dm-1"] value 0
     inst [N or "/::dm-2"] value 0
@@ -818,7 +812,7 @@ cgroup.blkio.dev.throttle.io_service_bytes.sync
 
 cgroup.blkio.dev.throttle.io_service_bytes.total
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 967549952
     inst [N or "/::dm-1"] value 1318912
     inst [N or "/::dm-2"] value 367479296
@@ -829,7 +823,7 @@ cgroup.blkio.dev.throttle.io_service_bytes.total
 
 cgroup.blkio.dev.throttle.io_service_bytes.write
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 273772544
     inst [N or "/::dm-1"] value 0
     inst [N or "/::dm-2"] value 249178624
@@ -904,20 +898,6 @@ cgroup.blkio.dev.time
     inst [N or "/::sdb"] value 2266200
     inst [N or "/::sr0"] value 0
 
-cgroup.blkio.id.container
-    Data Type: string  InDom: 3.26 0xc0001a
-    Semantics: discrete  Units: none
-    inst [N or "/"] value ""
-    inst [N or "/libvirt"] value ""
-    inst [N or "/libvirt/lxc"] value ""
-
-cgroup.cpuacct.id.container
-    Data Type: string  InDom: 3.21 0xc00015
-    Semantics: discrete  Units: none
-    inst [N or "/"] value ""
-    inst [N or "/libvirt"] value ""
-    inst [N or "/libvirt/lxc"] value ""
-
 cgroup.cpuacct.stat.system
     Data Type: 64-bit unsigned int  InDom: 3.21 0xc00015
     Semantics: counter  Units: millisec
@@ -981,13 +961,6 @@ cgroup.cpusched.cfs_quota
     inst [N or "/libvirt"] value -1
     inst [N or "/libvirt/lxc"] value -1
 
-cgroup.cpusched.id.container
-    Data Type: string  InDom: 3.23 0xc00017
-    Semantics: discrete  Units: none
-    inst [N or "/"] value ""
-    inst [N or "/libvirt"] value ""
-    inst [N or "/libvirt/lxc"] value ""
-
 cgroup.cpusched.periods
     Data Type: 64-bit unsigned int  InDom: 3.23 0xc00017
     Semantics: instant  Units: none
@@ -1023,13 +996,6 @@ cgroup.cpuset.cpus
     inst [N or "/libvirt"] value "0-7"
     inst [N or "/libvirt/lxc"] value "0-7"
 
-cgroup.cpuset.id.container
-    Data Type: string  InDom: 3.20 0xc00014
-    Semantics: discrete  Units: none
-    inst [N or "/"] value ""
-    inst [N or "/libvirt"] value ""
-    inst [N or "/libvirt/lxc"] value ""
-
 cgroup.cpuset.mems
     Data Type: string  InDom: 3.20 0xc00014
     Semantics: instant  Units: none
@@ -1043,13 +1009,6 @@ cgroup.memory.failcnt
     inst [N or "/"] value 0
     inst [N or "/libvirt"] value 0
     inst [N or "/libvirt/lxc"] value 0
-
-cgroup.memory.id.container
-    Data Type: string  InDom: 3.24 0xc00018
-    Semantics: discrete  Units: none
-    inst [N or "/"] value ""
-    inst [N or "/libvirt"] value ""
-    inst [N or "/libvirt/lxc"] value ""
 
 cgroup.memory.limit
     Data Type: 64-bit unsigned int  InDom: 3.24 0xc00018
@@ -1325,11 +1284,6 @@ cgroup.netclass.classid
     Semantics: instant  Units: none
 No value(s) available!
 
-cgroup.netclass.id.container
-    Data Type: string  InDom: 3.25 0xc00019
-    Semantics: discrete  Units: none
-No value(s) available!
-
 cgroup.subsys.count
     Data Type: 32-bit unsigned int  InDom: PM_INDOM_NULL 0xffffffff
     Semantics: instant  Units: count
@@ -1485,24 +1439,19 @@ cgroup.blkio.dev.throttle.io_serviced.sync
 cgroup.blkio.dev.throttle.io_serviced.total
 cgroup.blkio.dev.throttle.io_serviced.write
 cgroup.blkio.dev.time
-cgroup.blkio.id.container
-cgroup.cpuacct.id.container
 cgroup.cpuacct.stat.system
 cgroup.cpuacct.stat.user
 cgroup.cpuacct.usage
 cgroup.cpuacct.usage_percpu
 cgroup.cpusched.cfs_period
 cgroup.cpusched.cfs_quota
-cgroup.cpusched.id.container
 cgroup.cpusched.periods
 cgroup.cpusched.shares
 cgroup.cpusched.throttled
 cgroup.cpusched.throttled_time
 cgroup.cpuset.cpus
-cgroup.cpuset.id.container
 cgroup.cpuset.mems
 cgroup.memory.failcnt
-cgroup.memory.id.container
 cgroup.memory.limit
 cgroup.memory.stat.active_anon
 cgroup.memory.stat.active_file
@@ -1542,7 +1491,6 @@ cgroup.memory.usage
 cgroup.mounts.count
 cgroup.mounts.subsys
 cgroup.netclass.classid
-cgroup.netclass.id.container
 cgroup.subsys.count
 cgroup.subsys.enabled
 cgroup.subsys.hierarchy
@@ -1601,27 +1549,27 @@ cgroup.blkio.all.io_queued.write
 
 cgroup.blkio.all.io_service_bytes.async
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 30122435584
 
 cgroup.blkio.all.io_service_bytes.read
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 1938551808
 
 cgroup.blkio.all.io_service_bytes.sync
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 1949011968
 
 cgroup.blkio.all.io_service_bytes.total
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 32071447552
 
 cgroup.blkio.all.io_service_bytes.write
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 30132895744
 
 cgroup.blkio.all.io_service_time.async
@@ -1706,27 +1654,27 @@ cgroup.blkio.all.sectors
 
 cgroup.blkio.all.throttle.io_service_bytes.async
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 28772984832
 
 cgroup.blkio.all.throttle.io_service_bytes.read
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 1956128768
 
 cgroup.blkio.all.throttle.io_service_bytes.sync
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 2068295680
 
 cgroup.blkio.all.throttle.io_service_bytes.total
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 30841280512
 
 cgroup.blkio.all.throttle.io_service_bytes.write
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 28885151744
 
 cgroup.blkio.all.throttle.io_serviced.async
@@ -1831,35 +1779,35 @@ cgroup.blkio.dev.io_queued.write
 
 cgroup.blkio.dev.io_service_bytes.async
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 0
     inst [N or "/::sda"] value 30122435584
     inst [N or "/::sr0"] value 0
 
 cgroup.blkio.dev.io_service_bytes.read
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 0
     inst [N or "/::sda"] value 1938551808
     inst [N or "/::sr0"] value 0
 
 cgroup.blkio.dev.io_service_bytes.sync
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 0
     inst [N or "/::sda"] value 1949011968
     inst [N or "/::sr0"] value 0
 
 cgroup.blkio.dev.io_service_bytes.total
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 0
     inst [N or "/::sda"] value 32071447552
     inst [N or "/::sr0"] value 0
 
 cgroup.blkio.dev.io_service_bytes.write
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 0
     inst [N or "/::sda"] value 30132895744
     inst [N or "/::sr0"] value 0
@@ -1978,35 +1926,35 @@ cgroup.blkio.dev.sectors
 
 cgroup.blkio.dev.throttle.io_service_bytes.async
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 17896448
     inst [N or "/::sda"] value 28755088384
     inst [N or "/::sr0"] value 0
 
 cgroup.blkio.dev.throttle.io_service_bytes.read
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 17536000
     inst [N or "/::sda"] value 1938592768
     inst [N or "/::sr0"] value 0
 
 cgroup.blkio.dev.throttle.io_service_bytes.sync
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 544768
     inst [N or "/::sda"] value 2067750912
     inst [N or "/::sr0"] value 0
 
 cgroup.blkio.dev.throttle.io_service_bytes.total
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 18441216
     inst [N or "/::sda"] value 30822839296
     inst [N or "/::sr0"] value 0
 
 cgroup.blkio.dev.throttle.io_service_bytes.write
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 905216
     inst [N or "/::sda"] value 28884246528
     inst [N or "/::sr0"] value 0
@@ -2053,16 +2001,6 @@ cgroup.blkio.dev.time
     inst [N or "/::sda"] value 18058780
     inst [N or "/::sr0"] value 0
 
-cgroup.blkio.id.container
-    Data Type: string  InDom: 3.26 0xc0001a
-    Semantics: discrete  Units: none
-    inst [N or "/"] value ""
-
-cgroup.cpuacct.id.container
-    Data Type: string  InDom: 3.21 0xc00015
-    Semantics: discrete  Units: none
-    inst [N or "/"] value ""
-
 cgroup.cpuacct.stat.system
     Data Type: 64-bit unsigned int  InDom: 3.21 0xc00015
     Semantics: counter  Units: millisec
@@ -2096,11 +2034,6 @@ cgroup.cpusched.cfs_quota
     Semantics: instant  Units: microsec
     inst [N or "/"] value -1
 
-cgroup.cpusched.id.container
-    Data Type: string  InDom: 3.23 0xc00017
-    Semantics: discrete  Units: none
-    inst [N or "/"] value ""
-
 cgroup.cpusched.periods
     Data Type: 64-bit unsigned int  InDom: 3.23 0xc00017
     Semantics: instant  Units: none
@@ -2126,11 +2059,6 @@ cgroup.cpuset.cpus
     Semantics: instant  Units: none
     inst [N or "/"] value "0-3"
 
-cgroup.cpuset.id.container
-    Data Type: string  InDom: 3.20 0xc00014
-    Semantics: discrete  Units: none
-    inst [N or "/"] value ""
-
 cgroup.cpuset.mems
     Data Type: string  InDom: 3.20 0xc00014
     Semantics: instant  Units: none
@@ -2140,11 +2068,6 @@ cgroup.memory.failcnt
     Data Type: 64-bit unsigned int  InDom: 3.24 0xc00018
     Semantics: counter  Units: count
     inst [N or "/"] value 0
-
-cgroup.memory.id.container
-    Data Type: string  InDom: 3.24 0xc00018
-    Semantics: discrete  Units: none
-    inst [N or "/"] value ""
 
 cgroup.memory.limit
     Data Type: 64-bit unsigned int  InDom: 3.24 0xc00018
@@ -2350,11 +2273,6 @@ cgroup.netclass.classid
     Semantics: instant  Units: none
 No value(s) available!
 
-cgroup.netclass.id.container
-    Data Type: string  InDom: 3.25 0xc00019
-    Semantics: discrete  Units: none
-No value(s) available!
-
 cgroup.subsys.count
     Data Type: 32-bit unsigned int  InDom: PM_INDOM_NULL 0xffffffff
     Semantics: instant  Units: count
@@ -2495,24 +2413,19 @@ cgroup.blkio.dev.throttle.io_serviced.sync
 cgroup.blkio.dev.throttle.io_serviced.total
 cgroup.blkio.dev.throttle.io_serviced.write
 cgroup.blkio.dev.time
-cgroup.blkio.id.container
-cgroup.cpuacct.id.container
 cgroup.cpuacct.stat.system
 cgroup.cpuacct.stat.user
 cgroup.cpuacct.usage
 cgroup.cpuacct.usage_percpu
 cgroup.cpusched.cfs_period
 cgroup.cpusched.cfs_quota
-cgroup.cpusched.id.container
 cgroup.cpusched.periods
 cgroup.cpusched.shares
 cgroup.cpusched.throttled
 cgroup.cpusched.throttled_time
 cgroup.cpuset.cpus
-cgroup.cpuset.id.container
 cgroup.cpuset.mems
 cgroup.memory.failcnt
-cgroup.memory.id.container
 cgroup.memory.limit
 cgroup.memory.stat.active_anon
 cgroup.memory.stat.active_file
@@ -2552,7 +2465,6 @@ cgroup.memory.usage
 cgroup.mounts.count
 cgroup.mounts.subsys
 cgroup.netclass.classid
-cgroup.netclass.id.container
 cgroup.subsys.count
 cgroup.subsys.enabled
 cgroup.subsys.hierarchy
@@ -3381,7 +3293,7 @@ cgroup.blkio.all.io_queued.write
 
 cgroup.blkio.all.io_service_bytes.async
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 30138164224
     inst [N or "/system.slice"] value 319488
     inst [N or "/system.slice/-.mount"] value 0
@@ -3463,7 +3375,7 @@ cgroup.blkio.all.io_service_bytes.async
 
 cgroup.blkio.all.io_service_bytes.read
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 1944835072
     inst [N or "/system.slice"] value 319488
     inst [N or "/system.slice/-.mount"] value 0
@@ -3545,7 +3457,7 @@ cgroup.blkio.all.io_service_bytes.read
 
 cgroup.blkio.all.io_service_bytes.sync
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 1953562624
     inst [N or "/system.slice"] value 4096
     inst [N or "/system.slice/-.mount"] value 0
@@ -3627,7 +3539,7 @@ cgroup.blkio.all.io_service_bytes.sync
 
 cgroup.blkio.all.io_service_bytes.total
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 32091726848
     inst [N or "/system.slice"] value 323584
     inst [N or "/system.slice/-.mount"] value 0
@@ -3709,7 +3621,7 @@ cgroup.blkio.all.io_service_bytes.total
 
 cgroup.blkio.all.io_service_bytes.write
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 30146891776
     inst [N or "/system.slice"] value 4096
     inst [N or "/system.slice/-.mount"] value 0
@@ -5103,7 +5015,7 @@ cgroup.blkio.all.sectors
 
 cgroup.blkio.all.throttle.io_service_bytes.async
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 28793937920
     inst [N or "/system.slice"] value 188416
     inst [N or "/system.slice/-.mount"] value 0
@@ -5185,7 +5097,7 @@ cgroup.blkio.all.throttle.io_service_bytes.async
 
 cgroup.blkio.all.throttle.io_service_bytes.read
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 1967489024
     inst [N or "/system.slice"] value 188416
     inst [N or "/system.slice/-.mount"] value 0
@@ -5267,7 +5179,7 @@ cgroup.blkio.all.throttle.io_service_bytes.read
 
 cgroup.blkio.all.throttle.io_service_bytes.sync
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 2073251840
     inst [N or "/system.slice"] value 4096
     inst [N or "/system.slice/-.mount"] value 0
@@ -5349,7 +5261,7 @@ cgroup.blkio.all.throttle.io_service_bytes.sync
 
 cgroup.blkio.all.throttle.io_service_bytes.total
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 30867189760
     inst [N or "/system.slice"] value 192512
     inst [N or "/system.slice/-.mount"] value 0
@@ -5431,7 +5343,7 @@ cgroup.blkio.all.throttle.io_service_bytes.total
 
 cgroup.blkio.all.throttle.io_service_bytes.write
     Data Type: 64-bit unsigned int  InDom: 3.26 0xc0001a
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/"] value 28899700736
     inst [N or "/system.slice"] value 4096
     inst [N or "/system.slice/-.mount"] value 0
@@ -6205,7 +6117,7 @@ cgroup.blkio.dev.io_queued.write
 
 cgroup.blkio.dev.io_service_bytes.async
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 0
     inst [N or "/::dm-1"] value 0
     inst [N or "/::sda"] value 30138164224
@@ -6225,7 +6137,7 @@ cgroup.blkio.dev.io_service_bytes.async
 
 cgroup.blkio.dev.io_service_bytes.read
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 0
     inst [N or "/::dm-1"] value 0
     inst [N or "/::sda"] value 1944835072
@@ -6245,7 +6157,7 @@ cgroup.blkio.dev.io_service_bytes.read
 
 cgroup.blkio.dev.io_service_bytes.sync
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 0
     inst [N or "/::dm-1"] value 0
     inst [N or "/::sda"] value 1953562624
@@ -6265,7 +6177,7 @@ cgroup.blkio.dev.io_service_bytes.sync
 
 cgroup.blkio.dev.io_service_bytes.total
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 0
     inst [N or "/::dm-1"] value 0
     inst [N or "/::sda"] value 32091726848
@@ -6285,7 +6197,7 @@ cgroup.blkio.dev.io_service_bytes.total
 
 cgroup.blkio.dev.io_service_bytes.write
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 0
     inst [N or "/::dm-1"] value 0
     inst [N or "/::sda"] value 30146891776
@@ -6625,7 +6537,7 @@ cgroup.blkio.dev.sectors
 
 cgroup.blkio.dev.throttle.io_service_bytes.async
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 22292480
     inst [N or "/::dm-1"] value 840704
     inst [N or "/::sda"] value 28770804736
@@ -6645,7 +6557,7 @@ cgroup.blkio.dev.throttle.io_service_bytes.async
 
 cgroup.blkio.dev.throttle.io_service_bytes.read
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 21854208
     inst [N or "/::dm-1"] value 758784
     inst [N or "/::sda"] value 1944876032
@@ -6665,7 +6577,7 @@ cgroup.blkio.dev.throttle.io_service_bytes.read
 
 cgroup.blkio.dev.throttle.io_service_bytes.sync
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 643072
     inst [N or "/::dm-1"] value 98304
     inst [N or "/::sda"] value 2072510464
@@ -6685,7 +6597,7 @@ cgroup.blkio.dev.throttle.io_service_bytes.sync
 
 cgroup.blkio.dev.throttle.io_service_bytes.total
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 22935552
     inst [N or "/::dm-1"] value 939008
     inst [N or "/::sda"] value 30843315200
@@ -6705,7 +6617,7 @@ cgroup.blkio.dev.throttle.io_service_bytes.total
 
 cgroup.blkio.dev.throttle.io_service_bytes.write
     Data Type: 64-bit unsigned int  InDom: 3.27 0xc0001b
-    Semantics: counter  Units: byte
+    Semantics: counter  Units: Kbyte
     inst [N or "/::dm-0"] value 1081344
     inst [N or "/::dm-1"] value 180224
     inst [N or "/::sda"] value 28898439168
@@ -6842,170 +6754,6 @@ cgroup.blkio.dev.time
     inst [N or "/system.slice::dm-1"] value 0
     inst [N or "/system.slice::sda"] value 1260
     inst [N or "/user.slice::sda"] value 240
-
-cgroup.blkio.id.container
-    Data Type: string  InDom: 3.26 0xc0001a
-    Semantics: discrete  Units: none
-    inst [N or "/"] value ""
-    inst [N or "/system.slice"] value ""
-    inst [N or "/system.slice/-.mount"] value ""
-    inst [N or "/system.slice/ModemManager.service"] value ""
-    inst [N or "/system.slice/NetworkManager-wait-online.service"] value ""
-    inst [N or "/system.slice/NetworkManager.service"] value ""
-    inst [N or "/system.slice/abrt-ccpp.service"] value ""
-    inst [N or "/system.slice/abrt-oops.service"] value ""
-    inst [N or "/system.slice/abrt-vmcore.service"] value ""
-    inst [N or "/system.slice/abrt-xorg.service"] value ""
-    inst [N or "/system.slice/abrtd.service"] value ""
-    inst [N or "/system.slice/accounts-daemon.service"] value ""
-    inst [N or "/system.slice/atd.service"] value ""
-    inst [N or "/system.slice/avahi-daemon.service"] value ""
-    inst [N or "/system.slice/avahi-daemon.socket"] value ""
-    inst [N or "/system.slice/bluetooth.service"] value ""
-    inst [N or "/system.slice/chronyd.service"] value ""
-    inst [N or "/system.slice/colord.service"] value ""
-    inst [N or "/system.slice/crond.service"] value ""
-    inst [N or "/system.slice/cups.service"] value ""
-    inst [N or "/system.slice/cups.socket"] value ""
-    inst [N or "/system.slice/dbus.service"] value ""
-    inst [N or "/system.slice/dbus.socket"] value ""
-    inst [N or "/system.slice/dev-disk-by\x2did-ata\x2dST500LT012\x2d1DG142_W3P5F3RG\x2dpart9.swap"] value ""
-    inst [N or "/system.slice/dev-disk-by\x2did-wwn\x2d0x5000c50077b73cb4\x2dpart9.swap"] value ""
-    inst [N or "/system.slice/dev-disk-by\x2dpartuuid-b845133d\x2dd830\x2d4d13\x2dbbd7\x2d7fd1a510a882.swap"] value ""
-    inst [N or "/system.slice/dev-disk-by\x2duuid-d7d61c16\x2dacba\x2d4cb9\x2d85ee\x2d6368870c61da.swap"] value ""
-    inst [N or "/system.slice/dev-sda9.swap"] value ""
-    inst [N or "/system.slice/docker-f4d3b90bea1585f216da780c97cc4675827296e1c90fdc957fb2ea0c1db85a6a.scope"] value "f4d3b90bea1585f216da780c97cc4675827296e1c90fdc957fb2ea0c1db85a6a"
-    inst [N or "/system.slice/docker.service"] value ""
-    inst [N or "/system.slice/docker.socket"] value ""
-    inst [N or "/system.slice/ebtables.service"] value ""
-    inst [N or "/system.slice/firewalld.service"] value ""
-    inst [N or "/system.slice/gdm.service"] value ""
-    inst [N or "/system.slice/httpd.service"] value ""
-    inst [N or "/system.slice/ip6tables.service"] value ""
-    inst [N or "/system.slice/iptables.service"] value ""
-    inst [N or "/system.slice/irqbalance.service"] value ""
-    inst [N or "/system.slice/iscsid.socket"] value ""
-    inst [N or "/system.slice/iscsiuio.socket"] value ""
-    inst [N or "/system.slice/kdump.service"] value ""
-    inst [N or "/system.slice/libvirt-guests.service"] value ""
-    inst [N or "/system.slice/libvirtd.service"] value ""
-    inst [N or "/system.slice/mcelog.service"] value ""
-    inst [N or "/system.slice/mdmonitor.service"] value ""
-    inst [N or "/system.slice/memcached.service"] value ""
-    inst [N or "/system.slice/netconsole.service"] value ""
-    inst [N or "/system.slice/network.service"] value ""
-    inst [N or "/system.slice/nfs-lock.service"] value ""
-    inst [N or "/system.slice/pcscd.service"] value ""
-    inst [N or "/system.slice/pcscd.socket"] value ""
-    inst [N or "/system.slice/plymouth-quit-wait.service"] value ""
-    inst [N or "/system.slice/plymouth-quit.service"] value ""
-    inst [N or "/system.slice/pmcd.service"] value ""
-    inst [N or "/system.slice/pmlogger.service"] value ""
-    inst [N or "/system.slice/polkit.service"] value ""
-    inst [N or "/system.slice/rc-local.service"] value ""
-    inst [N or "/system.slice/rngd.service"] value ""
-    inst [N or "/system.slice/rpcbind.service"] value ""
-    inst [N or "/system.slice/rpcbind.socket"] value ""
-    inst [N or "/system.slice/rsyslog.service"] value ""
-    inst [N or "/system.slice/rtkit-daemon.service"] value ""
-    inst [N or "/system.slice/run-user-1000-gvfs.mount"] value ""
-    inst [N or "/system.slice/smartd.service"] value ""
-    inst [N or "/system.slice/sshd.service"] value ""
-    inst [N or "/system.slice/sysstat.service"] value ""
-    inst [N or "/system.slice/system-getty.slice"] value ""
-    inst [N or "/system.slice/system-systemd\x2dbacklight.slice"] value ""
-    inst [N or "/system.slice/systemd-ask-password-wall.service"] value ""
-    inst [N or "/system.slice/systemd-logind.service"] value ""
-    inst [N or "/system.slice/systemd-user-sessions.service"] value ""
-    inst [N or "/system.slice/udisks2.service"] value ""
-    inst [N or "/system.slice/upower.service"] value ""
-    inst [N or "/system.slice/var-lib-docker-devicemapper-mnt-f4d3b90bea1585f216da780c97cc4675827296e1c90fdc957fb2ea0c1db85a6a.mount"] value ""
-    inst [N or "/system.slice/var-lib-docker-devicemapper.mount"] value ""
-    inst [N or "/system.slice/vmtoolsd.service"] value ""
-    inst [N or "/system.slice/wpa_supplicant.service"] value ""
-    inst [N or "/user.slice"] value ""
-
-cgroup.cpuacct.id.container
-    Data Type: string  InDom: 3.21 0xc00015
-    Semantics: discrete  Units: none
-    inst [N or "/"] value ""
-    inst [N or "/system.slice"] value ""
-    inst [N or "/system.slice/-.mount"] value ""
-    inst [N or "/system.slice/ModemManager.service"] value ""
-    inst [N or "/system.slice/NetworkManager-wait-online.service"] value ""
-    inst [N or "/system.slice/NetworkManager.service"] value ""
-    inst [N or "/system.slice/abrt-ccpp.service"] value ""
-    inst [N or "/system.slice/abrt-oops.service"] value ""
-    inst [N or "/system.slice/abrt-vmcore.service"] value ""
-    inst [N or "/system.slice/abrt-xorg.service"] value ""
-    inst [N or "/system.slice/abrtd.service"] value ""
-    inst [N or "/system.slice/accounts-daemon.service"] value ""
-    inst [N or "/system.slice/atd.service"] value ""
-    inst [N or "/system.slice/avahi-daemon.service"] value ""
-    inst [N or "/system.slice/avahi-daemon.socket"] value ""
-    inst [N or "/system.slice/bluetooth.service"] value ""
-    inst [N or "/system.slice/chronyd.service"] value ""
-    inst [N or "/system.slice/colord.service"] value ""
-    inst [N or "/system.slice/crond.service"] value ""
-    inst [N or "/system.slice/cups.service"] value ""
-    inst [N or "/system.slice/cups.socket"] value ""
-    inst [N or "/system.slice/dbus.service"] value ""
-    inst [N or "/system.slice/dbus.socket"] value ""
-    inst [N or "/system.slice/dev-disk-by\x2did-ata\x2dST500LT012\x2d1DG142_W3P5F3RG\x2dpart9.swap"] value ""
-    inst [N or "/system.slice/dev-disk-by\x2did-wwn\x2d0x5000c50077b73cb4\x2dpart9.swap"] value ""
-    inst [N or "/system.slice/dev-disk-by\x2dpartuuid-b845133d\x2dd830\x2d4d13\x2dbbd7\x2d7fd1a510a882.swap"] value ""
-    inst [N or "/system.slice/dev-disk-by\x2duuid-d7d61c16\x2dacba\x2d4cb9\x2d85ee\x2d6368870c61da.swap"] value ""
-    inst [N or "/system.slice/dev-sda9.swap"] value ""
-    inst [N or "/system.slice/docker-f4d3b90bea1585f216da780c97cc4675827296e1c90fdc957fb2ea0c1db85a6a.scope"] value "f4d3b90bea1585f216da780c97cc4675827296e1c90fdc957fb2ea0c1db85a6a"
-    inst [N or "/system.slice/docker.service"] value ""
-    inst [N or "/system.slice/docker.socket"] value ""
-    inst [N or "/system.slice/ebtables.service"] value ""
-    inst [N or "/system.slice/firewalld.service"] value ""
-    inst [N or "/system.slice/gdm.service"] value ""
-    inst [N or "/system.slice/httpd.service"] value ""
-    inst [N or "/system.slice/ip6tables.service"] value ""
-    inst [N or "/system.slice/iptables.service"] value ""
-    inst [N or "/system.slice/irqbalance.service"] value ""
-    inst [N or "/system.slice/iscsid.socket"] value ""
-    inst [N or "/system.slice/iscsiuio.socket"] value ""
-    inst [N or "/system.slice/kdump.service"] value ""
-    inst [N or "/system.slice/libvirt-guests.service"] value ""
-    inst [N or "/system.slice/libvirtd.service"] value ""
-    inst [N or "/system.slice/mcelog.service"] value ""
-    inst [N or "/system.slice/mdmonitor.service"] value ""
-    inst [N or "/system.slice/memcached.service"] value ""
-    inst [N or "/system.slice/netconsole.service"] value ""
-    inst [N or "/system.slice/network.service"] value ""
-    inst [N or "/system.slice/nfs-lock.service"] value ""
-    inst [N or "/system.slice/pcscd.service"] value ""
-    inst [N or "/system.slice/pcscd.socket"] value ""
-    inst [N or "/system.slice/plymouth-quit-wait.service"] value ""
-    inst [N or "/system.slice/plymouth-quit.service"] value ""
-    inst [N or "/system.slice/pmcd.service"] value ""
-    inst [N or "/system.slice/pmlogger.service"] value ""
-    inst [N or "/system.slice/polkit.service"] value ""
-    inst [N or "/system.slice/rc-local.service"] value ""
-    inst [N or "/system.slice/rngd.service"] value ""
-    inst [N or "/system.slice/rpcbind.service"] value ""
-    inst [N or "/system.slice/rpcbind.socket"] value ""
-    inst [N or "/system.slice/rsyslog.service"] value ""
-    inst [N or "/system.slice/rtkit-daemon.service"] value ""
-    inst [N or "/system.slice/run-user-1000-gvfs.mount"] value ""
-    inst [N or "/system.slice/smartd.service"] value ""
-    inst [N or "/system.slice/sshd.service"] value ""
-    inst [N or "/system.slice/sysstat.service"] value ""
-    inst [N or "/system.slice/system-getty.slice"] value ""
-    inst [N or "/system.slice/system-systemd\x2dbacklight.slice"] value ""
-    inst [N or "/system.slice/systemd-ask-password-wall.service"] value ""
-    inst [N or "/system.slice/systemd-logind.service"] value ""
-    inst [N or "/system.slice/systemd-user-sessions.service"] value ""
-    inst [N or "/system.slice/udisks2.service"] value ""
-    inst [N or "/system.slice/upower.service"] value ""
-    inst [N or "/system.slice/var-lib-docker-devicemapper-mnt-f4d3b90bea1585f216da780c97cc4675827296e1c90fdc957fb2ea0c1db85a6a.mount"] value ""
-    inst [N or "/system.slice/var-lib-docker-devicemapper.mount"] value ""
-    inst [N or "/system.slice/vmtoolsd.service"] value ""
-    inst [N or "/system.slice/wpa_supplicant.service"] value ""
-    inst [N or "/user.slice"] value ""
 
 cgroup.cpuacct.stat.system
     Data Type: 64-bit unsigned int  InDom: 3.21 0xc00015
@@ -7733,88 +7481,6 @@ cgroup.cpusched.cfs_quota
     inst [N or "/system.slice/wpa_supplicant.service"] value -1
     inst [N or "/user.slice"] value -1
 
-cgroup.cpusched.id.container
-    Data Type: string  InDom: 3.23 0xc00017
-    Semantics: discrete  Units: none
-    inst [N or "/"] value ""
-    inst [N or "/system.slice"] value ""
-    inst [N or "/system.slice/-.mount"] value ""
-    inst [N or "/system.slice/ModemManager.service"] value ""
-    inst [N or "/system.slice/NetworkManager-wait-online.service"] value ""
-    inst [N or "/system.slice/NetworkManager.service"] value ""
-    inst [N or "/system.slice/abrt-ccpp.service"] value ""
-    inst [N or "/system.slice/abrt-oops.service"] value ""
-    inst [N or "/system.slice/abrt-vmcore.service"] value ""
-    inst [N or "/system.slice/abrt-xorg.service"] value ""
-    inst [N or "/system.slice/abrtd.service"] value ""
-    inst [N or "/system.slice/accounts-daemon.service"] value ""
-    inst [N or "/system.slice/atd.service"] value ""
-    inst [N or "/system.slice/avahi-daemon.service"] value ""
-    inst [N or "/system.slice/avahi-daemon.socket"] value ""
-    inst [N or "/system.slice/bluetooth.service"] value ""
-    inst [N or "/system.slice/chronyd.service"] value ""
-    inst [N or "/system.slice/colord.service"] value ""
-    inst [N or "/system.slice/crond.service"] value ""
-    inst [N or "/system.slice/cups.service"] value ""
-    inst [N or "/system.slice/cups.socket"] value ""
-    inst [N or "/system.slice/dbus.service"] value ""
-    inst [N or "/system.slice/dbus.socket"] value ""
-    inst [N or "/system.slice/dev-disk-by\x2did-ata\x2dST500LT012\x2d1DG142_W3P5F3RG\x2dpart9.swap"] value ""
-    inst [N or "/system.slice/dev-disk-by\x2did-wwn\x2d0x5000c50077b73cb4\x2dpart9.swap"] value ""
-    inst [N or "/system.slice/dev-disk-by\x2dpartuuid-b845133d\x2dd830\x2d4d13\x2dbbd7\x2d7fd1a510a882.swap"] value ""
-    inst [N or "/system.slice/dev-disk-by\x2duuid-d7d61c16\x2dacba\x2d4cb9\x2d85ee\x2d6368870c61da.swap"] value ""
-    inst [N or "/system.slice/dev-sda9.swap"] value ""
-    inst [N or "/system.slice/docker-f4d3b90bea1585f216da780c97cc4675827296e1c90fdc957fb2ea0c1db85a6a.scope"] value "f4d3b90bea1585f216da780c97cc4675827296e1c90fdc957fb2ea0c1db85a6a"
-    inst [N or "/system.slice/docker.service"] value ""
-    inst [N or "/system.slice/docker.socket"] value ""
-    inst [N or "/system.slice/ebtables.service"] value ""
-    inst [N or "/system.slice/firewalld.service"] value ""
-    inst [N or "/system.slice/gdm.service"] value ""
-    inst [N or "/system.slice/httpd.service"] value ""
-    inst [N or "/system.slice/ip6tables.service"] value ""
-    inst [N or "/system.slice/iptables.service"] value ""
-    inst [N or "/system.slice/irqbalance.service"] value ""
-    inst [N or "/system.slice/iscsid.socket"] value ""
-    inst [N or "/system.slice/iscsiuio.socket"] value ""
-    inst [N or "/system.slice/kdump.service"] value ""
-    inst [N or "/system.slice/libvirt-guests.service"] value ""
-    inst [N or "/system.slice/libvirtd.service"] value ""
-    inst [N or "/system.slice/mcelog.service"] value ""
-    inst [N or "/system.slice/mdmonitor.service"] value ""
-    inst [N or "/system.slice/memcached.service"] value ""
-    inst [N or "/system.slice/netconsole.service"] value ""
-    inst [N or "/system.slice/network.service"] value ""
-    inst [N or "/system.slice/nfs-lock.service"] value ""
-    inst [N or "/system.slice/pcscd.service"] value ""
-    inst [N or "/system.slice/pcscd.socket"] value ""
-    inst [N or "/system.slice/plymouth-quit-wait.service"] value ""
-    inst [N or "/system.slice/plymouth-quit.service"] value ""
-    inst [N or "/system.slice/pmcd.service"] value ""
-    inst [N or "/system.slice/pmlogger.service"] value ""
-    inst [N or "/system.slice/polkit.service"] value ""
-    inst [N or "/system.slice/rc-local.service"] value ""
-    inst [N or "/system.slice/rngd.service"] value ""
-    inst [N or "/system.slice/rpcbind.service"] value ""
-    inst [N or "/system.slice/rpcbind.socket"] value ""
-    inst [N or "/system.slice/rsyslog.service"] value ""
-    inst [N or "/system.slice/rtkit-daemon.service"] value ""
-    inst [N or "/system.slice/run-user-1000-gvfs.mount"] value ""
-    inst [N or "/system.slice/smartd.service"] value ""
-    inst [N or "/system.slice/sshd.service"] value ""
-    inst [N or "/system.slice/sysstat.service"] value ""
-    inst [N or "/system.slice/system-getty.slice"] value ""
-    inst [N or "/system.slice/system-systemd\x2dbacklight.slice"] value ""
-    inst [N or "/system.slice/systemd-ask-password-wall.service"] value ""
-    inst [N or "/system.slice/systemd-logind.service"] value ""
-    inst [N or "/system.slice/systemd-user-sessions.service"] value ""
-    inst [N or "/system.slice/udisks2.service"] value ""
-    inst [N or "/system.slice/upower.service"] value ""
-    inst [N or "/system.slice/var-lib-docker-devicemapper-mnt-f4d3b90bea1585f216da780c97cc4675827296e1c90fdc957fb2ea0c1db85a6a.mount"] value ""
-    inst [N or "/system.slice/var-lib-docker-devicemapper.mount"] value ""
-    inst [N or "/system.slice/vmtoolsd.service"] value ""
-    inst [N or "/system.slice/wpa_supplicant.service"] value ""
-    inst [N or "/user.slice"] value ""
-
 cgroup.cpusched.periods
     Data Type: 64-bit unsigned int  InDom: 3.23 0xc00017
     Semantics: instant  Units: none
@@ -8148,11 +7814,6 @@ cgroup.cpuset.cpus
     Semantics: instant  Units: none
     inst [N or "/"] value "0-3"
 
-cgroup.cpuset.id.container
-    Data Type: string  InDom: 3.20 0xc00014
-    Semantics: discrete  Units: none
-    inst [N or "/"] value ""
-
 cgroup.cpuset.mems
     Data Type: string  InDom: 3.20 0xc00014
     Semantics: instant  Units: none
@@ -8164,13 +7825,6 @@ cgroup.memory.failcnt
     inst [N or "/"] value 0
     inst [N or "/system.slice"] value 0
     inst [N or "/system.slice/docker-f4d3b90bea1585f216da780c97cc4675827296e1c90fdc957fb2ea0c1db85a6a.scope"] value 0
-
-cgroup.memory.id.container
-    Data Type: string  InDom: 3.24 0xc00018
-    Semantics: discrete  Units: none
-    inst [N or "/"] value ""
-    inst [N or "/system.slice"] value ""
-    inst [N or "/system.slice/docker-f4d3b90bea1585f216da780c97cc4675827296e1c90fdc957fb2ea0c1db85a6a.scope"] value "f4d3b90bea1585f216da780c97cc4675827296e1c90fdc957fb2ea0c1db85a6a"
 
 cgroup.memory.limit
     Data Type: 64-bit unsigned int  InDom: 3.24 0xc00018
@@ -8446,11 +8100,6 @@ cgroup.mounts.subsys
 cgroup.netclass.classid
     Data Type: 64-bit unsigned int  InDom: 3.25 0xc00019
     Semantics: instant  Units: none
-No value(s) available!
-
-cgroup.netclass.id.container
-    Data Type: string  InDom: 3.25 0xc00019
-    Semantics: discrete  Units: none
 No value(s) available!
 
 cgroup.subsys.count

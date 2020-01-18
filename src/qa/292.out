@@ -20,7 +20,11 @@ semantics: discrete instantaneous value
 units:     none
 samples:   all
 TIMESTAMP     DEBUG
+TIMESTAMP     Archive logging suspended
 TIMESTAMP     DEBUG
+TIMESTAMP     Archive logging suspended
 TIMESTAMP     DEBUG
+TIMESTAMP     Archive logging suspended
 TIMESTAMP     DEBUG
+TIMESTAMP     Archive logging suspended
 TIMESTAMP     DEBUG

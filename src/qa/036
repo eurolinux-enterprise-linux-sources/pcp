@@ -22,30 +22,13 @@ _cleanup()
 # filter pid's in lines like ...
 # __pmProcessExec: pid=1965 wait_pid=1965
 #
-# and for some *BSD systems, the /bin/sh -c " ...; kill -TERM $$; ..." test
-# returns an exit code of 143 (0x8f00) which is the real status shifted
-# left by 8 bits (!) ... so map 0x8f00 -> 0x8f (so exit 143 -> signal 15)
-# and the return value 143 -> 1015 (1000 + signal 15).
-#
 _filter()
 {
     tee -a $here/$seq.full \
     | sed \
 	-e 's/pid=[0-9][0-9]*/pid=PID/g' \
 	-e "s@$tmp@TMP@g" \
-	-e 's/PID exit=143/PID signal=15/' \
-	-e 's/-> 143 exit=143/-> 1015 signal=15/' \
     #end
-}
-
-# whitespace in od(1) output is not consistent across platforms
-#
-_od_filter()
-{
-    sed \
-	-e 's/  */ /g' \
-	-e 's/ $//' \
-    # end
 }
 
 status=1	# failure is the default!
@@ -62,7 +45,7 @@ echo "--- pipe in ---"
 src/exectest -Dexec -p -- echo hullo world 2>&1 | _filter
 echo "--- pipe out ---"
 echo "hello other world" >$tmp.data
-src/exectest -Dexec -P $tmp.data -- od -c 2>&1 | _filter | _od_filter
+src/exectest -Dexec -P $tmp.data -- od -c 2>&1 | _filter
 echo "---  exec and executable not on \$PATH ---"
 cat <<'End-of-File' >$tmp.sh
 #!/bin/sh

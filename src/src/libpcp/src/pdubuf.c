@@ -20,7 +20,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "compiler.h"
 #include <assert.h>
 #include <search.h>
@@ -169,7 +169,7 @@ __pmPinPDUBuf(void *handle)
 	pcp->bc_pincnt++;
     } else {
 	PM_UNLOCK(pdubuf_lock);
-	pmNotifyErr(LOG_WARNING, "__pmPinPDUBuf: " PRINTF_P_PFX "%p not in pool!", handle);
+	__pmNotifyErr(LOG_WARNING, "__pmPinPDUBuf: " PRINTF_P_PFX "%p not in pool!", handle);
 	if (pmDebugOptions.pdubuf)
 	    pdubufdump();
 	return;

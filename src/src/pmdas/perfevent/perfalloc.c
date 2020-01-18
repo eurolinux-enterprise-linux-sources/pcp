@@ -169,20 +169,19 @@ int main(int argc, char **argv)
 	sigaddset(&set, SIGINT);
 	sigaddset(&set, SIGHUP);
 
-	(void) sigprocmask(SIG_BLOCK, &set, &oldset);
+	sigprocmask(SIG_BLOCK, &set, &oldset);
 
 	while(running)
 	{
 		sigsuspend(&oldset);
 	}
 
-	(void) sigprocmask(SIG_UNBLOCK, &set, NULL);
+	sigprocmask(SIG_UNBLOCK, &set, NULL);
 
 	fl.l_type = F_UNLCK;
 	(void) fcntl(fp, F_SETLK, &fl);
 	(void) close(fp);
-
-	free_perf_alloc_lockfile();
+    free_perf_alloc_lockfile();
 
 	return 0;
 }

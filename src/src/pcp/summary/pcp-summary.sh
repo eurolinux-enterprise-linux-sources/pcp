@@ -1,6 +1,6 @@
 #! /bin/sh
 # 
-# Copyright (c) 2013-2015,2018 Red Hat.
+# Copyright (c) 2013-2015 Red Hat.
 # Copyright (c) 1997,2003 Silicon Graphics, Inc.  All Rights Reserved.
 # 
 # This program is free software; you can redistribute it and/or modify it
@@ -33,17 +33,6 @@ done
 # metrics
 metrics="pmcd.numagents pmcd.numclients pmcd.version pmcd.build pmcd.timezone pmcd.hostname pmcd.services pmcd.agent.status pmcd.pmlogger.archive pmcd.pmlogger.pmcd_host hinv.ncpu hinv.ndisk hinv.nnode hinv.nrouter hinv.nxbow hinv.ncell hinv.physmem hinv.cputype pmda.uname pmcd.pmie.pmcd_host pmcd.pmie.configfile pmcd.pmie.numrules pmcd.pmie.logfile"
 pmiemetrics="pmcd.pmie.actions pmcd.pmie.eval.true pmcd.pmie.eval.false pmcd.pmie.eval.unknown pmcd.pmie.eval.expected"
-
-# process count with 'primary' (pid 0) instance removed
-_process()
-{
-    $PCP_AWK_PROG '
-BEGIN		{ count = 0 }
-$1 == "0"	{ next }
-$1 == "1"	{ next }
-		{ count++ }
-END		{ print count }'
-}
 
 _plural()
 {
@@ -93,7 +82,6 @@ EOF
 
 Pflag=false
 debug=false
-BATCH=''
 ARGS=`pmgetopt --progname=$progname --config=$tmp/usage -- "$@"`
 [ $? != 0 ] && exit 1
 
@@ -103,7 +91,6 @@ do
     case "$1" in
       -a)
 	export PCP_ARCHIVE="$2"
-	BATCH="-b 1"
 	shift
 	;;
       -D)
@@ -144,16 +131,18 @@ then
 /^  commencing/				{  tmp = substr($5, 7, 6)
 					   sub(tmp, tmp+0.001, $5)
 					   sub("commencing", "@")
+					   printf "pcp_offset=\"%s\"\n", $0
 					   printf "pcp_hostzone=true\n", $0
 					}'`
     [ -z "$pcp_host" ] && pcp_host="unknown host"
+    [ -z "$pcp_offset" ] || export PCP_ORIGIN="$pcp_offset"
     [ -z "$pcp_hostzone" ] || export PCP_HOSTZONE="$pcp_hostzone"
 else
     pcp_host="$PCP_HOST"
-    [ -z "$pcp_host" ] && pcp_host=`hostname`
+    [ -z "$pcp_host" ] && export pcp_host=`hostname`
 fi
 
-if eval pminfo $BATCH -f $metrics > $tmp/metrics 2>$tmp/err
+if eval pminfo -f $metrics > $tmp/metrics 2>$tmp/err
 then
     :
 else
@@ -321,7 +310,12 @@ then
     # need \n\n here to force line breaks when piped into fmt later
     #
     numloggers=`join $tmp/log_host $tmp/log_archive | sort \
-	| sed -e 's/"//g' | tee $tmp/log | _process`
+	| sed -e 's/"//g' | tee $tmp/log | $PCP_AWK_PROG '
+BEGIN		{ count = 0 }
+$1 == "0"	{ next }
+$1 == "1"	{ next }
+		{ count++ }
+END		{ print count }'`
 
     $PCP_AWK_PROG < $tmp/log > $tmp/loggers '
 BEGIN		{ primary=0 }
@@ -346,10 +340,10 @@ then
     sort $tmp/ie_numrules -o $tmp/ie_numrules
     if [ $Pflag = "true" ]; then
 	numpmies=`join $tmp/ie_host $tmp/ie_config | join - $tmp/ie_numrules \
-	    | sort -n | sed -e 's/"//g' | tee $tmp/pmie | _process`
+	    | sort -n | sed -e 's/"//g' | tee $tmp/pmie | wc -l | tr -d ' '`
     else
 	numpmies=`join $tmp/ie_host $tmp/ie_log \
-	    | sort -n | sed -e 's/"//g' | tee $tmp/pmie | _process`
+	    | sort -n | sed -e 's/"//g' | tee $tmp/pmie | wc -l | tr -d ' '`
     fi
 
     if [ $Pflag = "true" -a -f $tmp/ie_actions -a -f $tmp/ie_true -a \
@@ -367,25 +361,7 @@ then
 	mv $tmp/tmp $tmp/pmie
     fi
 
-    $PCP_AWK_PROG -v Pflag=$Pflag < $tmp/pmie '
-BEGIN		{ primary=0 }
-$1 == "0"	{ primary=$3; next }
-$3 == primary	{
-	if (Pflag == "true") {
-	    printf "primary engine: %s (%u rules)\n\n",$3,$4
-	    printf "evaluations true=%u false=%u unknown=%u (actions=%u)\n\n",$5,$6,$7,$8
-	    printf "expected evaluation rate=%.2f rules/sec\n\n",$9
-	} else {
-	    printf "primary engine: %s\n\n",$3
-	}
-    }' > $tmp/pmies
-
-    $PCP_AWK_PROG -v Pflag=$Pflag < $tmp/pmie '
-BEGIN		{ primary=0 }
-$1 == "0"	{ primary=$3; next }
-$1 == "1"	{ next }
-$3 == primary	{ next }
-    {
+    $PCP_AWK_PROG -v Pflag=$Pflag < $tmp/pmie '{
 	if (Pflag == "true") {
 	    printf "%s: %s (%u rules)\n\n",$2,$3,$4
 	    printf "evaluations true=%u false=%u unknown=%u (actions=%u)\n\n",$5,$6,$7,$8
@@ -393,7 +369,7 @@ $3 == primary	{ next }
 	} else {
 	    printf "%s: %s\n\n",$2,$3
 	}
-    }' >> $tmp/pmies
+    }' > $tmp/pmies
 else
     numpmies=0
 fi

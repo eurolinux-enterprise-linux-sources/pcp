@@ -12,6 +12,7 @@
  * for more details.
  */
 #include "pmapi.h"
+#include "impl.h"
 #include <wtypes.h>
 #include <winnt.h>
 #include <winsvc.h>
@@ -97,12 +98,8 @@ pcpSetServiceState(PCPSERVICE s, DWORD state, DWORD code, DWORD waitHint)
 VOID
 pcpServiceMain(DWORD argc, LPTSTR *argv, PCPSERVICE s)
 {
-    char *default_basedirs[] = {
-	    "C:\\git-sdk-64\\mingw64",
-	    "C:\\git-sdk-32\\mingw32",
-	    "C:\\Program\ Files\\PCP",
-    };
-    char *default_service = "pmcd";
+    char *default_basedirs[] = { "C:\\Glider", "C:\\MSYS" };
+    char *default_service = "pcp";
     char *service = NULL, *basedir = NULL;
     int i;
 
@@ -232,7 +229,7 @@ main(int argc, char **argv)
 {
     SERVICE_TABLE_ENTRY dispatchTable[2];
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     /* setup dispatch table and sentinel */
     dispatchTable[0].lpServiceName = services[0].name;
@@ -242,9 +239,9 @@ main(int argc, char **argv)
 
     if (!StartServiceCtrlDispatcher(dispatchTable)) {
 	DWORD c = GetLastError();
-	fprintf(stderr, "%s: cannot dispatch services (%ld)\n", pmGetProgname(), c);
+	fprintf(stderr, "%s: cannot dispatch services (%ld)\n", pmProgname, c);
 	if (c == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
-	    fprintf(stderr, "%s: run as service, not on console\n", pmGetProgname());
+	    fprintf(stderr, "%s: run as service, not on console\n", pmProgname);
 	return 1;
     }
     return 0;

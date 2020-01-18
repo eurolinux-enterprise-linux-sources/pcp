@@ -14,21 +14,13 @@ echo "QA output created by $seq"
 which curl >/dev/null 2>&1 || _notrun "No curl binary installed"
 [ -f ${PCP_BINADM_DIR}/pmwebd ] || _notrun "pmwebd package not installed"
 
-# only restart pmwebd if it was running before the QA test starts
-#
-if [ -n "`_get_pids_by_name pmwebd`" ]
-then
-    restart_pmwebd=true
-else
-    restart_pmwebd=false
-fi
-
 _cleanup()
 {
     cd $here
-    _service pmwebd stop >/dev/null 2>&1
-    _restore_auto_restart pmwebd
-    $restart_pmwebd && _service pmwebd restart >/dev/null 2>&1
+    _service pmwebd stop >>$here/$seq.full 2>&1
+    _service pcp start >>$here/$seq.full 2>&1
+    _wait_for_pmcd
+    _wait_for_pmlogger
     rm -rf $tmp.*
 }
 
@@ -76,11 +68,8 @@ _get_metrics()
     fi
 }
 
-_stop_auto_restart pmwebd # see GH #394
-_service pmwebd stop >/dev/null 2>&1
-$sudo $signal -a pmwebd >/dev/null 2>&1
-
-_service pmwebd start | _filter_pmwebd_start
+_service pmwebd stop >>$here/$seq.full 2>&1
+_service pmwebd start
 _wait_for_pmwebd 44323
 
 # real QA test starts here
@@ -118,7 +107,7 @@ fi
 
 # start pmcd
 echo "Restarting pmcd ..."
-_service pmcd start 2>&1 | _filter_pcp_start
+_service pmcd start 2>&1 | _filter_pcp_stop
 _wait_for_pmcd
 
 ctx3=`_get_context`

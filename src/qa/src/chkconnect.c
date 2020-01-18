@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 int
 main(int argc, char **argv)
@@ -26,7 +27,7 @@ main(int argc, char **argv)
 
     static char	*usage = "[-D debugspec] [-h hostname] [-i iterations] [-n namespace]";
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:h:i:n:")) != EOF) {
 	switch (c) {
@@ -35,7 +36,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -47,7 +48,7 @@ main(int argc, char **argv)
 	case 'i':	/* iteration count */
 	    iter = (int)strtol(optarg, &endnum, 10);
 	    if (*endnum != '\0') {
-		fprintf(stderr, "%s: -i requires numeric argument\n", pmGetProgname());
+		fprintf(stderr, "%s: -i requires numeric argument\n", pmProgname);
 		errflag++;
 	    }
 	    break;
@@ -64,7 +65,7 @@ main(int argc, char **argv)
     }
 
     if (errflag) {
-	fprintf(stderr, "Usage: %s %s\n", pmGetProgname(), usage);
+	fprintf(stderr, "Usage: %s %s\n", pmProgname, usage);
 	exit(1);
     }
 

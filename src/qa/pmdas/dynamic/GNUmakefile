@@ -66,5 +66,3 @@ install install_pcp: default
 	$(INSTALL) -m 644 GNUmakefile.install $(TESTDIR)/GNUmakefile
 
 include $(BUILDRULES)
-
-dynamic.o:	$(TOPDIR)/src/include/pcp/libpcp.h

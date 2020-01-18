@@ -46,7 +46,6 @@ GTAGS
 #*
 *#
 .#*
-CmakeLists.txt
 provisioning/osxsierra.legally.ok
 *.gdb_history
 *vgcore.*

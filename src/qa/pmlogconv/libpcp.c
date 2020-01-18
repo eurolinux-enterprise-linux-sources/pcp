@@ -13,7 +13,7 @@
  */
 
 #include "pcp/pmapi.h"
-#include "pcp/libpcp.h"
+#include "pcp/impl.h"
 
 #define PM_LOG_VERS01 1
 
@@ -52,8 +52,10 @@ __pmLogChkLabel(__pmLogCtl *lcp, FILE *f, __pmLogLabel *lp, int vol)
 	}
     }
 
-    if (pmDebugOptions.log)
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_LOG)
 	fprintf(stderr, "__pmLogChkLabel: fd=%d vol=%d", fileno(f), vol);
+#endif
 
     fseek(f, (long)0, SEEK_SET);
     n = (int)fread(&len, 1, sizeof(len), f);
@@ -61,14 +63,18 @@ __pmLogChkLabel(__pmLogCtl *lcp, FILE *f, __pmLogLabel *lp, int vol)
     if (n != sizeof(len) || len != xpectlen) {
 	if (feof(f)) {
 	    clearerr(f);
-	    if (pmDebugOptions.log)
+#ifdef PCP_DEBUG
+	    if (pmDebug & DBG_TRACE_LOG)
 		fprintf(stderr, " file is empty\n");
+#endif
 	    return PM_ERR_NODATA;
 	}
 	else {
-	    if (pmDebugOptions.log)
+#ifdef PCP_DEBUG
+	    if (pmDebug & DBG_TRACE_LOG)
 		fprintf(stderr, " header read -> %d (expect %d) or bad header len=%d (expected %d)\n",
 		    n, (int)sizeof(len), len, xpectlen);
+#endif
 	    if (ferror(f)) {
 		clearerr(f);
 		return -errno;
@@ -79,9 +85,11 @@ __pmLogChkLabel(__pmLogCtl *lcp, FILE *f, __pmLogLabel *lp, int vol)
     }
 
     if ((n = (int)fread(lp, 1, sizeof(__pmLogLabel), f)) != sizeof(__pmLogLabel)) {
-	if (pmDebugOptions.log)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_LOG)
 	    fprintf(stderr, " bad label len=%d: expected %d\n",
 		n, (int)sizeof(__pmLogLabel));
+#endif
 	if (ferror(f)) {
 	    clearerr(f);
 	    return -errno;
@@ -101,9 +109,11 @@ __pmLogChkLabel(__pmLogCtl *lcp, FILE *f, __pmLogLabel *lp, int vol)
     n = (int)fread(&len, 1, sizeof(len), f);
     len = ntohl(len);
     if (n != sizeof(len) || len != xpectlen) {
-	if (pmDebugOptions.log)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_LOG)
 	    fprintf(stderr, " trailer read -> %d (expect %d) or bad trailer len=%d (expected %d)\n",
 		n, (int)sizeof(len), len, xpectlen);
+#endif
 	if (ferror(f)) {
 	    clearerr(f);
 	    return -errno;
@@ -116,16 +126,20 @@ __pmLogChkLabel(__pmLogCtl *lcp, FILE *f, __pmLogLabel *lp, int vol)
     if ((lp->ill_magic & 0xffffff00) != PM_LOG_MAGIC ||
 	(version != PM_LOG_VERS01 && version != PM_LOG_VERS02) ||
 	lp->ill_vol != vol) {
-	if (pmDebugOptions.log)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_LOG)
 	    fprintf(stderr, " version %d not supported\n", version);
+#endif
 	return PM_ERR_LABEL;
     }
     else {
 	if (__pmSetVersionIPC(fileno(f), version) < 0)
 	    return -errno;
-	if (pmDebugOptions.log)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_LOG)
 	    fprintf(stderr, " [magic=%8x version=%d vol=%d pid=%d host=%s]\n",
 		lp->ill_magic, version, lp->ill_vol, (int)lp->ill_pid, lp->ill_hostname);
+#endif
     }
 
     if (vol >= 0 && vol < lcp->l_numseen)
@@ -139,7 +153,7 @@ __pmLogChkLabel(__pmLogCtl *lcp, FILE *f, __pmLogLabel *lp, int vol)
  */
 
 static char *
-StrTimeval(pmTimeval *tp)
+StrTimeval(__pmTimeval *tp)
 {
     if (tp == NULL) {
 	static char *null_timeval = "<null timeval>";
@@ -157,7 +171,7 @@ StrTimeval(pmTimeval *tp)
 }
 
 static int
-addindom(__pmLogCtl *lcp, pmInDom indom, const pmTimeval *tp, int numinst, 
+addindom(__pmLogCtl *lcp, pmInDom indom, const __pmTimeval *tp, int numinst, 
          int *instlist, char **namelist, int *indom_buf, int allinbuf)
 {
     __pmLogInDom	*idp;
@@ -173,9 +187,11 @@ addindom(__pmLogCtl *lcp, pmInDom indom, const pmTimeval *tp, int numinst,
     idp->buf = indom_buf;
     idp->allinbuf = allinbuf;
 
-    if (pmDebugOptions.logmeta)
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_LOGMETA)
 	fprintf(stderr, "addindom( ..., %s, %s, numinst=%d)\n",
-	    pmInDomStr(indom), StrTimeval((pmTimeval *)tp), numinst);
+	    pmInDomStr(indom), StrTimeval((__pmTimeval *)tp), numinst);
+#endif
 
 
     if ((hp = __pmHashSearch((unsigned int)indom, &lcp->l_hashindom)) == NULL) {
@@ -229,10 +245,12 @@ __pmLogLoadMeta(__pmLogCtl *lcp)
                 sts = 0;
 		goto end;
             }
-	    if (pmDebugOptions.logmeta) {
+#ifdef PCP_DEBUG
+	    if (pmDebug & DBG_TRACE_LOGMETA) {
 		fprintf(stderr, "__pmLogLoadMeta: header read -> %d: expected: %d\n",
 			n, (int)sizeof(__pmLogHdr));
 	    }
+#endif
 	    if (ferror(f)) {
 		clearerr(f);
 		sts = -errno;
@@ -241,10 +259,12 @@ __pmLogLoadMeta(__pmLogCtl *lcp)
 		sts = PM_ERR_LOGREC;
 	    goto end;
 	}
-	if (pmDebugOptions.logmeta) {
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_LOGMETA) {
 	    fprintf(stderr, "__pmLogLoadMeta: record len=%d, type=%d @ offset=%d\n",
 		h.len, h.type, (int)(ftell(f) - sizeof(__pmLogHdr)));
 	}
+#endif
 	rlen = h.len - (int)sizeof(__pmLogHdr) - (int)sizeof(int);
 	if (h.type == TYPE_DESC) {
             numpmid++;
@@ -253,10 +273,12 @@ __pmLogLoadMeta(__pmLogCtl *lcp)
 		goto end;
 	    }
 	    if ((n = (int)fread(dp, 1, sizeof(pmDesc), f)) != sizeof(pmDesc)) {
-		if (pmDebugOptions.logmeta) {
+#ifdef PCP_DEBUG
+		if (pmDebug & DBG_TRACE_LOGMETA) {
 		    fprintf(stderr, "__pmLogLoadMeta: pmDesc read -> %d: expected: %d\n",
 			    n, (int)sizeof(pmDesc));
 		}
+#endif
 		if (ferror(f)) {
 		    clearerr(f);
 		    sts = -errno;
@@ -286,10 +308,12 @@ __pmLogLoadMeta(__pmLogCtl *lcp)
                 /* read in the names & store in PMNS tree ... */
 		if ((n = (int)fread(&numnames, 1, sizeof(numnames), f)) != 
                      sizeof(numnames)) {
-		    if (pmDebugOptions.logmeta) {
+#ifdef PCP_DEBUG
+		    if (pmDebug & DBG_TRACE_LOGMETA) {
 			fprintf(stderr, "__pmLogLoadMeta: numnames read -> %d: expected: %d\n",
 				n, (int)sizeof(numnames));
 		    }
+#endif
 		    if (ferror(f)) {
 			clearerr(f);
 			sts = -errno;
@@ -306,10 +330,12 @@ __pmLogLoadMeta(__pmLogCtl *lcp)
  		for (i = 0; i < numnames; i++) {
 		    if ((n = (int)fread(&len, 1, sizeof(len), f)) != 
 			 sizeof(len)) {
-			if (pmDebugOptions.logmeta) {
+#ifdef PCP_DEBUG
+			if (pmDebug & DBG_TRACE_LOGMETA) {
 			    fprintf(stderr, "__pmLogLoadMeta: len name[%d] read -> %d: expected: %d\n",
 				    i, n, (int)sizeof(len));
 			}
+#endif
 			if (ferror(f)) {
 			    clearerr(f);
 			    sts = -errno;
@@ -324,10 +350,12 @@ __pmLogLoadMeta(__pmLogCtl *lcp)
 		    }
 
 		    if ((n = (int)fread(name, 1, len, f)) != len) {
-			if (pmDebugOptions.logmeta) {
+#ifdef PCP_DEBUG
+			if (pmDebug & DBG_TRACE_LOGMETA) {
 			    fprintf(stderr, "__pmLogLoadMeta: name[%d] read -> %d: expected: %d\n",
 				    i, n, len);
 			}
+#endif
 			if (ferror(f)) {
 			    clearerr(f);
 			    sts = -errno;
@@ -337,10 +365,12 @@ __pmLogLoadMeta(__pmLogCtl *lcp)
 			goto end;
 		    }
                     name[len] = '\0';
-		    if (pmDebugOptions.logmeta) {
+#ifdef PCP_DEBUG
+		    if (pmDebug & DBG_TRACE_LOGMETA) {
 			fprintf(stderr, "__pmLogLoadMeta: PMID: %s name: %s\n",
 				pmIDStr(dp->pmid), name);
 		    }
+#endif
 
                     if ((sts = __pmAddPMNSNode(lcp->l_pmns, dp->pmid, name)) < 0) {
 			/*
@@ -360,7 +390,7 @@ __pmLogLoadMeta(__pmLogCtl *lcp)
 	else if (h.type == TYPE_INDOM) {
 	    int			*tbuf;
 	    pmInDom		indom;
-	    pmTimeval		*when;
+	    __pmTimeval		*when;
 	    int			numinst;
 	    int			*instlist;
 	    char		**namelist;
@@ -375,10 +405,12 @@ __pmLogLoadMeta(__pmLogCtl *lcp)
 		goto end;
 	    }
 	    if ((n = (int)fread(tbuf, 1, rlen, f)) != rlen) {
-		if (pmDebugOptions.logmeta) {
+#ifdef PCP_DEBUG
+		if (pmDebug & DBG_TRACE_LOGMETA) {
 		    fprintf(stderr, "__pmLogLoadMeta: indom read -> %d: expected: %d\n",
 			    n, rlen);
 		}
+#endif
 		if (ferror(f)) {
 		    clearerr(f);
 		    sts = -errno;
@@ -389,7 +421,7 @@ __pmLogLoadMeta(__pmLogCtl *lcp)
 	    }
 
 	    k = 0;
-	    when = (pmTimeval *)&tbuf[k];
+	    when = (__pmTimeval *)&tbuf[k];
 	    when->tv_sec = ntohl(when->tv_sec);
 	    when->tv_usec = ntohl(when->tv_usec);
 	    k += sizeof(*when)/sizeof(int);
@@ -431,10 +463,12 @@ __pmLogLoadMeta(__pmLogCtl *lcp)
 	n = (int)fread(&check, 1, sizeof(check), f);
 	check = ntohl(check);
 	if (n != sizeof(check) || h.len != check) {
-	    if (pmDebugOptions.logmeta) {
+#ifdef PCP_DEBUG
+	    if (pmDebug & DBG_TRACE_LOGMETA) {
 		fprintf(stderr, "__pmLogLoadMeta: trailer read -> %d or len=%d: expected %d @ offset=%d\n",
 		    n, check, h.len, (int)(ftell(f) - sizeof(check)));
 	    }
+#endif
 	    if (ferror(f)) {
 		clearerr(f);
 		sts = -errno;

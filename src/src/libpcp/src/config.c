@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 Red Hat.
+ * Copyright (c) 2012-2016 Red Hat.
  * Copyright (c) 2008-2009 Aconex.  All Rights Reserved.
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
  * 
@@ -16,8 +16,7 @@
 
 #include <ctype.h>
 #include "pmapi.h"
-#include "libpcp.h"
-#include "internal.h"
+#include "impl.h"
 #include "pmda.h"
 #ifdef HAVE_STRINGS_H
 #include <strings.h>
@@ -40,13 +39,8 @@ __pmIsConfigLock(void *lock)
 }
 #endif
 
-#ifdef IS_OLD_MINGW
+#ifdef IS_MINGW
 /*
- * It is not clear what's the right thing to do on Windows ...
- * pro tem, disable all of this path rewriting until we have a
- * clearer understanding.  Note IS_OLD_MINGW that needs to be
- * removed/changed.  See also NQR note below.  TODO.
- *
  * Fix up the Windows path separator quirkiness - PCP code deals
  * typically with forward-slash separators (i.e. if not passed in
  * on the command line, but hard-coded), but only very little now.
@@ -121,125 +115,53 @@ static int posix_style(void)
 {
     char	*s;
     int		sts;
-
     PM_LOCK(__pmLock_extcall);
     s = getenv("SHELL");		/* THREADSAFE */
-    /*
-     * TODO - this is NQR
-     * with the current git-sdk based mingw build ecosystem, SHELL
-     * from the env here is C:\git-sdk-64\usr\bin\bash.exe and
-     * $EXEPATH=C:\git-sdk-64
-     */
-    sts = (s && (strncmp(s, "/bin/", 5) == 0 || strncmp(s, "/usr/bin/", 9) == 0));
+    sts = (s && strncmp(s, "/bin/", 5) == 0);
     PM_UNLOCK(__pmLock_extcall);
     return sts;
 }
 
 /*
- * Called with __pmLock_extcall held, so setenv() is thread-safe.
+ * Called with __pmLock_extcall held, so putenv() is thread-safe.
  */
 static void
 dos_formatter(char *var, char *prefix, char *val)
 {
+    char envbuf[MAXPATHLEN];
     int msys = posix_style();
 
     if (prefix && dos_rewrite_path(var, val, msys)) {
 	char *p = msys ? msys_native_path(prefix) : prefix;
-	char envbuf[MAXPATHLEN];
-
-	pmsprintf(envbuf, sizeof(envbuf), "%s%s", p, val);
-	setenv(var, envbuf, 1);	/* THREADSAFE */
+	pmsprintf(envbuf, sizeof(envbuf), "%s=%s%s", var, p, val);
     }
     else {
-	setenv(var, val, 1);	/* THREADSAFE */
+	pmsprintf(envbuf, sizeof(envbuf), "%s=%s", var, val);
     }
+    putenv(strdup(envbuf));		/* THREADSAFE */
 }
 
 PCP_DATA const __pmConfigCallback __pmNativeConfig = dos_formatter;
 char *__pmNativePath(char *path) { return dos_native_path(path); }
-int pmPathSeparator() { return posix_style() ? '/' : '\\'; }
+int __pmPathSeparator() { return posix_style() ? '/' : '\\'; }
 int __pmAbsolutePath(char *path) { return posix_style() ? path[0] == '/' : dos_absolute_path(path); }
 #else
+char *__pmNativePath(char *path) { return path; }
 int __pmAbsolutePath(char *path) { return path[0] == '/'; }
-int pmPathSeparator() { return '/'; }
+int __pmPathSeparator() { return '/'; }
 
 /*
- * path argument MUST be malloc'd ... could be free'd here and a
- * new path allocated
- *
- * Handle path rewriting for non-*nix platforms
- */
-char *__pmNativePath(char *path)
-{
-#ifdef IS_MINGW
-    /*
-     * if path[0] is not '/', do nothing
-     * map /c/mingw... $PCP_DIR/mingw...
-     * map /anythinglese to $PCP_DIR/anythingelse
-     */
-    char	*p;
-    char	*new_path;
-    char	*start;
-    static char *pcp_dir;
-    static int	init = 1;
-
-    if (path[0] != '/') {
-	/* relative pathname, nothing to do */
-	return path;
-    }
-
-    if (init) {
-	/* one-trip initialization */
-	pcp_dir = getenv("PCP_DIR");		/* THREADSAFE */
-	init = 0;
-    }
-
-    if (pcp_dir == NULL)
-	return path;
-
-    /*
-     * check for / drive-digit / mingw...
-     */
-    if (strlen(path) >= 8 &&
-	path[2] == '/' &&
-	strncmp(&path[3], "mingw", 5) == 0) {
-	start = &path[2];
-    }
-    else
-	start = path;
-
-    new_path = (char *)malloc(strlen(pcp_dir) + strlen(start) + 1);
-    if (new_path == NULL) {
-	pmNoMem("__pmNativePath", strlen(pcp_dir) + strlen(start) + 1, PM_FATAL_ERR);
-	/* NOTREACHED */
-    }
-    strncpy(new_path, pcp_dir, strlen(pcp_dir) + 1);
-    for (p = new_path; *p; p++) {
-	if (*p == '\\') *p = '/';
-    }
-    strncat(new_path, start, strlen(start) + 1);
-    if (pmDebugOptions.config && pmDebugOptions.desperate)
-	fprintf(stderr, "__pmNativePath: \"%s\" start @ [%d] -> \"%s\"\n", path, (int)(start - path), new_path);
-
-    free(path);
-    return(new_path);
-#else
-    return path;
-#endif
-}
-
-/*
- * Called with __pmLock_extcall held, so setenv() is thread-safe.
+ * Called with __pmLock_extcall held, so putenv() is thread-safe.
  */
 static void
 posix_formatter(char *var, char *prefix, char *val)
 {
-    char	envbuf[MAXPATHLEN];
+    /* +40 bytes for max PCP env variable name */
+    char	envbuf[MAXPATHLEN+40];
     char	*vp;
     char	*vend;
-    unsigned	length;
 
-    (void)prefix;
+    pmsprintf(envbuf, sizeof(envbuf), "%s=", var);
     vend = &val[strlen(val)-1];
     if (val[0] == *vend && (val[0] == '\'' || val[0] == '"')) {
 	/*
@@ -248,82 +170,62 @@ posix_formatter(char *var, char *prefix, char *val)
 	 */
 	vp = &val[1];
 	vend--;
-    } else {
-	vp = val;
     }
-    if ((length = vend - vp + 1) > sizeof(envbuf))
-	length = sizeof(envbuf);
-    pmsprintf(envbuf, sizeof(envbuf), "%.*s", length, vp);
-    setenv(var, envbuf, 1);		/* THREADSAFE */
+    else
+	vp = val;
+    strncat(envbuf, vp, vend-vp+1);
+    envbuf[strlen(var)+1+vend-vp+1+1] = '\0';
+
+    putenv(strdup(envbuf));		/* THREADSAFE */
+    (void)prefix;
 }
 
 PCP_DATA const __pmConfigCallback __pmNativeConfig = posix_formatter;
 #endif
 
-/*
- * Search order for pcp.conf file is:
- * - $PCP_CONF if set (handled already)
- * - $PCP_DIR/etc/pcp.conf if $PCP_DIR is set
- * - /usr/local/etc/pcp.conf if it exists and /etc/pcp.conf does NOT exist
- * - /etc/pcp.conf otherwise
- */
-static char *
-__pmconfigpath(const char *pcp_dir, const char *pcp_conf)
-{
-    char	path[MAXPATHLEN];
 
-    if (pcp_dir != NULL) {
-	pmsprintf(path, sizeof(path), "%s/etc/pcp.conf", pcp_dir);
-	return strdup(path);
-    }
-
-    if (access("/etc/pcp.conf", R_OK) == -1) {
-	/* may still be the Mac OS X case with HomeBrew, for example */
-	if (access("/usr/local/etc/pcp.conf", R_OK) == 0)
-	    return strdup("/usr/local/etc/pcp.conf");
-    }
-    return strdup("/etc/pcp.conf");
-}
-
-/*
- * Scan pcp.conf and put all PCP config variables found therein
- * into the environment.
- */
 static void
 __pmconfig(__pmConfigCallback formatter, int fatal)
 {
-    FILE	*fp;
-    char	*pcp_conf, *pcp_dir, *val, *p;
-    char	errmsg[PM_MAXERRMSGLEN];
-    char	var[MAXPATHLEN];
+    /*
+     * Scan ${PCP_CONF-$PCP_DIR/etc/pcp.conf} and put all PCP config
+     * variables found therein into the environment.
+     */
+    FILE *fp;
+    char confpath[32];
+    char errmsg[PM_MAXERRMSGLEN];
+    char dir[MAXPATHLEN];
+    char var[MAXPATHLEN];
+    char *prefix;
+    char *conf;
+    char *val;
+    char *p;
 
     PM_LOCK(__pmLock_extcall);
-    pcp_dir = getenv("PCP_DIR");	/* THREADSAFE */
-    if (pcp_dir != NULL)
-	pcp_dir = strdup(pcp_dir);
-    pcp_conf = getenv("PCP_CONF");	/* THREADSAFE */
-    if (pcp_conf != NULL)
-	pcp_conf = strdup(pcp_conf);
-    else
-	pcp_conf = __pmconfigpath(pcp_dir, pcp_conf);
+    prefix = getenv("PCP_DIR");		/* THREADSAFE */
+    conf = getenv("PCP_CONF");		/* THREADSAFE */
+    if (conf == NULL) {
+	strncpy(confpath, "/etc/pcp.conf", sizeof(confpath));
+	if (prefix == NULL) {
+	    /* THREADSAFE - no locks acquired in __pmNativePath() */
+	    conf = __pmNativePath(confpath);
+	}
+	else {
+	    pmsprintf(dir, sizeof(dir),
+			 "%s%s", prefix, __pmNativePath(confpath));
+	    conf = dir;
+	}
+    }
+    conf = strdup(conf);
+    if (prefix != NULL) prefix = strdup(prefix);
     PM_UNLOCK(__pmLock_extcall);
 
-    if (pcp_conf == NULL) {
-	if (!fatal)
-	    goto out;
-	/* see note below about fprintf use - applies equally here */
-	fprintf(stderr,
-		"FATAL PCP ERROR: could not allocate %u bytes for %s\n",
-		(unsigned int) strlen("/etc/pcp.conf") + 1, "/etc/pcp.conf");
-	goto failure;
-    }
-
-    /* THREADSAFE - no locks acquired in __pmNativePath() */
-    pcp_conf = __pmNativePath(pcp_conf);
-
-    if ((fp = fopen(pcp_conf, "r")) == NULL) {
-	if (!fatal)
-	    goto out;
+    if ((fp = fopen(conf, "r")) == NULL) {
+	if (!fatal) {
+	    free(conf);
+	    if (prefix != NULL) free(prefix);
+	    return;
+	}
 	/*
 	 * we used to pmprintf() here to be sure the message
 	 * would be seen, given the seriousness of the situation
@@ -335,8 +237,10 @@ __pmconfig(__pmConfigCallback formatter, int fatal)
 	fprintf(stderr,
 	    "FATAL PCP ERROR: could not open config file \"%s\" : %s\n"
 	    "You may need to set PCP_CONF or PCP_DIR in your environment.\n",
-		pcp_conf, osstrerror_r(errmsg, sizeof(errmsg)));
-	goto failure;
+		conf, osstrerror_r(errmsg, sizeof(errmsg)));
+	free(conf);
+	if (prefix != NULL) free(prefix);
+	exit(1);
     }
 
     while (fgets(var, sizeof(var), fp) != NULL) {
@@ -355,24 +259,15 @@ __pmconfig(__pmConfigCallback formatter, int fatal)
 	     * THREADSAFE - no locks acquired in formatter() which is
 	     * really dos_formatter() or posix_formatter()
 	     */
-	    formatter(var, pcp_dir, val);
+	    formatter(var, prefix, val);
 	}
 	if (pmDebugOptions.config)
 	    fprintf(stderr, "pmgetconfig: (init) %s=%s\n", var, val);
 	PM_UNLOCK(__pmLock_extcall);
     }
     fclose(fp);
-out:
-    if (pcp_dir != NULL)
-	free(pcp_dir);
-    free(pcp_conf);
-    return;
-
-failure:
-    if (pcp_dir != NULL)
-	free(pcp_dir);
-    free(pcp_conf);
-    exit(1);
+    free(conf);
+    if (prefix != NULL) free(prefix);
 }
 
 void
@@ -431,7 +326,7 @@ pmGetOptionalConfig(const char *name)
 }
 
 int
-pmGetUsername(char **username)
+__pmGetUsername(char **username)
 {
     char *user = pmGetOptionalConfig("PCP_USER");
     if (user && user[0] != '\0') {
@@ -483,8 +378,6 @@ ipv6_enabled(void)
 #endif
 }
 
-extern const char *compress_suffix_list(void);
-
 #ifdef PM_MULTI_THREAD
 #define MULTI_THREAD_ENABLED	enabled
 #else
@@ -527,16 +420,6 @@ extern const char *compress_suffix_list(void);
 #else
 #define LOCK_DEBUG_ENABLED	disabled
 #endif
-#if defined(HAVE_LZMA_DECOMPRESSION)
-#define LZMA_DECOMPRESS		enabled
-#else
-#define LZMA_DECOMPRESS		disabled
-#endif
-#if defined(HAVE_TRANSPARENT_DECOMPRESSION)
-#define TRANSPARENT_DECOMPRESS	enabled
-#else
-#define TRANSPARENT_DECOMPRESS	disabled
-#endif
 
 typedef const char *(*feature_detector)(void);
 static struct {
@@ -561,9 +444,6 @@ static struct {
 	{ "multi_archive_contexts", enabled },			/* from pcp-3.11.1 */
 	{ "lock_asserts",	LOCK_ASSERTS_ENABLED },		/* from pcp-3.11.10 */
 	{ "lock_debug",		LOCK_DEBUG_ENABLED },		/* from pcp-3.11.10 */
-	{ "lzma_decompress",	LZMA_DECOMPRESS },		/* from pcp-4.0.0 */
-	{ "transparent_decompress", TRANSPARENT_DECOMPRESS },	/* from pcp-4.0.0 */
-	{ "compress_suffixes",	compress_suffix_list },		/* from pcp-4.0.1 */
 };
 
 void
@@ -581,7 +461,7 @@ __pmAPIConfig(__pmAPIConfigCallback formatter)
 }
 
 const char *
-pmGetAPIConfig(const char *name)
+__pmGetAPIConfig(const char *name)
 {
     int i;
 

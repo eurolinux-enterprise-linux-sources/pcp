@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <sys/time.h>
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "pmda.h"
 #include "internal.h"
 
@@ -79,7 +79,7 @@ __pmFetchLocal(__pmContext *ctxp, int numpmid, pmID pmidlist[], pmResult **resul
     }
 
     ans->numpmid = numpmid;
-    pmtimevalNow(&ans->timestamp);
+    __pmtimevalNow(&ans->timestamp);
     for (j = 0; j < numpmid; j++)
 	ans->vset[j] = NULL;
 

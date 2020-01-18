@@ -12,12 +12,6 @@ desc metric
 fetch metric [ metric ... ]
 getdesc on | off
 instance indom# [ number | name | "name" ]
-label context
-label domain
-label indom indom#
-label cluster cluster#
-label item metric
-label instances indom#
 name pmid#
 namespace fname
 open dso dsoname init_routine [ domain# ]
@@ -115,7 +109,7 @@ Error: Bad debug flag (blah)
 Type 'help' for a list of commands.
 dbpmda> debug none
 dbpmda> open pipe /blah/this_file_should_not_exist
-openpmda: stat /blah/this_file_should_not_exist failed: No such file or directory
+openpmda: /blah/this_file_should_not_exist: No such file or directory
 dbpmda> status
 
 Namespace:              (default)
@@ -138,8 +132,8 @@ Getdesc:                off
 
 Dump Instance Profile state=INCLUDE, 0 profiles
 
-dbpmda> open pipe $PCP_PMDAS_DIR/sample/pmdasample -d 29 -l TMP.log
-Start pmdasample PMDA: $PCP_PMDAS_DIR/sample/pmdasample -d 29 -l TMP.log
+dbpmda> open pipe $PCP_PMDAS_DIR/sample/pmdasample -d 29
+Start pmdasample PMDA: $PCP_PMDAS_DIR/sample/pmdasample -d 29
 dbpmda> status
 
 Namespace:              (default)

@@ -18,7 +18,7 @@
 #include <inttypes.h>
 #include <sys/stat.h>
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "internal.h"
 
 static void *

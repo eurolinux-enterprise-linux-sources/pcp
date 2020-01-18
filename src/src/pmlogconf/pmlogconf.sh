@@ -490,9 +490,7 @@ then
     #
     PMCD="$HOST"
     [ -z "$PMCD" ] && PMCD=local:
-    WAIT="-t 10"
-    [ -z "$PMCD_WAIT_TIMEOUT" ] || WAIT="-t $PMCD_WAIT_TIMEOUT"
-    if $PCP_BINADM_DIR/pmcd_wait -h "$PMCD" $WAIT -v 2>$tmp/err
+    if $PCP_BINADM_DIR/pmcd_wait -h "$PMCD" -v 2>$tmp/err
     then
 	:
     else
@@ -610,8 +608,6 @@ s; F5:; sgi/efs:;
 s; F6:; sgi/xvm-ops:;
 s; F7:; sgi/xvm-stats:;
 s; F8:; sgi/xvm-all:;
-s; G1:; gfs2/gfs2-base:;
-s; G2:; gfs2/gfs2-all:;
 s; H0:; sgi/craylink:;
 s; H1:; sgi/hub:;
 s; H2:; sgi/cpu-evctr:;

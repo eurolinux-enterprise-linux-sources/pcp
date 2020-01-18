@@ -1,6 +1,6 @@
 """ Build script for the PCP python package """
 #
-# Copyright (C) 2012-2018 Red Hat.
+# Copyright (C) 2012-2017 Red Hat.
 # Copyright (C) 2009-2012 Michael T. Werner
 #
 # This file is part of the "pcp" module, the python interfaces for the
@@ -29,20 +29,20 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name = 'pcp',
-    version = '4.1',
+    version = '1.2',
     description = 'Performance Co-Pilot collector, monitor and instrumentation APIs',
     long_description = long_description,
     license = 'GPLv2+',
     author = 'Performance Co-Pilot Development Team',
     author_email = 'pcp@groups.io',
-    url = 'https://pcp.io',
+    url = 'http://pcp.io',
     packages = find_packages(),
     ext_modules = [
         Extension('cpmapi', ['pmapi.c'], libraries = ['pcp']),
         Extension('cpmda', ['pmda.c'], libraries = ['pcp_pmda', 'pcp']),
-        Extension('cpmgui', ['pmgui.c'], libraries = ['pcp_gui', 'pcp']),
-        Extension('cpmi', ['pmi.c'], libraries = ['pcp_import', 'pcp']),
-        Extension('cmmv', ['mmv.c'], libraries = ['pcp_mmv', 'pcp']),
+        Extension('cpmgui', ['pmgui.c'], libraries = ['pcp_gui']),
+        Extension('cpmi', ['pmi.c'], libraries = ['pcp_import']),
+        Extension('cmmv', ['mmv.c'], libraries = ['pcp_mmv']),
     ],
     keywords = ['performance', 'analysis', 'monitoring' ],
     platforms = [ 'Windows', 'Linux', 'FreeBSD', 'NetBSD', 'OpenBSD', 'Solaris', 'Mac OS X', 'AIX' ],

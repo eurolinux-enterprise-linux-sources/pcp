@@ -43,6 +43,9 @@
 #include "qed_timecontrol.h"
 #include "qed_recorddialog.h"
 
+#include <iostream>
+using namespace std;
+
 QString		theConfigName;
 QString		theAltConfigName;
 FILE		*theConfigFile;
@@ -50,8 +53,6 @@ FILE		*theAltConfig;
 float		theGlobalScale = 1.2;
 char		**frontend_argv;
 int		frontend_argc;
-
-extern int	somedebug;
 
 PmView::PmView() : QMainWindow(NULL)
 {
@@ -81,8 +82,8 @@ PmView::PmView() : QMainWindow(NULL)
     my.toolbarHidden = !globalSettings.initialToolbar;
     toolbarAction->setChecked(globalSettings.initialToolbar);
     my.consoleHidden = true;
-    if (somedebug)
-	consoleAction->setVisible(true);
+    if (!pmDebug)
+	consoleAction->setVisible(false);
     consoleAction->setChecked(false);
 
     // Build Scene Graph
@@ -97,10 +98,8 @@ PmView::PmView() : QMainWindow(NULL)
     my.drawStyle->style.setValue(SoDrawStyle::FILLED);
     my.root->addChild(my.drawStyle);
 
-    my.activeView = 0;
-
 #if 0
-    // TODO : support image dump from command line?
+    // TODO is this needed?
     if (outfile)
 	QTimer::singleShot(0, this, SLOT(exportFile()));
     else
@@ -116,19 +115,7 @@ void PmView::languageChange()
 
 void PmView::init(void)
 {
-    View *view = new View;
-    view->init(activeGroup, createPopupMenu(),
-		    activeGroup->isArchiveSource()? "Archive" : "Live");
-    pmview->addActiveView(view);
-
     my.statusBar->init();
-
-    connect(pmtime, SIGNAL(step(bool, QmcTime::Packet *)),
-		this, SLOT(step(bool, QmcTime::Packet *)));
-    connect(pmtime, SIGNAL(VCRMode(bool, QmcTime::Packet *, bool)),
-		this, SLOT(VCRMode(bool, QmcTime::Packet *, bool)));
-    connect(pmtime, SIGNAL(timeZone(bool, QmcTime::Packet *, char *)),
-		this, SLOT(timeZone(bool, QmcTime::Packet *, char *)));
 }
 
 void
@@ -153,7 +140,7 @@ bool PmView::view(bool showAxis,
 
     viewer()->setSceneGraph(my.root);
     viewer()->setAutoRedraw(true);
-    viewer()->setTitle(pmGetProgname());
+    viewer()->setTitle(pmProgname);
     if (showAxis)
 	viewer()->setFeedbackVisibility(true);
 
@@ -170,15 +157,19 @@ bool PmView::view(bool showAxis,
 	passes = atoi(sval);
 #endif
 
-    if (pmDebugOptions.appl1)
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_APPL1)
 	cerr << "PmView::view: antialiasing set to smooth = "
 	     << (smooth == TRUE ? "true" : "false")
 	     << ", passes = " << passes << endl;
+#endif
 
     if (passes > 1)
         viewer()->setAntialiasing(smooth, atoi(sval));
-    if (pmDebugOptions.appl1)
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_APPL1)
 	cerr << "PmView::view: displaying window" << endl;
+#endif
 
     viewer()->viewAll();
 
@@ -216,9 +207,11 @@ void PmView::render(RenderOptions options, time_t theTime)
 		;
 	    else {
 		// TODO: set label string to my.text
-		if (pmDebugOptions.appl1)
-		    cerr << "PmView::render: metricLabel text \"" <<
-			my.text << "\"" << endl;
+#ifdef PCP_DEBUG
+	    if (pmDebug & DBG_TRACE_APPL1)
+		cerr << "PmView::render: metricLabel text \"" <<
+			my.text() << "\"" << endl;
+#endif
 	    }
 	}
     }
@@ -241,23 +234,6 @@ void PmView::quit()
     // End any processes we may have started and close any open dialogs
     if (pmtime)
 	pmtime->quit();
-#ifdef HAVE_UNSETENV
-    unsetenv("PCP_STDERR");
-#else
-    putenv("PCP_STDERR=");
-#endif
-    pmflush();
-}
-
-void PmView::setValueText(QString &string)
-{
-    my.statusBar->setValueText(string);
-    QTimer::singleShot(PmView::defaultTimeout(), this, SLOT(timeout()));
-}
-
-void PmView::timeout()
-{
-    my.statusBar->clearValueText();
 }
 
 void PmView::closeEvent(QCloseEvent *)
@@ -299,10 +275,6 @@ void PmView::setButtonState(QedTimeButton::State state)
 
 void PmView::step(bool live, QmcTime::Packet *packet)
 {
-    if (pmDebugOptions.timecontrol) {
-	console->post("pmView::step(live=%d)", live);
-	console->post("Packet: %s", QmcTime::packetStr(packet));
-    }
     if (live)
 	liveGroup->step(packet);
     else
@@ -311,10 +283,6 @@ void PmView::step(bool live, QmcTime::Packet *packet)
 
 void PmView::VCRMode(bool live, QmcTime::Packet *packet, bool drag)
 {
-    if (pmDebugOptions.timecontrol) {
-	console->post("pmView::VCRMode(live=%d, ..., drag=%d", live, drag);
-	console->post("Packet: %s", QmcTime::packetStr(packet));
-    }
     if (live)
 	liveGroup->VCRMode(packet, drag);
     else
@@ -323,10 +291,6 @@ void PmView::VCRMode(bool live, QmcTime::Packet *packet, bool drag)
 
 void PmView::timeZone(bool live, QmcTime::Packet *packet, char *tzdata)
 {
-    if (pmDebugOptions.timecontrol) {
-	console->post("pmView::timeZone(live=%d, ..., tzdata=%s)", live, tzdata);
-	console->post("Packet: %s", QmcTime::packetStr(packet));
-    }
     if (live)
 	liveGroup->setTimezone(packet, tzdata);
     else
@@ -335,7 +299,7 @@ void PmView::timeZone(bool live, QmcTime::Packet *packet, char *tzdata)
 
 void PmView::filePrint()
 {
-    QMessageBox::information(this, pmGetProgname(), "Print, print, print... whirrr");
+    QMessageBox::information(this, pmProgname, "Print, print, print... whirrr");
 }
 
 void PmView::fileQuit()
@@ -347,13 +311,13 @@ void PmView::helpManual()
 {
     bool ok;
     QString documents("file://");
-    QString separator = QString(pmPathSeparator());
+    QString separator = QString(__pmPathSeparator());
     documents.append(pmGetConfig("PCP_HTML_DIR"));
     documents.append(separator).append("index.html");
     ok = QDesktopServices::openUrl(QUrl(documents, QUrl::TolerantMode));
     if (!ok) {
 	documents.prepend("Failed to open:\n");
-	QMessageBox::warning(this, pmGetProgname(), documents);
+	QMessageBox::warning(this, pmProgname, documents);
     }
 }
 
@@ -361,13 +325,13 @@ void PmView::helpTutorial()
 {
     bool ok;
     QString documents("file://");
-    QString separator = QString(pmPathSeparator());
+    QString separator = QString(__pmPathSeparator());
     documents.append(pmGetConfig("PCP_HTML_DIR"));
     documents.append(separator).append("tutorial.html");
     ok = QDesktopServices::openUrl(QUrl(documents, QUrl::TolerantMode));
     if (!ok) {
 	documents.prepend("Failed to open:\n");
-	QMessageBox::warning(this, pmGetProgname(), documents);
+	QMessageBox::warning(this, pmProgname, documents);
     }
 }
 
@@ -432,13 +396,15 @@ void PmView::optionsMenubar()
 
 void PmView::optionsConsole()
 {
-    if (somedebug) {
+#if 0
+    if (pmDebug) {
 	if (my.consoleHidden)
 	    console->show();
 	else
 	    console->hide();
 	my.consoleHidden = !my.consoleHidden;
     }
+#endif
 }
 
 void PmView::optionsNewPmchart()
@@ -678,7 +644,7 @@ bool View::stopRecording()
     if (error) {
 	cleanupRecording();
 	pmview->setRecordState(false);
-	QMessageBox::warning(NULL, pmGetProgname(), errmsg,
+	QMessageBox::warning(NULL, pmProgname, errmsg,
 		QMessageBox::Ok|QMessageBox::Default|QMessageBox::Escape,
 		QMessageBox::NoButton, QMessageBox::NoButton);
     }
@@ -709,7 +675,7 @@ bool View::queryRecording(void)
 
     if (error) {
 	pmview->setRecordState(false);
-	QMessageBox::warning(NULL, pmGetProgname(), errmsg,
+	QMessageBox::warning(NULL, pmProgname, errmsg,
 		QMessageBox::Ok|QMessageBox::Default|QMessageBox::Escape,
 		QMessageBox::NoButton, QMessageBox::NoButton);
     }
@@ -723,7 +689,7 @@ bool View::detachLoggers(void)
 
     if (error) {
 	pmview->setRecordState(false);
-	QMessageBox::warning(NULL, pmGetProgname(), errmsg,
+	QMessageBox::warning(NULL, pmProgname, errmsg,
 		QMessageBox::Ok|QMessageBox::Default|QMessageBox::Escape,
 		QMessageBox::NoButton, QMessageBox::NoButton);
     }

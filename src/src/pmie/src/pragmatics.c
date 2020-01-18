@@ -26,15 +26,12 @@
 #include <math.h>
 #include <ctype.h>
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "dstruct.h"
 #include "eval.h"
 #include "pragmatics.h"
 #if defined(HAVE_IEEEFP_H)
 #include <ieeefp.h>
-#endif
-#ifdef HAVE_STRINGS_H
-#include <strings.h>
 #endif
 
 extern char	*clientid;
@@ -72,7 +69,7 @@ newContext(Symbol *host, const char *hconn, int is_temp)
     if (archives) {
         if ((sts = pmNewContext(PM_CONTEXT_ARCHIVE, hconn)) < 0) {
             fprintf(stderr, "%s: cannot open archive %s\n",
-                    pmGetProgname(), hconn);
+                    pmProgname, hconn);
             fprintf(stderr, "pmNewContext: %s\n", pmErrStr(sts));
             exit(1);
         }
@@ -82,18 +79,18 @@ newContext(Symbol *host, const char *hconn, int is_temp)
 	    if (sts == -ECONNREFUSED)
 		fprintf(stderr, "%s: warning - pmcd "
 			"via %s does not respond\n",
-			pmGetProgname(), hconn);
+			pmProgname, hconn);
 	    else if (sts == PM_ERR_PERMISSION)
 		fprintf(stderr, "%s: warning - pmcd via %s does not "
 			"permit delivery of metrics to the local host\n",
-			pmGetProgname(), hconn);
+			pmProgname, hconn);
 	    else if (sts == PM_ERR_CONNLIMIT)
 		fprintf(stderr, "%s: warning - pmcd "
 			"via %s has exceeded its connection limit\n",
-			pmGetProgname(), hconn);
+			pmProgname, hconn);
 	    else
 		fprintf(stderr, "%s: warning - pmcd via %s is unreachable\n", 
-			pmGetProgname(), hconn);
+			pmProgname, hconn);
 	}
 	sts = -1;
     }
@@ -128,59 +125,34 @@ newContext(Symbol *host, const char *hconn, int is_temp)
  * instance profile
  ***********************************************************************/
 
-/*
- * equality of external instance names
- * - try full match first, else
- * - match up to first space of myname and indomname
- */
+/* equality (not symmetric) of instance names */
 static int
-eqinst(char *myname, char *indomname)
+eqinst(char *i1, char *i2)
 {
-    char	*p;
-    int		mylen;
-    int		indomlen;
+    int		n1 = (int) strlen(i1);
+    int		n2 = (int) strlen(i2);
 
-    if (strcmp(myname, indomname) == 0) {
-	/* full match */
+    /* test equality of first word */
+    if ((strncmp(i1, i2, n1) == 0) && ((n1 == n2) || isspace((int)i2[n1])))
 	return 1;
-    }
 
-    p = index(myname, ' ');
-    if (p == NULL) {
-	/* no space */
-	mylen = 0;
-    }
-    else {
-	mylen = p - myname;
-    }
+    do {	/* skip over first word */
+	i2++;
+	n2--;
+	if (n2 < n1)
+	    return 0;
+    } while (! isspace((int)*i2));
 
-    p = index(indomname, ' ');
-    if (p == NULL) {
-	/* no space */
-	indomlen = 0;
-    }
-    else {
-	indomlen = p - indomname;
-    }
+    do {	/* skip over spaces */
+	i2++;
+	n2--;
+	if (n2 < n1)
+	    return 0;
+    } while (isspace((int)*i2));
 
-    if (mylen == 0 && indomlen == 0) {
-	/* no spaces in either */
-	return 0;
-    }
-
-    if (indomlen == 0) indomlen = strlen(indomname);
-    if (mylen == 0) mylen = strlen(myname);
-
-    if (mylen != indomlen) {
-	/* lengths to first space or end of string not equal */
-	return 0;
-    }
-
-    if (strncmp(myname, indomname, mylen) == 0) {
-	/* prefix match to first space */
+    /* test equality of second word */
+    if ((strncmp(i1, i2, n1) == 0) && ((n1 == n2) || isspace((int)i2[n1])))
 	return 1;
-    }
-
     return 0;
 }
 
@@ -317,9 +289,9 @@ findFetch(Host *h, Metric *m)
 	    int tmp_mode = PM_MODE_INTERP;
 	    getDoubleAsXTB(&h->task->delta, &tmp_ival, &tmp_mode);
 
-	    pmtimevalFromReal(start, &tv);
+	    __pmtimevalFromReal(start, &tv);
 	    if ((sts = pmSetMode(tmp_mode, &tv, tmp_ival)) < 0) {
-		fprintf(stderr, "%s: pmSetMode failed: %s\n", pmGetProgname(),
+		fprintf(stderr, "%s: pmSetMode failed: %s\n", pmProgname,
 			pmErrStr(sts));
 		exit(1);
 	    }
@@ -384,7 +356,7 @@ findProfile(Fetch *f, Metric *m)
 
     /* add instances required by Metric to Profile */
     if ((sts = pmUseContext(f->handle)) < 0) {
-	fprintf(stderr, "%s: pmUseContext failed: %s\n", pmGetProgname(),
+	fprintf(stderr, "%s: pmUseContext failed: %s\n", pmProgname,
 		pmErrStr(sts));
 	exit(1);
     }
@@ -396,7 +368,7 @@ findProfile(Fetch *f, Metric *m)
     if (m->specinst == 0 && p->need_all == 0) {
 	sts = pmDelProfile(p->indom, 0, (int *)0);
 	if (sts < 0) {
-	    fprintf(stderr, "%s: pmDelProfile failed: %s\n", pmGetProgname(),
+	    fprintf(stderr, "%s: pmDelProfile failed: %s\n", pmProgname,
 		    pmErrStr(sts));
 	    exit(1);
 	}
@@ -409,7 +381,7 @@ findProfile(Fetch *f, Metric *m)
 	sts = 0;
 
     if (sts < 0) {
-	fprintf(stderr, "%s: pmAddProfile failed: %s\n", pmGetProgname(),
+	fprintf(stderr, "%s: pmAddProfile failed: %s\n", pmProgname,
 		pmErrStr(sts));
 	exit(1);
     }
@@ -525,7 +497,7 @@ initArchive(Archive *a)
     if ((sts = pmNewContext(PM_CONTEXT_ARCHIVE, a->fname)) < 0) {
 	fprintf(stderr, "%s: cannot open archive %s\n"
 		"pmNewContext failed: %s\n",
-		pmGetProgname(), a->fname, pmErrStr(sts));
+		pmProgname, a->fname, pmErrStr(sts));
 	return 0;
     }
     handle = sts;
@@ -533,36 +505,36 @@ initArchive(Archive *a)
     tmp = pmGetContextHostName(handle);
     if (strlen(tmp) == 0) {
 	fprintf(stderr, "%s: pmGetContextHostName(%d) failed\n",
-	    pmGetProgname(), handle);
+	    pmProgname, handle);
 	return 0;
     }
     if ((a->hname = strdup(tmp)) == NULL)
-	pmNoMem("host name copy", strlen(tmp)+1, PM_FATAL_ERR);
+	__pmNoMem("host name copy", strlen(tmp)+1, PM_FATAL_ERR);
 
     /* get the goodies from archive label */
     if ((sts = pmGetArchiveLabel(&label)) < 0) {
 	fprintf(stderr, "%s: cannot read label from archive %s\n"
 			"pmGetArchiveLabel failed: %s\n", 
-			pmGetProgname(), a->fname, pmErrStr(sts));
+			pmProgname, a->fname, pmErrStr(sts));
 	pmDestroyContext(handle);
 	return 0;
     }
-    a->first = pmtimevalToReal(&label.ll_start);
+    a->first = __pmtimevalToReal(&label.ll_start);
     if ((sts = pmGetArchiveEnd(&tv)) < 0) {
 	fprintf(stderr, "%s: archive %s is corrupted\n"
 		"pmGetArchiveEnd failed: %s\n",
-		pmGetProgname(), a->fname, pmErrStr(sts));
+		pmProgname, a->fname, pmErrStr(sts));
 	pmDestroyContext(handle);
 	return 0;
     }
-    a->last = pmtimevalToReal(&tv);
+    a->last = __pmtimevalToReal(&tv);
 
     /* check for duplicate host */
     b = archives;
     while (b) {
 	if (strcmp(a->hname, b->hname) == 0) {
 	    fprintf(stderr, "%s: Error: archive %s not legal - archive %s is already open "
-		    "for host %s\n", pmGetProgname(), a->fname, b->fname, b->hname);
+		    "for host %s\n", pmProgname, a->fname, b->fname, b->hname);
 	    pmDestroyContext(handle);
 	    return 0;
 	}
@@ -594,21 +566,21 @@ zoneInit(void)
     if (timeZone) {			/* TZ from timezone string */
 	if ((sts = pmNewZone(timeZone)) < 0)
 	    fprintf(stderr, "%s: cannot set timezone to %s\n"
-		    "pmNewZone failed: %s\n", pmGetProgname(), timeZone,
+		    "pmNewZone failed: %s\n", pmProgname, timeZone,
 		    pmErrStr(sts));
     } 
     else if (hostZone) { /* TZ from live host or archive */
 	if ((handle = pmNewContext(archives ? PM_CONTEXT_ARCHIVE : PM_CONTEXT_HOST, dfltHostConn)) < 0)
 	    fprintf(stderr, "%s: cannot set timezone from %s\n"
-		    "pmNewContext failed: %s\n", pmGetProgname(),
+		    "pmNewContext failed: %s\n", pmProgname,
 		    dfltHostConn, pmErrStr(handle));
 	else if ((sts = pmNewContextZone()) < 0)
 	    fprintf(stderr, "%s: cannot set timezone from %s\n"
-		    "pmNewContextZone failed: %s\n", pmGetProgname(),
+		    "pmNewContextZone failed: %s\n", pmProgname,
 		    dfltHostConn, pmErrStr(sts));
 	else
 	    fprintf(stdout, "%s: timezone set to local timezone from %s\n",
-		    pmGetProgname(), dfltHostConn);
+		    pmProgname, dfltHostConn);
 	if (handle >= 0)
 	    pmDestroyContext(handle);
     }
@@ -649,17 +621,10 @@ scale(pmUnits in)
     return f;
 }
 
-/*
- * initialize / reinitialize Metric (m)
- * reinit is 0 for init case, 1 for reinit case
- *
- * returns:
- *	0	problem, need to retry this one again later
- * 	1	all OK, can schedule fetching this one
- *     -1	serious badness, don't even bother retrying
- */
-static int
-init(Metric *m, int reinit)
+
+/* initialize Metric */
+int      /* 1: ok, 0: try again later, -1: fail */
+initMetric(Metric *m)
 {
     char	*hname;
     char	*hconn = symName(m->hconn);
@@ -671,55 +636,41 @@ init(Metric *m, int reinit)
     int		sts;
     int		i, j;
 
-    if (pmDebugOptions.appl1 && pmDebugOptions.desperate)
-	fprintf(stderr, "%sinitMetric(m=%p %s)\n", reinit ? "re" : "", m, mname);
-
     /* set up temporary context */
-    if ((handle = newContext(&m->hname, hconn, 1)) < 0) {
-	if (pmDebugOptions.appl1 && pmDebugOptions.desperate)
-	    fprintf(stderr, "%sinitMetric: newContext failed: %s\n", reinit ? "re" : "", pmErrStr(handle));
+    if ((handle = newContext(&m->hname, hconn, 1)) < 0)
 	return 0;
-    }
     hname = symName(m->hname);
 
     host_state_changed(hconn, STATE_RECONN);
 
     if ((sts = pmLookupName(1, &mname, &m->desc.pmid)) < 0) {
-	if (!reinit)
-	    fprintf(stderr, "%s: metric %s not in namespace for %s\n"
+	fprintf(stderr, "%s: metric %s not in namespace for %s\n"
 		"pmLookupName failed: %s\n",
-		pmGetProgname(), mname, findsource(hname, hconn), pmErrStr(sts));
-	if (pmDebugOptions.appl1 && pmDebugOptions.desperate)
-	    fprintf(stderr, "%sinitMetric: pmLookupName failed: %s\n", reinit ? "re" : "", pmErrStr(sts));
+		pmProgname, mname, findsource(hname, hconn), pmErrStr(sts));
 	ret = 0;
 	goto end;
     }
 
     /* fill in performance metric descriptor */
     if ((sts = pmLookupDesc(m->desc.pmid, &m->desc)) < 0) {
-	if (!reinit)
-	    fprintf(stderr, "%s: metric %s not currently available from %s\n"
+	fprintf(stderr, "%s: metric %s not currently available from %s\n"
 		"pmLookupDesc failed: %s\n",
-		pmGetProgname(), mname, findsource(hname, hconn), pmErrStr(sts));
-	if (pmDebugOptions.appl1 && pmDebugOptions.desperate)
-	    fprintf(stderr, "%sinitMetric: pmLookupDesc(%s) failed: %s\n", reinit ? "re" : "", pmIDStr(m->desc.pmid), pmErrStr(sts));
+		pmProgname, mname, findsource(hname, hconn), pmErrStr(sts));
 	ret = 0;
 	goto end;
     }
-    if (pmDebugOptions.appl1 && pmDebugOptions.desperate)
-	fprintf(stderr, "%sinitMetric: got metadata pmid=%s type=%s units=%s\n", reinit ? "re" : "", pmIDStr(m->desc.pmid), pmTypeStr(m->desc.type), pmUnitsStr(&m->desc.units));
 
     if (m->desc.type == PM_TYPE_AGGREGATE ||
 	m->desc.type == PM_TYPE_AGGREGATE_STATIC ||
 	m->desc.type == PM_TYPE_EVENT ||
 	m->desc.type == PM_TYPE_HIGHRES_EVENT ||
 	m->desc.type == PM_TYPE_UNKNOWN) {
-	fprintf(stderr, "%s: metric %s has inappropriate type\n", pmGetProgname(), mname);
+	fprintf(stderr, "%s: metric %s has inappropriate type\n", pmProgname, mname);
 	ret = -1;
     }
     else if (m->desc.indom == PM_INDOM_NULL) {
 	if (m->specinst != 0) {
-	    fprintf(stderr, "%s: metric %s has no instances\n", pmGetProgname(), mname);
+	    fprintf(stderr, "%s: metric %s has no instances\n", pmProgname, mname);
 	    ret = -1;
 	}
 	else
@@ -740,16 +691,8 @@ init(Metric *m, int reinit)
 		    "pmGetIndom failed: %s\n", mname, findsource(hname, hconn), pmErrStr(sts));
 	    ret = 0;
 	}
-	if (sts >= 0) {
-	    /* got instance domain */
-	    if (pmDebugOptions.appl1 && pmDebugOptions.desperate) {
-		fprintf(stderr, "%sinitMetric: got indom, %d instances", reinit ? "re" : "", sts);
-		if (sts > 0)
-		    fprintf(stderr, " \"%s\"", inames[0]);
-		if (sts > 1)
-		    fprintf(stderr, "...\"%s\"", inames[sts-1]);
-		fputc('\n', stderr);
-	    }
+
+	if (ret == 1) {	/* got instance profile */
 	    if (m->specinst == 0) {
 		/* all instances */
 		m->iids = iids;
@@ -772,13 +715,19 @@ init(Metric *m, int reinit)
 			}
 		    }
 		    if (j == sts) {
-			if (!reinit)
-			    pmNotifyErr(LOG_ERR, "metric %s from %s does not "
+			__pmNotifyErr(LOG_ERR, "metric %s from %s does not "
 				"(currently) have instance \"%s\"\n",
                                       mname, findsource(hname, hconn), m->inames[i]);
 			m->iids[i] = PM_IN_NULL;
 			ret = 0;
 		    }
+		}
+		if (sts > 0) {
+		    /*
+		     * pmGetInDom or pmGetInDomArchive returned some
+		     * instances above
+		     */
+		    free(iids);
 		}
 
 		/* 
@@ -805,28 +754,26 @@ init(Metric *m, int reinit)
 
 	    if (pmDebugOptions.appl1) {
 		int	numinst;
-		fprintf(stderr, "%sinitMetric: %s from %s: instance domain specinst=%d\n",
-			reinit ? "re" : "", mname, hname, m->specinst);
+		fprintf(stderr, "initMetric: %s from %s: instance domain specinst=%d\n",
+			mname, hname, m->specinst);
 		if (m->m_idom < 1) fprintf(stderr, "  %d instances!\n", m->m_idom);
 		numinst =  m->specinst == 0 ? m->m_idom : m->specinst;
 		for (i = 0; i < numinst; i++) {
 		    fprintf(stderr, "  indom[%d]", i);
-		    if (m->iids[i] == PM_IN_NULL) {
+		    if (m->iids[i] == PM_IN_NULL) 
 			fprintf(stderr, " ?missing");
-			ret = 0;
-		    }
 		    else
 			fprintf(stderr, " %d", m->iids[i]);
 		    fprintf(stderr, " \"%s\"\n", m->inames[i]);
 		}
 	    }
-	    /*
-	     * pmGetInDom or pmGetInDomArchive returned some instances
-	     * above
-	     */
-	    free(inames);
-	    if (m->specinst != 0)
-		free(iids);
+	    if (sts > 0) {
+		/*
+		 * pmGetInDom or pmGetInDomArchive returned some instances
+		 * above
+		 */
+		free(inames);
+	    }
 	}
     }
 
@@ -842,17 +789,177 @@ init(Metric *m, int reinit)
 		m->vals[j] = 0;
 	}
     }
-    if (ret == 1 && reinit) {
+
+end:
+    /* destroy temporary context */
+    pmDestroyContext(handle);
+
+    /* retry not meaningful for archives */
+    if (archives && (ret == 0))
+	ret = -1;
+
+    return ret;
+}
+
+
+/* reinitialize Metric - only for live host */
+int      /* 1: ok, 0: try again later, -1: fail */
+reinitMetric(Metric *m)
+{
+    char	*hname;
+    char	*hconn = symName(m->hconn);
+    char	*mname = symName(m->mname);
+    char	**inames;
+    int		*iids;
+    int		handle;
+    int		ret = 1;
+    int		sts;
+    int		i, j;
+
+    /* set up temporary context */
+    if ((handle = newContext(&m->hname, hconn, 1)) < 0)
+	return 0;
+    hname = symName(m->hname);
+
+    host_state_changed(hconn, STATE_RECONN);
+
+    if ((sts = pmLookupName(1, &mname, &m->desc.pmid)) < 0) {
+	ret = 0;
+	goto end;
+    }
+
+    /* fill in performance metric descriptor */
+    if ((sts = pmLookupDesc(m->desc.pmid, &m->desc)) < 0) {
+	ret = 0;
+        goto end;
+    }
+
+    if (m->desc.type == PM_TYPE_AGGREGATE ||
+	m->desc.type == PM_TYPE_AGGREGATE_STATIC ||
+	m->desc.type == PM_TYPE_EVENT ||
+	m->desc.type == PM_TYPE_HIGHRES_EVENT ||
+	m->desc.type == PM_TYPE_UNKNOWN) {
+	fprintf(stderr, "%s: metric %s has inappropriate type\n", pmProgname, mname);
+	ret = -1;
+    }
+    else if (m->desc.indom == PM_INDOM_NULL) {
+	if (m->specinst != 0) {
+	    fprintf(stderr, "%s: metric %s has no instances\n", pmProgname, mname);
+	    ret = -1;
+	}
+	else
+	    m->m_idom = 1;
+    }
+    else {
+	if ((sts = pmGetInDom(m->desc.indom, &iids, &inames)) < 0) { /* full profile */
+	    ret = 0;
+	}
+	else {
+	    if (m->specinst == 0) {
+		/* all instances */
+		m->iids = iids;
+		m->m_idom = sts;
+		m->inames = alloc(m->m_idom*sizeof(char *));
+		for (i = 0; i < m->m_idom; i++) {
+		    m->inames[i] = sdup(inames[i]);
+		}
+	    }
+	    else {
+		/* explicit instance profile */
+		m->m_idom = 0;
+		for (i = 0; i < m->specinst; i++) {
+		    /* look for first matching instance name */
+		    for (j = 0; j < sts; j++) {
+			if (eqinst(m->inames[i], inames[j])) {
+			    m->iids[i] = iids[j];
+			    m->m_idom++;
+			    break;
+			}
+		    }
+		    if (j == sts) {
+			m->iids[i] = PM_IN_NULL;
+			ret = 0;
+		    }
+		}
+		if (sts > 0) {
+		    /*
+		     * pmGetInDom or pmGetInDomArchive returned some
+		     * instances above
+		     */
+		    free(iids);
+		}
+
+		/* 
+		 * if specinst != m_idom, then some not found ... move these
+		 * to the end of the list
+		 */
+		for (j = m->specinst-1; j >= 0; j--) {
+		    if (m->iids[j] != PM_IN_NULL)
+			break;
+		}
+		for (i = 0; i < j; i++) {
+		    if (m->iids[i] == PM_IN_NULL) {
+			/* need to swap */
+			char	*tp;
+			tp = m->inames[i];
+			m->inames[i] = m->inames[j];
+			m->iids[i] = m->iids[j];
+			m->inames[j] = tp;
+			m->iids[j] = PM_IN_NULL;
+			j--;
+		    }
+		}
+	    }
+
+	    if (pmDebugOptions.appl1) {
+		int	numinst;
+		fprintf(stderr, "reinitMetric: %s from %s: instance domain specinst=%d\n",
+			mname, hname, m->specinst);
+		if (m->m_idom < 1) fprintf(stderr, "  %d instances!\n", m->m_idom);
+		if (m->specinst == 0) numinst = m->m_idom;
+		else numinst = m->specinst;
+		for (i = 0; i < numinst; i++) {
+		    fprintf(stderr, "  indom[%d]", i);
+		    if (m->iids[i] == PM_IN_NULL) 
+			fprintf(stderr, " ?missing");
+		    else
+			fprintf(stderr, " %d", m->iids[i]);
+		    fprintf(stderr, " \"%s\"\n", m->inames[i]);
+		}
+	    }
+	    if (sts > 0) {
+		/*
+		 * pmGetInDom or pmGetInDomArchive returned some instances
+		 * above
+		 */
+		free(inames);
+	    }
+	}
+    }
+
+    if (ret == 1) {
+	/* compute conversion factor into canonical units
+	   - non-zero conversion factor flags initialized metric */
+	m->conv = scale(m->desc.units);
+
+	/* automatic rate computation */
+	if (m->desc.sem == PM_SEM_COUNTER) {
+	    m->vals = (double *) ralloc(m->vals, m->m_idom * sizeof(double));
+	    for (j = 0; j < m->m_idom; j++)
+		m->vals[j] = 0;
+	}
+    }
+
+    if (ret >= 0) {
 	/*
-	 * reshape, starting here are working up the expression until
+	 * re-shape, starting here are working up the expression until
 	 * we reach the top of the tree or the designated metrics
 	 * associated with the node are not the same
 	 */
 	Expr	*x = m->expr;
-	int	reshape = 0;
 	while (x) {
 	    /*
-	     * only reshape expressions that may have set values
+	     * only re-shape expressions that may have set values
 	     */
 	    if (x->op == CND_FETCH ||
 		x->op == CND_NEG || x->op == CND_ADD || x->op == CND_SUB ||
@@ -871,40 +978,19 @@ init(Metric *m, int reinit)
 		x->op == CND_NOT || x->op == CND_AND || x->op == CND_OR ||
 		x->op == CND_RISE || x->op == CND_FALL || x->op == CND_INSTANT ||
 		x->op == CND_MATCH || x->op == CND_NOMATCH) {
-		reshape++;
 		instFetchExpr(x);
 		findEval(x);
 		if (pmDebugOptions.appl1) {
-		    fprintf(stderr, "reinitMetric: reshaped ...\n");
+		    fprintf(stderr, "reinitMetric: re-shaped ...\n");
 		    dumpExpr(x);
 		}
 	    }
 	    if (x->parent) {
 		x = x->parent;
-		/*
-		 * used to stop if x->metrics != m, but this is wrong
-		 * when the same metric is used as the left and right
-		 * operator (with different instance specifiers), e.g.
-		 * all_inst(foo == foo #'magic') ...
-		 */
-		;
-		/* 
-		 * if operand is a set -> scalar function, like
-		 * CND_COUNT_INST, don't propagate instance reshaping
-		 * further up the tree
-		 */
-		if (isScalarResult(x))
-		    break;
+		if (x->metrics == m)
+		    continue;
 	    }
-	    else
-		break;		/* x is root of expression tree */
-	}
-	if (reshape && pmDebugOptions.appl1 && pmDebugOptions.desperate) {
-	    x = m->expr;
-	    while (x->parent)
-		x = x->parent;
-	    fprintf(stderr, "reinitMetric: enclosing tree after reshaping\n");
-	    dumpTree(x);
+	    break;
 	}
     }
 
@@ -912,26 +998,9 @@ end:
     /* destroy temporary context */
     pmDestroyContext(handle);
 
-    /* retry not meaningful for archives */
-    if (archives && (ret == 0))
-	ret = -1;
-
     return ret;
 }
 
-/* initialize Metric */
-int      /* 1: ok, 0: try again later, -1: fail */
-initMetric(Metric *m)
-{
-    return init(m, 0);
-}
-
-/* reinitialize Metric - only for live host */
-int      /* 1: ok, 0: try again later, -1: fail */
-reinitMetric(Metric *m)
-{
-    return init(m, 1);
-}
 
 /* put initialised Metric onto fetch list */
 void
@@ -1036,13 +1105,13 @@ taskFetch(Task *t)
 		if ((sts = pmFetch(f->npmids, f->pmids, &f->result)) < 0) {
 		    if (archives) {
 			if (sts == PM_ERR_LOGREC) {
-			    fprintf(stderr, "%s: pmFetch failed: %s\n", pmGetProgname(),
+			    fprintf(stderr, "%s: pmFetch failed: %s\n", pmProgname,
 				    pmErrStr(sts));
 			    exit(1);
 			}
 		    }
 		    else {
-			pmNotifyErr(LOG_ERR, "pmFetch from %s failed: %s\n",
+			__pmNotifyErr(LOG_ERR, "pmFetch from %s failed: %s\n",
 				symName(f->host->name), pmErrStr(sts));
 			host_state_changed(symName(f->host->conn), STATE_LOSTCONN);
 			h->down = 1;
@@ -1083,7 +1152,7 @@ taskFetch(Task *t)
 			    if (m->desc.pmid == r->vset[i]->pmid) {
 				if (r->vset[i]->numval > 0) {
 				    m->vset = r->vset[i];
-				    m->stamp = pmtimevalToReal(&r->timestamp);
+				    m->stamp = __pmtimevalToReal(&r->timestamp);
 				}
 				break;
 			    }

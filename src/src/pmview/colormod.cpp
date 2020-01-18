@@ -19,6 +19,9 @@
 #include "modlist.h"
 #include "launch.h"
 
+#include <iostream>
+using namespace std;
+
 ColorMod::~ColorMod()
 {
 }
@@ -39,9 +42,12 @@ ColorMod::ColorMod(const char *metric, double scale,
 
     if (_metrics->numValues() == 1 && _scale.numSteps() && status() >= 0) {
 	add();
-	if (pmDebugOptions.appl2)
+#ifdef PCP_DEBUG
+	if (pmDebug & DBG_TRACE_APPL2)
 	    cerr << "ColorMod: Added " << metric << " (Id = " 
 		 << _root->getName().getString() << ")" << endl;
+#endif
+
     }
     else if (_metrics->numValues() > 1) {
 	warningMsg(_POS_, 
@@ -137,15 +143,19 @@ ColorMod::launch(Launch &launch, bool) const
 int
 ColorMod::select(SoPath *)
 {
-    if (pmDebugOptions.appl2)
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_APPL2)
 	cerr << "ColorMod::select: " << _metrics->metric(0) << endl;
+#endif
     return 1;
 }
 
 int
 ColorMod::remove(SoPath *)
 {
-    if (pmDebugOptions.appl2)
+#ifdef PCP_DEBUG
+    if (pmDebug & DBG_TRACE_APPL2)
 	cerr << "ColorMod::remove: " << _metrics->metric(0) << endl;
+#endif
     return 0;
 }

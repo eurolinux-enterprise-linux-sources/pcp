@@ -3,6 +3,7 @@
  */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 #include <pcp/pmda.h>
 
 static int rootfd;
@@ -43,7 +44,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(opts.optarg);
 	    if (sts < 0) {
 		pmprintf("%s: unrecognized debug options specification (%s)\n",
-			pmGetProgname(), opts.optarg);
+			pmProgname, opts.optarg);
 		opts.errors++;
 	    }
 	    break;

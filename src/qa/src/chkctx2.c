@@ -2,8 +2,7 @@
  * Copyright (c) 1997-2001 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
-#define TYPE type == PM_CONTEXT_ARCHIVE ? "archive" : "host"
-#define SOURCE handle == 0 ? "host" : TYPE
+#define SOURCE handle == 0 ? "host" : ( type == PM_CONTEXT_ARCHIVE ? "archive" : "host" )
 #define HOST handle == 0 ? "localhost" : host
 
 /*
@@ -11,6 +10,7 @@
  */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 static int inst_bin[] = { 100, 200, 300, 400, 500, 600, 700, 800, 900 };
 
@@ -43,14 +43,14 @@ main(int argc, char **argv)
     int		handle;
     static char	*usage = "[-a archive] [-D debugspec] [-h hostname] [-L] [-n namespace]";
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "a:D:h:Ln:")) != EOF) {
 	switch (c) {
 
 	case 'a':	/* archive name */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmProgname);
 		errflag++;
 	    }
 	    type = PM_CONTEXT_ARCHIVE;
@@ -61,14 +61,14 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
 
 	case 'h':	/* hostname for PMCD to contact */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmProgname);
 		errflag++;
 	    }
 	    host = optarg;
@@ -77,7 +77,7 @@ main(int argc, char **argv)
 
 	case 'L':	/* local mode, no PMCD */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmProgname);
 		errflag++;
 	    }
 	    host = NULL;
@@ -96,12 +96,12 @@ main(int argc, char **argv)
     }
 
     if (errflag) {
-	fprintf(stderr, "Usage: %s %s\n", pmGetProgname(), usage);
+	fprintf(stderr, "Usage: %s %s\n", pmProgname, usage);
 	exit(1);
     }
 
     if ((sts = pmLoadASCIINameSpace(namespace, 1)) < 0) {
-	printf("%s: Cannot load namespace from \"%s\": %s\n", pmGetProgname(), namespace, pmErrStr(sts));
+	printf("%s: Cannot load namespace from \"%s\": %s\n", pmProgname, namespace, pmErrStr(sts));
 	exit(1);
     }
     if ((sts = pmLookupName(2, namelist, metrics)) < 0) {
@@ -187,7 +187,7 @@ main(int argc, char **argv)
 	if (handle) {
 	    if ((sts = pmDestroyContext(handle)) < 0)
 		fprintf(stderr, "pmDestroyContext %d %s=%s: %s\n",
-		    handle, TYPE, host, pmErrStr(sts));
+		    handle, SOURCE, HOST, pmErrStr(sts));
 	}
 	handle--;
     }

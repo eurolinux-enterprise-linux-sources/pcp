@@ -25,12 +25,8 @@ RESOURCES	= pmview.qrc
 INCLUDEPATH	+= /usr/include/Coin3
 INCLUDEPATH	+= ../include ../libpcp_qmc/src ../libpcp_qed/src
 CONFIG		+= qt warn_on
-CONFIG(release, release|debug) {
-DESTDIR	= build/release
-}
-CONFIG(debug, release|debug) {
-DESTDIR	= build/debug
-}
+release:DESTDIR	= build/debug
+debug:DESTDIR	= build/release
 LIBS		+= -L../libpcp/src
 LIBS		+= -L../libpcp_qmc/src -L../libpcp_qmc/src/$$DESTDIR
 LIBS		+= -L../libpcp_qed/src -L../libpcp_qed/src/$$DESTDIR
@@ -38,6 +34,4 @@ LIBS		+= -lpcp_qed -lpcp_qmc -lpcp -lCoin -lSoQt
 win32:LIBS	+= -lwsock32 -liphlpapi
 QT		+= printsupport network widgets
 QMAKE_INFO_PLIST = pmview.info
-QMAKE_CFLAGS	+= $$(CFLAGS)
-QMAKE_CXXFLAGS	+= $$(CFLAGS) $$(CXXFLAGS)
-QMAKE_LFLAGS	+= $$(LDFLAGS)
+QMAKE_CXXFLAGS	+= $$(PCP_CFLAGS)

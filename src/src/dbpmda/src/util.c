@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013,2017 Red Hat.
+ * Copyright (c) 2013 Red Hat.
  * Copyright (c) 1995-2001 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -16,10 +16,6 @@
 #include "./dbpmda.h"
 #include "./lex.h"
 #include "./gram.h"
-#include <pcp/deprecated.h>
-#ifdef HAVE_STRINGS_H
-#include <strings.h>
-#endif
 
 /*
  * This works because ...
@@ -31,10 +27,10 @@
 #include "../../libpcp/src/pmdbg.h"
 
 extern pmdaInterface	dispatch;
-extern int		fromPMDA;
-extern int		toPMDA;
+extern int		infd;
+extern int		outfd;
 
-pmProfile		*profile;
+__pmProfile		*profile;
 int			profile_changed;
 int			timer;
 int			get_desc;
@@ -49,12 +45,12 @@ static int		argc;
 void
 reset_profile(void)
 {
-    if ((profile = (pmProfile *)realloc(profile, sizeof(pmProfile))) == NULL) {
-	pmNoMem("reset_profile", sizeof(pmProfile), PM_FATAL_ERR);
+    if ((profile = (__pmProfile *)realloc(profile, sizeof(__pmProfile))) == NULL) {
+	__pmNoMem("reset_profile", sizeof(__pmProfile), PM_FATAL_ERR);
 	exit(1);
     }
     ctxp->c_instprof = profile;
-    memset(profile, 0, sizeof(pmProfile));
+    memset(profile, 0, sizeof(__pmProfile));
     profile->state = PM_PROFILE_INCLUDE;        /* default global state */
     profile_changed = 1;
 }
@@ -71,7 +67,7 @@ setup_context(void)
      * we don't want or need any PMDAs to be loaded for this one
      * PM_CONTEXT_LOCAL context
      */
-    pmSpecLocalPMDA("clear");
+    __pmSpecLocalPMDA("clear");
 
     if ((sts = pmNewContext(PM_CONTEXT_LOCAL, NULL)) < 0) {
 	fprintf(stderr, "setup_context: creation failed: %s\n", pmErrStr(sts));
@@ -140,18 +136,6 @@ strnum(int n)
     return buf;
 }
 
-char *
-strcluster(pmID pmid)
-{
-    static char buffer[32];
-    char *p;
-
-    pmIDStr_r(pmid, buffer, sizeof(buffer));
-    p = rindex(buffer, '.');
-    *p = '\0';
-    return buffer;
-}
-
 void
 initmetriclist(void)
 {
@@ -197,7 +181,7 @@ addarglist(char *arg)
 
     if (param.argc >= argc) {
         argc = param.argc;
-	argv = (char **)realloc(argv, argc * sizeof(char *));
+	argv = (char **)realloc(argv, argc * sizeof(pmProgname));
 	if (argv == NULL) {
 	    fprintf(stderr, "addarglist: realloc failed: %s\n", osstrerror());
 	    exit(1);
@@ -226,7 +210,7 @@ watch(char *fname)
 }
 
 void
-printindom(FILE *f, pmInResult *irp)
+printindom(FILE *f, __pmInResult *irp)
 {
     int		i;
 
@@ -253,7 +237,6 @@ dohelp(int command, int full)
 	dohelp(FETCH, HELP_USAGE);
 	dohelp(GETDESC, HELP_USAGE);
 	dohelp(INSTANCE, HELP_USAGE);
-	dohelp(LABEL, HELP_USAGE);
 	dohelp(PMNS_NAME, HELP_USAGE);
 	dohelp(NAMESPACE, HELP_USAGE);
 	dohelp(OPEN, HELP_USAGE);
@@ -300,14 +283,6 @@ dohelp(int command, int full)
 	    break;
 	case INSTANCE:
 	    puts("instance indom# [ number | name | \"name\" ]");
-	    break;
-	case LABEL:
-	    puts("label context");
-	    puts("label domain");
-	    puts("label indom indom#");
-	    puts("label cluster cluster#");
-	    puts("label item metric");
-	    puts("label instances indom#");
 	    break;
 	case NAMESPACE:
 	    puts("namespace fname");
@@ -517,7 +492,7 @@ dostatus(void)
 	case CONN_DAEMON:
 	    printf("daemon\n");
 	    printf("PMDA PMAPI Version:     ");
-	    i = __pmVersionIPC(fromPMDA);
+	    i = __pmVersionIPC(infd);
 	    if (i == UNKNOWN_VERSION)
 		printf("unknown!\n");
 	    else
@@ -588,7 +563,7 @@ _dbDumpResult(FILE *f, pmResult *resp, pmDesc *desc_list)
 
     fprintf(f, "pmResult dump from " PRINTF_P_PFX "%p timestamp: %d.%06d ",
         resp, (int)resp->timestamp.tv_sec, (int)resp->timestamp.tv_usec);
-    pmPrintStamp(f, &resp->timestamp);
+    __pmPrintStamp(f, &resp->timestamp);
     fprintf(f, " numpmid: %d\n", resp->numpmid);
     for (i = 0; i < resp->numpmid; i++) {
 	pmValueSet	*vsp = resp->vset[i];

@@ -42,6 +42,3 @@ extern kvm_t	*kvmp;
 
 #define KERN_IFNET	0
 extern struct nlist	symbols[];
-
-/* for uname(3) */
-#include <sys/utsname.h>

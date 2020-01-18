@@ -48,6 +48,7 @@
  */
 
 #include "pmapi.h"
+#include "impl.h"
 #include "pmda.h"
 
 #include <sys/param.h>
@@ -115,6 +116,7 @@ refresh_netif_metrics(void)
     size_t		new_buflen;
     struct rt_msghdr	*rtm;
     struct if_msghdr	*ifm;
+    struct if_data	*ifd = NULL;
     struct sockaddr	*sa;
     struct sockaddr	*rti_info[RTAX_MAX];
     struct sockaddr_dl	*sdl;
@@ -150,7 +152,7 @@ refresh_netif_metrics(void)
 	    free(buf);
 	buf = (char *)malloc(new_buflen);
 	if (buf == NULL) {
-	    pmNoMem("refresh_disk_metrics: stats", new_buflen, PM_FATAL_ERR);
+	    __pmNoMem("refresh_disk_metrics: stats", new_buflen, PM_FATAL_ERR);
 	    /* NOTREACHED */
 	}
 	buflen = new_buflen;
@@ -168,6 +170,7 @@ refresh_netif_metrics(void)
 	switch (rtm->rtm_type) {
 	case RTM_IFINFO:
 	    ifm = (struct if_msghdr *)next;
+	    ifd = &ifm->ifm_data;
 	    sa = (struct sockaddr *)(ifm + 1);
 	    get_rtaddrs(ifm->ifm_addrs, sa, rti_info);
 	    sdl = (struct sockaddr_dl *)rti_info[RTAX_IFP];
@@ -218,7 +221,7 @@ do_netif_metrics(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	if (sts == PMDA_CACHE_ACTIVE) {
 	    sts = 1;
 	    /* cluster and domain already checked, just need item ... */
-	    switch (pmID_item(mdesc->m_desc.pmid)) {
+	    switch (pmid_item(mdesc->m_desc.pmid)) {
 		case 0:		/* network.interface.mtu */
 		    atom->ull = ifm->ifm_data.ifi_mtu;
 		    break;
@@ -301,7 +304,7 @@ do_netif_metrics(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	 *
 	 * cluster and domain already checked, just need item ...
 	 */
-	switch (pmID_item(mdesc->m_desc.pmid)) {
+	switch (pmid_item(mdesc->m_desc.pmid)) {
 	    case 17:		/* hinv.interface */
 		atom->ul = valid;
 		sts = 1;

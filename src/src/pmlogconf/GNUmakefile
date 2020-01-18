@@ -1,5 +1,4 @@
 #
-# Copyright (c) 2011-2018 Red Hat.
 # Copyright (c) 2000,2004 Silicon Graphics, Inc.  All Rights Reserved.
 # 
 # This program is free software; you can redistribute it and/or modify it
@@ -16,21 +15,7 @@
 TOPDIR = ../..
 include $(TOPDIR)/src/include/builddefs
 
-SUBDIRS = \
-	cpu \
-	disk \
-	filesystem \
-        gfs2 \
-	kernel \
-	kvm \
-	libvirt \
-	memory \
-	networking \
-	platform \
-	sgi \
-	storage \
-	tools \
-	v1.0
+SUBDIRS = v1.0 platform disk sgi memory cpu kernel filesystem networking tools
 
 # Only evaluate zeroconf configurations if we package that.
 # Otherwise zeroconf will be installed for all platforms as

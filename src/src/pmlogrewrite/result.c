@@ -40,7 +40,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "logger.h"
 #include <assert.h>
 
@@ -367,7 +367,7 @@ rescale(int i, metricspec_t *mp)
 	     * No type conversion here, so error not expected
 	     */
 	    fprintf(stderr, "%s: Botch: %s (%s): extracting value: %s\n",
-			pmGetProgname(), mp->old_name, pmIDStr(mp->old_desc.pmid), pmErrStr(sts));
+			pmProgname, mp->old_name, pmIDStr(mp->old_desc.pmid), pmErrStr(sts));
 	    inarch.rp->vset[i]->numval = j;
 	    __pmDumpResult(stderr, inarch.rp);
 	    abandon();
@@ -381,7 +381,7 @@ rescale(int i, metricspec_t *mp)
 	     * from pmConvScale()
 	     */
 	    fprintf(stderr, "%s: Botch: %s (%s): scale conversion from %s",
-			pmGetProgname(), mp->old_name, pmIDStr(mp->old_desc.pmid), pmUnitsStr(&mp->old_desc.units));
+			pmProgname, mp->old_name, pmIDStr(mp->old_desc.pmid), pmUnitsStr(&mp->old_desc.units));
 	    fprintf(stderr, " to %s failed: %s\n", pmUnitsStr(&mp->new_desc.units), pmErrStr(sts));
 	    inarch.rp->vset[i]->numval = j;
 	    __pmDumpResult(stderr, inarch.rp);
@@ -410,7 +410,7 @@ rescale(int i, metricspec_t *mp)
 	     * __pmStuffValue()
 	     */
 	    fprintf(stderr, "%s: Botch: %s (%s): stuffing value %s (type=%s) into rewritten pmResult: %s\n",
-			pmGetProgname(), mp->old_name, pmIDStr(mp->old_desc.pmid), pmAtomStr(&oval, mp->old_desc.type), pmTypeStr(mp->old_desc.type), pmErrStr(sts));
+			pmProgname, mp->old_name, pmIDStr(mp->old_desc.pmid), pmAtomStr(&oval, mp->old_desc.type), pmTypeStr(mp->old_desc.type), pmErrStr(sts));
 	    inarch.rp->vset[i]->numval = j;
 	    __pmDumpResult(stderr, inarch.rp);
 	    abandon();
@@ -445,7 +445,7 @@ retype(int i, metricspec_t *mp)
 	sts = pmExtractValue(old_valfmt, &vsp->vlist[j], mp->old_desc.type, &val, mp->new_desc.type);
 	if (sts < 0) {
 	    fprintf(stderr, "%s: Error: %s (%s): extracting value from type %s",
-			pmGetProgname(), mp->old_name, pmIDStr(mp->old_desc.pmid), pmTypeStr(mp->old_desc.type));
+			pmProgname, mp->old_name, pmIDStr(mp->old_desc.pmid), pmTypeStr(mp->old_desc.type));
 	    fprintf(stderr, " to %s: %s\n", pmTypeStr(mp->new_desc.type), pmErrStr(sts));
 	    inarch.rp->vset[i]->numval = j;
 	    __pmDumpResult(stderr, inarch.rp);
@@ -474,7 +474,7 @@ retype(int i, metricspec_t *mp)
 	     * __pmStuffValue()
 	     */
 	    fprintf(stderr, "%s: Botch: %s (%s): stuffing value %s (type=%s) into rewritten pmResult: %s\n",
-			pmGetProgname(), mp->old_name, pmIDStr(mp->old_desc.pmid), pmAtomStr(&val, mp->new_desc.type), pmTypeStr(mp->new_desc.type), pmErrStr(sts));
+			pmProgname, mp->old_name, pmIDStr(mp->old_desc.pmid), pmAtomStr(&val, mp->new_desc.type), pmTypeStr(mp->new_desc.type), pmErrStr(sts));
 	    inarch.rp->vset[i]->numval = j;
 	    __pmDumpResult(stderr, inarch.rp);
 	    abandon();
@@ -529,7 +529,7 @@ do_result(void)
 		pmValueSet	*save_vsp = save[i];
 		int		save_numval;
 		save_numval = orig_numval[i];
-		if (pmDebugOptions.appl2)
+		if (pmDebugOptions.appl1)
 		    fprintf(stderr, "Delete: vset[%d] for %s\n", i, pmIDStr(inarch.rp->vset[i]->pmid));
 		for (j = i+1; j < inarch.rp->numpmid; j++) {
 		    inarch.rp->vset[j-1] = inarch.rp->vset[j];
@@ -549,7 +549,7 @@ do_result(void)
 	     *   METRIC_CHANGE_NAME
 	     *   METRIC_CHANGE_SEM
 	     */
-	    if (pmDebugOptions.appl2)
+	    if (pmDebugOptions.appl1)
 		fprintf(stderr, "Rewrite: vset[%d] for %s\n", i, pmIDStr(inarch.rp->vset[i]->pmid));
 
 	    if (mp->flags & METRIC_CHANGE_PMID)
@@ -665,11 +665,11 @@ do_result(void)
     if (orig_numpmid == 0 || inarch.rp->numpmid > 0) {
 	unsigned long	out_offset;
 	unsigned long	peek_offset;
-	peek_offset = __pmFtell(outarch.archctl.ac_mfp);
+	peek_offset = __pmFtell(outarch.logctl.l_mfp);
 	sts = __pmEncodeResult(PDU_OVERRIDE2, inarch.rp, &inarch.logrec);
 	if (sts < 0) {
 	    fprintf(stderr, "%s: Error: __pmEncodeResult: %s\n",
-		    pmGetProgname(), pmErrStr(sts));
+		    pmProgname, pmErrStr(sts));
 	    abandon();
 	    /*NOTREACHED*/
 	}
@@ -679,12 +679,12 @@ do_result(void)
 	     * data file size will exceed 2^31-1 bytes, so force
 	     * volume switch
 	     */
-	    newvolume(outarch.archctl.ac_curvol+1);
+	    newvolume(outarch.logctl.l_curvol+1);
 	}
-	out_offset = __pmFtell(outarch.archctl.ac_mfp);
-	if ((sts = __pmLogPutResult2(&outarch.archctl, inarch.logrec)) < 0) {
+	out_offset = __pmFtell(outarch.logctl.l_mfp);
+	if ((sts = __pmLogPutResult2(&outarch.logctl, inarch.logrec)) < 0) {
 	    fprintf(stderr, "%s: Error: __pmLogPutResult2: log data: %s\n",
-		    pmGetProgname(), pmErrStr(sts));
+		    pmProgname, pmErrStr(sts));
 	    abandon();
 	    /*NOTREACHED*/
 	}
@@ -694,7 +694,7 @@ do_result(void)
 	    fprintf(stderr, "Log: write ");
 	    stamp.tv_sec = inarch.rp->timestamp.tv_sec;
 	    stamp.tv_usec = inarch.rp->timestamp.tv_usec;
-	    pmPrintStamp(stderr, &stamp);
+	    __pmPrintStamp(stderr, &stamp);
 	    fprintf(stderr, " numpmid=%d @ offset=%ld\n", inarch.rp->numpmid, out_offset);
 	}
     }

@@ -15,7 +15,7 @@ echo "QA output created by $seq"
 
 [ -d $PCP_PMDAS_DIR/redis ] || _notrun "redis.io PMDA is not installed"
 redis_port=6379
-$PCP_BINADM_DIR/telnet-probe -c localhost $redis_port \
+echo quit | $PCP_BINADM_DIR/telnet-probe localhost $redis_port \
         || _notrun "Noone home on default Redis port $redis_port"
 
 _cleanup()
@@ -28,10 +28,7 @@ _cleanup()
 
 _filter()
 {
-    sed \
-	-e "/Information not currently available/d" \
-	-e "/Metric not supported by this version of monitored application/d" \
-    #end
+    sed -e "/Information not currently available/d"
 }
 
 iam=redis

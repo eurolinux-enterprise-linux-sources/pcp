@@ -23,12 +23,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -50,22 +45,19 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 1 metric
-    29.0.5 (sample.colour): inst [2 or "blue"] value NUMBER
+TIMESTAMP  29.0.5 (sample.colour): inst [2 or "blue"] value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 mandatory on once -> mandatory maybe
 sample.colour
@@ -90,12 +82,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -115,19 +102,17 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 mandatory on once -> mandatory off
 sample.colour
@@ -152,12 +137,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -177,19 +157,17 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 mandatory on once -> advisory on once
 sample.colour
@@ -198,7 +176,7 @@ sample.colour
   inst [2 or "blue"]  15 (mand on, delta=0 msec, inlog, avail)
 Log for pmlogger on HOST started DATE
 
-Warning [TMP.config, line 6]
+Warning [/tmp/SEQ-MYPID.config, line 6]
 Incompatible request for metric "sample.colour" and instance "blue"
 Request for (advisory) ON conflicts with current (mandatory) ON state
 Config parsed
@@ -217,13 +195,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
-Fetch task[1] delta: 0 usec numpmid: 1
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -245,22 +217,19 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 1 metric
-    29.0.5 (sample.colour): inst [2 or "blue"] value NUMBER
+TIMESTAMP  29.0.5 (sample.colour): inst [2 or "blue"] value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 mandatory on once -> advisory off
 sample.colour
@@ -269,7 +238,7 @@ sample.colour
   inst [2 or "blue"]  15 (mand on, delta=0 msec, inlog, avail)
 Log for pmlogger on HOST started DATE
 
-Warning [TMP.config, line 6]
+Warning [/tmp/SEQ-MYPID.config, line 6]
 Incompatible request for metric "sample.colour" and instance "blue"
 Request for (advisory) OFF conflicts with current (mandatory) ON state
 Config parsed
@@ -288,13 +257,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
-Fetch task[1] delta: 0 usec numpmid: 1
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -316,22 +279,19 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 1 metric
-    29.0.5 (sample.colour): inst [2 or "blue"] value NUMBER
+TIMESTAMP  29.0.5 (sample.colour): inst [2 or "blue"] value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 mandatory maybe -> mandatory on once
 sample.colour
@@ -356,12 +316,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -383,22 +338,19 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 1 metric
-    29.0.5 (sample.colour): inst [2 or "blue"] value NUMBER
+TIMESTAMP  29.0.5 (sample.colour): inst [2 or "blue"] value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 mandatory maybe -> mandatory maybe
 sample.colour
@@ -423,12 +375,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -448,19 +395,17 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 mandatory maybe -> mandatory off
 sample.colour
@@ -485,12 +430,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -510,19 +450,17 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 mandatory maybe -> advisory on once
 sample.colour
@@ -547,12 +485,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -574,22 +507,19 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 1 metric
-    29.0.5 (sample.colour): inst [2 or "blue"] value NUMBER
+TIMESTAMP  29.0.5 (sample.colour): inst [2 or "blue"] value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 mandatory maybe -> advisory off
 sample.colour
@@ -614,12 +544,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -639,19 +564,17 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 mandatory off -> mandatory on once
 sample.colour
@@ -676,12 +599,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -703,22 +621,19 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 1 metric
-    29.0.5 (sample.colour): inst [2 or "blue"] value NUMBER
+TIMESTAMP  29.0.5 (sample.colour): inst [2 or "blue"] value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 mandatory off -> mandatory maybe
 sample.colour
@@ -743,12 +658,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -768,19 +678,17 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 mandatory off -> mandatory off
 sample.colour
@@ -805,12 +713,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -830,19 +733,17 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 mandatory off -> advisory on once
 sample.colour
@@ -851,7 +752,7 @@ sample.colour
   inst [2 or "blue"]  2 (mand off)
 Log for pmlogger on HOST started DATE
 
-Warning [TMP.config, line 6]
+Warning [/tmp/SEQ-MYPID.config, line 6]
 Incompatible request for metric "sample.colour" and instance "blue"
 Request for (advisory) ON conflicts with current (mandatory) OFF state
 Config parsed
@@ -870,13 +771,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
-Fetch task[1] delta: 0 usec numpmid: 1
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -896,19 +791,17 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 mandatory off -> advisory off
 sample.colour
@@ -917,7 +810,7 @@ sample.colour
   inst [2 or "blue"]  2 (mand off)
 Log for pmlogger on HOST started DATE
 
-Warning [TMP.config, line 6]
+Warning [/tmp/SEQ-MYPID.config, line 6]
 Incompatible request for metric "sample.colour" and instance "blue"
 Request for (advisory) OFF conflicts with current (mandatory) OFF state
 Config parsed
@@ -936,13 +829,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
-Fetch task[1] delta: 0 usec numpmid: 1
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -962,19 +849,17 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 advisory on once -> mandatory on once
 sample.colour
@@ -999,12 +884,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -1026,22 +906,19 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 1 metric
-    29.0.5 (sample.colour): inst [2 or "blue"] value NUMBER
+TIMESTAMP  29.0.5 (sample.colour): inst [2 or "blue"] value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 advisory on once -> mandatory maybe
 sample.colour
@@ -1066,12 +943,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -1091,19 +963,17 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 advisory on once -> mandatory off
 sample.colour
@@ -1128,12 +998,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -1153,19 +1018,17 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 advisory on once -> advisory on once
 sample.colour
@@ -1190,12 +1053,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -1217,22 +1075,19 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 1 metric
-    29.0.5 (sample.colour): inst [2 or "blue"] value NUMBER
+TIMESTAMP  29.0.5 (sample.colour): inst [2 or "blue"] value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 advisory on once -> advisory off
 sample.colour
@@ -1257,12 +1112,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -1282,19 +1132,17 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 advisory off -> mandatory on once
 sample.colour
@@ -1319,12 +1167,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -1346,22 +1189,19 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 1 metric
-    29.0.5 (sample.colour): inst [2 or "blue"] value NUMBER
+TIMESTAMP  29.0.5 (sample.colour): inst [2 or "blue"] value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 advisory off -> mandatory maybe
 sample.colour
@@ -1386,12 +1226,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -1411,19 +1246,17 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 advisory off -> mandatory off
 sample.colour
@@ -1448,12 +1281,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -1473,19 +1301,17 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 advisory off -> advisory on once
 sample.colour
@@ -1510,12 +1336,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -1537,22 +1358,19 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 1 metric
-    29.0.5 (sample.colour): inst [2 or "blue"] value NUMBER
+TIMESTAMP  29.0.5 (sample.colour): inst [2 or "blue"] value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
 advisory off -> advisory off
 sample.colour
@@ -1577,12 +1395,7 @@ PMIDs: [1] 29.0.5
       Request @ ADDR:
       instances: [1] 2
 
-Fetch task[0] delta: 0 usec numpmid: 1
-  Fetch group[0][0] 1 metrics
 Starting logger for host "HOST"
-__pmFopen("TMP.index", "w"): no decompress
-__pmFopen("TMP.meta", "w"): no decompress
-__pmFopen("TMP.0", "w"): no decompress
 Archive basename: ARCHIVE
 logputresult: pdubuf=ADDR input len=NNN output len=NNN posn=NNN
 __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
@@ -1602,16 +1415,14 @@ __pmLogPutIndex: timestamp=NNN.NNNNNN vol=0 meta posn=NNN log posn=NNN
 
 Log finished DATE
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER
 
-TIMESTAMP 5 metrics
-    2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
-    2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
-    2.0.23 (pmcd.pid): value NUMBER
-    2.0.24 (pmcd.seqnum): value NUMBER
+TIMESTAMP  2.3.3 (pmcd.pmlogger.host): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.3.0 (pmcd.pmlogger.port): inst [LOGGER_PID or "LOGGER_PID"] value PORT
+              2.3.2 (pmcd.pmlogger.archive): inst [LOGGER_PID or "LOGGER_PID"] value STRING
+              2.0.23 (pmcd.pid): value NUMBER
+              2.0.24 (pmcd.seqnum): value NUMBER

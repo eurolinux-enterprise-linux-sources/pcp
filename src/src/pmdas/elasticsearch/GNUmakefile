@@ -1,5 +1,4 @@
 #
-# Copyright (c) 2018-2019 Red Hat.
 # Copyright (c) 2011 Aconex.  All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it
@@ -18,7 +17,6 @@ include $(TOPDIR)/src/include/builddefs
 
 IAM	= elasticsearch
 DOMAIN	= ELASTICSEARCH
-PYSCRIPT = pmda$(IAM).python
 PMDADIR	= $(PCP_PMDAS_DIR)/$(IAM)
 LOGCONF	= $(PCP_VAR_DIR)/config/pmlogconf/$(IAM)
 
@@ -36,7 +34,8 @@ ifeq "$(PMDA_ELASTICSEARCH)" "true"
 build-me:	check_domain
 install_pcp install: default
 	$(INSTALL) -m 755 -d $(PMDADIR)
-	$(INSTALL) -m 755 Install Remove Upgrade $(PYSCRIPT) $(PMDADIR)
+	$(INSTALL) -m 755 Install Remove $(PMDADIR)
+	$(INSTALL) -m 644 pmda$(IAM).pl $(PMDADIR)/pmda$(IAM).pl
 	$(INSTALL) -m 755 -d $(LOGCONF)
 	$(INSTALL) -m 644 pmlogconf.summary $(LOGCONF)/summary
 	@$(INSTALL_MAN)
@@ -47,7 +46,4 @@ install_pcp install:
 endif
 
 check_domain:	../../pmns/stdpmid
-	$(DOMAIN_PYTHONRULE)
-
-check:: $(PYSCRIPT)
-	$(PYLINT) $^
+	$(DOMAIN_PERLRULE)

@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 int
 main(int argc, char **argv)
@@ -33,7 +34,7 @@ main(int argc, char **argv)
     struct timeval appEnd;
     struct timeval appOffset;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:h:?")) != EOF) {
 	switch (c) {
@@ -42,14 +43,14 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
 
 	case 'h':	/* contact PMCD on this hostname */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmProgname);
 		errflag++;
 	    }
 	    host = optarg;
@@ -64,7 +65,7 @@ main(int argc, char **argv)
     }
 
     if (zflag && type == 0) {
-	fprintf(stderr, "%s: -z requires an explicit -a, -h or -U option\n", pmGetProgname());
+	fprintf(stderr, "%s: -z requires an explicit -a, -h or -U option\n", pmProgname);
 	errflag++;
     }
 
@@ -75,19 +76,19 @@ main(int argc, char **argv)
 Options\n\
   -D debug	standard PCP debug options\n\
   -h host	metrics source is PMCD on host\n",
-		pmGetProgname());
+		pmProgname);
 	exit(1);
     }
 
     if (logfile != NULL) {
-	pmOpenLog(pmGetProgname(), logfile, stderr, &sts);
-	if (sts != 1) {
-	    fprintf(stderr, "%s: Could not open logfile \"%s\"\n", pmGetProgname(), logfile);
+	__pmOpenLog(pmProgname, logfile, stderr, &sts);
+	if (sts < 0) {
+	    fprintf(stderr, "%s: Could not open logfile \"%s\"\n", pmProgname, logfile);
 	}
     }
 
     if (pmnsfile != PM_NS_DEFAULT && (sts = pmLoadASCIINameSpace(pmnsfile, 1)) < 0) {
-	printf("%s: Cannot load namespace from \"%s\": %s\n", pmGetProgname(), 
+	printf("%s: Cannot load namespace from \"%s\": %s\n", pmProgname, 
 	       pmnsfile, pmErrStr(sts));
 	exit(1);
     }
@@ -100,29 +101,29 @@ Options\n\
     if ((sts = pmNewContext(type, host)) < 0) {
 	if (type == PM_CONTEXT_HOST)
 	    fprintf(stderr, "%s: Cannot connect to PMCD on host \"%s\": %s\n",
-		pmGetProgname(), host, pmErrStr(sts));
+		pmProgname, host, pmErrStr(sts));
 	else
 	    fprintf(stderr, "%s: Cannot open archive \"%s\": %s\n",
-		pmGetProgname(), host, pmErrStr(sts));
+		pmProgname, host, pmErrStr(sts));
 	exit(1);
     }
 
     if (type == PM_CONTEXT_ARCHIVE) {
 	if ((sts = pmGetArchiveLabel(&label)) < 0) {
 	    fprintf(stderr, "%s: Cannot get archive label record: %s\n",
-		pmGetProgname(), pmErrStr(sts));
+		pmProgname, pmErrStr(sts));
 	    exit(1);
 	}
 	if (mode != PM_MODE_INTERP) {
 	    if ((sts = pmSetMode(mode, &label.ll_start, 0)) < 0) {
-		fprintf(stderr, "%s: pmSetMode: %s\n", pmGetProgname(), pmErrStr(sts));
+		fprintf(stderr, "%s: pmSetMode: %s\n", pmProgname, pmErrStr(sts));
 		exit(1);
 	    }
 	}
   	startTime = label.ll_start;
 	sts = pmGetArchiveEnd(&endTime);
 	if (sts < 0) {
-	    fprintf(stderr, "%s: pmGetArchiveEnd: %s\n", pmGetProgname(),
+	    fprintf(stderr, "%s: pmGetArchiveEnd: %s\n", pmProgname,
 		    pmErrStr(sts));
 	    exit(1);
 	}
@@ -135,7 +136,7 @@ Options\n\
     if (zflag) {
 	if ((tzh = pmNewContextZone()) < 0) {
 	    fprintf(stderr, "%s: Cannot set context timezone: %s\n",
-		pmGetProgname(), pmErrStr(tzh));
+		pmProgname, pmErrStr(tzh));
 	    exit(1);
 	}
 	if (type == PM_CONTEXT_ARCHIVE)
@@ -147,7 +148,7 @@ Options\n\
     else if (tz != NULL) {
 	if ((tzh = pmNewZone(tz)) < 0) {
 	    fprintf(stderr, "%s: Cannot set timezone to \"%s\": %s\n",
-		pmGetProgname(), tz, pmErrStr(tzh));
+		pmProgname, tz, pmErrStr(tzh));
 	    exit(1);
 	}
 	printf("Note: timezone set to \"TZ=%s\"\n\n", tz);
@@ -163,7 +164,7 @@ Options\n\
 
     if (align != NULL && type != PM_CONTEXT_ARCHIVE) {
 	fprintf(stderr, "%s: -A option only supported for PCP archives, alignment request ignored\n",
-		pmGetProgname());
+		pmProgname);
 	align = NULL;
     }
 
@@ -172,7 +173,7 @@ Options\n\
 			    &endnum);
 
     if (sts < 0) {
-	fprintf(stderr, "%s: %s\n", pmGetProgname(), endnum);
+	fprintf(stderr, "%s: %s\n", pmProgname, endnum);
 	exit(1);
     }
 

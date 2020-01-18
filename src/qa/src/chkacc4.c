@@ -6,7 +6,7 @@
  */
 
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
 #if defined(HAVE_PWD_H)
 #include <pwd.h>
 #endif
@@ -104,14 +104,14 @@ main(int argc, char **argv)
     char		*name;
     size_t		size;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:u:g:?")) != EOF) {
 	switch (c) {
 	case 'D':	/* debug options */
 	    if ((sts = pmSetDebug(optarg)) < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -120,13 +120,13 @@ main(int argc, char **argv)
 	    gid = atoi(optarg);
 	    if ((grp = getgrgid(gid)) == NULL) {
 		fprintf(stderr, "%s: getgrgid: unknown group identifier (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 		break;
 	    }
 	    size = (ngroups + 1) * sizeof(*grp);
 	    if ((groups = realloc(groups, size)) == NULL)
-		pmNoMem("gid realloc", size, PM_FATAL_ERR);
+		__pmNoMem("gid realloc", size, PM_FATAL_ERR);
 	    groups[ngroups] = *grp;
 	    for (c = 0, name = grp->gr_mem[0]; name; c++, name++)
 		groups[ngroups].gr_mem[c] = strdup(name);
@@ -137,13 +137,13 @@ main(int argc, char **argv)
 	    uid = atoi(optarg);
 	    if ((usr = getpwuid(uid)) == NULL) {
 		fprintf(stderr, "%s: getpwuid: unknown user identifier (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 		break;
 	    }
 	    size = (nusers + 1) * sizeof(*usr);
 	    if ((users = realloc(users, size)) == NULL)
-		pmNoMem("uid realloc", size, PM_FATAL_ERR);
+		__pmNoMem("uid realloc", size, PM_FATAL_ERR);
 	    memset(&users[nusers], 0, sizeof(*usr));
 	    users[nusers].pw_name = strdup(usr->pw_name);
 	    users[nusers].pw_uid = usr->pw_uid;
@@ -166,7 +166,7 @@ Options:\n\
   -D debugspec   set debugging diagnostic options\n\
   -u uid         add numeric user ID to set used in testing\n\
   -g gid         add numeric group ID to set used in testing\n",
-                pmGetProgname());
+                pmProgname);
 	return 1;
     }
 

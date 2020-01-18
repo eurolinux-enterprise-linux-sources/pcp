@@ -1,4 +1,7 @@
 QA output created by 102
+Waiting for pmcd to terminate ...
+Starting pmcd ... 
+Starting pmlogger ... 
 Error [<stdin>, line NUM]
 Not connected to any pmlogger instance
 Error [<stdin>, line NUM]
@@ -302,7 +305,7 @@ sample.bin
     mand on  nl       1 hour [900 or "bin-900"]
 
 sample.drift
-    mand on  nl       1 hour
+    mand on           1 hour
 
 sample.seconds
     mand on  nl       1 hour
@@ -320,7 +323,7 @@ sample.bin
     mand on  nl       1 hour [900 or "bin-900"]
 
 sample.drift
-    mand on  nl       1 hour
+    mand on           1 hour
 
 sample.seconds
     mand on  nl       1 hour
@@ -368,3 +371,6 @@ pmlc> log mandatory maybe {
 ?     sample.drift, sample.seconds
 ? }
 pmlc> 
+Waiting for pmcd to terminate ...
+Starting pmcd ... 
+Starting pmlogger ... 

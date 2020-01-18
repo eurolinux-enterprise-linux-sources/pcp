@@ -8,10 +8,9 @@
 seq=`basename $0`
 echo "QA output created by $seq"
 
-. ./common.containers
+. ./common.docker
 
 _check_containers
-_check_docker_binary
 _check_docker_images busybox
 
 _cleanup()

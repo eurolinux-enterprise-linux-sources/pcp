@@ -14,7 +14,7 @@
 #include "showboundsdialog.h"
 #include <QMessageBox>
 #include <pcp/pmapi.h>
-#include <pcp/libpcp.h>
+#include <pcp/impl.h>
 #include "pmtime.h"
 
 ShowBounds::ShowBounds(QWidget* parent) : QDialog(parent)

@@ -14,7 +14,7 @@
 
 #include <stdarg.h>
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
@@ -72,7 +72,7 @@ promptformore(void)
 #ifdef HAVE_TERMIO_H
     if (first) {
 	if (ioctl(0, TCGETA, &otty) < 0) {
-	    fprintf(stderr, "%s: TCGETA ioctl failed: %s\n", pmGetProgname(),
+	    fprintf(stderr, "%s: TCGETA ioctl failed: %s\n", pmProgname,
 		    osstrerror());
 	    exit(1);
 	}
@@ -85,7 +85,7 @@ promptformore(void)
     ntty.c_cc[VTIME] = 1;
     ntty.c_lflag &= ~(ICANON | ECHO);
     if (ioctl(0, TCSETAW, &ntty) < 0) {
-	fprintf(stderr, "%s: TCSETAW ioctl failed: %s\n", pmGetProgname(),
+	fprintf(stderr, "%s: TCSETAW ioctl failed: %s\n", pmProgname,
 		osstrerror());
 	exit(1);
     }
@@ -128,7 +128,7 @@ promptformore(void)
 reset_tty:
 #ifdef HAVE_TERMIO_H
     if (ioctl(0, TCSETAW, &otty) < 0) {
-	fprintf(stderr, "%s: reset TCSETAW ioctl failed: %s\n", pmGetProgname(),
+	fprintf(stderr, "%s: reset TCSETAW ioctl failed: %s\n", pmProgname,
 		osstrerror());
 	exit(1);
     }
@@ -159,8 +159,7 @@ pprintf(char *format, ...)
     if (first == 1) {	/* first time thru */
 	first = 0;
 #ifdef TIOCGWINSZ
-	if (ioctl(0, TIOCGWINSZ, &geom) < 0)
-	    memset(&geom, 0, sizeof(geom));
+	ioctl(0, TIOCGWINSZ, &geom);
 	nrows = (geom.ws_row < MINROWS? MINROWS : geom.ws_row);
 	ncols = (geom.ws_col < MINCOLS? MINCOLS : geom.ws_col);
 #else
@@ -221,7 +220,7 @@ error(char *format, ...)
     }
     else {
 	f = stderr;
-	fprintf(f, "%s: error - ", pmGetProgname());
+	fprintf(f, "%s: error - ", pmProgname);
     }
     vfprintf(f, format, args);
     fprintf(f, "\n");

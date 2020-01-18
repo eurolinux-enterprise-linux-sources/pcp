@@ -5,7 +5,7 @@
  */
 
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
 
 int verbose;
 
@@ -326,14 +326,14 @@ main(int argc, char **argv)
     char	*namespace = PM_NS_DEFAULT;
     char	*metricname = (char *)0;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "a:D:h:K:Ln:v?")) != EOF) {
 	switch (c) {
 
 	case 'a':	/* archive name */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmProgname);
 		errflag++;
 	    }
 	    type = PM_CONTEXT_ARCHIVE;
@@ -345,14 +345,14 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
 
 	case 'h':	/* contact PMCD on this hostname */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmProgname);
 		errflag++;
 	    }
 	    host = optarg;
@@ -360,15 +360,15 @@ main(int argc, char **argv)
 	    break;
 
 	case 'K':	/* update local PMDA table */
-	    if ((errmsg = pmSpecLocalPMDA(optarg)) != NULL) {
-		fprintf(stderr, "%s: pmSpecLocalPMDA failed: %s\n", pmGetProgname(), errmsg);
+	    if ((errmsg = __pmSpecLocalPMDA(optarg)) != NULL) {
+		fprintf(stderr, "%s: __pmSpecLocalPMDA failed: %s\n", pmProgname, errmsg);
 		errflag++;
 	    }
 	    break;
 
 	case 'L':	/* local PMDA connection, no PMCD */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmProgname);
 		errflag++;
 	    }
 	    type = PM_CONTEXT_LOCAL;
@@ -409,19 +409,19 @@ main(int argc, char **argv)
 Options\n\
   -a archive	metrics source is an archive log\n\
   -D debug	standard PCP debug options\n\
-  -h host	metrics source is PMCD on host (default is local context)\n\
+  -h host	metrics source is PMCD on host (default is local libirixpmda)\n\
   -L            metrics source is local connection to PMDA, no PMCD\n\
   -K spec       optional additional PMDA spec for local connection\n\
                 spec is of the form op,domain,dso-path,init-routine\n\
   -n namespace  use an alternative PMNS\n\
   -v            verbose\n",
-		pmGetProgname());
+		pmProgname);
 	exit(1);
     }
 
     if (namespace != PM_NS_DEFAULT) {
 	if ((sts = pmLoadASCIINameSpace(namespace, 1)) < 0) {
-	    printf("%s: Cannot load namespace from \"%s\": %s\n", pmGetProgname(), namespace, pmErrStr(sts));
+	    printf("%s: Cannot load namespace from \"%s\": %s\n", pmProgname, namespace, pmErrStr(sts));
 	    exit(1);
 	}
     }
@@ -434,21 +434,21 @@ Options\n\
     if ((sts = pmNewContext(type, host)) < 0) {
 	if (type == PM_CONTEXT_HOST)
 	    fprintf(stderr, "%s: Cannot connect to PMCD on host \"%s\": %s\n",
-		pmGetProgname(), host, pmErrStr(sts));
+		pmProgname, host, pmErrStr(sts));
 	else if (type == PM_CONTEXT_LOCAL) {
 	    fprintf(stderr, "%s: pmNewContext failed for PM_CONTEXT_LOCAL: %s\n",
-		pmGetProgname(), pmErrStr(sts));
+		pmProgname, pmErrStr(sts));
 	}
 	else
 	    fprintf(stderr, "%s: Cannot open archive \"%s\": %s\n",
-		pmGetProgname(), host, pmErrStr(sts));
+		pmProgname, host, pmErrStr(sts));
 	exit(1);
     }
 
     if (type == PM_CONTEXT_ARCHIVE) {
 	if ((sts = pmGetArchiveLabel(&label)) < 0) {
 	    fprintf(stderr, "%s: Cannot get archive label record: %s\n",
-		pmGetProgname(), pmErrStr(sts));
+		pmProgname, pmErrStr(sts));
 	    exit(1);
 	}
     }

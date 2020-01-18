@@ -14,6 +14,7 @@
  * for more details.
  */
 #include <pmapi.h>
+#include <impl.h>
 #include <tdh.h>
 #include <tdhmsg.h>
 #include <evntrace.h>

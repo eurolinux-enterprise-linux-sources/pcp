@@ -7,6 +7,7 @@
  */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 #include <pcp/pmda.h>
 
 static pmUnits	iu = PMDA_PMUNITS( 0, 1, 1, 0, PM_TIME_SEC, 0 );
@@ -38,7 +39,7 @@ main(int argc, char **argv)
     int		l;
     int		underflow = 0;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:v")) != EOF) {
 	switch (c) {
@@ -47,7 +48,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -64,7 +65,7 @@ main(int argc, char **argv)
     }
 
     if (errflag) {
-	fprintf(stderr, "Usage: %s %s\n", pmGetProgname(), usage);
+	fprintf(stderr, "Usage: %s %s\n", pmProgname, usage);
 	exit(1);
     }
 
@@ -94,9 +95,9 @@ main(int argc, char **argv)
 		    else {
 			if (vflag) {
 			    u = pmUnitsStr(&iu);
-			    printf("%" FMT_INT64 " %s", iv.ll, *u == '\0' ? "none" : u);
+			    printf("%lld %s", (long long)iv.ll, *u == '\0' ? "none" : u);
 			    u = pmUnitsStr(&ou);
-			    printf(" -> %" FMT_INT64 " %s\n", ov.ll, *u == '\0' ? "none" : u);
+			    printf(" -> %lld %s\n", (long long)ov.ll, *u == '\0' ? "none" : u);
 			}
 			if ((sts = pmConvScale(PM_TYPE_64, &ov, &ou, &tv, &iu)) < 0) {
 			    printf("reconvert: %s\n", pmErrStr(sts));
@@ -107,11 +108,11 @@ main(int argc, char **argv)
 				    underflow++;
 				else {
 				    u = pmUnitsStr(&iu);
-				    printf("error?  %" FMT_INT64 " %s", iv.ll, *u == '\0' ? "none" : u);
+				    printf("error?  %lld %s", (long long)iv.ll, *u == '\0' ? "none" : u);
 				    u = pmUnitsStr(&ou);
-				    printf(" -> %" FMT_INT64 " %s", ov.ll, *u == '\0' ? "none" : u);
+				    printf(" -> %lld %s", (long long)ov.ll, *u == '\0' ? "none" : u);
 				    u = pmUnitsStr(&iu);
-				    printf(" -> %" FMT_INT64 " %s\n", tv.ll, *u == '\0' ? "none" : u);
+				    printf(" -> %lld %s\n", (long long)tv.ll, *u == '\0' ? "none" : u);
 				}
 			    }
 			}
@@ -148,9 +149,9 @@ main(int argc, char **argv)
 			else {
 			    if (vflag) {
 				u = pmUnitsStr(&iu);
-				printf("%" FMT_INT64 " %s", iv.ll, *u == '\0' ? "none" : u);
+				printf("%lld %s", (long long)iv.ll, *u == '\0' ? "none" : u);
 				u = pmUnitsStr(&ou);
-				printf(" -> %" FMT_INT64 " %s\n", ov.ll, *u == '\0' ? "none" : u);
+				printf(" -> %lld %s\n", (long long)ov.ll, *u == '\0' ? "none" : u);
 			    }
 			    if ((sts = pmConvScale(PM_TYPE_64, &ov, &ou, &tv, &iu)) < 0) {
 				printf("reconvert: %s\n", pmErrStr(sts));
@@ -161,11 +162,11 @@ main(int argc, char **argv)
 					underflow++;
 				    else {
 					u = pmUnitsStr(&iu);
-					printf("error?  %" FMT_INT64 " %s", iv.ll, *u == '\0' ? "none" : u);
+					printf("error?  %lld %s", (long long)iv.ll, *u == '\0' ? "none" : u);
 					u = pmUnitsStr(&ou);
-					printf(" -> %" FMT_INT64 " %s", ov.ll, *u == '\0' ? "none" : u);
+					printf(" -> %lld %s", (long long)ov.ll, *u == '\0' ? "none" : u);
 					u = pmUnitsStr(&iu);
-					printf(" -> %" FMT_INT64 " %s\n", tv.ll, *u == '\0' ? "none" : u);
+					printf(" -> %lld %s\n", (long long)tv.ll, *u == '\0' ? "none" : u);
 				    }
 				}
 			    }

@@ -207,7 +207,7 @@ inFile(char *name)
 	f = stdin;
     else {
 	if ((f = fopen(name, "r")) == NULL) {
-	    fprintf(stderr, "%s: cannot open config file %s\n", pmGetProgname(), name);
+	    fprintf(stderr, "%s: cannot open config file %s\n", pmProgname, name);
 	    free(t);
 	    return 0;
 	}

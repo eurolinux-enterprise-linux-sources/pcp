@@ -13,7 +13,7 @@
 # 
 use strict;
 
-package PCP::TimeSource;
+package TimeSource;
 
 use Time::HiRes; qw(time);
 

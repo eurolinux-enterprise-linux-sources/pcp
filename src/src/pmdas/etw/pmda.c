@@ -329,17 +329,18 @@ static pmdaMetric metrictab[] = {
 static int
 etw_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 {
+    __pmID_int *idp = (__pmID_int *)&(mdesc->m_desc.pmid);
     etw_event_t	*etw;
     int		sts = PMDA_FETCH_STATIC;
 
-    pmNotifyErr(LOG_WARNING, "called %s, mdesc=%p", __FUNCTION__, mdesc);
+    __pmNotifyErr(LOG_WARNING, "called %s, mdesc=%p", __FUNCTION__, mdesc);
 
-    switch (pmID_cluster(mdesc->m_desc.pmid)) {
+    switch (idp->cluster) {
     case CLUSTER_KERNEL_PROCESS:
 	if ((etw = ((mdesc != NULL) ? mdesc->m_user : NULL)) == NULL)
 	    return PM_ERR_PMID;
 
-	switch (pmID_item(mdesc->m_desc.pmid)) {
+	switch (idp->item) {
 	    case 0:		/* etw.kernel.process.start.count */
 	    case 20:		/* etw.kernel.process.exit.count */
 	    case 50:		/* etw.kernel.thread.start.count */
@@ -382,7 +383,7 @@ etw_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	break;
 
     case CLUSTER_CONFIGURATION:
-	switch (pmID_item(mdesc->m_desc.pmid)) {
+	switch (idp->item) {
 	    case 0:			/* etw.numclients */
 		sts = pmdaEventClients(atom);
 		break;
@@ -399,7 +400,7 @@ etw_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 }
 
 static int
-etw_profile(pmProfile *prof, pmdaExt *pmda)
+etw_profile(__pmProfile *prof, pmdaExt *pmda)
 {
     pmdaEventNewClient(pmda->e_context);
     return 0;
@@ -408,7 +409,7 @@ etw_profile(pmProfile *prof, pmdaExt *pmda)
 static int
 etw_fetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *pmda)
 {
-    pmNotifyErr(LOG_WARNING, "called %s", __FUNCTION__);
+    __pmNotifyErr(LOG_WARNING, "called %s", __FUNCTION__);
     pmdaEventNewClient(pmda->e_context);
     return pmdaFetch(numpmid, pmidlist, resp, pmda);
 }
@@ -423,7 +424,7 @@ etw_store(pmResult *result, pmdaExt *pmda)
 static void
 etw_end_contextCallBack(int context)
 {
-    pmNotifyErr(LOG_WARNING, "called %s", __FUNCTION__);
+    __pmNotifyErr(LOG_WARNING, "called %s", __FUNCTION__);
     pmdaEventEndClient(context);
 }
 
@@ -471,10 +472,10 @@ event_table_init(void)
 	etw_event_t *e = &eventtab[i];
 
 	if (!mutex) {
-	    pmNotifyErr(LOG_WARNING, "failed to create mutex for event %s",
+	    __pmNotifyErr(LOG_WARNING, "failed to create mutex for event %s",
 				    e->pmnsname);
 	} else if ((id = pmdaEventNewQueue(e->pmnsname, DEFAULT_MAXMEM)) < 0) {
-	    pmNotifyErr(LOG_WARNING, "failed to create queue for event %s",
+	    __pmNotifyErr(LOG_WARNING, "failed to create queue for event %s",
 				    e->pmnsname);
 	} else {
 	    e->queueid = id;
@@ -488,7 +489,7 @@ void
 etw_init(pmdaInterface *dp, const char *configfile)
 {
     char	helppath[MAXPATHLEN];
-    int		sep = pmPathSeparator();
+    int		sep = __pmPathSeparator();
 
     pmsprintf(helppath, sizeof(helppath), "%s%c" "etw" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);

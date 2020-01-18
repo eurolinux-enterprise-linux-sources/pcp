@@ -14,7 +14,7 @@
 
 #include <ctype.h>
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 
 static int stomp_connect(const char *hostname, int port);
 static void stomp_disconnect(void);
@@ -128,10 +128,10 @@ static int stomp_read_ack(void)
     nready = select(fd + 1, &readyfds, NULL, NULL, &tv);
     if (nready <= 0) {
 	if (nready == 0)
-	    pmNotifyErr(LOG_ERR, "Timed out waiting for server %s:%d - %s",
+	    __pmNotifyErr(LOG_ERR, "Timed out waiting for server %s:%d - %s",
 				hostname, port, netstrerror());
 	else
-	    pmNotifyErr(LOG_ERR, "Error waiting for server %s:%d - %s",
+	    __pmNotifyErr(LOG_ERR, "Error waiting for server %s:%d - %s",
 				hostname, port, netstrerror());
 	stomp_disconnect();
 	return -1;
@@ -140,7 +140,7 @@ static int stomp_read_ack(void)
     do {
 	sts = recv(fd, buffer, sizeof(buffer), 0);
 	if (sts < 0) {
-	    pmNotifyErr(LOG_ERR, "Error recving from server %s:%d - %s",
+	    __pmNotifyErr(LOG_ERR, "Error recving from server %s:%d - %s",
 				hostname, port, netstrerror());
 	    stomp_disconnect();
 	    return -1;
@@ -160,7 +160,7 @@ static int stomp_write(const char *buffer, int length)
     do {
 	sts = send(fd, buffer, length, 0);
 	if (sts < 0) {
-	    pmNotifyErr(LOG_ERR, "Write error to JMS server %s:%d - %s",
+	    __pmNotifyErr(LOG_ERR, "Write error to JMS server %s:%d - %s",
 			hostname, port, netstrerror());
 	    stomp_disconnect();
 	    return -1;
@@ -246,18 +246,18 @@ static char *isspace_terminate(char *string)
  */
 static void stomp_parse(void)
 {
-    char config[MAXPATHLEN];
+    char config[MAXPATHLEN+1];
     FILE *f;
-    int sep = pmPathSeparator();
+    int sep = __pmPathSeparator();
 
     if (stompfile)
-	pmsprintf(config, sizeof(config), "%s", stompfile);
+	strncat(config, stompfile, sizeof(config)-1);
     else
 	pmsprintf(config, sizeof(config),
 		"%s%c" "config" "%c" "pmie" "%c" "stomp",
 		 pmGetConfig("PCP_VAR_DIR"), sep, sep, sep);
     if ((f = fopen(config, "r")) == NULL) {
-	pmNotifyErr(LOG_ERR, "Cannot open STOMP configuration file %s: %s",
+	__pmNotifyErr(LOG_ERR, "Cannot open STOMP configuration file %s: %s",
 			config, osstrerror());
 	exit(1);
     }
@@ -284,13 +284,13 @@ static void stomp_parse(void)
     fclose(f);
 
     if (!hostname)
-	pmNotifyErr(LOG_ERR, "No host in STOMP config file %s", config);
+	__pmNotifyErr(LOG_ERR, "No host in STOMP config file %s", config);
     if (port == -1)
-	pmNotifyErr(LOG_ERR, "No port in STOMP config file %s", config);
+	__pmNotifyErr(LOG_ERR, "No port in STOMP config file %s", config);
     if (!username)
-	pmNotifyErr(LOG_ERR, "No username in STOMP config file %s", config);
+	__pmNotifyErr(LOG_ERR, "No username in STOMP config file %s", config);
     if (!passcode)
-	pmNotifyErr(LOG_ERR, "No passcode in STOMP config file %s", config);
+	__pmNotifyErr(LOG_ERR, "No passcode in STOMP config file %s", config);
     if (port == -1 || !hostname || !username || !passcode)
 	exit(1);
 }
@@ -320,48 +320,48 @@ void stompInit(void)
     }
 
     if (verbose)
-	pmNotifyErr(LOG_INFO, "Connecting to %s, port %d", hostname, port);
+	__pmNotifyErr(LOG_INFO, "Connecting to %s, port %d", hostname, port);
     if (stomp_connect(hostname, port) < 0) {
-	pmNotifyErr(LOG_ERR, "Could not connect to the message server");
+	__pmNotifyErr(LOG_ERR, "Could not connect to the message server");
 	goto disconnect;
     }
 
     if (verbose)
-	pmNotifyErr(LOG_INFO, "Connected; sending stomp connect message");
+	__pmNotifyErr(LOG_INFO, "Connected; sending stomp connect message");
     if (stomp_authenticate() < 0) {
-	pmNotifyErr(LOG_ERR, "Could not sent STOMP CONNECT frame to server");
+	__pmNotifyErr(LOG_ERR, "Could not sent STOMP CONNECT frame to server");
 	goto disconnect;
     }
 
     if (verbose)
-	pmNotifyErr(LOG_INFO, "Sent; waiting for server ACK");
+	__pmNotifyErr(LOG_INFO, "Sent; waiting for server ACK");
     if (stomp_read_ack() < 0) {
-	pmNotifyErr(LOG_ERR, "Could not read STOMP ACK frame.");
+	__pmNotifyErr(LOG_ERR, "Could not read STOMP ACK frame.");
 	goto disconnect;
     }
 
     if (verbose)
-	pmNotifyErr(LOG_INFO, "ACK; sending initial PMIE topic and hello");
+	__pmNotifyErr(LOG_INFO, "ACK; sending initial PMIE topic and hello");
     if (stomp_destination() < 0) {
-	pmNotifyErr(LOG_ERR, "Could not read TOPIC frame.");
+	__pmNotifyErr(LOG_ERR, "Could not read TOPIC frame.");
 	goto disconnect;
     }
     if (stomp_hello() < 0) {
-	pmNotifyErr(LOG_ERR, "Could not send HELLO frame.");
+	__pmNotifyErr(LOG_ERR, "Could not send HELLO frame.");
 	goto disconnect;
     }
 
     if (verbose)
-	pmNotifyErr(LOG_INFO, "Sent; waiting for server ACK");
+	__pmNotifyErr(LOG_INFO, "Sent; waiting for server ACK");
     if (stomp_read_ack() < 0) {
-	 pmNotifyErr(LOG_ERR, "Could not read STOMP ACK frame");
+	 __pmNotifyErr(LOG_ERR, "Could not read STOMP ACK frame");
 	goto disconnect;
     }
 
     if (!firsttime)
-	pmNotifyErr(LOG_INFO, "Reconnected to STOMP protocol server");
+	__pmNotifyErr(LOG_INFO, "Reconnected to STOMP protocol server");
     else if (verbose)
-	pmNotifyErr(LOG_INFO, "Initial STOMP protocol setup complete");
+	__pmNotifyErr(LOG_INFO, "Initial STOMP protocol setup complete");
     firsttime = 0;
     goto finished;
 

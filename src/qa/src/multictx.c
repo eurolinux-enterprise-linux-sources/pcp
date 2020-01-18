@@ -24,7 +24,7 @@
  */
 
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
 #include <string.h>
 
 typedef struct {
@@ -86,7 +86,7 @@ main(int argc, char **argv)
     char	**namelist;
 
     /* trim cmd name of leading directory components */
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "a:D:h:Ls:?")) != EOF) {
 	switch (c) {
@@ -94,9 +94,9 @@ main(int argc, char **argv)
 	case 'a':	/* archive name */
 	    if (type != 0) {
 #ifdef BUILD_STANDALONE
-		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmProgname);
 #else
-		fprintf(stderr, "%s: at most one of -a and -h allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a and -h allowed\n", pmProgname);
 #endif
 		errflag++;
 	    }
@@ -108,7 +108,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -116,9 +116,9 @@ main(int argc, char **argv)
 	case 'h':	/* contact PMCD on this hostname */
 	    if (type != 0) {
 #ifdef BUILD_STANDALONE
-		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmProgname);
 #else
-		fprintf(stderr, "%s: at most one of -a and -h allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a and -h allowed\n", pmProgname);
 #endif
 		errflag++;
 	    }
@@ -129,7 +129,7 @@ main(int argc, char **argv)
 #ifdef BUILD_STANDALONE
 	case 'L':	/* LOCAL, no PMCD */
 	    if (type != 0) {
-		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h, -L and -U allowed\n", pmProgname);
 		errflag++;
 	    }
 	    host = NULL;
@@ -142,7 +142,7 @@ main(int argc, char **argv)
 	case 's':	/* sample count */
 	    samples = (int)strtol(optarg, &endnum, 10);
 	    if (*endnum != '\0' || samples < 0) {
-		fprintf(stderr, "%s: -s requires numeric argument\n", pmGetProgname());
+		fprintf(stderr, "%s: -s requires numeric argument\n", pmProgname);
 		errflag++;
 	    }
 	    break;
@@ -169,7 +169,7 @@ Options:\n\
 "  -L             use local context instead of PMCD\n"
 #endif
 "  -s samples     terminate after this many samples [default 10]\n",
-                pmGetProgname());
+                pmProgname);
         exit(1);
     }
 
@@ -182,7 +182,7 @@ Options:\n\
 
     ctl = (ctl_t *)malloc(numctl * sizeof(ctl[0]));
     if (ctl == NULL) {
-	pmNoMem("ctl", numctl*sizeof(ctl[0]), PM_FATAL_ERR);
+	__pmNoMem("ctl", numctl*sizeof(ctl[0]), PM_FATAL_ERR);
 	/* NOTREACHED */
     }
 
@@ -193,10 +193,10 @@ Options:\n\
 	if ((sts = pmNewContext(type, host)) < 0) {
 	    if (type == PM_CONTEXT_HOST)
 		fprintf(stderr, "%s: Cannot connect to PMCD on host \"%s\": %s\n",
-		    pmGetProgname(), host, pmErrStr(sts));
+		    pmProgname, host, pmErrStr(sts));
 	    else
 		fprintf(stderr, "%s: Cannot open archive \"%s\": %s\n",
-		    pmGetProgname(), host, pmErrStr(sts));
+		    pmProgname, host, pmErrStr(sts));
 	    exit(1);
 	}
 	ctl[i].ctx = sts;

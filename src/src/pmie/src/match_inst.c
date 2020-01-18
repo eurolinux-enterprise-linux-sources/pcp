@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <regex.h>
 #include "pmapi.h"	/* _pmCtime only */
+#include "impl.h"	/* _pmCtime only */
 #include "dstruct.h"
 #include "fun.h"
 #include "show.h"

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014,2017 Red Hat.
+ * Copyright (c) 2012-2014 Red Hat.
  * Copyright (c) 1995-2002 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -84,7 +84,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(opts.optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug flag specification (%s)\n",
-		    pmGetProgname(), opts.optarg);
+		    pmProgname, opts.optarg);
 		opts.errors++;
 	    }
 	    break;
@@ -109,7 +109,7 @@ main(int argc, char **argv)
 	    sts = (int)strtol(opts.optarg, &endnum, 10);
 	    if (*endnum != '\0' || sts <= 0.0) {
 		pmprintf("%s: -q requires a positive numeric argument\n",
-			pmGetProgname());
+			pmProgname);
 		opts.errors++;
 	    } else {
 		_creds_timeout = sts;
@@ -117,7 +117,7 @@ main(int argc, char **argv)
 	    break;
 
 	case 'U':		/* run under alternate user account */
-	    pmSetProcessIdentity(opts.optarg);
+	    __pmSetProcessIdentity(opts.optarg);
 	    break;
 
 	default:
@@ -134,14 +134,14 @@ main(int argc, char **argv)
 	    /* pid was specified */
 	    if (primary) {
 		pmprintf("%s: you may not specify both -P and a pid\n",
-			pmGetProgname());
+			pmProgname);
 		opts.errors++;
 	    }
 	    else {
 		pid = (int)strtol(argv[opts.optind], &endnum, 10);
 		if (*endnum != '\0') {
 		    pmprintf("%s: pid must be a numeric process id\n",
-			    pmGetProgname());
+			    pmProgname);
 		    opts.errors++;
 		}
 	    }
@@ -156,14 +156,14 @@ main(int argc, char **argv)
     if (pmnsfile == PM_NS_DEFAULT) {
 	if ((sts = pmLoadNameSpace(pmnsfile)) < 0) {
 		fprintf(stderr, "%s: Cannot load default namespace: %s\n",
-			pmGetProgname(), pmErrStr(sts));
+			pmProgname, pmErrStr(sts));
 	    exit(1);
 	}
     }
     else {
 	if ((sts = pmLoadASCIINameSpace(pmnsfile, 1)) < 0) {
 		fprintf(stderr, "%s: Cannot load namespace from \"%s\": %s\n",
-			pmGetProgname(), pmnsfile, pmErrStr(sts));
+			pmProgname, pmnsfile, pmErrStr(sts));
 	    exit(1);
 	}
     }
@@ -308,56 +308,39 @@ main(int argc, char **argv)
 		    break;
 		}
 		break;
-
-	    case LABEL:
-		switch (connmode) {
-		    case CONN_DSO:
-			dodso(PDU_LABEL_REQ);
-			break;
-
-		    case CONN_DAEMON:
-			dopmda(PDU_LABEL_REQ);
-			break;
-
-		    case NO_CONN:
-			yywarn("No PMDA currently opened");
-			break;
-		}
-		break;
-
 	    case NAMESPACE:
 		if (cmd_namespace != NULL)
 		    free(cmd_namespace);
 		cmd_namespace = strdup(param.name);
 		if (cmd_namespace == NULL) {
 		    fprintf(stderr, "%s: No memory for new namespace\n",
-			    pmGetProgname());
+			    pmProgname);
 		    exit(1);
 		}
 		pmUnloadNameSpace();
 		if ((sts = pmLoadASCIINameSpace(cmd_namespace, 1)) < 0) {
 		    fprintf(stderr, "%s: Cannot load namespace from \"%s\": %s\n",
-			    pmGetProgname(), cmd_namespace, pmErrStr(sts));
+			    pmProgname, cmd_namespace, pmErrStr(sts));
 
 		    pmUnloadNameSpace();
 		    if (pmnsfile == PM_NS_DEFAULT) {
 			fprintf(stderr, "%s: Reload default namespace\n",
-				pmGetProgname());
+				pmProgname);
 			if ((sts = pmLoadNameSpace(pmnsfile)) < 0) {
 			    fprintf(stderr,
 				    "%s: Cannot load default namespace: %s\n",
-				    pmGetProgname(), pmErrStr(sts));
+				    pmProgname, pmErrStr(sts));
 			    exit(1);
 			}
 		    }
 		    else {
 			fprintf(stderr, "%s: Reload namespace from \"%s\"\n",
-				pmGetProgname(), pmnsfile);
+				pmProgname, pmnsfile);
 			if ((sts = pmLoadASCIINameSpace(pmnsfile, 1)) < 0) {
 			    fprintf(stderr,
 				    "%s: Cannot load namespace from \"%s\""
 				    ": %s\n",
-				    pmGetProgname(), pmnsfile, pmErrStr(sts));
+				    pmProgname, pmnsfile, pmErrStr(sts));
 			    exit(1);
 			}
 		    }

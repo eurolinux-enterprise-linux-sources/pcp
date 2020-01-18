@@ -23,8 +23,6 @@ TESTCODE  = test.pl cvalue.c
 PERLDOCS  = Changes MANIFEST
 LSRCFILES = Makefile.PL $(PERLDOCS) $(PERLMOD) $(INTERFACE) $(TESTCODE)
 
-LLDLIBS	= -lpcp
-
 LPKGDIRT = PCP-PMDA-*.tar.gz MYMETA.yml MYMETA.json
 LDIRDIRT = PCP-PMDA-*
 LDIRT = Makefile COPYING PMDA.bs PMDA.c PMDA.o cvalue pm_to_blib blib \
@@ -35,7 +33,11 @@ default: dist
 MAKEMAKER_OPTIONS = INSTALLDIRS=$(PERL_INSTALLDIRS) INSTALLVENDORMAN3DIR=$(PCP_MAN_DIR)/man3
 INSTALLER_OPTIONS = DESTDIR=$$DIST_ROOT
 
+ifeq ($(TARGET_OS),mingw)
+PERLMAKE = dmake.exe
+else
 PERLMAKE = $(MAKE)
+endif
 
 PMDA.o: Makefile PMDA.xs
 	$(PERLMAKE) -f Makefile
@@ -68,4 +70,3 @@ default_pcp: default
 
 install_pcp: install
 
-local.o PMDA.o:	$(TOPDIR)/src/include/pcp/libpcp.h

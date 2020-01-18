@@ -11,7 +11,6 @@ children of "pmcd" ...
     control             <s = 1>
     cputime             <s = 1>
     datasize            <s = 0>
-    labels              <s = 0>
     numagents           <s = 0>
     numclients          <s = 0>
     openfds             <s = 0>
@@ -74,7 +73,6 @@ children of "" ...
     mem                 <s = 1>
     network             <s = 1>
     pmcd                <s = 1>
-    pmda                <s = 1>
     sample              <s = 1>
     sampledso           <s = 1>
     swap                <s = 1>

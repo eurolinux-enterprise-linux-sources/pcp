@@ -55,23 +55,13 @@ int
 main(int argc, char **argv)
 {
     int		i;
-    int		sts;
     pthread_t p[3];
 
     prog = argv[0];
 
-    if ((sts = pthread_create(p,   NULL, pio_sucker, NULL)) != 0) {
-	fprintf(stderr, "%s: pio_sucker pthread_create failed: %s\n", prog, strerror(sts));
-	exit(1);
-    }
-    if ((sts = pthread_create(p+1,   NULL, pcpu_sucker, NULL)) != 0) {
-	fprintf(stderr, "%s: pcpu_sucker pthread_create failed: %s\n", prog, strerror(sts));
-	exit(1);
-    }
-    if ((sts = pthread_create(p+2,   NULL, ptime_sucker, NULL)) != 0) {
-	fprintf(stderr, "%s: ptime_sucker pthread_create failed: %s\n", prog, strerror(sts));
-	exit(1);
-    }
+    pthread_create(p,   NULL, pio_sucker, NULL);
+    pthread_create(p+1, NULL, pcpu_sucker, NULL);
+    pthread_create(p+2, NULL, ptime_sucker, NULL);
 
     for (i=0; i < 3; i++) {
 	wait(NULL);

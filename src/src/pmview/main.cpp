@@ -27,10 +27,13 @@
 #include "viewobj.h"
 #include "main.h"
 
+#include <sys/stat.h>
+#include <iostream>
+using namespace std;
+
 int Cflag;
 int Lflag;
 int Wflag;
-int somedebug;
 char *outgeometry;
 Settings globalSettings;
 
@@ -44,7 +47,6 @@ SceneGroup *archiveGroup;	// one metrics class group for all archives
 SceneGroup *activeGroup;	// currently active metric fetchgroup
 QedTimeControl *pmtime;		// one timecontrol class for pmtime
 PmView *pmview;
-QTextStream cerr(stderr);
 
 static const char *options = "A:a:Cc:D:g:h:Ln:O:p:S:T:t:VzZ:?";
 
@@ -68,7 +70,7 @@ static void usage(void)
 "  -V            display pmview version number and exit\n"
 "  -Z timezone   set reporting timezone\n"
 "  -z            set reporting timezone to local time of metrics source\n",
-	pmGetProgname(), (int)PmView::defaultViewDelta());
+	pmProgname, (int)PmView::defaultViewDelta());
     pmflush();
     exit(1);
 }
@@ -79,11 +81,11 @@ int warningMsg(const char *file, int line, const char *msg, ...)
     va_list arg;
     va_start(arg, msg);
 
-    int pos = pmsprintf(theBuffer, theBufferLen, "%s: Warning: ", pmGetProgname());
+    int pos = pmsprintf(theBuffer, theBufferLen, "%s: Warning: ", pmProgname);
     pos += vsnprintf(theBuffer + pos, theBufferLen - pos, msg, arg);
     pmsprintf(theBuffer + pos, theBufferLen - pos, "\n");
 
-    if (somedebug) {
+    if (pmDebug) {
 	QTextStream cerr(stderr);
 	cerr << file << ":" << line << ": " << theBuffer << endl;
     }
@@ -94,11 +96,53 @@ int warningMsg(const char *file, int line, const char *msg, ...)
     return sts;
 }
 
+double QmcTime::secondsToUnits(double value, QmcTime::DeltaUnits units)
+{
+    switch (units) {
+    case Milliseconds:
+	value = value * 1000.0;
+	break;
+    case Minutes:
+	value = value / 60.0;
+	break;
+    case Hours:
+	value = value / (60.0 * 60.0);
+	break;
+    case Days:
+	value = value / (60.0 * 60.0 * 24.0);
+	break;
+    case Weeks:
+	value = value / (60.0 * 60.0 * 24.0 * 7.0);
+	break;
+    case Seconds:
+    default:
+	break;
+    }
+    return value;
+}
+
+double QmcTime::deltaValue(QString delta, QmcTime::DeltaUnits units)
+{
+    return QmcTime::secondsToUnits(delta.trimmed().toDouble(), units);
+}
+
+QString QmcTime::deltaString(double value, QmcTime::DeltaUnits units)
+{
+    QString delta;
+
+    value = QmcTime::secondsToUnits(value, units);
+    if ((double)(int)value == value)
+	delta.sprintf("%.2f", value);
+    else
+	delta.sprintf("%.6f", value);
+    return delta;
+}
+
 void writeSettings(void)
 {
     QSettings userSettings;
 
-    userSettings.beginGroup(pmGetProgname());
+    userSettings.beginGroup(pmProgname);
     if (globalSettings.viewDeltaModified) {
 	globalSettings.viewDeltaModified = false;
 	userSettings.setValue("viewDelta", globalSettings.viewDelta);
@@ -145,7 +189,7 @@ void writeSettings(void)
 void readSettings(void)
 {
     QSettings userSettings;
-    userSettings.beginGroup(pmGetProgname());
+    userSettings.beginGroup(pmProgname);
 
     //
     // Parameters related to sampling
@@ -209,7 +253,7 @@ genInventor(void)
 	if (!(yyin = fopen(configfile, "r"))) {
 	    pmprintf(
 		"%s: Error: Unable to open configuration file \"%s\": %s\n",
-		pmGetProgname(), configfile, strerror(errno));
+		pmProgname, configfile, strerror(errno));
 	    return -1;
 	}
 	theAltConfigName = theConfigName;
@@ -238,8 +282,8 @@ genInventor(void)
 fail:
             pmprintf("%s: Warning: Unable to save configuration for "
 		     "recording to \"%s\": %s\n",
-		    pmGetProgname(), configfile, strerror(errno));
-	else if (pmDebugOptions.appl0)
+		    pmProgname, configfile, strerror(errno));
+	else if (pmDebug & DBG_TRACE_APPL0)
 	    cerr << "genInventor: Copy of configuration saved to "
 		 << configfile << endl;
 
@@ -251,8 +295,8 @@ fail:
     if (theAltConfig)
 	fclose(theAltConfig);
 
-    if (pmDebugOptions.appl0) {
-	cerr << pmGetProgname() << ": " << errorCount << " errors detected in "
+    if (pmDebug & DBG_TRACE_APPL0) {
+	cerr << pmProgname << ": " << errorCount << " errors detected in "
 	     << theConfigName << endl;
     }
 
@@ -267,9 +311,9 @@ fail:
 				   rootObj->depth() / -2.0);
 	sep->addChild(tran);
 
-	if (pmDebugOptions.appl0 ||
-	    pmDebugOptions.appl1 ||
-	    pmDebugOptions.appl2) {
+	if (pmDebug & DBG_TRACE_APPL0 ||
+	    pmDebug & DBG_TRACE_APPL1 ||
+	    pmDebug & DBG_TRACE_APPL2) {
 	    SoBaseColor *col = new SoBaseColor;
 	    col->rgb.setValue(1.0, 0.0, 0.0);
 	    sep->addChild(col);
@@ -287,12 +331,12 @@ fail:
     if ((ViewObj::numModObjects() == 0 || theModList->size() == 0) && 
 	 elementalNodeList.getLength() == 0) {
 	pmprintf("%s: No valid modulated objects in the scene\n",
-		 pmGetProgname());
+		 pmProgname);
 	sts--;
     }
     else if (sts < 0) {
 	pmprintf("%s: Unrecoverable errors in the configuration file %s\n",
-	    pmGetProgname(), (const char *)theConfigName.toLatin1());
+	    pmProgname, (const char *)theConfigName.toLatin1());
     }
 
     return sts;
@@ -316,16 +360,6 @@ main(int argc, char **argv)
 
 	case 'C':
 	    Cflag++;
-	    break;
-
-	case 'D':
-	    somedebug = 1;
-	    sts = pmSetDebug(optarg);
-	    if (sts < 0) {
-		pmprintf("%s: Warning: unrecognized debug options (%s) ignored\n",
-			    pmGetProgname(), optarg);
-		pmflush();
-	    }
 	    break;
 
 	case 'g':
@@ -357,7 +391,7 @@ main(int argc, char **argv)
 	usage();
 
     if (a.my.pmnsfile && (sts = pmLoadNameSpace(a.my.pmnsfile)) < 0) {
-	pmprintf("%s: %s\n", pmGetProgname(), pmErrStr(sts));
+	pmprintf("%s: %s\n", pmProgname, pmErrStr(sts));
 	pmflush();
 	exit(1);
     }
@@ -381,11 +415,6 @@ main(int argc, char **argv)
     console->post("Metric group setup complete (%d hosts, %d archives)",
 			a.my.hosts.size(), a.my.archives.size());
 
-    if (a.my.delta.tv_sec == 0 && a.my.delta.tv_usec == 0) {
-	/* no -t on command line, so set default delta */
-	a.my.delta.tv_sec = PmView::defaultViewDelta();
-    }
-
     if (a.my.zflag) {
 	if (a.my.archives.size() > 0)
 	    archiveGroup->useTZ();
@@ -399,7 +428,7 @@ main(int argc, char **argv)
 	    liveGroup->useTZ(QString(a.my.tz));
 	if ((sts = pmNewZone(a.my.tz)) < 0) {
 	    pmprintf("%s: cannot set timezone to \"%s\": %s\n",
-		    pmGetProgname(), (char *)a.my.tz, pmErrStr(sts));
+		    pmProgname, (char *)a.my.tz, pmErrStr(sts));
 	    pmflush();
 	    exit(1);
 	}

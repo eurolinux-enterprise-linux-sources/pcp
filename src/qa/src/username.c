@@ -3,18 +3,19 @@
  */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 #include <unistd.h>
 
 #include "localconfig.h"
 
 #if PCP_VER < 3611
-#define pmSetProcessIdentity(x) (exit(1), 1)
+#define __pmSetProcessIdentity(x) (exit(1), 1)
 #endif
 
 static void
 usage (void)
 {
-    fprintf(stderr, "Usage %s: username\n", pmGetProgname());
+    fprintf(stderr, "Usage %s: username\n", pmProgname);
     exit(1);
 }
 
@@ -23,18 +24,10 @@ main(int argc, char* argv[])
 {
     int sts;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
     if (argc != 2)
 	usage();
-    sts = pmSetProcessIdentity(argv[1]);
-#ifndef IS_MINGW
+    sts = __pmSetProcessIdentity(argv[1]);
     pause();
-#else
-    /*
-     * punt ... looks like a signal will get us back from here
-     * (at least it works in one test case with SIGINT)
-     */
-    SleepEx(INFINITE, TRUE);
-#endif
     return sts;
 }

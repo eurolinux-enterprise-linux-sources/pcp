@@ -273,7 +273,7 @@ QmcIndom::genProfile()
 
     if (pmDebugOptions.pmc || pmDebugOptions.indom || pmDebugOptions.profile) {
 	QTextStream cerr(stderr);
-	cerr << "QmcIndom::genProfile: indom = " << pmInDomStr(my.id) << ", count = " 
+	cerr << "QmcIndom::genProfile: id = " << my.id << ", count = " 
 	     << my.count << ", numInsts = " << numInsts() << ", active = "
 	     << my.numActive << ", activeRef = " << my.numActiveRef
 	     << ": " << action << " ptr = " << ptr;
@@ -305,8 +305,8 @@ QmcIndom::dump(QTextStream &os) const
 int
 QmcIndom::update()
 {
-    int *instList = NULL;
-    char **nameList = NULL;
+    int *instList;
+    char **nameList;
     int i, j, count;
     int oldLen = my.instances.size();
     uint oldNullCount = my.nullCount;
@@ -448,6 +448,9 @@ QmcIndom::update()
 	    }
 	}
 
+	free(instList);
+	free(nameList);
+
 	if (pmDebugOptions.indom) {
 	    QTextStream cerr(stderr);
 	    if (my.instances.size() == oldLen && my.nullCount == oldNullCount)
@@ -473,11 +476,6 @@ QmcIndom::update()
 		     << pmErrStr(sts) << endl;
 	}
     }
-
-    if (instList)
-	free(instList);
-    if (nameList)
-	free(nameList);
 
     return sts;
 }

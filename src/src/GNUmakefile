@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2012-2018 Red Hat.
+# Copyright (c) 2012-2016 Red Hat.
 # Copyright (c) 2000,2004,2012 Silicon Graphics, Inc.  All Rights Reserved.
 # 
 # This program is free software; you can redistribute it and/or modify it
@@ -19,7 +19,7 @@ include $(TOPDIR)/src/include/builddefs
 
 INCLUDE_SUBDIR = include
 PMNS_SUBDIR = pmns
-LIBPCP_SUBDIR = libpcp libpcp_static
+LIBPCP_SUBDIR = libpcp
 LIBS_SUBDIRS = \
 	libpcp_pmda \
 	libpcp_trace \
@@ -46,7 +46,6 @@ OTHER_SUBDIRS = \
 	pcp2graphite \
 	pcp2influxdb \
 	pcp2json \
-	pcp2spark \
 	pcp2xlsx \
 	pcp2xml \
 	pcp2zabbix \
@@ -70,7 +69,6 @@ OTHER_SUBDIRS = \
 	pmie \
 	pmieconf \
 	pmiestatus \
-	pmjson \
 	pmlc \
 	pmlock \
 	pmlogextract \
@@ -79,7 +77,6 @@ OTHER_SUBDIRS = \
 	pmlogconf \
 	pmloglabel \
 	pmlogrewrite \
-	pmlogsize \
 	pmlogsummary \
 	pmlogcheck \
 	pmmgr \
@@ -87,7 +84,6 @@ OTHER_SUBDIRS = \
 	pmproxy \
 	pmquery \
 	pmrep \
-	pmseries \
 	pmstat \
 	pmstore \
 	pmsocks \
@@ -98,7 +94,7 @@ OTHER_SUBDIRS = \
 	pmtime \
 	pmval \
 	pmview \
-	pmwebd \
+	pmwebapi \
 	perl \
 	python \
 	procmemstat \
@@ -110,11 +106,9 @@ OTHER_SUBDIRS = \
 	sar2pcp \
 	sheet2pcp \
 	ganglia2pcp \
-	webapps \
 	win32ctl \
 	zabbix-agent \
 	pmpython \
-	discover \
 	derived \
 	selinux \
 	zeroconf \
@@ -137,6 +131,11 @@ default_pcp : $(SUBDIRS)
 install :: default_pcp install_pcp
 
 install_pcp : $(SUBDIRS)
+	$(SUBDIRS_MAKERULE)
+
+check :: check_pcp
+ 
+check_pcp : pcp python
 	$(SUBDIRS_MAKERULE)
 
 $(LIBPCP_SUBDIR): $(INCLUDE_SUBDIR)

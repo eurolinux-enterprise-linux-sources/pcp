@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013,2017 Red Hat.
+ * Copyright (c) 2013 Red Hat.
  * Copyright (c) 1995,2003,2004 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -15,6 +15,7 @@
 
 #include <sys/stat.h>
 #include "pmapi.h"
+#include "impl.h"
 
 #ifdef HAVE_VALUES_H
 #include <values.h>
@@ -31,11 +32,11 @@
 #include "./lex.h"
 #include "./gram.h"
 
-static pmTimeval	now;
+static __pmTimeval	now = { 0, 0 };
 
-int			fromPMDA;
-int			toPMDA;
-char			*myPmdaName;
+int			infd;
+int			outfd;
+char			*myPmdaName = 0;
 
 extern int		_creds_timeout;
 
@@ -93,8 +94,8 @@ agent_creds(__pmPDU *pb)
     if (credlist)
 	free(credlist);
 
-    if (((sts = __pmSetVersionIPC(fromPMDA, version)) < 0) ||
-	((sts = __pmSetVersionIPC(toPMDA, version)) < 0))
+    if (((sts = __pmSetVersionIPC(infd, version)) < 0) ||
+	((sts = __pmSetVersionIPC(outfd, version)) < 0))
 	return sts;
 
     if (vflag) {	/* complete the version exchange - respond to agent */
@@ -104,7 +105,7 @@ agent_creds(__pmPDU *pb)
 	handshake[0].c_vala = PDU_VERSION;
 	handshake[0].c_valb = 0;
 	handshake[0].c_valc = 0;
-	if ((sts = __pmSendCreds(toPMDA, (int)getpid(), 1, handshake)) < 0)
+	if ((sts = __pmSendCreds(outfd, (int)getpid(), 1, handshake)) < 0)
 	    return sts;
     }
 
@@ -118,7 +119,7 @@ pmdaversion(void)
     __pmPDU	*ack;
     int		pinpdu;
 
-    pinpdu = sts = __pmGetPDU(fromPMDA, ANY_SIZE, _creds_timeout, &ack);
+    pinpdu = sts = __pmGetPDU(infd, ANY_SIZE, _creds_timeout, &ack);
     if (sts == PDU_CREDS) {
 	if ((sts = agent_creds(ack)) < 0) {
 	    fprintf(stderr, "Warning: version exchange failed "
@@ -127,11 +128,11 @@ pmdaversion(void)
     }
     else {
 	if (sts < 0)
-	    fprintf(stderr, "__pmGetPDU(%d): %s\n", fromPMDA, pmErrStr(sts));
+	    fprintf(stderr, "__pmGetPDU(%d): %s\n", infd, pmErrStr(sts));
 	else
 	    fprintf(stderr, "pmdaversion: expecting PDU_CREDS, got PDU type %d\n", sts);
-	fprintf(stderr, "Warning: no version exchange with PMDA %s after %d secs\n",
-			myPmdaName, _creds_timeout);
+	fprintf(stderr, "Warning: no version exchange with PMDA %s\n",
+			myPmdaName);
     }
     if (pinpdu > 0)
 	__pmUnpinPDUBuf(ack);
@@ -141,21 +142,12 @@ void
 openpmda(char *fname)
 {
     int		i;
-#ifndef IS_MINGW
     struct stat	buf;
-#endif
 
-    /*
-     * skip the stat() test on Windows the user supplied name may not
-     * include the .exe suffix ... let __pmProcessCreate() handle the
-     * error if we're wrong ...
-     */
-#ifndef IS_MINGW
     if (stat(fname, &buf) < 0) {
-	fprintf(stderr, "openpmda: stat %s failed: %s\n", fname, osstrerror());
+	fprintf(stderr, "openpmda: %s: %s\n", fname, osstrerror());
 	return;
     }
-#endif
 
     closepmda();
     free(param.argv[0]);
@@ -166,16 +158,11 @@ openpmda(char *fname)
 	printf(" %s", param.argv[i]);
     putchar('\n');
 
-    if (__pmProcessCreate(param.argv, &fromPMDA, &toPMDA) < (pid_t)0) {
-	fprintf(stderr, "openpmda: create process failed: %s\n", osstrerror());
+    if (__pmProcessCreate(param.argv, &infd, &outfd) < (pid_t)0) {
+	fprintf(stderr, "openpmda: create process: %s\n", osstrerror());
     }
     else {
 	connmode = CONN_DAEMON;
-#ifdef IS_MINGW
-	/* do not muck with \n in PDU stream */
-	_setmode(toPMDA, _O_BINARY);
-	_setmode(fromPMDA, _O_BINARY);
-#endif
 	reset_profile();
 	if (myPmdaName != NULL)
 	    free(myPmdaName);
@@ -207,7 +194,7 @@ open_unix_socket(char *fname)
     memset(&s_un, 0, sizeof(s_un));
     s_un.sun_family = AF_UNIX;
     strncpy(s_un.sun_path, fname, strlen(fname));
-    len = (int)offsetof(struct sockaddr_un, sun_path) + (int)strlen(s_un.sun_path)+1;
+    len = (int)offsetof(struct sockaddr_un, sun_path) + (int)strlen(s_un.sun_path);
 
     closepmda();
 
@@ -217,8 +204,8 @@ open_unix_socket(char *fname)
 	return;
     }
 
-    fromPMDA = fd;
-    toPMDA = fd;
+    infd = fd;
+    outfd = fd;
 
     printf("Connect to PMDA on socket %s\n", fname);
 
@@ -233,7 +220,7 @@ open_unix_socket(char *fname)
 void
 open_unix_socket(char *fname)
 {
-    pmNotifyErr(LOG_CRIT, "UNIX domain sockets unsupported\n");
+    __pmNotifyErr(LOG_CRIT, "UNIX domain sockets unsupported\n");
 }
 #endif
 
@@ -271,8 +258,8 @@ open_socket(int port, int family, const char *protocol)
 	return;
     }
 
-    fromPMDA = fd;
-    toPMDA = fd;
+    infd = fd;
+    outfd = fd;
 
     pmsprintf(socket, MYSOCKETSZ, "%s port %d", protocol, port);
     printf("Connect to PMDA on %s\n", socket);
@@ -302,10 +289,10 @@ closepmda(void)
 {
     if (connmode != NO_CONN) {
 	/* End of context logic mimics PMCD, no error checking is needed. */
-	__pmSendError(toPMDA, FROM_ANON, PM_ERR_NOTCONN);
-	close(toPMDA);
-	close(fromPMDA);
-	__pmResetIPC(fromPMDA);
+	__pmSendError(outfd, FROM_ANON, PM_ERR_NOTCONN);
+	close(outfd);
+	close(infd);
+	__pmResetIPC(infd);
 	connmode = NO_CONN;
 	if (myPmdaName != NULL) {
 	    free(myPmdaName);
@@ -323,13 +310,13 @@ dopmda_desc(pmID pmid, pmDesc *desc, int print)
     int		i;
     int		pinpdu;
 
-    if ((sts = __pmSendDescReq(toPMDA, FROM_ANON, pmid)) >= 0) {
-	if ((pinpdu = sts = __pmGetPDU(fromPMDA, ANY_SIZE, TIMEOUT_NEVER, &pb)) == PDU_DESC) {
+    if ((sts = __pmSendDescReq(outfd, FROM_ANON, pmid)) >= 0) {
+	if ((pinpdu = sts = __pmGetPDU(infd, ANY_SIZE, TIMEOUT_NEVER, &pb)) == PDU_DESC) {
 	    if ((sts = __pmDecodeDesc(pb, desc)) >= 0) {
 		if (print)
-		    pmPrintDesc(stdout, desc);
+		    __pmPrintDesc(stdout, desc);
 		    else if (pmDebugOptions.pdu)
-			pmPrintDesc(stdout, desc);
+			__pmPrintDesc(stdout, desc);
             }
 	    else
 		printf("Error: __pmDecodeDesc() failed: %s\n", pmErrStr(sts));
@@ -361,14 +348,11 @@ dopmda(int pdu)
     pmDesc		desc;
     pmDesc		*desc_list = NULL;
     pmResult		*result = NULL;
-    pmLabelSet		*labelset = NULL;
-    pmInResult	*inresult;
+    __pmInResult	*inresult;
     __pmPDU		*pb;
     int			i;
     int			j;
-    int			type;
     int			ident;
-    int			numsets;
     int			length;
     char		*buffer;
     struct timeval	start;
@@ -381,7 +365,7 @@ dopmda(int pdu)
     int			pinpdu;
 
     if (timer != 0)
-	pmtimevalNow(&start);
+	__pmtimevalNow(&start);
   
     switch (pdu) {
 
@@ -412,14 +396,14 @@ dopmda(int pdu)
 
 	    sts = 0;
 	    if (profile_changed) {
-		if ((sts = __pmSendProfile(toPMDA, FROM_ANON, 0, profile)) < 0)
+		if ((sts = __pmSendProfile(outfd, FROM_ANON, 0, profile)) < 0)
 		    printf("Error: __pmSendProfile() failed: %s\n", pmErrStr(sts));
 		else
 		    profile_changed = 0;
 	    }
 	    if (sts >= 0) {
-		if ((sts = __pmSendFetch(toPMDA, FROM_ANON, 0, NULL, param.numpmid, param.pmidlist)) >= 0) {
-		    if ((pinpdu = sts = __pmGetPDU(fromPMDA, ANY_SIZE, TIMEOUT_NEVER, &pb)) == PDU_RESULT) {
+		if ((sts = __pmSendFetch(outfd, FROM_ANON, 0, NULL, param.numpmid, param.pmidlist)) >= 0) {
+		    if ((pinpdu = sts = __pmGetPDU(infd, ANY_SIZE, TIMEOUT_NEVER, &pb)) == PDU_RESULT) {
 			if ((sts = __pmDecodeResult(pb, &result)) >= 0) {
 			    if (get_desc) 
 				_dbDumpResult(stdout, result, desc_list);
@@ -453,8 +437,8 @@ dopmda(int pdu)
 
 	case PDU_INSTANCE_REQ:
 	    printf("pmInDom: %s\n", pmInDomStr(param.indom));
-	    if ((sts = __pmSendInstanceReq(toPMDA, FROM_ANON, &now, param.indom, param.number, param.name)) >= 0) {
-		if ((pinpdu = sts = __pmGetPDU(fromPMDA, ANY_SIZE, TIMEOUT_NEVER, &pb)) == PDU_INSTANCE) {
+	    if ((sts = __pmSendInstanceReq(outfd, FROM_ANON, &now, param.indom, param.number, param.name)) >= 0) {
+		if ((pinpdu = sts = __pmGetPDU(infd, ANY_SIZE, TIMEOUT_NEVER, &pb)) == PDU_INSTANCE) {
 		    if ((sts = __pmDecodeInstance(pb, &inresult)) >= 0) {
 			printindom(stdout, inresult);
 			__pmFreeInResult(inresult);
@@ -490,7 +474,7 @@ dopmda(int pdu)
 
     	    if (profile_changed) {
 		printf("Sending Profile...\n");
-		if ((sts = __pmSendProfile(toPMDA, FROM_ANON, 0, profile)) < 0) {
+		if ((sts = __pmSendProfile(outfd, FROM_ANON, 0, profile)) < 0) {
 		    printf("Error: __pmSendProfile() failed: %s\n", pmErrStr(sts));
 		    return;
 		}
@@ -500,9 +484,9 @@ dopmda(int pdu)
 
 	    printf("Getting Result Structure...\n");
 	    pinpdu = 0;
-	    if ((sts = __pmSendFetch(toPMDA, FROM_ANON, 0, NULL, 
+	    if ((sts = __pmSendFetch(outfd, FROM_ANON, 0, NULL, 
 				    1, &(desc.pmid))) >= 0) {
-		if ((pinpdu = sts = __pmGetPDU(fromPMDA, ANY_SIZE, TIMEOUT_NEVER, 
+		if ((pinpdu = sts = __pmGetPDU(infd, ANY_SIZE, TIMEOUT_NEVER, 
 				     &pb)) == PDU_RESULT) {
 		    if ((sts = __pmDecodeResult(pb, &result)) < 0)
 			printf("Error: __pmDecodeResult() failed: %s\n", 
@@ -543,11 +527,11 @@ dopmda(int pdu)
 	    }
 
 	    printf("Sending Result...\n");
-	    sts = __pmSendResult(toPMDA, FROM_ANON, result);
+	    sts = __pmSendResult(outfd, FROM_ANON, result);
 	    pmFreeResult(result);	
 	    __pmUnpinPDUBuf(pb);
 	    if (sts >= 0) {
-		if ((pinpdu = sts = __pmGetPDU(fromPMDA, ANY_SIZE, TIMEOUT_NEVER, 
+		if ((pinpdu = sts = __pmGetPDU(infd, ANY_SIZE, TIMEOUT_NEVER, 
 				     &pb)) == PDU_ERROR) {
 		    if ((i = __pmDecodeError(pb, &sts)) >= 0) {
 			if (sts < 0)
@@ -588,8 +572,8 @@ dopmda(int pdu)
 		    param.number |= PM_TEXT_HELP;
 		}
 
-		if ((sts = __pmSendTextReq(toPMDA, FROM_ANON, ident, param.number)) >= 0) {
-		    if ((pinpdu = sts = __pmGetPDU(fromPMDA, ANY_SIZE, TIMEOUT_NEVER, &pb)) == PDU_TEXT) {
+		if ((sts = __pmSendTextReq(outfd, FROM_ANON, ident, param.number)) >= 0) {
+		    if ((pinpdu = sts = __pmGetPDU(infd, ANY_SIZE, TIMEOUT_NEVER, &pb)) == PDU_TEXT) {
 			if ((sts = __pmDecodeText(pb, &i, &buffer)) >= 0) {
 			    if (j == 0) {
 				if (*buffer != '\0')
@@ -622,74 +606,14 @@ dopmda(int pdu)
 		}
 		else
 		    printf("Error: __pmSendTextReq() failed: %s\n", pmErrStr(sts));
+	    
 	    }
-	    break;
-
-	case PDU_LABEL_REQ:
-	    if (param.number & PM_LABEL_INDOM) {
-		printf("pmInDom: %s\n", pmInDomStr(param.indom));
-		ident = param.indom;
-	    }
-	    else if (param.number & PM_LABEL_CLUSTER) {
-		printf("Cluster: %s\n", strcluster(param.pmid));
-		ident = param.pmid;
-	    }
-	    else if (param.number & PM_LABEL_ITEM) {
-		printf("PMID: %s\n", pmIDStr(param.pmid));
-		ident = param.pmid;
-	    }
-	    else if (param.number & PM_LABEL_INSTANCES) {
-		printf("Instances of pmInDom: %s\n", pmInDomStr(param.indom));
-		ident = param.indom;
-	    }
-	    else /* param.number & (PM_LABEL_DOMAIN|PM_LABEL_CONTEXT) */
-		ident = PM_IN_NULL;
-
-	    if ((sts = __pmSendLabelReq(toPMDA, FROM_ANON, ident, param.number)) >= 0) {
-		if ((pinpdu = sts = __pmGetPDU(fromPMDA, ANY_SIZE, TIMEOUT_NEVER, &pb)) == PDU_LABEL) {
-		    if ((sts = __pmDecodeLabel(pb, &ident, &type, &labelset, &numsets)) >= 0) {
-			for (i = 0; i < numsets; i++) {
-			    if (labelset[i].inst != PM_IN_NULL)
-				printf("[%3d] Labels inst: %d\n", i, labelset[i].inst);
-			    else
-				printf("Labels:\n");
-			    for (j = 0; j < labelset[i].nlabels; j++) {
-				pmLabel	*lp = &labelset[i].labels[j];
-				char *name = labelset[i].json + lp->name;
-				char *value = labelset[i].json + lp->value;
-				printf("    %.*s=%.*s\n", lp->namelen, name, lp->valuelen, value);
-			    }
-			}
-			if (numsets > 0)
-			    pmFreeLabelSets(labelset, numsets);
-			else
-			    printf("Info: __pmDecodeLabel() returns 0 label sets\n");
-		    }
-		    else
-			printf("Error: __pmDecodeLabel() failed: %s\n", pmErrStr(sts));
-		}
-		else if (sts == PDU_ERROR) {
-		    if ((i = __pmDecodeError(pb, &sts)) >= 0)
-			printf("Error PDU: %s\n", pmErrStr(sts));
-		    else
-			printf("Error: __pmDecodeError() failed: %s\n", pmErrStr(i));
-		}
-		else if (sts == 0)
-		    printf("Error: __pmGetPDU() failed: PDU empty, PMDA may have died\n");
-		else
-		    printf("Error: __pmGetPDU() failed: %s\n", pmErrStr(sts));
-		if (pinpdu > 0)
-		    __pmUnpinPDUBuf(pb);
-	    }
-	    else
-		printf("Error: __pmSendLabelReq() failed: %s\n", pmErrStr(sts));
-
 	    break;
 
 	case PDU_PMNS_IDS:
             printf("PMID: %s\n", pmIDStr(param.pmid));
-	    if ((sts = __pmSendIDList(toPMDA, FROM_ANON, 1, &param.pmid, 0)) >= 0) {
-		if ((pinpdu = sts = __pmGetPDU(fromPMDA, ANY_SIZE, TIMEOUT_NEVER, &pb)) == PDU_PMNS_NAMES) {
+	    if ((sts = __pmSendIDList(outfd, FROM_ANON, 1, &param.pmid, 0)) >= 0) {
+		if ((pinpdu = sts = __pmGetPDU(infd, ANY_SIZE, TIMEOUT_NEVER, &pb)) == PDU_PMNS_NAMES) {
 		    if ((sts = __pmDecodeNameList(pb, &numnames, &namelist, NULL)) >= 0) {
 			for (i = 0; i < sts; i++) {
 			    printf("   %s\n", namelist[i]);
@@ -719,8 +643,8 @@ dopmda(int pdu)
 
 	case PDU_PMNS_NAMES:
             printf("Metric: %s\n", param.name);
-	    if ((sts = __pmSendNameList(toPMDA, FROM_ANON, 1, &param.name, NULL)) >= 0) {
-		if ((pinpdu = sts = __pmGetPDU(fromPMDA, ANY_SIZE, TIMEOUT_NEVER, &pb)) == PDU_PMNS_IDS) {
+	    if ((sts = __pmSendNameList(outfd, FROM_ANON, 1, &param.name, NULL)) >= 0) {
+		if ((pinpdu = sts = __pmGetPDU(infd, ANY_SIZE, TIMEOUT_NEVER, &pb)) == PDU_PMNS_IDS) {
 		    int		xsts;
 
 		    if ((sts = __pmDecodeIDList(pb, 1, &pmid, &xsts)) >= 0)
@@ -748,8 +672,8 @@ dopmda(int pdu)
 
 	case PDU_PMNS_CHILD:
             printf("Metric: %s\n", param.name);
-	    if ((sts = __pmSendChildReq(toPMDA, FROM_ANON, param.name, 1)) >= 0) {
-		if ((pinpdu = sts = __pmGetPDU(fromPMDA, ANY_SIZE, TIMEOUT_NEVER, &pb)) == PDU_PMNS_NAMES) {
+	    if ((sts = __pmSendChildReq(outfd, FROM_ANON, param.name, 1)) >= 0) {
+		if ((pinpdu = sts = __pmGetPDU(infd, ANY_SIZE, TIMEOUT_NEVER, &pb)) == PDU_PMNS_NAMES) {
 		    if ((sts = __pmDecodeNameList(pb, &numnames, &namelist, &statuslist)) >= 0) {
 			for (i = 0; i < numnames; i++) {
 			    printf("   %8.8s %s\n", statuslist[i] == 1 ? "non-leaf" : "leaf", namelist[i]);
@@ -780,8 +704,8 @@ dopmda(int pdu)
 
 	case PDU_PMNS_TRAVERSE:
             printf("Metric: %s\n", param.name);
-	    if ((sts = __pmSendTraversePMNSReq(toPMDA, FROM_ANON, param.name)) >= 0) {
-		if ((pinpdu = sts = __pmGetPDU(fromPMDA, ANY_SIZE, TIMEOUT_NEVER, &pb)) == PDU_PMNS_NAMES) {
+	    if ((sts = __pmSendTraversePMNSReq(outfd, FROM_ANON, param.name)) >= 0) {
+		if ((pinpdu = sts = __pmGetPDU(infd, ANY_SIZE, TIMEOUT_NEVER, &pb)) == PDU_PMNS_NAMES) {
 		    if ((sts = __pmDecodeNameList(pb, &numnames, &namelist, NULL)) >= 0) {
 			for (i = 0; i < numnames; i++) {
 			    printf("   %s\n", namelist[i]);
@@ -819,7 +743,7 @@ dopmda(int pdu)
 	    name[sizeof(name)-1] = '\0';
 
 	    printf("Attribute: %s=%s\n", name, buffer ? buffer : "''");
-	    if ((sts = __pmSendAuth(toPMDA, 0 /* context */, j, buffer, length)) >= 0)
+	    if ((sts = __pmSendAuth(outfd, 0 /* context */, j, buffer, length)) >= 0)
 		printf("Success\n");
 	    else
 		printf("Error: __pmSendAuth() failed: %s\n", pmErrStr(sts));
@@ -832,8 +756,8 @@ dopmda(int pdu)
     }
 
     if (sts >= 0 && timer != 0) {
-	pmtimevalNow(&end);
-	printf("Timer: %f seconds\n", pmtimevalSub(&end, &start));
+	__pmtimevalNow(&end);
+	printf("Timer: %f seconds\n", __pmtimevalSub(&end, &start));
     }
 }
 
@@ -899,14 +823,12 @@ fillResult(pmResult *result, int type)
 
 	if (vsp->numval == 0) {
 	    printf("Error: %s not available!\n", pmIDStr(param.pmid));
-	    sts = PM_ERR_VALUE;
-	    goto done;
+	    return PM_ERR_VALUE;
 	}
 
 	if (vsp->numval < 0) {
 	    printf("Error: %s: %s\n", pmIDStr(param.pmid), pmErrStr(vsp->numval));
-	    sts = vsp->numval;
-	    goto done;
+	    return vsp->numval;
 	}
 
 	for (i = 0; i < vsp->numval; i++) {
@@ -922,10 +844,6 @@ fillResult(pmResult *result, int type)
 	    putchar('\n');
 	}
     }
-
-done:
-    if (type == PM_TYPE_STRING && atom.cp != NULL)
-	free(atom.cp);
 
     return sts;
 }

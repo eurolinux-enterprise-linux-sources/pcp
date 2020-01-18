@@ -21,31 +21,6 @@ else
     ln $seq.out.nonipv6 $seq.out || exit 1
 fi
 
-# optionally check for unique IP addresses (test assumes this)
-#
-if which host >/dev/null 2>&1
-then
-    touch $tmp.addr
-    sed -n <051.hosts -e '/^[^#].*=/s/=/ /p' \
-    | while read var hostname
-    do
-	ipaddr=`host $hostname | sed -n -e '/ has address /s/.* //p'`
-	if [ -z "$ipaddr" ]
-	then
-	    echo "Warning: cannot get ipaddr for $hostname ($var) ... host(1) reports:"
-	    host $hostname
-	fi
-	if grep "($ipaddr)" $tmp.addr >$tmp.tmp
-	then
-	    echo "Error: duplicate IP addresses in 051.hosts:"
-	    cat $tmp.tmp
-	    echo "$var=$hostname ($ipaddr)"
-	    exit
-	fi
-	echo "$var=$hostname ($ipaddr)" >>$tmp.addr
-    done
-fi
-
 # get valid hostnames: $remote_1, $remote_2, etc.
 #
 . ./051.hosts
@@ -161,7 +136,7 @@ cleanup()
     fi
     echo "Restarting pmcd"
     unset PMCD_SOCKET
-    _service pcp restart 2>&1 | _filter_pcp_start
+    _service pcp restart | _filter_pcp_start
     _restore_auto_restart pmcd
     _wait_for_pmcd
     _wait_for_pmlogger

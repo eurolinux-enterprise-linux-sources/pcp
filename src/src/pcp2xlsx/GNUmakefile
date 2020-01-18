@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2017-2018 Red Hat.
+# Copyright (c) 2017 Red Hat, Inc.  All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
@@ -25,7 +25,7 @@ default: $(TARGET).py $(MAN_PAGES)
 include $(BUILDRULES)
 
 install: default
-ifeq "$(HAVE_PYTHON_OPENPYXL)" "true"
+ifeq "$(HAVE_PYTHON_XLSXWRITER)" "true"
 	$(INSTALL) -m 755 $(TARGET).py $(PCP_BIN_DIR)/$(TARGET)
 	@$(INSTALL_MAN)
 endif
@@ -33,6 +33,3 @@ endif
 default_pcp: default
 
 install_pcp: install
-
-check:: $(TARGET).py
-	$(PYLINT) $^

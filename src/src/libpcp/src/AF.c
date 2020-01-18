@@ -18,7 +18,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "internal.h"
 
 #define MIN_ITIMER_USEC 100
@@ -57,9 +57,7 @@ __pmIsAFLock(void *lock)
 void
 init_AF_lock(void)
 {
-#ifdef PM_MULTI_THREAD
     __pmInitMutex(&AF_lock);
-#endif
 }
 
 /*
@@ -200,7 +198,7 @@ printdelta(FILE *f, struct timeval *tp)
 static void
 tsub(struct timeval *a, struct timeval *b)
 {
-    pmtimevalDec(a, b);
+    __pmtimevalDec(a, b);
     if (a->tv_sec < 0) {
 	/* clip negative values at zero */
 	a->tv_sec = 0;
@@ -230,11 +228,11 @@ enqueue(qelt *qp)
     if (pmDebugOptions.af) {
 	struct timeval	now;
 
-	pmtimevalNow(&now);
-	pmPrintStamp(stderr, &now);
+	__pmtimevalNow(&now);
+	__pmPrintStamp(stderr, &now);
 	fprintf(stderr, " AFenqueue " PRINTF_P_PFX "%p(%d, " PRINTF_P_PFX "%p) for ",
 		qp->q_func, qp->q_afid, qp->q_data);
-	pmPrintStamp(stderr, &qp->q_when);
+	__pmPrintStamp(stderr, &qp->q_when);
 	fputc('\n', stderr);
     }
 
@@ -260,13 +258,13 @@ enqueue(qelt *qp)
  *
  * AFhold
  *   sighold		- problem, should use sigaction()
- * pmtimevalNow
+ * __pmtimevalNow
  *  gettimeofday	- problem
  *  qp->q_func		- potential problem if application func() does
  *  			  not restrict itself to async-signal-safe routines
  *  free		- problem
- * pmtimevalInc	- ok
- * pmtimevalDec	- ok
+ * __pmtimevalInc	- ok
+ * __pmtimevalDec	- ok
  *
  * in debug code
  *   fprintf	- problem, but we are not going to rewrite all of debug code,
@@ -285,15 +283,15 @@ onalarm(int dummy)
 	AFhold();
 
     if (pmDebugOptions.af) {
-	pmtimevalNow(&now);
-	pmPrintStamp(stderr, &now);
+	__pmtimevalNow(&now);
+	__pmPrintStamp(stderr, &now);
 	fprintf(stderr, " AFonalarm(%d)\n", dummy);
     }
     if (root != NULL) {
 	/* something to do ... */
 	while (root != NULL) {
 	    /* compute difference between scheduled time and now */
-	    pmtimevalNow(&now);
+	    __pmtimevalNow(&now);
 	    tmp = root->q_when;
 	    tsub(&tmp, &now);
 	    if (tmp.tv_sec == 0 && tmp.tv_usec <= 10000) {
@@ -305,7 +303,7 @@ onalarm(int dummy)
 		qp = root;
 		root = root->q_next;
 		if (pmDebugOptions.af) {
-		    pmPrintStamp(stderr, &now);
+		    __pmPrintStamp(stderr, &now);
 		    fprintf(stderr, " AFcallback " PRINTF_P_PFX "%p(%d, " PRINTF_P_PFX "%p)\n",
 			    qp->q_func, qp->q_afid, qp->q_data);
 		}
@@ -334,18 +332,18 @@ onalarm(int dummy)
 		     *      		   |               +-- now
 		     *      		   +-- now - q_delta
 		     */
-		    pmtimevalNow(&now);
+		    __pmtimevalNow(&now);
 		    for ( ; ; ) {
-			pmtimevalInc(&qp->q_when, &qp->q_delta);
+			__pmtimevalInc(&qp->q_when, &qp->q_delta);
 			tmp = qp->q_when;
-			pmtimevalDec(&tmp, &now);
-			pmtimevalInc(&tmp, &qp->q_delta);
+			__pmtimevalDec(&tmp, &now);
+			__pmtimevalInc(&tmp, &qp->q_delta);
 			if (tmp.tv_sec >= 0)
 			    break;
 			if (pmDebugOptions.af) {
-			    pmPrintStamp(stderr, &now);
+			    __pmPrintStamp(stderr, &now);
 			    fprintf(stderr, " AFcallback event %d too slow, skip callback for ", qp->q_afid);
-			    pmPrintStamp(stderr, &qp->q_when);
+			    __pmPrintStamp(stderr, &qp->q_when);
 			    fputc('\n', stderr);
 			}
 		    }
@@ -362,7 +360,7 @@ onalarm(int dummy)
 
 	if (root == NULL) {
 	    if (pmDebugOptions.af) {
-		pmPrintStamp(stderr, &now);
+		__pmPrintStamp(stderr, &now);
 		fprintf(stderr, "Warning: AF event queue is empty, nothing more will be scheduled\n");
 	    }
 	    ;
@@ -370,13 +368,13 @@ onalarm(int dummy)
 	else {
 	    /* set itimer for head of queue */
 	    interval = root->q_when;
-	    pmtimevalNow(&now);
+	    __pmtimevalNow(&now);
 	    tsub(&interval, &now);
 	    if (interval.tv_sec == 0 && interval.tv_usec < MIN_ITIMER_USEC)
 		/* use minimal delay (platform dependent) */
 		interval.tv_usec = MIN_ITIMER_USEC;
 	    if (pmDebugOptions.af) {
-		pmPrintStamp(stderr, &now);
+		__pmPrintStamp(stderr, &now);
 		fprintf(stderr, " AFsetitimer for delta ");
 		printdelta(stderr, &interval);
 		fputc('\n', stderr);
@@ -413,15 +411,15 @@ __pmAFsetup(const struct timeval *start, const struct timeval *delta, void *data
     qp->q_data = data;
     qp->q_delta = *delta;
     qp->q_func = func;
-    pmtimevalNow(&qp->q_when);
+    __pmtimevalNow(&qp->q_when);
     if (start != NULL)
-	pmtimevalInc(&qp->q_when, start);
+	__pmtimevalInc(&qp->q_when, start);
 
     enqueue(qp);
     if (root == qp) {
 	/* we ended up at the head of the list, set itimer */
 	interval = qp->q_when;
-	pmtimevalNow(&now);
+	__pmtimevalNow(&now);
 	tsub(&interval, &now);
 
 	if (interval.tv_sec == 0 && interval.tv_usec < MIN_ITIMER_USEC)
@@ -429,7 +427,7 @@ __pmAFsetup(const struct timeval *start, const struct timeval *delta, void *data
 	    interval.tv_usec = MIN_ITIMER_USEC;
 
 	if (pmDebugOptions.af) {
-	    pmPrintStamp(stderr, &now);
+	    __pmPrintStamp(stderr, &now);
 	    fprintf(stderr, " AFsetitimer for delta ");
 	    printdelta(stderr, &interval);
 	    fputc('\n', stderr);
@@ -480,13 +478,13 @@ __pmAFunregister(int afid)
 	     * new head of queue
 	     */
 	    interval = root->q_when;
-	    pmtimevalNow(&now);
+	    __pmtimevalNow(&now);
 	    tsub(&interval, &now);
 	    if (interval.tv_sec == 0 && interval.tv_usec < MIN_ITIMER_USEC)
 		/* use minimal delay (platform dependent) */
 		interval.tv_usec = MIN_ITIMER_USEC;
 	    if (pmDebugOptions.af) {
-		pmPrintStamp(stderr, &now);
+		__pmPrintStamp(stderr, &now);
 		fprintf(stderr, " AFsetitimer for delta ");
 		printdelta(stderr, &interval);
 		fputc('\n', stderr);

@@ -17,7 +17,7 @@ TOPDIR = ../..
 include $(TOPDIR)/src/include/builddefs
 
 SUBDIRS = src
-LDIRT	= pmcd.service
+LDIRT	= *.log
 
 default : $(SUBDIRS) pmcd.service
 	$(SUBDIRS_MAKERULE)

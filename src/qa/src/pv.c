@@ -4,7 +4,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <pcp/pmapi.h>
+#include "pcp/pmapi.h"
 
 /*
  * exercise pmPrintValue() ... should produce very similar answers
@@ -18,8 +18,8 @@ main(void)
     pmValue		v;
     int			l;
     unsigned int	ul;
-    __int64_t		ll;
-    __uint64_t		ull;
+    long long		ll;
+    unsigned long long	ull;
     float		f;
     float		*fp;
     double		d;
@@ -27,8 +27,6 @@ main(void)
 	int	len;
 	char	vbuf[sizeof(double)];
     } vb;
-    char		*fmt_int64x;
-    char		*p;
 
     v.inst = 1;
 
@@ -59,25 +57,13 @@ main(void)
     pmPrintValue(stdout, PM_VAL_SPTR,  PM_TYPE_DOUBLE, &v, 16);
     printf(" correct: %.9f\n", d);
 
-    fmt_int64x = strdup("%" FMT_INT64);
-    for (p = fmt_int64x; *p; p++)
-	;
-    p--;
-    if (*p != 'd') {
-	fprintf(stderr, "Botch: expect FMT_INT64 (%s) to end in 'd'\n", FMT_INT64);
-	exit (1);
-    }
-    *p = 'x';
-
     ll = -1 & (~0xffff);
     memcpy((void *)vb.vbuf, (void *)&ll, sizeof(long long));
     vb.len = sizeof(vb.len) + sizeof(long long);
     v.value.pval = (pmValueBlock *)&vb;
     printf("PM_TYPE_64: ");
     pmPrintValue(stdout, PM_VAL_SPTR,  PM_TYPE_64,  &v, 1);
-    printf(" correct: %" FMT_INT64 " (0x", ll);
-    printf(fmt_int64x, ll);
-    printf(")\n");
+    printf(" correct: %lli (0x%llx)\n", ll, ll);
 
     ull = 0x8765432112340000LL;
     memcpy((void *)vb.vbuf, (void *)&ull, sizeof(unsigned long long));
@@ -85,9 +71,7 @@ main(void)
     v.value.pval = (pmValueBlock *)&vb;
     printf("PM_TYPE_U64: ");
     pmPrintValue(stdout, PM_VAL_SPTR,  PM_TYPE_U64,  &v, 1);
-    printf(" correct: %" FMT_UINT64 " (0x", ull);
-    printf(fmt_int64x, ull);
-    printf(")\n");
+    printf(" correct: %llu (0x%llx)\n", ull, ull);
 
     exit(0);
 }

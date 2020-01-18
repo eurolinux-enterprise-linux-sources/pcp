@@ -18,6 +18,7 @@ include $(TOPDIR)/src/include/builddefs
 CMDTARGET = pmstat$(EXECSUFFIX)
 CFILES  = pmstat.c
 LDIRT = $(CMDTARGET)
+LSRCFILES = pmstat.pmlogger
 
 LLDFLAGS = -L$(TOPDIR)/src/libpcp_gui/src
 LLDLIBS = $(PCP_GUILIB)
@@ -33,8 +34,3 @@ install:	default
 default_pcp:	default
 
 install_pcp:	install
-
-pmstat.o:	$(TOPDIR)/src/include/pcp/libpcp.h
-
-check:: $(CFILES)
-	$(CLINT) $^

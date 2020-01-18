@@ -15,8 +15,7 @@
 
 #include <ctype.h>
 #include "pmapi.h"
-#include "libpcp.h"
-#include "deprecated.h"
+#include "impl.h"
 #include "pmda.h"
 #include "shping.h"
 #include "domain.h"
@@ -169,7 +168,7 @@ logmessage(int priority, const char *format, ...)
     for (p = buffer; *p; p++);
     if (*(--p) == '\n') *p = '\0';
 
-    fprintf(stderr, "[%.19s] %s(%" FMT_PID ") %s: %s\n", ctime(&now), pmGetProgname(), (pid_t)getpid(), level, buffer) ;
+    fprintf(stderr, "[%.19s] %s(%" FMT_PID ") %s: %s\n", ctime(&now), pmProgname, (pid_t)getpid(), level, buffer) ;
 }
 
 
@@ -235,14 +234,14 @@ refresh(void *dummy)
 
     for ( ; ; ) {
 	cycles++;
-	pmtimevalNow(&startcycle);
+	__pmtimevalNow(&startcycle);
 	if (pmDebugOptions.appl1)
 	    fprintf(stderr, "\nStart cycle @ %s", ctime(&startcycle.tv_sec));
 	for (i = 0; i < numcmd; i++) {
 	    if (pmDebugOptions.appl1)
 		fprintf(stderr, "[%s] %s ->\n", cmdlist[i].tag, cmdlist[i].cmd);
 	    getrusage(RUSAGE_CHILDREN, &cpu_then);
-	    pmtimevalNow(&then);
+	    __pmtimevalNow(&then);
 	    fflush(stderr);
 	    fflush(stdout);
 	    shpid = fork();
@@ -281,7 +280,7 @@ refresh(void *dummy)
 	    timedout = 0;
 	    alarm(timeout);
 	    waitpid(shpid, &sts, 0);
-	    pmtimevalNow(&now);
+	    __pmtimevalNow(&now);
 	    getrusage(RUSAGE_CHILDREN, &cpu_now);
 	    alarm(0);
 
@@ -343,7 +342,7 @@ refresh(void *dummy)
 		break;
 	 }
 
-	pmtimevalNow(&now);
+	__pmtimevalNow(&now);
 	if (cycletime) {
 	    waittime = (int)cycletime - now.tv_sec + startcycle.tv_sec;
 	    if (waittime < 0) {
@@ -370,6 +369,7 @@ shping_fetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *ext)
     static pmResult	*res = NULL;
     static int		maxnpmids = 0;
     pmValueSet		*vset;
+    __pmID_int		*pmidp;
     pmAtomValue		atom;
     pmDesc		*dp = NULL;
     int			type;
@@ -408,15 +408,16 @@ shping_fetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *ext)
 
     for (i = 0; i < numpmid; i++) {
 
+    	pmidp = (__pmID_int*)&pmidlist[i];
 	dp = NULL;
 
 	if (ext->e_direct) {
- 	    if (pmID_cluster(pmidlist[i]) == 0 && pmID_item(pmidlist[i]) < nummetric)
-		dp = &metrics[pmID_item(pmidlist[i])].m_desc;
+ 	    if (pmidp->cluster == 0 && pmidp->item < nummetric)
+		dp = &metrics[pmidp->item].m_desc;
 	}
 	else {
 	    for (j = 1; j<nummetric; j++) {
-		if (pmID_cluster(pmidlist[i]) == 0 && 
+		if (pmidp->cluster == 0 && 
 		    metrics[j].m_desc.pmid == pmidlist[i]) {
 		    dp = &metrics[j].m_desc;
 		    break;
@@ -467,6 +468,7 @@ shping_fetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *ext)
 	}
 
 	type = dp->type;
+	pmidp = (__pmID_int *)&pmidlist[i];
 	j = 0;
 
 	do {
@@ -485,8 +487,8 @@ shping_fetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *ext)
 	    }
 	    vset->vlist[j].inst = inst;
 
-	    if (pmID_cluster(pmidlist[i]) == 0) {
-		switch (pmID_item(pmidlist[i])) {
+	    if (pmidp->cluster == 0) {
+		switch (pmidp->item) {
 
 		    case 0:	/* shping.time.real PMID: ...0.0 */
 			atom.f = cmdlist[inst].real;
@@ -563,11 +565,13 @@ shping_store(pmResult *result, pmdaExt *ext)
     pmValueSet	*vsp;
     int		sts = 0;
     int		ival;
+    __pmID_int	*pmidp;
 
     for (i = 0; i < result->numpmid; i++) {
 	vsp = result->vset[i];
-	if (pmID_cluster(vsp->pmid) == 0) {
-	    switch (pmID_item(vsp->pmid)) {
+	pmidp = (__pmID_int *)&vsp->pmid;
+	if (pmidp->cluster == 0) {
+	    switch (pmidp->item) {
 		case 4:	/* shping.control.cycletime PMID: ...0.4 */
 		    ival = vsp->vlist[0].value.lval;
 		    if (ival < 0) {

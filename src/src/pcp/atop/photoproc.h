@@ -8,7 +8,6 @@
 ** to access the process-database.
 **
 ** Copyright (C) 1996-2014 Gerlof Langeveld
-** Copyright (C) 2015,2019 Red Hat
 **
 ** This program is free software; you can redistribute it and/or modify it
 ** under the terms of the GNU General Public License as published by the
@@ -23,7 +22,6 @@
 
 #define	PNAMLEN		15
 #define	CMDLEN		255
-#define	CLEN		13
 
 /* 
 ** structure containing only relevant process-info extracted 
@@ -56,10 +54,6 @@ struct tstat {
 		int	nthrrun;	/* # threads in state 'R'       */
 		int	ctid;		/* OpenVZ container ID		*/
 		int	vpid;		/* OpenVZ virtual PID		*/
-
-		int	wasinactive;	/* boolean: task inactive       */
-
-		char	container[CLEN];/* Docker container id (12 pos) */
 	} gen;
 
 	/* CPU STATISTICS						*/
@@ -71,7 +65,6 @@ struct tstat {
 		int	rtprio;		/* realtime priority            */
 		int	policy;		/* scheduling policy            */
 		int	curcpu;		/* current processor            */
-		int	sleepavg;	/* sleep average percentage	*/
 	} cpu;
 
 	/* DISK STATISTICS						*/
@@ -111,25 +104,7 @@ struct tstat {
 		count_t	udprcv;		/* number of UDP-packets recved	*/
 		count_t udprsz;		/* cumulative size packets sent	*/
 	} net;
-
-	struct gpu {
-		char	state;		// A - active, E - Exit, '\0' - no use
-		char	cfuture[3];	//
-		short	nrgpus;		// number of GPUs for this process
-		int32_t	gpulist;	// bitlist with GPU numbers
-
-		int	gpubusy;	// gpu busy perc process lifetime      -1 = n/a
-		int	membusy;	// memory busy perc process lifetime   -1 = n/a
-		count_t	timems;		// milliseconds accounting   -1 = n/a
-					// value 0   for active process,
-					// value > 0 after termination
-
-		count_t	memnow;		// current    memory consumption in KiB
-		count_t	memcum;		// cumulative memory consumption in KiB
-		count_t	sample;		// number of samples
-	} gpu;
 };
-
 
 struct pinfo {
 	struct pinfo	*phnext;	/* next process in hash    chain */
@@ -137,22 +112,6 @@ struct pinfo {
 	struct pinfo	*prprev;	/* prev process in residue chain */
 
 	struct tstat	tstat;		/* per-process statistics        */
-};
-
-/*
-** structure to maintains all deviation info related to one sample
-*/
-struct devtstat {
-	struct tstat	*taskall;
-	struct tstat	**procall;
-	struct tstat	**procactive;
-
-	unsigned long	ntaskall;
-	unsigned long	ntaskactive;
-	unsigned long	nprocall;
-	unsigned long	nprocactive;
-
-	unsigned long	totrun, totslpi, totslpu, totzombie;
 };
 
 /*
@@ -168,8 +127,9 @@ int		pdb_srchresidue(struct tstat *, struct pinfo **);
 /*
 ** prototypes for raw process-statistics functions
 */
-void		deviattask(struct tstat *, unsigned long,
-			   struct tstat *, unsigned long,
-			   struct devtstat *, struct sstat *);
+int		deviattask(struct tstat *, int, struct tstat *, int, int,
+				struct tstat *, struct sstat *, unsigned int *,
+				int *, int *, int *, int *, int *);
 
-unsigned long	photoproc(struct tstat **, unsigned int *);
+int		photoproc(struct tstat **, int *);
+unsigned int	countprocs(void);

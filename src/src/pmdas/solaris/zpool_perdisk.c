@@ -40,14 +40,14 @@ make_vdev_name(zpool_handle_t *zp, const char *pname, nvlist_t *child)
 	uint_t size;
 
 	if (cname == NULL) {
-	    pmNotifyErr(LOG_WARNING, "Cannot get the name of %s\'s "
+	    __pmNotifyErr(LOG_WARNING, "Cannot get the name of %s\'s "
 			  "child\n", pname);
 	    goto out;
 	}
 	size = strlen(pname) + strlen(cname) + 2;
 	name = malloc(size);
 	if (name == NULL) {
-	    pmNotifyErr(LOG_WARNING, "Cannot allocate memory for %s.%s\n",
+	    __pmNotifyErr(LOG_WARNING, "Cannot allocate memory for %s.%s\n",
 			  pname, cname);
 	    goto free_out;
 	}
@@ -100,13 +100,13 @@ zp_get_vdevs(zpool_handle_t *zp, char *zpname, nvlist_t *vdt,
 		    (uint64_t **)&stats, &cnt);
 #endif
 	    if (rv != 0) {
-		pmNotifyErr(LOG_WARNING, "Cannot get the stats of %s\'s "
+		__pmNotifyErr(LOG_WARNING, "Cannot get the stats of %s\'s "
 			"child\n", zpname);
 		goto out;
 	    }
 	    name = make_vdev_name(zp, zpname, vdt);
 	    if (name == NULL) {
-		pmNotifyErr(LOG_WARNING, "Cannot get the name of a %s\'s "
+		__pmNotifyErr(LOG_WARNING, "Cannot get the name of a %s\'s "
 			"disk\n", zpname);
 		goto out;
 	    }
@@ -114,7 +114,7 @@ zp_get_vdevs(zpool_handle_t *zp, char *zpname, nvlist_t *vdt,
 	    new_vdev_names = realloc(*vdev_names, nelem *
 		    sizeof(*new_vdev_names));
 	    if (new_vdev_names == NULL) {
-		pmNotifyErr(LOG_WARNING, "Cannot realloc memory for %s\n",
+		__pmNotifyErr(LOG_WARNING, "Cannot realloc memory for %s\n",
 			name);
 		goto free_out;
 	    }
@@ -123,7 +123,7 @@ zp_get_vdevs(zpool_handle_t *zp, char *zpname, nvlist_t *vdt,
 
 	    new_vds = realloc(*vds, nelem * sizeof(*new_vds));
 	    if (new_vds == NULL) {
-		pmNotifyErr(LOG_WARNING, "Cannot realloc memory for vds %s\n",
+		__pmNotifyErr(LOG_WARNING, "Cannot realloc memory for vds %s\n",
 			name);
 		goto free_out;
 	    }
@@ -176,14 +176,14 @@ zp_cache_vdevs(zpool_handle_t *zp, void *arg)
 
 	rv = nvlist_lookup_nvlist(cfg, ZPOOL_CONFIG_VDEV_TREE, &vdt);
 	if (rv != 0) {
-	    pmNotifyErr(LOG_ERR, "Cannot get vdev tree for '%s': %d %d\n",
+	    __pmNotifyErr(LOG_ERR, "Cannot get vdev tree for '%s': %d %d\n",
 		    zpname, rv, oserror());
 	    goto done;
 	}
 
 	rv = zp_get_vdevs(zp, zpname, vdt, &vdev_names, &vds, &num);
 	if (rv != 0) {
-	    pmNotifyErr(LOG_WARNING, "Cannot get vdevs for zpool '%s'\n",
+	    __pmNotifyErr(LOG_WARNING, "Cannot get vdevs for zpool '%s'\n",
 	                  zpname);
 	    goto free_done;
 	}
@@ -199,7 +199,7 @@ zp_cache_vdevs(zpool_handle_t *zp, void *arg)
 		if (rv != PMDA_CACHE_INACTIVE || new_vdev) {
 		    zps = malloc(sizeof(*zps));
 		    if (zps == NULL) {
-			pmNotifyErr(LOG_WARNING,
+			__pmNotifyErr(LOG_WARNING,
 				  "Cannot allocate memory to hold stats for "
 				  "vdev '%s'\n", vdev_names[i]);
 			goto free_done;
@@ -209,7 +209,7 @@ zp_cache_vdevs(zpool_handle_t *zp, void *arg)
 		rv = pmdaCacheStore(zpindom, PMDA_CACHE_ADD, vdev_names[i],
 			zps);
 		if (rv < 0) {
-		    pmNotifyErr(LOG_WARNING,
+		    __pmNotifyErr(LOG_WARNING,
 			        "Cannot add '%s' to the cache "
 			        "for instance domain %s: %s\n",
 			        vdev_names[i], pmInDomStr(zpindom),
@@ -224,7 +224,7 @@ zp_cache_vdevs(zpool_handle_t *zp, void *arg)
 	        memcpy(&zps->vds, vds[i], sizeof(zps->vds));
 	        zps->vdev_stats_fresh = 1;
 	    } else {
-		pmNotifyErr(LOG_ERR,
+		__pmNotifyErr(LOG_ERR,
 			"Cannot get stats for '%s': %d %d\n",
 			vdev_names[i], rv, oserror());
 		zps->vdev_stats_fresh = 0;
@@ -265,9 +265,9 @@ zpool_perdisk_fetch(pmdaMetric *pm, int inst, pmAtomValue *atom)
 	return PM_ERR_INST;
 
     if (stats->vdev_stats_fresh) {
-	switch (pmID_item(md->md_desc.pmid)) {
+	switch (pmid_item(md->md_desc.pmid)) {
 	case 0: /* zpool.perdisk.state */
-	    atom->cp = (char *)zpool_state_to_name(stats->vds.vs_state,
+	    atom->cp = zpool_state_to_name(stats->vds.vs_state,
 					   stats->vds.vs_aux);
 	    break;
 	case 1: /* zpool.perdisk.state_int */

@@ -1,6 +1,7 @@
 QA output created by 1106
 --- simple cases ---
-__pmProcessExec: argc=1 toss=1 "cat"
+00000     0
+__pmProcessExec: argc=1 toss=1 "sum"
 __pmProcessExec: pid=PID wait_pid=PID exit=0
 
 a bb ccc dddd>eeee

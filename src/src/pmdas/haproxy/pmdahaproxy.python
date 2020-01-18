@@ -13,12 +13,12 @@
 # GNU General Public License for more details.
 #
 
-# Last updated for: haproxy 1.8.0
+# Last updated for: haproxy 1.7.5
 
 # pylint: disable=superfluous-parens, bad-whitespace
 # pylint: disable=invalid-name, line-too-long, no-self-use
 # pylint: disable=too-many-instance-attributes, too-many-locals
-# pylint: disable=broad-except, too-many-branches
+# pylint: disable=bare-except, broad-except, too-many-branches
 # pylint: disable=too-many-return-statements, bad-continuation
 
 """ PCP HAProxy Performance Metrics Domain Agent """
@@ -149,7 +149,7 @@ class HAProxyPMDA(PMDA):
         ]
 
         self.stat_indom = self.indom(0)
-        self.stat_insts = pmdaIndom(self.stat_indom, {})
+        self.stat_insts = pmdaIndom(self.stat_indom, [])
         self.add_indom(self.stat_insts)
 
         self.stat_cluster = 1
@@ -260,11 +260,7 @@ class HAProxyPMDA(PMDA):
         conffile += '/' + self.read_name() + '/' + self.read_name() + '.conf'
 
         # Silently ignore missing file/section
-        # Python < 3.2 compat
-        if sys.version_info[0] >= 3 and sys.version_info[1] >= 2:
-            config = ConfigParser.ConfigParser()
-        else:
-            config = ConfigParser.SafeConfigParser()
+        config = ConfigParser.SafeConfigParser()
         config.read(conffile)
         if config.has_section('pmda'):
             for opt in config.options('pmda'):
@@ -285,15 +281,15 @@ class HAProxyPMDA(PMDA):
     def setup_urllib(self, url, auth, pasw):
         """ Setup urllib """
         try:
-            import urllib.request as httprequest
-        except Exception:
-            import urllib2 as httprequest
-        passman = httprequest.HTTPPasswordMgrWithDefaultRealm()
+            import urllib.request as request
+        except:
+            import urllib2 as request
+        passman = request.HTTPPasswordMgrWithDefaultRealm()
         passman.add_password(None, url, auth, pasw)
-        authhandler = httprequest.HTTPBasicAuthHandler(passman)
-        opener = httprequest.build_opener(authhandler)
-        httprequest.install_opener(opener)
-        return httprequest
+        authhandler = request.HTTPBasicAuthHandler(passman)
+        opener = request.build_opener(authhandler)
+        request.install_opener(opener)
+        return request
 
     def read_socket(self, skt):
         """ Read data from socket """
@@ -367,7 +363,7 @@ class HAProxyPMDA(PMDA):
                     return [self.info[self.info_metrics[item][4]], 1]
                 else:
                     return [long(self.info[self.info_metrics[item][4]]), 1]
-            except Exception:
+            except:
                 return [PM_ERR_APPVERSION, 0]
 
         if cluster == self.stat_cluster:
@@ -379,7 +375,7 @@ class HAProxyPMDA(PMDA):
                     return [self.stat[name][item], 1]
                 else:
                     return [long(self.stat[name][item]), 1]
-            except Exception:
+            except:
                 return [PM_ERR_APPVERSION, 0]
 
         return [PM_ERR_PMID, 0]

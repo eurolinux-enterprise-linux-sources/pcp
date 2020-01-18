@@ -2,7 +2,7 @@
  * perfevent PMDA
  *
  * Copyright (c) 2013 Joe White
- * Copyright (c) 2012,2016,2018,2019 Red Hat.
+ * Copyright (c) 2012,2016 Red Hat.
  * Copyright (c) 1995,2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -15,8 +15,9 @@
  * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * for more details.
  */
-#include "pmapi.h"
-#include "pmda.h"
+#include <pcp/pmapi.h>
+#include <pcp/impl.h>
+#include <pcp/pmda.h>
 #include "domain.h"
 #include <sys/stat.h>
 #include <ctype.h>
@@ -85,7 +86,7 @@ static pmdaIndom *indomtab;
 /*
  * Performance metrics namespace
  */
-static pmdaNameSpace *pmns;
+static __pmnsTree *pmns;
 
 typedef struct dynamic_metric_info
 {
@@ -174,12 +175,6 @@ static const char *dynamic_derived_helptab[] =
     "The values of the derived events"
 };
 
-static const char *dynamic_indom_helptab[] =
-{
-    /* per-CPU instance domains */
-    "set of all processors"
-};
-
 static char mypath[MAXPATHLEN];
 static int	isDSO = 1;		/* =0 I am a daemon */
 static char	*username;
@@ -193,24 +188,20 @@ static int	compat_names = 0;
  */
 static int perfevent_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 {
-    unsigned int cluster;
-    unsigned int item;
     if( NULL == mdesc )
     {
         return PM_ERR_PMID;
     }
+    __pmID_int		*idp = (__pmID_int *)&(mdesc->m_desc.pmid);
 
-    cluster = pmID_cluster(mdesc->m_desc.pmid);
-    item = pmID_item(mdesc->m_desc.pmid);
-
-    if(cluster == 0)
+    if(idp->cluster == 0)
     {
-        if(item == 0)
+        if(idp->item == 0)
         {
             atom->cp = VERSION;
             return 1;
         }
-        else if( item == 1)
+        else if( idp->item == 1)
         {
             atom->l = activecounters;
             return 1;
@@ -220,9 +211,9 @@ static int perfevent_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomV
             return PM_ERR_PMID;
         }
     }
-    if (cluster == 1)
+    if (idp->cluster == 1)
     {
-        if (item == 0)
+        if (idp->item == 0)
         {
             atom->l = nderivedcounters;
             return 1;
@@ -232,7 +223,7 @@ static int perfevent_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomV
             return PM_ERR_PMID;
         }
     }
-    else if(cluster >= (nderivedcounters + nhwcounters + NUM_STATIC_CLUSTERS + NUM_STATIC_DERIVED_CLUSTERS)  )
+    else if(idp->cluster >= (nderivedcounters + nhwcounters + NUM_STATIC_CLUSTERS + NUM_STATIC_DERIVED_CLUSTERS)  )
     {
         return PM_ERR_PMID;
     }
@@ -247,7 +238,7 @@ static int perfevent_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomV
     const perf_data *pdata = NULL;
     const perf_derived_data *pddata = NULL;
 
-    if (cluster >= NUM_STATIC_DERIVED_CLUSTERS + NUM_STATIC_CLUSTERS + nhwcounters)
+    if (idp->cluster >= NUM_STATIC_DERIVED_CLUSTERS + NUM_STATIC_CLUSTERS + nhwcounters)
         pddata = &(pinfo->derived_counter->data[inst]);
     else if (pinfo->hwcounter->counter_disabled)
 	return PM_ERR_VALUE;
@@ -278,7 +269,7 @@ static int perfevent_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomV
 /*
  * store the instance profile away for the next fetch
  */
-static int perfevent_profile(pmProfile *prof, pmdaExt *pmda)
+static int perfevent_profile(__pmProfile *prof, pmdaExt *pmda)
 {
     pmdaEventNewClient(pmda->e_context);
     return 0;
@@ -294,23 +285,6 @@ static int perfevent_fetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaEx
 
     pmdaEventNewClient(pmda->e_context);
     return pmdaFetch(numpmid, pmidlist, resp, pmda);
-}
-
-static int perfevent_labelCallBack(pmInDom indom, unsigned int inst, pmLabelSet **lp)
-{
-    if (indom == PM_INDOM_NULL)
-	return 0;
-    return pmdaAddLabels(lp, "{\"cpu\":%u}", inst);
-}
-
-static int perfevent_label(int ident, int type, pmLabelSet **lpp, pmdaExt *pmda)
-{
-    if (type == PM_LABEL_INDOM && ident != PM_INDOM_NULL) {
-	pmdaAddLabels(lpp, "{\"device_type\":\"cpu\"}");
-	pmdaAddLabels(lpp, "{\"indom_name\":\"per cpu\"}");
-    }
-    pmdaEventNewClient(pmda->e_context);
-    return pmdaLabel(ident, type, lpp, pmda);
 }
 
 static void perfevent_end_contextCallBack(int context)
@@ -347,7 +321,7 @@ static int perfevent_text(int ident, int type, char **buffer, pmdaExt *pmda)
     if ((type & PM_TEXT_PMID) == PM_TEXT_PMID)
     {
         /* Lookup pmid in the metric table. */
-        int item = pmID_item(ident);
+        int item = pmid_item(ident);
 
         /* bounds check item, ensure PMID matches and user data present */
         if (item >= 0 && item < nummetrics
@@ -359,14 +333,6 @@ static int perfevent_text(int ident, int type, char **buffer, pmdaExt *pmda)
             *buffer = (char *)pinfo->help_text;
             return 0;
         }
-    }
-
-    if ((type & PM_TEXT_INDOM) == PM_TEXT_INDOM)
-    {
-	if ((pmInDom)ident != PM_INDOM_NULL) {
-	    *buffer = (char *)dynamic_indom_helptab[0];
-	    return 0;
-	}
     }
 
     return pmdaText(ident, type, buffer, pmda);
@@ -424,13 +390,13 @@ static int setup_perfevents()
     char buffer[MAXPATHLEN];
     const char *err_desc;
     int ret;
-    int	sep = pmPathSeparator();
+    int	sep = __pmPathSeparator();
     pmsprintf(buffer, sizeof(buffer), "%s%c" PMDANAME "%c" PMDANAME ".conf", pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
 
     perfif = manager_init(buffer);
     if( 0 == perfif )
     {
-        pmNotifyErr(LOG_ERR, "Unable to create perf instance\n");
+        __pmNotifyErr(LOG_ERR, "Unable to create perf instance\n");
         return -1;
     }
 
@@ -438,7 +404,7 @@ static int setup_perfevents()
     if( ret < 0 )
     {
         err_desc = perf_strerror(ret);
-        pmNotifyErr(LOG_ERR, "Error reading event counters perf_get returned %s\n",err_desc);
+        __pmNotifyErr(LOG_ERR, "Error reading event counters perf_get returned %s\n",err_desc);
         return -1;
     }
 
@@ -479,7 +445,7 @@ static int setup_metrics()
 
     if( (NULL == dynamic_metric_infotab) || (NULL == metrictab) || (NULL == indomtab) )
     {
-        pmNotifyErr(LOG_ERR, "Error allocating memory for %d metrics (%d counters)\n",
+        __pmNotifyErr(LOG_ERR, "Error allocating memory for %d metrics (%d counters)\n",
                       nummetrics, nhwcounters);
         free(dynamic_metric_infotab);
         free(metrictab);
@@ -600,9 +566,9 @@ static int setup_pmns()
     char name[MAXPATHLEN * 2];
     pmdaMetric *pmetric;
 
-    if ((sts = pmdaTreeCreate(&pmns)) < 0)
+    if ((sts = __pmNewPMNS(&pmns)) < 0)
     {
-        pmNotifyErr(LOG_ERR, "%s: failed to create new pmns: %s\n", pmGetProgname(), pmErrStr(sts));
+        __pmNotifyErr(LOG_ERR, "%s: failed to create new pmns: %s\n", pmProgname, pmErrStr(sts));
         pmns = NULL;
         return -1;
     }
@@ -611,7 +577,7 @@ static int setup_pmns()
 
     /* Setup for derived static metrics */
     pmsprintf(name, sizeof(name), PMDANAME ".derived.%s", "active");
-    pmdaTreeInsert(pmns, pmetric[0].m_desc.pmid, name);
+    __pmAddPMNSNode(pmns, pmetric[0].m_desc.pmid, name);
 
     pmetric += NUM_STATIC_DERIVED_METRICS;
 
@@ -624,7 +590,7 @@ static int setup_pmns()
         {
             pmsprintf(name, sizeof(name),
                      PMDANAME ".hwcounters.%s.%s", id, dynamic_nametab[j]);
-            pmdaTreeInsert(pmns, pmetric[j].m_desc.pmid, name);
+            __pmAddPMNSNode(pmns, pmetric[j].m_desc.pmid, name);
         }
         pmetric += METRICSPERCOUNTER;
         free(id);
@@ -637,7 +603,7 @@ static int setup_pmns()
         {
             pmsprintf(name, sizeof(name),
                      PMDANAME ".derived.%s.%s", id, dynamic_nametab[j]);
-            pmdaTreeInsert(pmns, pmetric[j].m_desc.pmid, name);
+            __pmAddPMNSNode(pmns, pmetric[j].m_desc.pmid, name);
         }
         pmetric += METRICSPERDERIVED;
         free(id);
@@ -657,9 +623,9 @@ perfevent_init(pmdaInterface *dp)
 {
     if (isDSO)
     {
-        int sep = pmPathSeparator();
+        int sep = __pmPathSeparator();
         pmsprintf(mypath, sizeof(mypath), "%s%c" PMDANAME "%c" "help", pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-        pmdaDSO(dp, PMDA_INTERFACE_7, PMDANAME " DSO", mypath);
+        pmdaDSO(dp, PMDA_INTERFACE_5, PMDANAME " DSO", mypath);
     }
 
     if (dp->status != 0)
@@ -676,7 +642,7 @@ perfevent_init(pmdaInterface *dp)
 
     if(!isDSO)
     {
-        pmSetProcessIdentity(username);
+        __pmSetProcessIdentity(username);
     }
 
     if(setup_metrics() < 0 )
@@ -684,16 +650,14 @@ perfevent_init(pmdaInterface *dp)
         return;
     }
 
-    dp->version.seven.profile = perfevent_profile;
-    dp->version.seven.fetch = perfevent_fetch;
-    dp->version.seven.label = perfevent_label;
-    dp->version.seven.text = perfevent_text;
-    dp->version.seven.pmid = perfevent_pmid;
-    dp->version.seven.name = perfevent_name;
-    dp->version.seven.children = perfevent_children;
+    dp->version.five.profile = perfevent_profile;
+    dp->version.five.fetch = perfevent_fetch;
+    dp->version.five.text = perfevent_text;
+    dp->version.five.pmid = perfevent_pmid;
+    dp->version.five.name = perfevent_name;
+    dp->version.five.children = perfevent_children;
 
     pmdaSetFetchCallBack(dp, perfevent_fetchCallBack);
-    pmdaSetLabelCallBack(dp, perfevent_labelCallBack);
     pmdaSetEndContextCallBack(dp, perfevent_end_contextCallBack);
 
     pmdaInit(dp, indomtab, nhwcounters + nderivedcounters, metrictab, nummetrics);
@@ -703,12 +667,12 @@ perfevent_init(pmdaInterface *dp)
         return;
     }
 
-    pmNotifyErr(LOG_INFO, "perfevent version " VERSION " initialised\n");
+    __pmNotifyErr(LOG_INFO, "perfevent version " VERSION " initialised\n");
 }
 
 static void usage(void)
 {
-    fprintf(stderr, "Usage: %s [options]\n\n", pmGetProgname());
+    fprintf(stderr, "Usage: %s [options]\n\n", pmProgname);
     fputs("Options:\n"
           "  -C           maintain compatibility to (possibly) nonconforming metric names\n"
           "  -d domain    use domain (numeric) for metrics domain of PMDA\n"
@@ -729,16 +693,16 @@ static void usage(void)
 int main(int argc, char **argv)
 {
     int			c, err = 0;
-    int			sep = pmPathSeparator();
+    int			sep = __pmPathSeparator();
     pmdaInterface	dispatch;
 
     isDSO = 0;
-    pmSetProgname(argv[0]);
-    pmGetUsername(&username);
+    __pmSetProgname(argv[0]);
+    __pmGetUsername(&username);
 
     pmsprintf(mypath, sizeof(mypath), "%s%c" "perfevent" "%c" "help",
              pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-    pmdaDaemon(&dispatch, PMDA_INTERFACE_7, pmGetProgname(), PERFEVENT,
+    pmdaDaemon(&dispatch, PMDA_INTERFACE_5, pmProgname, PERFEVENT,
                "perfevent.log", mypath);
 
     while ((c = pmdaGetOpt(argc, argv, "CD:d:i:l:pu:U:6:?", &dispatch, &err)) != EOF)

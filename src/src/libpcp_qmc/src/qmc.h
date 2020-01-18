@@ -11,7 +11,7 @@
 #define QMC_H
 
 #include <pcp/pmapi.h>
-#include <pcp/libpcp.h>
+#include <pcp/impl.h>
 
 //
 // Classes

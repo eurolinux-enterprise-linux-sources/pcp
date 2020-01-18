@@ -247,37 +247,37 @@ pmdaMetric metrictab[] = {
 	 PM_TYPE_U32, IB_CNT_INDOM, PM_SEM_DISCRETE, 
 	 PMDA_PMUNITS(0,0,0,0,0,0) } },
 
-    /* infiniband.port.switch.in.bytes */
-    { NULL,
+	/* infiniband.port.switch.in.bytes */
+	{ NULL,
 	{PMDA_PMID(3,METRIC_ib_port_switch_in_bytes),
 	 PM_TYPE_U64, IB_PORT_INDOM, PM_SEM_COUNTER, 
 	 PMDA_PMUNITS(1,0,0,PM_SPACE_BYTE,0,0) } },
 
-    /* infiniband.port.switch.in.packets */
+	/* infiniband.port.switch.in.packets */
     { NULL,
 	{PMDA_PMID(3,METRIC_ib_port_switch_in_packets),
 	 PM_TYPE_U64, IB_PORT_INDOM, PM_SEM_COUNTER, 
 	 PMDA_PMUNITS(0,0,1,0,0,0) } },
 
-    /* infiniband.port.switch.out.bytes */
-    { NULL,
+	/* infiniband.port.switch.out.bytes */
+	{ NULL,
 	{PMDA_PMID(3,METRIC_ib_port_switch_out_bytes),
 	 PM_TYPE_U64, IB_PORT_INDOM, PM_SEM_COUNTER, 
 	 PMDA_PMUNITS(1,0,0,PM_SPACE_BYTE,0,0) } },
 
-    /* infiniband.port.switch.out.packets */
+	/* infiniband.port.switch.out.packets */
     { NULL,
 	{PMDA_PMID(3,METRIC_ib_port_switch_out_packets),
 	 PM_TYPE_U64, IB_PORT_INDOM, PM_SEM_COUNTER, 
 	 PMDA_PMUNITS(0,0,1,0,0,0) } },
 
-    /* infiniband.port.switch.total.bytes */
-    { NULL,
+	/* infiniband.port.switch.total.bytes */
+	{ NULL,
 	{PMDA_PMID(3,METRIC_ib_port_switch_total_bytes),
 	 PM_TYPE_U64, IB_PORT_INDOM, PM_SEM_COUNTER, 
 	 PMDA_PMUNITS(1,0,0,PM_SPACE_BYTE,0,0) } },
 
-    /* infiniband.port.switch.total.packets */
+	/* infiniband.port.switch.total.packets */
     { NULL,
 	{PMDA_PMID(3,METRIC_ib_port_switch_total_packets),
 	 PM_TYPE_U64, IB_PORT_INDOM, PM_SEM_COUNTER, 
@@ -322,7 +322,7 @@ void
 ibpmda_init(const char *confpath, int writeconf, pmdaInterface *dp)
 {
     char defconf[MAXPATHLEN];
-    int sep = pmPathSeparator();
+    int sep = __pmPathSeparator();
     int i;
 
     if (dp->status != 0)
@@ -335,8 +335,8 @@ ibpmda_init(const char *confpath, int writeconf, pmdaInterface *dp)
     }
 
     for (i=0; i < ARRAYSZ(indomtab); i++) {
-	indomtab[i].it_indom = pmInDom_build(dp->domain, pmInDom_serial(indomtab[i].it_indom));
-	if (IB_CNT_INDOM != pmInDom_serial(indomtab[i].it_indom)) {
+	__pmindom_int(&indomtab[i].it_indom)->domain = dp->domain;
+	if (IB_CNT_INDOM != __pmindom_int(&indomtab[i].it_indom)->serial) {
 	    pmdaCacheOp (indomtab[i].it_indom, PMDA_CACHE_LOAD);
 	}
     }
@@ -346,7 +346,7 @@ ibpmda_init(const char *confpath, int writeconf, pmdaInterface *dp)
 	return;
 
     for (i=0; i < ARRAYSZ(indomtab); i++) {
-	if (IB_CNT_INDOM != pmInDom_serial(indomtab[i].it_indom)) {
+	if (IB_CNT_INDOM != __pmindom_int(&indomtab[i].it_indom)->serial) {
 	    pmdaCacheOp (indomtab[i].it_indom, PMDA_CACHE_SAVE);
 	}
     }
@@ -361,7 +361,7 @@ ibpmda_init(const char *confpath, int writeconf, pmdaInterface *dp)
 static void
 usage(void)
 {
-    fprintf(stderr, "Usage: %s [options]\n\n", pmGetProgname());
+    fprintf(stderr, "Usage: %s [options]\n\n", pmProgname);
     fputs("Options:\n"
           "  -d domain  use domain (numeric) for metrics domain of PMDA\n"
 	  "  -l logfile write log into logfile rather than using default log name\n"
@@ -375,17 +375,17 @@ int
 main(int argc, char **argv)
 {
     int err = 0;
-    int sep = pmPathSeparator();
+    int sep = __pmPathSeparator();
     pmdaInterface dispatch;
     char helppath[MAXPATHLEN];
     char *confpath = NULL;
     int opt;
     int writeconf = 0;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
     pmsprintf(helppath, sizeof(helppath), "%s%c" "infiniband" "%c" "help", 
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-    pmdaDaemon(&dispatch, PMDA_INTERFACE_3, pmGetProgname(), IB, "infiniband.log", helppath);
+    pmdaDaemon(&dispatch, PMDA_INTERFACE_3, pmProgname, IB, "infiniband.log", helppath);
 
     while ((opt = pmdaGetOpt(argc, argv, "D:c:d:l:w?", &dispatch, &err)) != EOF) {
 	switch (opt) {

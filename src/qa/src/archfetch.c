@@ -4,6 +4,7 @@
  */
 
 #include <pcp/pmapi.h>
+#include <pcp/impl.h>
 
 int
 main(int argc, char **argv)
@@ -25,10 +26,9 @@ main(int argc, char **argv)
     pmID	*pmidlist = NULL;
     pmResult	*rp;
     char	timebuf[26];
-    time_t	clock;
 
     /* trim cmd name of leading directory components */
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "a:D:O:s:zZ:?")) != EOF) {
 	switch (c) {
@@ -36,9 +36,9 @@ main(int argc, char **argv)
 	case 'a':	/* archive name */
 	    if (type != 0) {
 #ifdef BUILD_STANDALONE
-		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a, -h and -L allowed\n", pmProgname);
 #else
-		fprintf(stderr, "%s: at most one of -a and -h allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -a and -h allowed\n", pmProgname);
 #endif
 		errflag++;
 	    }
@@ -50,7 +50,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -58,14 +58,14 @@ main(int argc, char **argv)
 	case 's':	/* sample count */
 	    samples = (int)strtol(optarg, &endnum, 10);
 	    if (*endnum != '\0' || samples < 0) {
-		fprintf(stderr, "%s: -s requires numeric argument\n", pmGetProgname());
+		fprintf(stderr, "%s: -s requires numeric argument\n", pmProgname);
 		errflag++;
 	    }
 	    break;
 
 	case 'z':	/* timezone from archive */
 	    if (tz != NULL) {
-		fprintf(stderr, "%s: at most one of -Z and/or -z allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -Z and/or -z allowed\n", pmProgname);
 		errflag++;
 	    }
 	    zflag++;
@@ -73,7 +73,7 @@ main(int argc, char **argv)
 
 	case 'Z':	/* $TZ timezone */
 	    if (zflag) {
-		fprintf(stderr, "%s: at most one of -Z and/or -z allowed\n", pmGetProgname());
+		fprintf(stderr, "%s: at most one of -Z and/or -z allowed\n", pmProgname);
 		errflag++;
 	    }
 	    tz = optarg;
@@ -95,36 +95,36 @@ Options:\n\
   -s samples     terminate after this many samples\n\
   -z             set reporting timezone to local time of metrics source\n\
   -Z timezone    set reporting timezone\n",
-                pmGetProgname());
+                pmProgname);
         exit(1);
     }
 
     if (type == 0) {
-	fprintf(stderr, "%s: -a is not optional\n", pmGetProgname());
+	fprintf(stderr, "%s: -a is not optional\n", pmProgname);
 	exit(1);
     }
 
     if ((sts = pmNewContext(type, archive)) < 0) {
 	fprintf(stderr, "%s: Cannot open archive \"%s\": %s\n",
-		pmGetProgname(), archive, pmErrStr(sts));
+		pmProgname, archive, pmErrStr(sts));
 	exit(1);
     }
 
     if ((sts = pmGetArchiveLabel(&label)) < 0) {
 	fprintf(stderr, "%s: Cannot get archive label record: %s\n",
-	    pmGetProgname(), pmErrStr(sts));
+	    pmProgname, pmErrStr(sts));
 	exit(1);
     }
 
     if ((sts = pmSetMode(mode, &label.ll_start, 0)) < 0) {
-	fprintf(stderr, "%s: pmSetMode: %s\n", pmGetProgname(), pmErrStr(sts));
+	fprintf(stderr, "%s: pmSetMode: %s\n", pmProgname, pmErrStr(sts));
 	exit(1);
     }
 
     if (zflag) {
 	if ((tzh = pmNewContextZone()) < 0) {
 	    fprintf(stderr, "%s: Cannot set context timezone: %s\n",
-		pmGetProgname(), pmErrStr(tzh));
+		pmProgname, pmErrStr(tzh));
 	    exit(1);
 	}
 	printf("Note: timezone set to local timezone of host \"%s\" from archive\n\n",
@@ -133,7 +133,7 @@ Options:\n\
     else if (tz != NULL) {
 	if ((tzh = pmNewZone(tz)) < 0) {
 	    fprintf(stderr, "%s: Cannot set timezone to \"%s\": %s\n",
-		pmGetProgname(), tz, pmErrStr(tzh));
+		pmProgname, tz, pmErrStr(tzh));
 	    exit(1);
 	}
 	printf("Note: timezone set to \"TZ=%s\"\n\n", tz);
@@ -142,12 +142,12 @@ Options:\n\
     while (optind < argc) {
 	pmidlist = (pmID *)realloc(pmidlist, (numpmid+1)*sizeof(pmidlist[0]));
 	if (pmidlist == NULL) {
-	    pmNoMem("pmidlist[]", (numpmid+1)*sizeof(pmidlist[0]), PM_FATAL_ERR);
+	    __pmNoMem("pmidlist[]", (numpmid+1)*sizeof(pmidlist[0]), PM_FATAL_ERR);
 	    /* NOTREACHED */
 	}
 	sts = pmLookupName(1, &argv[optind], &pmidlist[numpmid]);
 	if (sts < 0) {
-	    fprintf(stderr, "%s: pmLookupName(..., %s, ...): %s\n", pmGetProgname(), argv[optind], pmErrStr(sts));
+	    fprintf(stderr, "%s: pmLookupName(..., %s, ...): %s\n", pmProgname, argv[optind], pmErrStr(sts));
 	    exit(1);
 	}
 	numpmid++;
@@ -159,8 +159,7 @@ Options:\n\
     while (samples == -1 || samples-- > 0) {
 	sts = pmFetch(numpmid, pmidlist, &rp);
 	if (sts >= 0) {
-	    clock = rp->timestamp.tv_sec;
-	    pmCtime(&clock, timebuf);
+	    pmCtime(&rp->timestamp.tv_sec, timebuf);
 	    printf("numpmid=%2d %.19s.%08d\n", rp->numpmid, timebuf, (int)rp->timestamp.tv_usec);
 	    pmFreeResult(rp);
 	}
@@ -171,7 +170,7 @@ Options:\n\
     }
 
     if ((sts = pmSetMode(mode, &label.ll_start, 0)) < 0) {
-	fprintf(stderr, "%s: pmSetMode: %s\n", pmGetProgname(), pmErrStr(sts));
+	fprintf(stderr, "%s: pmSetMode: %s\n", pmProgname, pmErrStr(sts));
 	exit(1);
     }
 
@@ -180,8 +179,7 @@ Options:\n\
     while (samples == -1 || samples-- > 0) {
 	sts = pmFetchArchive(&rp);
 	if (sts >= 0) {
-	    clock = rp->timestamp.tv_sec;
-	    pmCtime(&clock, timebuf);
+	    pmCtime(&rp->timestamp.tv_sec, timebuf);
 	    printf("numpmid=%2d %.19s.%08d", rp->numpmid, timebuf, (int)rp->timestamp.tv_usec);
 	    if (rp->numpmid == 0)
 		printf(" <mark>");

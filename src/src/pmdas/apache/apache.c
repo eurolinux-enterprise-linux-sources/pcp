@@ -17,6 +17,7 @@
  */
 
 #include "pmapi.h"
+#include "impl.h"
 #include "pmda.h"
 #include "pmhttp.h"
 #include "domain.h"
@@ -214,7 +215,7 @@ static int refreshData(void)
     len = pmhttpClientFetch(http_client, url, res, sizeof(res), NULL, 0);
     if (len < 0) {
 	if (pmDebugOptions.appl1)
-	    pmNotifyErr(LOG_ERR, "HTTP fetch (stats) failed\n");
+	    __pmNotifyErr(LOG_ERR, "HTTP fetch (stats) failed\n");
 	return 0; /* failed */
     }
 
@@ -317,7 +318,7 @@ static int refreshData(void)
 		    break;
 		default:
 		    if (pmDebugOptions.appl1) {
-			pmNotifyErr(LOG_WARNING,
+			__pmNotifyErr(LOG_WARNING,
 				"Unknown scoreboard character '%c'\n", *s3);
 		    }
 		}
@@ -325,7 +326,7 @@ static int refreshData(void)
 	     }
 	}
 	else if (pmDebugOptions.appl1) {
-	    pmNotifyErr(LOG_WARNING, "Unknown value name '%s'!\n", s2);
+	    __pmNotifyErr(LOG_WARNING, "Unknown value name '%s'!\n", s2);
 	}
     }
 
@@ -345,12 +346,14 @@ apache_fetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *pmda)
 static int
 apache_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 {
-    if (pmID_cluster(mdesc->m_desc.pmid) != 0)
+    __pmID_int	*idp = (__pmID_int *)&(mdesc->m_desc.pmid);
+
+    if (idp->cluster != 0)
 	return PM_ERR_PMID;
     else if (inst != PM_IN_NULL)
 	return PM_ERR_INST;
 
-    switch (pmID_item(mdesc->m_desc.pmid)) {
+    switch (idp->item) {
 	case 0:
 	    if (!(data.flags & ACCESSES))
 		return 0;
@@ -463,10 +466,10 @@ apache_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 void 
 apache_init(pmdaInterface *dp)
 {
-    pmSetProcessIdentity(username);
+    __pmSetProcessIdentity(username);
 
     if ((http_client = pmhttpNewClient()) == NULL) {
-	pmNotifyErr(LOG_ERR, "HTTP client creation failed\n");
+	__pmNotifyErr(LOG_ERR, "HTTP client creation failed\n");
 	exit(1);
     }
     pmsprintf(url, sizeof(url), "http://%s:%u/%s?auto", http_server, http_port, http_path);
@@ -479,16 +482,16 @@ apache_init(pmdaInterface *dp)
 int
 main(int argc, char **argv)
 {
-    int			c, sep = pmPathSeparator();
+    int			c, sep = __pmPathSeparator();
     pmdaInterface	pmda;
     char		helppath[MAXPATHLEN];
 
-    pmSetProgname(argv[0]);
-    pmGetUsername(&username);
+    __pmSetProgname(argv[0]);
+    __pmGetUsername(&username);
 
     pmsprintf(helppath, sizeof(helppath), "%s%c" "apache" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-    pmdaDaemon(&pmda, PMDA_INTERFACE_3, pmGetProgname(), APACHE, "apache.log",
+    pmdaDaemon(&pmda, PMDA_INTERFACE_3, pmProgname, APACHE, "apache.log",
 		helppath);
 
     while ((c = pmdaGetOptions(argc, argv, &opts, &pmda)) != EOF) {

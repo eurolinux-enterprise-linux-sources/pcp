@@ -32,7 +32,7 @@ pmlogger_daily
 
 Looking for pmlogger (process PID) [dots] found
 pcp ...
-Terminating pmlogger (process PID) [dots] SIGUSR1 ... SIGTERM ... done
+Terminating pmlogger (process PID) [dots] SIGUSR1 LOCALHOST SIGTERM LOCALHOST done
 Launching new pmlogger in directory "TMP/A" as [dots]
 pmlogger -m PMLOGGER.DAILY -l pmlogger.log -h LOCALHOST -c TMP.config DATE.TIME
 Waiting for new pmlogger to start [dots] done
@@ -44,13 +44,14 @@ last log entry ...
 current time ...
 log volume       0
 log size ...
+
 PMLOGGER.DAILY: Warning: no archives found to merge
 
 === daily maintenance of PCP archives for host LOCALHOST ===
 
 Looking for pmlogger (process PID) [dots] found
 pcp ...
-Terminating pmlogger (process PID) [dots] SIGUSR1 ... SIGTERM ... done
+Terminating pmlogger (process PID) [dots] SIGUSR1 LOCALHOST SIGTERM LOCALHOST done
 Launching new pmlogger in directory "TMP/B" as [dots]
 pmlogger -m PMLOGGER.DAILY -l pmlogger.log -h LOCALHOST -c TMP.config DATE.TIME
 Waiting for new pmlogger to start [dots] done
@@ -62,13 +63,14 @@ last log entry ...
 current time ...
 log volume       0
 log size ...
+
 PMLOGGER.DAILY: Warning: no archives found to merge
 
 === daily maintenance of PCP archives for host LOCALHOST ===
 
 Looking for pmlogger (process PID) [dots] found
 pcp ...
-Terminating pmlogger (process PID) [dots] SIGUSR1 ... SIGTERM ... done
+Terminating pmlogger (process PID) [dots] SIGUSR1 LOCALHOST SIGTERM LOCALHOST done
 Launching new pmlogger in directory "TMP/C" as [dots]
 pmlogger -m PMLOGGER.DAILY -l pmlogger.log -h LOCALHOST -c TMP.config DATE.TIME
 Waiting for new pmlogger to start [dots] done
@@ -80,6 +82,7 @@ last log entry ...
 current time ...
 log volume       0
 log size ...
+
 PMLOGGER.DAILY: Warning: no archives found to merge
 3 archives in TMP/A
 3 archives in TMP/B

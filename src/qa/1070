@@ -26,10 +26,6 @@ perl -e "use Spreadsheet::Read" >/dev/null 2>&1
 [ $? -eq 0 ] || _notrun "perl Spreadsheet::Read module not installed"
 which sheet2pcp >/dev/null 2>&1
 [ $? -eq 0 ] || _notrun "sheet2pcp not installed"
-[ -f ${PCP_LIB_DIR}/libpcp_import.${DSO_SUFFIX} ] || \
-	_notrun "No support for libpcp_import"
-perl -e "use PCP::LogImport" 2>/dev/null || \
-	_notrun "Perl PCP::LogImport module is not installed"
 
 status=1        # failure is the default!
 $sudo rm -rf $tmp $tmp.* $seq.full
@@ -59,10 +55,10 @@ echo "Test data to be used:"
 pmrep -s 5 -t 2 $log -p -o stdout -x hinv.machine mem.util.used kernel.all.sysfork hinv.cpu.clock 2>&1 \
 | _path_filter \
 | _archive_filter
-pmrep -s 5 -t 2 $log -p -o csv -r -F 1070.csv hinv.machine mem.util.used kernel.all.sysfork hinv.cpu.clock 2>&1 \
+pmrep -s 5 -t 2 $log -p -o csv -F 1070.csv hinv.machine mem.util.used kernel.all.sysfork hinv.cpu.clock 2>&1 \
 | _archive_filter
 sheet2pcp 1070.csv 1070.map 1070-archive
-pmrep -s 5 -t 2 -a 1070-archive -z -p -o csv -r -F 1070.csv2 hinv.machine mem.util.used kernel.all.sysfork hinv.cpu.clock 2>&1 \
+pmrep -s 5 -t 2 -a 1070-archive -z -p -o csv -F 1070.csv2 hinv.machine mem.util.used kernel.all.sysfork hinv.cpu.clock 2>&1 \
 | _archive_filter
 echo "Diff of CSV files start (no output expected)"
 diff 1070.csv 1070.csv2

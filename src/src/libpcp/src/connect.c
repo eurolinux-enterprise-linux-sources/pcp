@@ -15,7 +15,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "internal.h"
 
 /* MY_BUFLEN needs to big enough to hold "hostname port" */
@@ -42,9 +42,7 @@ __pmIsConnectLock(void *lock)
 void
 init_connect_lock(void)
 {
-#if defined(PM_MULTI_THREAD)
     __pmInitMutex(&connect_lock);
-#endif
 }
 
 static int
@@ -63,7 +61,7 @@ negotiate_proxy(int fd, const char *hostname, int port)
 
     if (__pmSend(fd, MY_VERSION, strlen(MY_VERSION), 0) != strlen(MY_VERSION)) {
 	char	errmsg[PM_MAXERRMSGLEN];
-	pmNotifyErr(LOG_WARNING,
+	__pmNotifyErr(LOG_WARNING,
 	     "__pmConnectPMCD: send version string to pmproxy failed: %s\n",
 	    pmErrStr_r(-neterror(), errmsg, sizeof(errmsg)));
 	return PM_ERR_IPC;
@@ -85,7 +83,7 @@ negotiate_proxy(int fd, const char *hostname, int port)
     }
 
     if (!ok) {
-	pmNotifyErr(LOG_WARNING,
+	__pmNotifyErr(LOG_WARNING,
 	     "__pmConnectPMCD: bad version string from pmproxy: \"%s\"\n",
 	    buf);
 	return PM_ERR_IPC;
@@ -94,7 +92,7 @@ negotiate_proxy(int fd, const char *hostname, int port)
     pmsprintf(buf, sizeof(buf), "%s %d\n", hostname, port);
     if (__pmSend(fd, buf, strlen(buf), 0) != strlen(buf)) {
 	char	errmsg[PM_MAXERRMSGLEN];
-	pmNotifyErr(LOG_WARNING,
+	__pmNotifyErr(LOG_WARNING,
 	     "__pmConnectPMCD: send hostname+port string to pmproxy failed: %s'\n",
 	     pmErrStr_r(-neterror(), errmsg, sizeof(errmsg)));
 	return PM_ERR_IPC;
@@ -133,7 +131,7 @@ check_feature_flags(int ctxflags, int features, int local_conn)
 	    /* PMCD requires a client cert, but we are not even setup for secure connections */
 	    return PM_ERR_NEEDCLIENTCERT;
 	}
-    }
+     }
 
     if (ctxflags) {
 	/*
@@ -240,7 +238,7 @@ __pmConnectHandshake(int fd, const char *hostname, int ctxflags, __pmHashCtl *at
     __pmPDU	*pb;
     int		ok;
     int		version;
-    int		challenge = 0;
+    int		challenge;
     int		sts;
     int		pinpdu;
 
@@ -344,7 +342,7 @@ load_proxy_hostspec(pmHostSpec *proxy)
 	proxy->name = strdup(envstr);
 	PM_UNLOCK(__pmLock_extcall);
 	if (proxy->name == NULL) {
-	    pmNotifyErr(LOG_WARNING,
+	    __pmNotifyErr(LOG_WARNING,
 			  "__pmConnectPMCD: cannot save PMPROXY_HOST: %s\n",
 			  pmErrStr_r(-oserror(), errmsg, sizeof(errmsg)));
 	}
@@ -368,7 +366,7 @@ __pmConnectGetPorts(pmHostSpec *host)
     PM_LOCK(connect_lock);
     load_pmcd_ports();
     if (__pmAddHostPorts(host, global_portlist, global_nports) < 0) {
-	pmNotifyErr(LOG_WARNING,
+	__pmNotifyErr(LOG_WARNING,
 		"__pmConnectGetPorts: portlist dup failed, "
 		"using default PMCD_PORT (%d)\n", SERVER_PORT);
 	host->ports[0] = SERVER_PORT;

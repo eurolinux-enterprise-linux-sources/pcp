@@ -29,8 +29,9 @@ LDIRT	= *.log help.pag help.dir $(subst .c,.o,$(CFILES)) \
 
 default default_pcp setup: $(CFILES_TARGETS) $(TARGETS)
 
-MYFILES = broken_help broken_pmns domain.h root
+MYFILES = broken_help broken_pmns domain.h
 MYSCRIPTS = broken_Install broken_Remove
+LSRCFILES += $(MYFILES) $(MYSCRIPTS) GNUmakefile.install
 
 include $(BUILDRULES)
 

@@ -8,8 +8,6 @@
 #include <qmc_desc.h>
 #include <qmc_indom.h>
 
-#include <pcp/libpcp.h>
-
 QTextStream cerr(stderr);
 QTextStream cout(stdout);
 
@@ -20,7 +18,7 @@ main(int argc, char* argv[])
     int		c;
     __pmContext	*ctxp;
 
-    pmSetProgname(argv[0]);
+    pmProgname = basename(argv[0]);
 
     while ((c = getopt(argc, argv, "D:?")) != EOF) {
 	switch (c) {
@@ -28,7 +26,7 @@ main(int argc, char* argv[])
 	    sts = pmSetDebug(optarg);
             if (sts < 0) {
 		pmprintf("%s: unrecognized debug options specification (%s)\n",
-			 pmGetProgname(), optarg);
+			 pmProgname, optarg);
                 sts = 1;
             }
             break;
@@ -40,7 +38,7 @@ main(int argc, char* argv[])
     }
 
     if (sts) {
-	pmprintf("Usage: %s\n", pmGetProgname());
+	pmprintf("Usage: %s\n", pmProgname);
 	pmflush();
 	exit(1);
         /*NOTREACHED*/
@@ -52,18 +50,18 @@ main(int argc, char* argv[])
 
     if (src->status() < 0) {
 	pmprintf("%s: Error: Unable to create context to \"%s\": %s\n",
-		pmGetProgname(), (const char *)source.toLatin1(),
+		pmProgname, (const char *)source.toLatin1(),
 		pmErrStr(src->status()));
 	pmflush();
 	return 1;
     }
 
-    pmID hinv_map_cpu = pmID_build(1, 26, 9);
+    pmID hinv_map_cpu = pmid_build(1, 26, 9);
     QmcDesc hinv_map_cpu_pmc(hinv_map_cpu);
 
     if (hinv_map_cpu_pmc.status() < 0) {
 	pmprintf("\n%s: Error: hinv.map.cpu: %s\n",
-		 pmGetProgname(), pmErrStr(hinv_map_cpu_pmc.status()));
+		 pmProgname, pmErrStr(hinv_map_cpu_pmc.status()));
 	pmflush();
 	return 1;
     }
@@ -72,7 +70,7 @@ main(int argc, char* argv[])
 
     if (indom.status() < 0) {
 	pmprintf("%s: Error: hinv.map.cpu: %s\n",
-		 pmGetProgname(), pmErrStr(indom.status()));
+		 pmProgname, pmErrStr(indom.status()));
 	pmflush();
 	return 1;
     }
@@ -81,7 +79,7 @@ main(int argc, char* argv[])
 
     if (indom.diffProfile()) {
 	pmprintf("%s: Error: Profile requires updating but there is nothing in it\n",
-		 pmGetProgname());
+		 pmProgname);
 	sts = 1;
     }
 
@@ -90,7 +88,7 @@ main(int argc, char* argv[])
 
     if (!indom.diffProfile()) {
 	pmprintf("%s: Error: Profile should require updating but flag not set\n",
-		 pmGetProgname());
+		 pmProgname);
 	sts = 1;
     }
 
@@ -99,7 +97,7 @@ main(int argc, char* argv[])
 
     ctxp = __pmHandleToPtr(pmWhichContext());
     if (ctxp == NULL) {
-	pmprintf("%s: Error: no current context first time?\n", pmGetProgname());
+	pmprintf("%s: Error: no current context first time?\n", pmProgname);
 	pmflush();
 	return 1;
     }
@@ -108,7 +106,7 @@ main(int argc, char* argv[])
 
     if (indom.diffProfile()) {
 	pmprintf("%s: Error: Profile just generated but flag still set\n",
-		 pmGetProgname());
+		 pmProgname);
 	sts = 1;
     }
 
@@ -117,7 +115,7 @@ main(int argc, char* argv[])
 
     if (!indom.diffProfile()) {
 	pmprintf("%s: Error: All instances referenced but profile flag unset\n",
-		 pmGetProgname());
+		 pmProgname);
 	sts = 1;
     }
 
@@ -126,7 +124,7 @@ main(int argc, char* argv[])
 
     ctxp = __pmHandleToPtr(pmWhichContext());
     if (ctxp == NULL) {
-	pmprintf("%s: Error: no current context second time?\n", pmGetProgname());
+	pmprintf("%s: Error: no current context second time?\n", pmProgname);
 	pmflush();
 	return 1;
     }
@@ -135,7 +133,7 @@ main(int argc, char* argv[])
 
     if (indom.diffProfile()) {
 	pmprintf("%s: Error: Profile just generated but flag still set\n",
-		 pmGetProgname());
+		 pmProgname);
 	sts = 1;
     }
 

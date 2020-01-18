@@ -1,4 +1,5 @@
 domain.h
+exports
 mmvdump
 pmdammv
 pmda_mmv.so

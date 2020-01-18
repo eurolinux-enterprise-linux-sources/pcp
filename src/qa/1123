@@ -15,23 +15,7 @@ trap "_cleanup_qt; exit \$status" 0 1 2 3 15
 which pmchart >/dev/null 2>&1 || _notrun "pmchart not installed"
 [ -f $PCP_VAR_DIR/config/pmchart/BusyCPU ] || _notrun "BusyCPU view not installed"
 
-_need_metric proc.psinfo.utime
-_need_metric proc.psusage.utime
-
-case `hostname`
-in
-    vm20|shard)
-	    # cannot explain or understand this, but the condition appears
-	    # to be entirely reproducible - Aug 2018
-	    #
-	    _notrun "pmchart hangs for this test on `hostname`"
-	    ;;
-esac
-
-# cannot rm $tmp because common.qt may have already created a directory
-# for $XDG_RUNTIME_DIR below there
-#
-$sudo rm -rf $tmp.* $seq.full
+$sudo rm -rf $tmp $tmp.* $seq.full
 
 # real QA test starts here
 
@@ -42,11 +26,7 @@ pid=$!
 
 PCP_STDERR= $PCP_VAR_DIR/config/pmchart/BusyCPU \
 | tee -a $here/$seq.full \
-| grep 'Plot .* Instance ' \
-| wc -l \
-| $PCP_AWK_PROG '
-1 <= $1 && $1 <= 10	{ print "Found between 1 and 10 busy processes"; next }
-			{ print "Oops, found " $1 " busy processes" }'
+| sed -n -e '/src\/hanoi/s/Instance [0-9][0-9]*'"$pid"'/Instance <hanoi_pid>/p'
 
 PCP_STDERR= pmchart -c BusyCPU -C -C
 ( kill $pid >/dev/null 2>&1 ) &

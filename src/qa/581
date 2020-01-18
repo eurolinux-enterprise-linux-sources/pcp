@@ -57,11 +57,9 @@ _cleanup()
 	$sudo rm -f $control
 	[ -f $control.$seq ] && $sudo mv $control.$seq $control
 	_restore_loggers
-	_service pcp restart 2>&1 | _filter_pcp_start
+	_service pcp restart | _filter_pcp_start
 	_wait_for_pmcd
-	_restore_auto_restart pmcd
 	_wait_for_pmlogger
-	_restore_auto_restart pmlogger
 	needlcean=false
     fi
     $sudo rm -f $tmp.*
@@ -77,10 +75,6 @@ $sudo rm -f $control.$seq
 trap "_cleanup; exit \$status" 0 1 2 3 15
 [ -f $control ] && $sudo mv $control $control.$seq
 
-# don't need to regenerate config.default with pmlogconf
-#
-export PMLOGGER_CHECK_SKIP_LOGCONF=yes
-
 PMCD_RECONNECT_TIMEOUT=1
 export PMCD_RECONNECT_TIMEOUT
 
@@ -94,11 +88,9 @@ End-of-File
 
 $sudo rm -f $control
 $sudo cp $tmp.indom $control
-_stop_auto_restart pmcd
-_stop_auto_restart pmlogger
 _disable_loggers
 _service pmlogger stop | _filter_pcp_stop
-_service pmcd restart 2>&1 | _filter_pcp_start
+_service pmcd restart | _filter_pcp_start
 _wait_for_pmcd
 pminfo -f sample.dynamic.instant | _filter
 echo
@@ -118,7 +110,7 @@ sleep_stop=5
 sleep $sleep_stop
 _service pmcd stop | _filter_pcp_stop
 sleep $sleep_start
-_service pmcd start 2>&1 | _filter_pcp_start
+_service pmcd start | _filter_pcp_start
 _wait_for_pmcd
 pminfo -f sample.dynamic.instant |_filter
 echo
@@ -139,7 +131,7 @@ cat >$tmp.indom <<End-of-File
 End-of-File
 $sudo cp $tmp.indom $control
 sleep $sleep_start
-_service pmcd start 2>&1 | _filter_pcp_start
+_service pmcd start | _filter_pcp_start
 _wait_for_pmcd
 pminfo -f sample.dynamic.instant |_filter
 echo
@@ -158,7 +150,7 @@ cat >$tmp.indom <<End-of-File
 End-of-File
 $sudo cp $tmp.indom $control
 sleep $sleep_start
-_service pmcd start 2>&1 | _filter_pcp_start
+_service pmcd start | _filter_pcp_start
 _wait_for_pmcd
 pminfo -f sample.dynamic.instant |_filter
 echo
@@ -171,7 +163,7 @@ cat >$tmp.indom <<End-of-File
 End-of-File
 $sudo cp $tmp.indom $control
 sleep $sleep_start
-_service pmcd start 2>&1 | _filter_pcp_start
+_service pmcd start | _filter_pcp_start
 _wait_for_pmcd
 pminfo -f sample.dynamic.instant |_filter
 echo
@@ -186,14 +178,10 @@ echo
 echo "Expect only connection lost/re-established and DYN_* lines ..."
 echo
 
-# In addition to the regular filtering, some versions of Linux return
+# in addition to the regular filtering, some versions of Linux return
 # ECONNRESET on the write() when pmcd is signald, rather than waiting
 # to return the error on the following read() ... as far as this test
-# is concerned, these are synonyms.
-# If some of the metrics in the pmie rules are unavailable (e.g.
-# filesys.capacity on FreeBSD), then we'll also see
-# ... warning - pmcd via ... does not respond
-# ... Cannot connect to pmcd
+# is concerned, these are synonyms
 #
 _filter_pmie_log <$tmp.out \
 | sed \
@@ -204,12 +192,7 @@ _filter_pmie_log <$tmp.out \
     -e "/ Info: /s/localhost/HOST/g" \
     -e "/ Info: /s/local:/HOST/g" \
     -e '/ Error: __pmCloseChannelbyContext: /d' \
-    -e '/warning - pmcd via .* does not respond/d' \
-    -e '/Cannot connect to pmcd/d' \
     -e 's/failed: Connection reset by peer/failed: IPC protocol failure/' \
-    -e '/not in namespace for pmcd/d' \
-    -e '/pmLookupName failed: Unknown metric name/d' \
-    -e '/pmie: warning - pmcd via local: is unreachable/d' \
     -e '/^DATE: *$/d' \
     -e '/^FILESYS \/dev\//d' \
     -e '/^FILESYS \/dev$/d' \
@@ -220,30 +203,22 @@ _filter_pmie_log <$tmp.out \
     -e '/^MIRAGE m-[0-9][0-9]*$/d' \
     -e '/^DISK dks[0-9][0-9]*d[0-9][0-9]*/d' \
     -e '/^DISK [a-f0-9][a-f0-9]*\/lun[0-9][0-9]*\/c[0-9][0-9]*p[0-9][0-9]*/d' \
-    -e '/^DISK ada[0-9]$/d' \
-    -e '/^DISK cd[0-9][0-9]*$/d' \
-    -e '/^DISK fd[0-9][0-9]*$/d' \
     -e '/^DISK hd[a-z]/d' \
     -e '/^DISK sd[a-z0-9]/d' \
-    -e '/^DISK sr[0-9]/d' \
     -e '/^DISK dasd[a-z]/d' \
     -e '/^DISK mmcblk[0-9]/d' \
     -e '/^DISK cmdk[0-9]/d' \
     -e '/^DISK rd\//d' \
     -e '/^DISK scsi\/host/d' \
     -e '/^DISK vd[a-z]/d' \
-    -e '/^DISK wd[0-9][0-9]*$/d' \
     -e '/^DISK xscsi\/pci/d' \
     -e '/^DISK xvm\//d' \
-    -e '/^DISK nvme[0-9]*n[0-9]*/d' \
     -e '/^DISK disk[0-9][0-9]*$/d' \
     -e '/^CPU cpu[0-9][0-9]*$/d' \
     -e '/^CPU cpu:[0-9][0-9]*\.[0-9][0-9]*\.[ab]$/d' \
     -e '/^CPU cpu:[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[a-d]$/d' \
     -e '/^NETWORK dummy[0-9]/d' \
     -e '/^NETWORK br[0-9][0-9]*$/d' \
-    -e '/^NETWORK cni[0-9][0-9]*$/d' \
-    -e '/^NETWORK enc[0-9][0-9]*$/d' \
     -e '/^NETWORK enccw[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*$/d' \
     -e '/^NETWORK docker[0-9][0-9]*$/d' \
     -e '/^NETWORK e[cfmnt][0-9][0-9]*$/d' \
@@ -263,10 +238,7 @@ _filter_pmie_log <$tmp.out \
     -e '/^NETWORK lo$/d' \
     -e '/^NETWORK p[0-9][0-9]*p[0-9][0-9]*$/d' \
     -e '/^NETWORK pan[0-9][0-9]*$/d' \
-    -e '/^NETWORK pcn[0-9][0-9]*$/d' \
-    -e '/^NETWORK pflog[0-9][0-9]*$/d' \
     -e '/^NETWORK ppp[0-9][0-9]*$/d' \
-    -e '/^NETWORK re[0-9]/d' \
     -e '/^NETWORK sit[0-9]/d' \
     -e '/^NETWORK sl[0-9][0-9]*$/d' \
     -e '/^NETWORK stf[0-9][0-9]*$/d' \

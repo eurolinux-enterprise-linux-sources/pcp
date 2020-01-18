@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2016-2017 Red Hat.  All Rights Reserved.
+# Copyright (c) 2016 Red Hat.  All Rights Reserved.
 # 
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
@@ -16,17 +16,19 @@ TOPDIR = ../..
 include $(TOPDIR)/src/include/builddefs
 -include ./GNUlocaldefs
 
-CONFIGDIR = $(PCP_VAR_DIR)/config/derived
-CONFIGFILES = $(shell echo *.conf)
+DIR = $(PCP_VAR_DIR)/config/derived
 
-default:	$(CONFIGFILES)
+default :: default_pcp
+
+default_pcp :
 
 include $(BUILDRULES)
 
-install:	default
-	$(INSTALL) -m 755 -d $(CONFIGDIR)
-	$(INSTALL) -m 644 $(CONFIGFILES) $(CONFIGDIR)
+install :: default_pcp install_pcp
 
-default_pcp:	default
-
-install_pcp:	install
+install_pcp : $(SUBDIRS) default_pcp
+ifeq ($(TARGET_OS), linux)
+	$(INSTALL) -m 755 -d $(DIR)
+	$(INSTALL) -m 644 iostat.conf $(DIR)/iostat.conf
+	$(INSTALL) -m 644 cpu-util.conf $(DIR)/cpu-util.conf
+endif

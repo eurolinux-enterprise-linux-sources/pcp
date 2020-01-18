@@ -74,7 +74,6 @@ d
 	-e 's/fd [0-9-][0-9]*/fd <n>/g' \
 	-e '/client\[[0-9][0-9]*\]/s//client[N]/' \
 	-e '/lib=.*\.'"$DSO_SUFFIX"'/s/[0-9] dso/N dso/' \
-	-e "/Warning:/s/PMCD_PORT=$port/PMCD_PORT=\$port/" \
 	-e 's/ $//' \
     | $PCP_AWK_PROG '
 BEGIN				{ skip = 0 }
@@ -122,7 +121,7 @@ cleanup()
 	pmafm $LOGGING_DIR/$LOCALHOST/Latest remove >$tmp.cmd 2>&1 \
 	&& $sudo sh $tmp.cmd
 	echo "Restarting pmcd"
-	_service pcp restart 2>&1 >/dev/null
+	_service pcp restart >/dev/null
 	_restore_auto_restart pmcd
 	_wait_for_pmcd
 	_wait_for_pmlogger
@@ -206,7 +205,7 @@ echo "me: ip=$me_ip hex_ip=$me_xip" >>$seq.full
 echo "host1: ip=$other1_ip hex_ip=$other1_xip" >>$seq.full
 echo "host2: ip=$other2_ip hex_ip=$other2_xip" >>$seq.full
 
-echo "# Installed by PCP QA test $seq on `date`" >$nconfig
+echo "# from qa/$seq" >$nconfig
 egrep '^(linux|darwin|solaris)' $config >>$nconfig
 grep '^pmcd' $config >>$nconfig
 
@@ -226,8 +225,7 @@ echo "export PMCD_PORT=$PMCD_PORT" >>$tmp.start
 echo "$PCP_RC_DIR/pmcd restart" >>$tmp.start
 $sudo sh $tmp.start 2>&1 \
 | tee -a $seq.full \
-| sed \
-    -e '/Wait/d' \
+| sed '/Wait/d' \
 | _filter_pcp_start
 _wait_for_pmcd
 

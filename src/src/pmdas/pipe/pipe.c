@@ -84,14 +84,14 @@ static pmdaMetric metrictab[] = {
 static const int nummetrics = sizeof(metrictab)/sizeof(metrictab[0]);
 
 static int
-pipe_instance(pmInDom indom, int inst, char *name, pmInResult **result, pmdaExt *pmda)
+pipe_instance(pmInDom indom, int inst, char *name, __pmInResult **result, pmdaExt *pmda)
 {
     event_client_access(pmda->e_context);
     return pmdaInstance(indom, inst, name, result, pmda);
 }
 
 static int
-pipe_profile(pmProfile *prof, pmdaExt *pmda)
+pipe_profile(__pmProfile *prof, pmdaExt *pmda)
 {
     event_client_access(pmda->e_context);
     return 0;
@@ -108,28 +108,28 @@ static int
 pipe_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 {
     struct pipe_command	*pc;
-    unsigned int	item = pmID_item(mdesc->m_desc.pmid);
+    __pmID_int		*idp = (__pmID_int *)&(mdesc->m_desc.pmid);
     int			context, queue = -1, sts;
 
     context = pmdaGetContext();
-    if (item >= PIPE_METRIC_COUNT)
+    if (idp->item >= PIPE_METRIC_COUNT)
 	return PM_ERR_PMID;
-    if (item == PIPE_LINE)	/* event parameter only */
+    if (idp->item == PIPE_LINE)	/* event parameter only */
 	return PMDA_FETCH_NOVALUES;
 
-    if (item > PIPE_COMMANDS) {
+    if (idp->item > PIPE_COMMANDS) {
 	if (inst == PM_IN_NULL)
 	    return PM_ERR_INST;
 	sts = pmdaCacheLookup(INDOM(PIPE_INDOM), inst, NULL, (void **)&pc);
 	if (sts != PMDA_CACHE_ACTIVE)
 	    return PM_ERR_INST;
     }
-    if (item > PIPE_LINE) {
+    if (idp->item > PIPE_LINE) {
 	if ((queue = event_queueid(context, inst)) < 0)
 	    return PMDA_FETCH_NOVALUES;
     }
 
-    switch (item) {
+    switch (idp->item) {
     case PIPE_NUMCLIENTS:
 	if (inst != PM_IN_NULL)
 	    return PM_ERR_INST;
@@ -178,8 +178,9 @@ pipe_store(pmResult *result, pmdaExt *pmda)
 
     for (i = 0; i < result->numpmid; i++) {
 	pmValueSet	*vsp = result->vset[i];
+	__pmID_int	*idp = (__pmID_int *)&vsp->pmid;
 
-	if (pmID_item(vsp->pmid) != PIPE_FIREHOSE)
+	if (idp->item != PIPE_FIREHOSE)
 	    return PM_ERR_PERMISSION;
 	if (vsp->numval != 1)
 	    return PM_ERR_BADSTORE;
@@ -201,7 +202,7 @@ pipe_store(pmResult *result, pmdaExt *pmda)
 	    p = vp->value.pval->vbuf;
 
 	    if (pmDebugOptions.appl0)
-		pmNotifyErr(LOG_DEBUG, "store: ctx=%d inst=%u value=\"%s\"",
+		__pmNotifyErr(LOG_DEBUG, "store: ctx=%d inst=%u value=\"%s\"",
 				pmda->e_context, inst, p);
 
 	    /* see if pipe command exists &| is active - start it if not */
@@ -220,7 +221,7 @@ static void
 pipe_end_contextCallBack(int context)
 {
     if (pmDebugOptions.appl0)
-	pmNotifyErr(LOG_DEBUG, "end_context on ctx-%d", context);
+	__pmNotifyErr(LOG_DEBUG, "end_context on ctx-%d", context);
 
     pmdaEventEndClient(context);
 
@@ -239,10 +240,10 @@ pipe_attribute(int ctx, int attr, const char *value, int length, pmdaExt *pmda)
 	return sts;
 
     switch (attr) {
-    case PMDA_ATTR_USERID:
+    case PCP_ATTR_USERID:
 	event_userid(ctx, value);
 	break;
-    case PMDA_ATTR_GROUPID:
+    case PCP_ATTR_GROUPID:
 	event_groupid(ctx, value);
 	break;
     default:
@@ -255,7 +256,7 @@ static void
 pipe_init(pmdaInterface *dp, const char *configfile, int checkonly)
 {
     char	confdir[MAXPATHLEN], config[MAXPATHLEN];
-    int		numpipes, sep = pmPathSeparator();
+    int		numpipes, sep = __pmPathSeparator();
 
     /* Global pointer to line parameter for event record encoder. */
     paramline = &metrictab[PIPE_LINE].m_desc.pmid;
@@ -287,7 +288,7 @@ pipe_init(pmdaInterface *dp, const char *configfile, int checkonly)
 
     if (dp->status != 0)
 	return;
-    pmdaSetCommFlags(dp, PMDA_FLAG_AUTHORIZE);
+    dp->comm.flags |= PDU_FLAG_AUTH;
 
     dp->version.six.fetch = pipe_fetch;
     dp->version.six.store = pipe_store;
@@ -310,7 +311,7 @@ pipe_setfd(int fd)
     if (fd > maxfd)
 	maxfd = fd;
     if (pmDebugOptions.appl2)
-        pmNotifyErr(LOG_DEBUG, "select: adding fd=%d", fd);
+        __pmNotifyErr(LOG_DEBUG, "select: adding fd=%d", fd);
     FD_SET(fd, &fds);
     return fd;
 }
@@ -319,7 +320,7 @@ int
 pipe_clearfd(int fd)
 {
     if (pmDebugOptions.appl2)
-        pmNotifyErr(LOG_DEBUG, "select: clearing fd=%d", fd);
+        __pmNotifyErr(LOG_DEBUG, "select: clearing fd=%d", fd);
     FD_CLR(fd, &fds);
     return fd;
 }
@@ -351,17 +352,17 @@ pipeMain(pmdaInterface *dispatch)
 	memcpy(&readyfds, &fds, sizeof(readyfds));
         nready = select(maxfd+1, &readyfds, NULL, NULL, NULL);
         if (pmDebugOptions.appl2)
-            pmNotifyErr(LOG_DEBUG, "select: nready=%d", nready);
+            __pmNotifyErr(LOG_DEBUG, "select: nready=%d", nready);
 	if (nready < 0) {
 	    if (neterror() != EINTR) {
-		pmNotifyErr(LOG_ERR, "select failure: %s", netstrerror());
+		__pmNotifyErr(LOG_ERR, "select failure: %s", netstrerror());
 		exit(1);
 	    }
 	}
 	if (nready > 0) {
 	    if (FD_ISSET(pmcdfd, &readyfds)) {
 		if (pmDebugOptions.appl0)
-		    pmNotifyErr(LOG_DEBUG,
+		    __pmNotifyErr(LOG_DEBUG,
 				"processing pmcd PDU [fd=%d]", pmcdfd);
 		if (__pmdaMainPDU(dispatch) < 0)
 		    break;
@@ -430,16 +431,16 @@ main(int argc, char **argv)
     char		*endnum;
     pmdaInterface	desc;
     long		minmem;
-    int			sep = pmPathSeparator();
+    int			sep = __pmPathSeparator();
     int			c, Cflag = 0;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     minmem = getpagesize();
     maxmem = (minmem > DEFAULT_MAXMEM) ? minmem : DEFAULT_MAXMEM;
     pmsprintf(helppath, sizeof(helppath), "%s%c" "pipe" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-    pmdaDaemon(&desc, PMDA_INTERFACE_6, pmGetProgname(), PIPE,
+    pmdaDaemon(&desc, PMDA_INTERFACE_6, pmProgname, PIPE,
 		"pipe.log", helppath);
 
     while ((c = pmdaGetOptions(argc, argv, &opts, &desc)) != EOF) {
@@ -456,7 +457,7 @@ main(int argc, char **argv)
 		convertUnits(&endnum, &maxmem);
 	    if (*endnum != '\0' || maxmem < minmem) {
 		pmprintf("%s: invalid max memory '%s' (min=%ld)\n",
-			    pmGetProgname(), opts.optarg, minmem);
+			    pmProgname, opts.optarg, minmem);
 		opts.errors++;
 	    }
 	    break;

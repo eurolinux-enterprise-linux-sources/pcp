@@ -1,7 +1,8 @@
 QA output created by 023
+Waiting for pmcd to terminate ...
 $PCP_PMCDCONF_PATH contains:
 <BEGIN>
-# Created by PCP QA test 023
+# Created by QA 023
 fake_irix 1 pipe binary dumb_pmda -d 1 fake_irix
 fake_proc 3 pipe binary dumb_pmda -d 3 fake_proc
 fake_cisco 5 pipe binary dumb_pmda -d 5 fake_cisco
@@ -13,7 +14,6 @@ disallow * : all;
 <END>
 Log for pmcd on HOST started DATE
 
-Warning: nports=1 from PMCD_PORT=$port in environment
 
 active agent dom   pid  in out ver protocol parameters
 ============ === ===== === === === ======== ==========
@@ -67,7 +67,6 @@ pmcd.agent.status
 
 Log for pmcd on HOST started DATE
 
-Warning: nports=1 from PMCD_PORT=$port in environment
 
 active agent dom   pid  in out ver protocol parameters
 ============ === ===== === === === ======== ==========
@@ -91,8 +90,8 @@ pmcd request port(s):
   === ==== ===== ====== =======
 ok FD A_PID inet INADDR_ANY
 ok FD A_PID ipv6 INADDR_ANY
-[DATE] pmcd(PID) Warning: pduread: timeout (after 2.000000 sec) on fd=FD
-Cleanup "fake_irix" agent (dom 1): protocol failure for fd=FD
+[DATE] pmcd(PID) Warning: pduread: timeout (after 2.000 sec) on fd=FD
+Cleanup "fake_irix" agent (dom 1): protocol failure for fd=FD, exit(0)
 [DATE] pmcd(PID) Info: Auto-restarting agents.
 [DATE] pmcd(PID) Info: 
 
@@ -125,12 +124,12 @@ n n A_PID 0 0.0.0.0 0.0.0.0 4 .*
 n n A_PID 0 :: :: 8 :*
 
 [DATE] pmcd(PID) Info: PMNS file "DEFAULT" is unchanged
-[DATE] pmcd(PID) Warning: pduread: timeout (after 2.000000 sec) on fd=FD
-Cleanup "fake_irix" agent (dom 1): protocol failure for fd=FD
-[DATE] pmcd(PID) Warning: pduread: timeout (after 3.000000 sec) on fd=FD
-Cleanup "fake_cisco" agent (dom 5): protocol failure for fd=FD
-[DATE] pmcd(PID) Warning: pduread: timeout (after 8.000000 sec) on fd=FD
-Cleanup "fake_six" agent (dom 6): protocol failure for fd=FD
+[DATE] pmcd(PID) Warning: pduread: timeout (after 2.000 sec) on fd=FD
+Cleanup "fake_irix" agent (dom 1): protocol failure for fd=FD, exit(0)
+[DATE] pmcd(PID) Warning: pduread: timeout (after 3.000 sec) on fd=FD
+Cleanup "fake_cisco" agent (dom 5): protocol failure for fd=FD, exit(0)
+[DATE] pmcd(PID) Warning: pduread: timeout (after 8.000 sec) on fd=FD
+Cleanup "fake_six" agent (dom 6): protocol failure for fd=FD, exit(0)
 [DATE] pmcd(PID) Info: 
 
 pmcd RESTARTED at DATE
@@ -183,4 +182,6 @@ pmcd.agent.status
     inst [6 or "fake_six"] value 0
 
 Restart and ping pmcd ...
+Starting pmcd ... 
+Starting pmlogger ... 
 pmcd.control.debug 1

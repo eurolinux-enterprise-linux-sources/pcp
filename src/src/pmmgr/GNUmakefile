@@ -19,13 +19,8 @@ SUBDIRS = config
 CXXMDTARGET = pmmgr$(EXECSUFFIX)
 HFILES = pmmgr.h
 CXXFILES = pmmgr.cxx
-MAN_PAGES = pmmgr.1
-
 LLDLIBS	= $(PCPLIB) $(LIB_FOR_PTHREADS) $(LIB_FOR_ATOMIC)
 LLDFLAGS += $(RDYNAMIC_FLAG) $(PIELDFLAGS)
-ifeq "$(TARGET_OS)" "openbsd"
-LLDFLAGS += -L/usr/local/lib
-endif
 LCFLAGS += $(PIECFLAGS)
 LDIRT = *.log pmmgr.service
 
@@ -51,7 +46,6 @@ ifeq ($(ENABLE_SYSTEMD),true)
 endif
 	$(INSTALL) -m 755 $(CXXMDTARGET) $(PCP_BINADM_DIR)/$(CXXMDTARGET)
 	$(INSTALL) -m 775 -o $(PCP_USER) -g $(PCP_GROUP) -d $(PCP_LOG_DIR)/pmmgr
-	@$(INSTALL_MAN)
 else
 build-me:
 install:
@@ -66,5 +60,3 @@ default_pcp : default
 install_pcp : install
 
 .PHONY: build-me
-
-pmmgr.o:	$(TOPDIR)/src/include/pcp/libpcp.h

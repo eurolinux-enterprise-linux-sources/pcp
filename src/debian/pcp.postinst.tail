@@ -18,23 +18,10 @@ chown pcp:pcp /var/lib/pcp/tmp
 chmod 775 /var/lib/pcp/tmp
 chown pcp:pcp /var/log/pcp
 chmod 775 /var/log/pcp
-chown pcp:pcp /etc/pcp/nssdb
-chmod 775 /etc/pcp/nssdb
 
 # must match src/pmcd/GNUmakefile
 chown pcp:pcp /var/log/pcp/pmcd
 chmod 775 /var/log/pcp/pmcd
-
-# must match src/pmdas/{json,bash,mmv}/GNUmakefile
-for PMDA in bash json mmv; do
-    # directory may be in optionally build component, so test first
-    #
-    if [ -d /var/lib/pcp/tmp/$PMDA ]
-    then
-	chown pcp:pcp /var/lib/pcp/tmp/$PMDA
-	chmod 775 /var/lib/pcp/tmp/$PMDA
-    fi
-done
 
 # must match src/pmie/GNUmakefile
 chown pcp:pcp /var/lib/pcp/config/pmie
@@ -51,8 +38,6 @@ chown pcp:pcp /var/lib/pcp/tmp/pmlogger
 chmod 775 /var/lib/pcp/tmp/pmlogger
 chown pcp:pcp /var/log/pcp/pmlogger
 chmod 775 /var/log/pcp/pmlogger
-chown pcp:pcp /var/log/pcp/sa
-chmod 775 /var/log/pcp/sa
 
 # must match src/pmproxy/GNUmakefile
 chown pcp:pcp /var/log/pcp/pmproxy
@@ -86,32 +71,32 @@ then
     chmod 644 /var/lib/pcp/config/pmlogger/config.default
 fi
 
-do_systemd=true
-which deb-systemd-helper >/dev/null 2>&1 || do_systemd=false
-# only need to check pmcd.service, if it is here they will all
-# be here
-[ -f /lib/systemd/system/pmcd.service ] || do_systemd=false
+update-rc.d pmcd defaults >/dev/null
+update-rc.d pmlogger defaults >/dev/null
+update-rc.d pmie defaults >/dev/null
+update-rc.d pmproxy defaults >/dev/null
 
-if $do_systemd
+# migrate existing statistics files to their new (permanent!) home
+#
+for dir in /var/tmp/mmv /var/tmp/pmdabash
+do
+    [ -d $dir ] || continue
+    [ "$(LC_ALL=C stat -c '%u %g %F' $dir)" = "0 0 directory" ] && mv $dir /var/lib/pcp/tmp
+done
+_clean_tmpdirs $PCP_TMP_DIR /var/tmp pmie pmlogger
+
+# transition pmdadmcache over to pmdadm (device mapper)
+#
+PCP_PMCDCONF_PATH=/etc/pcp/pmcd/pmcd.conf
+PCP_PMDAS_DIR=/var/lib/pcp/pmdas/
+if grep -q ^dmcache $PCP_PMCDCONF_PATH 2>/dev/null
 then
-    deb-systemd-helper enable pmcd.service >/dev/null
-    deb-systemd-helper enable pmlogger.service >/dev/null
-    deb-systemd-helper enable pmie.service >/dev/null
-    deb-systemd-helper enable pmproxy.service >/dev/null
-elif which update-rc.d >/dev/null 2>&1
-then
-    update-rc.d -f pmcd remove >/dev/null
-    update-rc.d pmcd defaults >/dev/null
-    update-rc.d -f pmlogger remove >/dev/null
-    update-rc.d pmlogger defaults >/dev/null
-    update-rc.d -f pmie remove >/dev/null
-    update-rc.d pmie defaults >/dev/null
-    update-rc.d -f pmproxy remove >/dev/null
-    update-rc.d pmproxy defaults >/dev/null
+    mkdir -p -m 755 "$PCP_PMDAS_DIR/dm"
+    touch "$PCP_PMDAS_DIR/dm/.NeedInstall"
+    touch "$PCP_PMDAS_DIR/dmcache/.NeedRemove"
 fi
 
-if which invoke-rc.d >/dev/null 2>&1
-then
+if which invoke-rc.d >/dev/null 2>&1; then
     invoke-rc.d pmcd start
     invoke-rc.d pmlogger start
 else

@@ -1,4 +1,3 @@
-#!/bin/sh
 #
 # Copyright (c) 2015 Martins Innus.
 # All rights reserved.
@@ -18,6 +17,7 @@
 . $PCP_SHARE_DIR/lib/pmdaproc.sh
 
 iam=slurm
+pmda_interface=2
 dso_opt=false
 daemon_opt=false
 perl_opt=true

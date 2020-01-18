@@ -16,7 +16,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "pmnsmap.h"
 
 pmLongOptions longopts[] = {
@@ -56,18 +56,18 @@ get_ncpu(void)
     int		sts;
 
     if ((sts = pmLookupName(1, pmclient_init, pmidlist)) < 0) {
-	fprintf(stderr, "%s: pmLookupName: %s\n", pmGetProgname(), pmErrStr(sts));
+	fprintf(stderr, "%s: pmLookupName: %s\n", pmProgname, pmErrStr(sts));
 	fprintf(stderr, "%s: metric \"%s\" not in name space\n",
-			pmGetProgname(), pmclient_init[0]);
+			pmProgname, pmclient_init[0]);
 	exit(1);
     }
     if ((sts = pmLookupDesc(pmidlist[0], desclist)) < 0) {
 	fprintf(stderr, "%s: cannot retrieve description for metric \"%s\" (PMID: %s)\nReason: %s\n",
-		pmGetProgname(), pmclient_init[0], pmIDStr(pmidlist[0]), pmErrStr(sts));
+		pmProgname, pmclient_init[0], pmIDStr(pmidlist[0]), pmErrStr(sts));
 	exit(1);
     }
     if ((sts = pmFetch(1, pmidlist, &rp)) < 0) {
-	fprintf(stderr, "%s: pmFetch: %s\n", pmGetProgname(), pmErrStr(sts));
+	fprintf(stderr, "%s: pmFetch: %s\n", pmProgname, pmErrStr(sts));
 	exit(1);
     }
 
@@ -106,25 +106,25 @@ get_sample(info_t *ip)
 
 	numpmid = sizeof(pmclient_sample) / sizeof(char *);
 	if ((pmidlist = (pmID *)malloc(numpmid * sizeof(pmidlist[0]))) == NULL) {
-	    fprintf(stderr, "%s: get_sample: malloc: %s\n", pmGetProgname(), osstrerror());
+	    fprintf(stderr, "%s: get_sample: malloc: %s\n", pmProgname, osstrerror());
 	    exit(1);
 	}
 	if ((desclist = (pmDesc *)malloc(numpmid * sizeof(desclist[0]))) == NULL) {
-	    fprintf(stderr, "%s: get_sample: malloc: %s\n", pmGetProgname(), osstrerror());
+	    fprintf(stderr, "%s: get_sample: malloc: %s\n", pmProgname, osstrerror());
 	    exit(1);
 	}
 	if ((sts = pmLookupName(numpmid, pmclient_sample, pmidlist)) < 0) {
-	    printf("%s: pmLookupName: %s\n", pmGetProgname(), pmErrStr(sts));
+	    printf("%s: pmLookupName: %s\n", pmProgname, pmErrStr(sts));
 	    for (i = 0; i < numpmid; i++) {
 		if (pmidlist[i] == PM_ID_NULL)
-		    fprintf(stderr, "%s: metric \"%s\" not in name space\n", pmGetProgname(), pmclient_sample[i]);
+		    fprintf(stderr, "%s: metric \"%s\" not in name space\n", pmProgname, pmclient_sample[i]);
 	    }
 	    exit(1);
 	}
 	for (i = 0; i < numpmid; i++) {
 	    if ((sts = pmLookupDesc(pmidlist[i], &desclist[i])) < 0) {
 		fprintf(stderr, "%s: cannot retrieve description for metric \"%s\" (PMID: %s)\nReason: %s\n",
-		    pmGetProgname(), pmclient_sample[i], pmIDStr(pmidlist[i]), pmErrStr(sts));
+		    pmProgname, pmclient_sample[i], pmIDStr(pmidlist[i]), pmErrStr(sts));
 		exit(1);
 	    }
 	}
@@ -132,7 +132,7 @@ get_sample(info_t *ip)
 
     /* fetch the current metrics */
     if ((sts = pmFetch(numpmid, pmidlist, &crp)) < 0) {
-	fprintf(stderr, "%s: pmFetch: %s\n", pmGetProgname(), pmErrStr(sts));
+	fprintf(stderr, "%s: pmFetch: %s\n", pmProgname, pmErrStr(sts));
 	exit(1);
     }
 
@@ -150,11 +150,11 @@ get_sample(info_t *ip)
 	    inst15 = pmLookupInDom(desclist[LOADAV].indom, "15 minute");
 	}
 	if (inst1 < 0) {
-	    fprintf(stderr, "%s: cannot translate instance for 1 minute load average\n", pmGetProgname());
+	    fprintf(stderr, "%s: cannot translate instance for 1 minute load average\n", pmProgname);
 	    exit(1);
 	}
 	if (inst15 < 0) {
-	    fprintf(stderr, "%s: cannot translate instance for 15 minute load average\n", pmGetProgname());
+	    fprintf(stderr, "%s: cannot translate instance for 15 minute load average\n", pmProgname);
 	    exit(1);
 	}
 	pmDelProfile(desclist[LOADAV].indom, 0, NULL);	/* all off */
@@ -167,7 +167,7 @@ get_sample(info_t *ip)
     /* if the second or later sample, pick the results apart */
     if (prp !=  NULL) {
 
-	dt = pmtimevalSub(&crp->timestamp, &prp->timestamp);
+	dt = __pmtimevalSub(&crp->timestamp, &prp->timestamp);
 
 	/*
 	 * But first ... is all the data present?
@@ -224,19 +224,9 @@ get_sample(info_t *ip)
 	    pmExtractValue(crp->vset[FREEMEM]->valfmt, crp->vset[FREEMEM]->vlist,
 		    desclist[FREEMEM].type, &tmp, PM_TYPE_FLOAT);
 	    /* convert from today's units at the collection site to Mbytes */
-	    sts = pmConvScale(PM_TYPE_FLOAT, &tmp, &desclist[FREEMEM].units,
+	    pmConvScale(PM_TYPE_FLOAT, &tmp, &desclist[FREEMEM].units,
 		    &atom, &mbyte_scale);
-	    if (sts < 0) {
-		/* should never happen */
-		if (pmDebugOptions.value) {
-		    fprintf(stderr, "%s: get_sample: Botch: %s (%s) scale conversion from %s", 
-			pmGetProgname(), pmIDStr(desclist[FREEMEM].pmid), pmclient_sample[FREEMEM], pmUnitsStr(&desclist[FREEMEM].units));
-		    fprintf(stderr, " to %s failed: %s\n", pmUnitsStr(&mbyte_scale), pmErrStr(sts));
-		}
-		ip->freemem = 0;
-	    }
-	    else
-		ip->freemem = atom.f;
+	    ip->freemem = atom.f;
 	}
 
 	/* disk IOPS - expect just one value, but need delta */
@@ -301,7 +291,7 @@ main(int argc, char **argv)
     }
 
     if (pauseFlag && opts.context != PM_CONTEXT_ARCHIVE) {
-	pmprintf("%s: pause can only be used with archives\n", pmGetProgname());
+	pmprintf("%s: pause can only be used with archives\n", pmProgname);
 	opts.errors++;
     }
 
@@ -322,10 +312,10 @@ main(int argc, char **argv)
     if ((sts = c = pmNewContext(opts.context, source)) < 0) {
 	if (opts.context == PM_CONTEXT_HOST)
 	    fprintf(stderr, "%s: Cannot connect to PMCD on host \"%s\": %s\n",
-		    pmGetProgname(), source, pmErrStr(sts));
+		    pmProgname, source, pmErrStr(sts));
 	else
 	    fprintf(stderr, "%s: Cannot open archive \"%s\": %s\n",
-		    pmGetProgname(), source, pmErrStr(sts));
+		    pmProgname, source, pmErrStr(sts));
 	exit(1);
     }
 
@@ -345,7 +335,7 @@ main(int argc, char **argv)
     if (opts.context == PM_CONTEXT_ARCHIVE) {
 	if ((sts = pmSetMode(PM_MODE_INTERP, &opts.start, (int)(opts.interval.tv_sec*1000 + opts.interval.tv_usec/1000))) < 0) {
 	    fprintf(stderr, "%s: pmSetMode failed: %s\n",
-		    pmGetProgname(), pmErrStr(sts));
+		    pmProgname, pmErrStr(sts));
 	    exit(1);
 	}
     }
@@ -363,13 +353,11 @@ main(int argc, char **argv)
 
     while (samples == -1 || samples-- > 0) {
 	if (lines % 15 == 0) {
-	    time_t	time;
 	    if (opts.context == PM_CONTEXT_ARCHIVE)
 		printf("Archive: %s, ", opts.archives[0]);
-	    time = info.timestamp.tv_sec;
 	    printf("Host: %s, %d cpu(s), %s",
 		    host, ncpu,
-		    pmCtime(&time, timebuf));
+		    pmCtime((const time_t *)&info.timestamp.tv_sec, timebuf));
 /* - report format
   CPU  Busy    Busy  Free Mem   Disk     Load Average
  Util   CPU    Util  (Mbytes)   IOPS    1 Min  15 Min

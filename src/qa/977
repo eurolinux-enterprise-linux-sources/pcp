@@ -8,7 +8,10 @@
 seq=`basename $0`
 echo "QA output created by $seq"
 
-. ./common.containers
+# get standard environment, filters and checks
+. ./common.product
+. ./common.filter
+. ./common.check
 
 _check_valgrind
 _check_containers

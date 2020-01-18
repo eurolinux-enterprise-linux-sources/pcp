@@ -25,6 +25,7 @@
  */
 
 #include "pmapi.h"
+#include "impl.h"
 #include "pmda.h"
 #include "domain.h"
 #include <ctype.h>
@@ -75,14 +76,14 @@ process_config_file_check(void)
 {
     struct stat statbuf;
     static int last_error;
-    int sep = pmPathSeparator();
+    int sep = __pmPathSeparator();
 
     pmsprintf(mypath, sizeof(mypath), "%s%c" "process" "%c" "process.conf",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
     if (stat(mypath, &statbuf) == -1) {
 	if (oserror() != last_error) {
 	    last_error = oserror();
-	    pmNotifyErr(LOG_WARNING, "stat failed on %s: %s\n", 
+	    __pmNotifyErr(LOG_WARNING, "stat failed on %s: %s\n", 
 			mypath, pmErrStr(-oserror()));
 	}
     } else {
@@ -149,12 +150,12 @@ process_grab_config_info(void)
     char *q;
     size_t size;
     int process_number = 0;
-    int sep = pmPathSeparator();
+    int sep = __pmPathSeparator();
 
     pmsprintf(mypath, sizeof(mypath), "%s%c" "process" "%c" "process.conf",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
     if ((fp = fopen(mypath, "r")) == NULL) {
-	pmNotifyErr(LOG_ERR, "fopen on %s failed: %s\n",
+	__pmNotifyErr(LOG_ERR, "fopen on %s failed: %s\n",
 		mypath, pmErrStr(-oserror()));
 	if (processes != NULL) {
 	    free(processes);
@@ -172,12 +173,12 @@ process_grab_config_info(void)
 	    *q = '\0';
 	} else {
 	    /* This means the line was too long */
-	    pmNotifyErr(LOG_WARNING, "line %d in config file too long\n",
+	    __pmNotifyErr(LOG_WARNING, "line %d in config file too long\n",
 			process_number + 1);
 	}
 	size = (process_number + 1) * sizeof(pmdaInstid);
 	if ((processes = realloc(processes, size)) == NULL)
-	    pmNoMem("process", size, PM_FATAL_ERR);
+	    __pmNoMem("process", size, PM_FATAL_ERR);
 	processes[process_number].i_name = malloc(strlen(process_name) + 1);
 	strcpy(processes[process_number].i_name, process_name);
 	processes[process_number].i_inst = process_number;
@@ -187,7 +188,7 @@ process_grab_config_info(void)
 
 done:
     if (processes == NULL)
-	pmNotifyErr(LOG_WARNING, "\"process\" instance domain is empty");
+	__pmNotifyErr(LOG_WARNING, "\"process\" instance domain is empty");
 
     indomtab[PROC_INDOM].it_set = processes;
     indomtab[PROC_INDOM].it_numinst = process_number;
@@ -326,9 +327,11 @@ process_fetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *pmda)
 static int
 process_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 {
-    if (pmID_cluster(mdesc->m_desc.pmid) != 0)
+    __pmID_int	*idp = (__pmID_int *)&(mdesc->m_desc.pmid);
+
+    if (idp->cluster != 0)
 	return PM_ERR_PMID;
-    if (pmID_item(mdesc->m_desc.pmid) != 0)
+    if (idp->item != 0)
 	return PM_ERR_PMID;
 
     /* We have the values stored, simply grab it and return it.  */
@@ -343,7 +346,7 @@ void
 process_init(pmdaInterface *dp)
 {
     if (isDSO) {
-	int sep = pmPathSeparator();
+	int sep = __pmPathSeparator();
 	pmsprintf(mypath, sizeof(mypath), "%s%c" "process" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
 	pmdaDSO(dp, PMDA_INTERFACE_2, "process DSO", mypath);
@@ -383,15 +386,15 @@ pmdaOptions	opts = {
 int
 main(int argc, char **argv)
 {
-    int			sep = pmPathSeparator();
+    int			sep = __pmPathSeparator();
     pmdaInterface	desc;
 
     isDSO = 0;
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     pmsprintf(mypath, sizeof(mypath), "%s%c" "process" "%c" "help",
 	pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-    pmdaDaemon(&desc, PMDA_INTERFACE_2, pmGetProgname(), PROCESS,
+    pmdaDaemon(&desc, PMDA_INTERFACE_2, pmProgname, PROCESS,
 		"process.log", mypath);
 
     pmdaGetOptions(argc, argv, &opts, &desc);

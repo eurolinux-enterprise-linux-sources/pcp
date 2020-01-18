@@ -1,6 +1,5 @@
 #
 # Copyright (c) 2017 Ronak Jain.
-# Copyright (c) 2017,2019 Red Hat.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
@@ -20,7 +19,7 @@ IAM	= prometheus
 PYSCRIPT = pmda$(IAM).python
 LDIRT	= domain.h root pmns $(IAM).log
 
-SUBDIRS	=
+SUBDIRS	= metadata
 
 MAN_SECTION = 1
 MAN_PAGES = pmda$(IAM).$(MAN_SECTION)
@@ -44,8 +43,7 @@ install_pcp install :: $(SUBDIRS)
 
 install_pcp install :: default
 	$(INSTALL) -m 755 -d $(PMDADIR)
-	$(INSTALL) -m 755 -d $(PMDADIR)/config.d
-	$(INSTALL) -m 755 Install Remove Upgrade $(PYSCRIPT) $(PMDADIR)
+	$(INSTALL) -m 755 Install Remove Generate $(PYSCRIPT) $(PMDADIR)
 	@$(INSTALL_MAN)
 else
 build-me:

@@ -22,7 +22,6 @@
 #include "main.h"
 #include "openviewdialog.h"
 #include "saveviewdialog.h"
-#include <pcp/libpcp.h>
 
 /*
  * View file parsing routines and global variables follow.  These are
@@ -104,11 +103,11 @@ static void err(int severity, int do_where, QString msg)
     }
     else {
 	if (severity == E_CRIT)
-	    QMessageBox::critical(pmchart, pmGetProgname(),  msg);
+	    QMessageBox::critical(pmchart, pmProgname,  msg);
 	else if (severity == E_WARN)
-	    QMessageBox::warning(pmchart, pmGetProgname(),  msg);
+	    QMessageBox::warning(pmchart, pmProgname,  msg);
 	else
-	    QMessageBox::information(pmchart, pmGetProgname(),  msg);
+	    QMessageBox::information(pmchart, pmProgname,  msg);
     }
     _errors++;
 }
@@ -263,7 +262,7 @@ bool OpenViewDialog::openView(const char *path)
     int			version;
     QString		errmsg;
     QRegExp		regex;
-    int			sep = pmPathSeparator();
+    int			sep = __pmPathSeparator();
     int			sts = 0;
 
     if (strcmp(path, "-") == 0) {
@@ -971,16 +970,11 @@ done_tab:
 			pms.source = strdup(host);
 		    }
 		}
-		else if (activeGroup->numContexts() > 0) {
+		else {
 		    // no explicit host, use current default source
 		    QmcSource source = activeGroup->context()->source();
 		    pms.source = strdup((const char *)
 					source.source().toLatin1());
-		}
-		else {
-		    // already reported context errors, just get out
-		    _errors++;
-		    goto abandon;
 		}
 		// expand instances when not specified for metrics
 		// with instance domains and all instances required,

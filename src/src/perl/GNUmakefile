@@ -15,7 +15,7 @@
 TOPDIR	= ../..
 include $(TOPDIR)/src/include/builddefs
 
-ifeq "$(ENABLE_PERL)" "true"
+ifeq "$(HAVE_PERL)" "true"
 SUBDIRS	= PMDA LogSummary MMV LogImport
 endif
 

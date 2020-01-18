@@ -1,7 +1,7 @@
 # pylint: disable=C0103
 """ Wrapper module for LIBPCP - the core Performace Co-Pilot API """
 #
-# Copyright (C) 2012-2018 Red Hat
+# Copyright (C) 2012-2017 Red Hat
 # Copyright (C) 2009-2012 Michael T. Werner
 #
 # This file is part of the "pcp" module, the python interfaces for the
@@ -21,7 +21,7 @@
 # Additional Information:
 #
 # Performance Co-Pilot Web Site
-# https://pcp.io
+# http://www.pcp.io
 #
 # Performance Co-Pilot Programmer's Guide
 # cf. Chapter 3. PMAPI - The Performance Metrics API
@@ -271,8 +271,8 @@ class tm(Structure):
                 ("tm_wday", c_int),
                 ("tm_yday", c_int),
                 ("tm_isdst", c_int),
-                ("tm_gmtoff", c_long),  # glibc/bsd extension
-                ("tm_zone", c_char_p)]  # glibc/bsd extension
+                ("tm_gmtoff", c_long),	# glibc/bsd extension
+                ("tm_zone", c_char_p)]	# glibc/bsd extension
 
     def struct_time(self):
         # convert POSIX representations - see mktime(3) - to python:
@@ -298,7 +298,7 @@ class tm(Structure):
                      self.tm_sec, self.tm_min, self.tm_hour,
                      self.tm_mday, self.tm_mon, self.tm_year,
                      self.tm_wday, self.tm_yday, self.tm_isdst,
-                     long(self.tm_gmtoff), str(self.tm_zone))
+                     self.tm_gmtoff, str(self.tm_zone))
         timetp = c_long(long(second))
         LIBPCP.pmCtime(byref(timetp), result)
         return str(result.value.decode()).rstrip()
@@ -578,35 +578,6 @@ class pmLogLabel(Structure):
         """ Return the timezone from the structure as native str """
         return str(self.tz.decode())
 
-class pmLabel(Structure):
-    """Structure describing label's specification"""
-
-    _fields_ = [ ("name", c_int, 16),
-                 ("namelen", c_int, 8),
-                 ("flags", c_int, 8),
-                 ("value", c_int, 16),
-                 ("valuelen", c_int, 16)]
-
-pmLabelPtr = POINTER(pmLabel)
-pmLabelPtr.name = property(lambda x: x.contents.name, None, None, None)
-pmLabelPtr.namelen = property(lambda x: x.contents.namelen, None, None, None)
-pmLabelPtr.flags = property(lambda x: x.contents.flags, None, None, None)
-pmLabelPtr.value = property(lambda x: x.contents.value, None, None, None)
-pmLabelPtr.valuelen = property(lambda x: x.contents.valuelen, None, None, None)
-
-class pmLabelSet(Structure):
-    """ Structure describing label set specifications"""
-
-    _fields_ = [ ("inst", c_uint),
-                 ("nlabels", c_int),
-                 ("json", c_char_p),
-                 ("jsonlen", c_int, 16),
-                 ("padding", c_int, 16),
-                 ("labels", POINTER(pmLabel))]
-    def __str__(self):
-        if self.json is None:
-            return "{}"
-        return self.json.decode()
 
 ##############################################################################
 #
@@ -831,37 +802,6 @@ LIBPCP.pmprintf.argtypes = [c_char_p]
 LIBPCP.pmSortInstances.restype = None
 LIBPCP.pmSortInstances.argtypes = [POINTER(pmResult)]
 
-LIBPCP.pmLookupLabels.restype = c_int
-LIBPCP.pmLookupLabels.argtypes = [c_int, POINTER(POINTER(pmLabelSet))]
-
-LIBPCP.pmGetInstancesLabels.restype = c_int
-LIBPCP.pmGetInstancesLabels.argtypes = [c_int, POINTER(POINTER(pmLabelSet))]
-
-LIBPCP.pmGetItemLabels.restype = c_int
-LIBPCP.pmGetItemLabels.argtypes = [c_int, POINTER(POINTER(pmLabelSet))]
-
-LIBPCP.pmGetClusterLabels.restype = c_int
-LIBPCP.pmGetClusterLabels.argtypes = [c_int, POINTER(POINTER(pmLabelSet))]
-
-LIBPCP.pmGetInDomLabels.restype = c_int
-LIBPCP.pmGetInDomLabels.argtypes = [c_int, POINTER(POINTER(pmLabelSet))]
-
-LIBPCP.pmGetDomainLabels.restype = c_int
-LIBPCP.pmGetDomainLabels.argtypes = [c_int, POINTER(POINTER(pmLabelSet))]
-
-LIBPCP.pmGetContextLabels.restype = c_int
-LIBPCP.pmGetContextLabels.argtypes = [POINTER(POINTER(pmLabelSet))]
-
-LIBPCP.pmMergeLabels.restype = c_int
-LIBPCP.pmMergeLabels.argtypes = [POINTER(c_char_p), c_int, c_char_p, c_int]
-
-mergeLabelSetsCB_type = CFUNCTYPE(c_int, POINTER(pmLabel), c_char_p, c_void_p)
-LIBPCP.pmMergeLabelSets.restype = c_int
-LIBPCP.pmMergeLabelSets.argtypes = [POINTER(POINTER(pmLabelSet)), c_int,
-    c_char_p, c_int, mergeLabelSetsCB_type, c_void_p]
-
-LIBPCP.pmFreeLabelSets.restype = None
-LIBPCP.pmFreeLabelSets.argtypes = [POINTER(pmLabelSet), c_int]
 
 ##############################################################################
 #
@@ -908,9 +848,9 @@ class pmOptions(object):
             c_api.pmSetOptionFlags(flags)
         else:   # good default for scripts - always evaluating log bounds
             c_api.pmSetOptionFlags(c_api.PM_OPTFLAG_BOUNDARIES)
-        self._delta = 1         # default archive pmSetMode delta
+        self._delta = 1			# default archive pmSetMode delta
         self._mode = c_api.PM_MODE_INTERP # default pmSetMode access mode
-        self._need_reset = False    # flag for __del__ memory reclaim
+        self._need_reset = False	# flag for __del__ memory reclaim
 
     def __del__(self):
         if LIBPCP and self._need_reset != False:
@@ -1107,63 +1047,63 @@ class pmOptions(object):
         """ Add support for --host-list into PMAPI monitor tool """
         return c_api.pmSetLongOptionHostList()
 
-    def pmGetOptionContext(self):   # int (typed)
+    def pmGetOptionContext(self):	# int (typed)
         return c_api.pmGetOptionContext()
 
-    def pmGetOptionHosts(self):     # str list
+    def pmGetOptionHosts(self):		# str list
         return c_api.pmGetOptionHosts()
 
-    def pmGetOptionArchives(self):  # str list
+    def pmGetOptionArchives(self):	# str list
         return c_api.pmGetOptionArchives()
 
-    def pmGetOptionAlignment(self): # timeval
+    def pmGetOptionAlignment(self):	# timeval
         alignment = c_api.pmGetOptionAlign_optarg()
         if alignment == None:
             return None
         return timeval.fromInterval(alignment)
 
-    def pmGetOptionStart(self):     # timeval
+    def pmGetOptionStart(self):		# timeval
         sec = c_api.pmGetOptionStart_sec()
         if sec == None:
             return None
         return timeval(sec, c_api.pmGetOptionStart_usec())
 
-    def pmGetOptionAlignOptarg(self):   # string
+    def pmGetOptionAlignOptarg(self):	# string
         return c_api.pmGetOptionAlign_optarg()
 
-    def pmGetOptionFinishOptarg(self):  # string
+    def pmGetOptionFinishOptarg(self):	# string
         return c_api.pmGetOptionFinish_optarg()
 
-    def pmGetOptionFinish(self):    # timeval
+    def pmGetOptionFinish(self):	# timeval
         sec = c_api.pmGetOptionFinish_sec()
         if sec == None:
             return None
         return timeval(sec, c_api.pmGetOptionFinish_usec())
 
-    def pmGetOptionOrigin(self):    # timeval
+    def pmGetOptionOrigin(self):	# timeval
         sec = c_api.pmGetOptionOrigin_sec()
         if sec == None:
             return None
         return timeval(sec, c_api.pmGetOptionOrigin_usec())
 
-    def pmGetOptionInterval(self):  # timeval
+    def pmGetOptionInterval(self):	# timeval
         sec = c_api.pmGetOptionInterval_sec()
         if sec == None:
             return None
         return timeval(sec, c_api.pmGetOptionInterval_usec())
 
-    def pmGetOptionSamples(self):   # int
+    def pmGetOptionSamples(self):	# int
         return c_api.pmGetOptionSamples()
 
-    def pmGetOptionHostZone(self):  # boolean
+    def pmGetOptionHostZone(self):	# boolean
         if c_api.pmGetOptionHostZone() == 0:
             return False
         return True
 
-    def pmGetOptionTimezone(self):  # str
+    def pmGetOptionTimezone(self):	# str
         return c_api.pmGetOptionTimezone()
 
-    def pmGetOptionContainer(self): # str
+    def pmGetOptionContainer(self):	# str
         return c_api.pmGetOptionContainer()
 
     def pmGetOptionLocalPMDA(self):        # boolean
@@ -1171,22 +1111,22 @@ class pmOptions(object):
             return False
         return True
 
-    def pmSetOptionArchive(self, archive):  # str
+    def pmSetOptionArchive(self, archive):	# str
         return c_api.pmSetOptionArchive(archive)
 
-    def pmSetOptionArchiveList(self, archives): # str
+    def pmSetOptionArchiveList(self, archives):	# str
         return c_api.pmSetOptionArchiveList(archives)
 
-    def pmSetOptionArchiveFolio(self, folio):   # str
+    def pmSetOptionArchiveFolio(self, folio):	# str
         return c_api.pmSetOptionArchiveFolio(folio)
 
-    def pmSetOptionContainer(self, container):  # str
+    def pmSetOptionContainer(self, container):	# str
         return c_api.pmSetOptionContainer(container)
 
-    def pmSetOptionHost(self, host):    # str
+    def pmSetOptionHost(self, host):	# str
         return c_api.pmSetOptionHost(host)
 
-    def pmSetOptionHostList(self, hosts):   # str
+    def pmSetOptionHostList(self, hosts):	# str
         return c_api.pmSetOptionHostList(hosts)
 
     def pmSetOptionSpecLocal(self, spec):        # str
@@ -1294,10 +1234,6 @@ class pmContext(object):
             source = hosts[index]
         elif typed == c_api.PM_CONTEXT_LOCAL:
             source = None
-        elif options.pmGetOptionOrigin() != None:
-            archives = options.pmGetOptionArchives()
-            source = archives[index]
-            typed = c_api.PM_CONTEXT_ARCHIVE
         else:
             typed = c_api.PM_CONTEXT_HOST
             source = "local:"
@@ -1345,7 +1281,8 @@ class pmContext(object):
                 source = None
 
         if context == c_api.PM_CONTEXT_LOCAL and speclocal:
-            for spec in filter(None, speclocal.split(";")):
+            speclocal = speclocal.replace("K:", "")
+            for spec in speclocal.split("|"):
                 options.pmSetOptionSpecLocal(spec)
 
         flags = options.pmGetOptionFlags()
@@ -2037,201 +1974,9 @@ class pmContext(object):
             raise pmErr(status)
         return result_p
 
-    def result_to_list(self, result_p, n):
-        """ helper to build label list from lookup labels result
-        """
-        labelL = []
-        for i in range(n):
-            if result_p[i] is not None:
-                labelL.append(result_p[i])
-        if len(labelL) == 0:
-            return None
-        return labelL
-
-    def pmLookupLabels(self, pmid):
-        """PMAPI - Get merged labelset for a single metric
-        """
-        result_p = POINTER(pmLabelSet)()
-        status = LIBPCP.pmUseContext(self.ctx)
-        if status < 0:
-            raise pmErr(status)
-        status = LIBPCP.pmLookupLabels(pmid, byref(result_p))
-        if status < 0:
-            raise pmErr(status)
-        if status > 0:
-            labelL = self.result_to_list(result_p, status)
-        else:
-            labelL = None
-        return labelL
-
-    def pmGetInstancesLabels(self, indom):
-        """PMAPI - Get labels for all metric values (instances)
-        """
-        result_p = POINTER(pmLabelSet)()
-        status = LIBPCP.pmUseContext(self.ctx)
-        if status < 0:
-            raise pmErr(status)
-        status = LIBPCP.pmGetInstancesLabels(indom, byref(result_p))
-        if status < 0:
-            raise pmErr(status)
-        if status > 0:
-            labelL = self.result_to_list(result_p, status)
-        else:
-            labelL = None
-        return labelL
-
-    def pmGetItemLabels(self, pmid):
-        """PMAPI - Get labels of a given metric identifier
-        """
-        result_p = POINTER(pmLabelSet)()
-        status = LIBPCP.pmUseContext(self.ctx)
-        if status < 0:
-            raise pmErr(status)
-        status = LIBPCP.pmGetItemLabels(pmid, byref(result_p))
-        if status < 0:
-            raise pmErr(status)
-        if status > 0:
-            labelL = self.result_to_list(result_p, status)
-        else:
-            labelL = None
-        return labelL
-
-    def pmGetClusterLabels(self, pmid):
-        """PMAPI - Get labels of a given metric cluster
-        """
-        result_p = POINTER(pmLabelSet)()
-        status = LIBPCP.pmUseContext(self.ctx)
-        if status < 0:
-            raise pmErr(status)
-        status = LIBPCP.pmGetClusterLabels(pmid, byref(result_p))
-        if status < 0:
-            raise pmErr(status)
-        if status > 0:
-            labelL = self.result_to_list(result_p, status)
-        else:
-            labelL = None
-        return labelL
-
-    def pmGetInDomLabels(self, indom):
-        """PMAPI - Get labels of a given instance domain
-        """
-        result_p = POINTER(pmLabelSet)()
-        status = LIBPCP.pmUseContext(self.ctx)
-        if status < 0:
-            raise pmErr(status)
-        status = LIBPCP.pmGetInDomLabels(indom, byref(result_p))
-        if status < 0:
-            raise pmErr(status)
-        if status > 0:
-            labelL = self.result_to_list(result_p, status)
-        else:
-            labelL = None
-        return labelL
-
-    def pmGetDomainLabels(self, domain):
-        """PMAPI - Get labels of a given performance domain
-        """
-        result_p = POINTER(pmLabelSet)()
-        status = LIBPCP.pmUseContext(self.ctx)
-        if status < 0:
-            raise pmErr(status)
-        status = LIBPCP.pmGetDomainLabels(domain, byref(result_p))
-        if status < 0:
-            raise pmErr(status)
-        if status > 0:
-            labelL = self.result_to_list(result_p, status)
-        else:
-            labelL = None
-        return labelL
-
-    def pmGetContextLabels(self):
-        """PMAPI - Get labels of the current context
-        """
-        result_p = POINTER(pmLabelSet)()
-        status = LIBPCP.pmUseContext(self.ctx)
-        if status < 0:
-            raise pmErr(status)
-        status = LIBPCP.pmGetContextLabels(byref(result_p))
-        if status < 0:
-            raise pmErr(status)
-        if status > 0:
-            labelL = self.result_to_list(result_p, status)
-        else:
-            labelL = None
-        return labelL
 
     ##
     # PMAPI Ancilliary Support Services
-
-    @staticmethod
-    def pmMergeLabels(labels):
-        """PMAPI - Merges string labels into a string
-        """
-        if type(labels) is not type([]):
-            labelsL = [labels]
-        else:
-            labelsL = labels
-        result_p = ctypes.create_string_buffer(c_api.PM_MAXLABELJSONLEN)
-        arg_arr = (c_char_p * len(labelsL))()
-        for i in range(len(labelsL)):
-            arg_arr[i] = c_char_p(labelsL[i].encode('utf-8'))
-        status = LIBPCP.pmMergeLabels(arg_arr, len(arg_arr),
-                    result_p, len(result_p))
-        if status < 0:
-            raise pmErr(status)
-        result = result_p.value
-        return str(result.decode('ascii', 'ignore'))
-
-    @staticmethod
-    def pmMergeLabelSets(labelSets, callback=None, arg=None):
-        """PMAPI - Merges list of pmLabelSets based on labelSets hierarchy into
-           a string. Each list element may also be either a list or None.
-        """
-        result_p = ctypes.create_string_buffer(c_api.PM_MAXLABELJSONLEN)
-        if callback is None:
-            callback = lambda x,y,z: 1
-        cb_func = mergeLabelSetsCB_type(callback)
-
-        if labelSets is None:
-            result_p.value = b"{}"
-        else:
-            if type(labelSets) is not type([]):
-                labelSetsL = [labelSets]
-            else:
-                labelSetsL = []
-                for l in labelSets:
-                    if type(l) is type([]):
-                        labelSetsL.extend(l)
-                    elif l is not None:
-                        labelSetsL.append(l)
-
-            arg_arr = (POINTER(pmLabelSet) * len(labelSetsL))()
-            for i in range(len(labelSetsL)):
-                arg_arr[i] = cast(byref(labelSetsL[i]), POINTER(pmLabelSet))
-            arg =  cast(c_char_p(arg), c_void_p)
-            status = LIBPCP.pmMergeLabelSets(arg_arr, len(labelSetsL), result_p,
-                        len(result_p), cb_func, arg)
-            if status < 0:
-                raise pmErr(status)
-
-        result = result_p.value
-        return str(result.decode('ascii', 'ignore'))
-
-
-    @staticmethod
-    def pmFreeLabelSets(labelSets):
-        """PMAPI - Free the pmLabelSets memory
-        """
-        if type(labelSets) is not type([]):
-            labelSetsL = [labelSets]
-        else:
-            labelSetsL = labelSets
-        arg = POINTER(pmLabelSet)
-        for i in range(len(labelSetsL)):
-            arg = cast(byref(labelSetsL[i]), POINTER(pmLabelSet))
-            # TODO: this aborts with invalid pointer. Not sure why yet
-            # LIBPCP.pmFreeLabelSets(arg, 1)
-        return
 
     @staticmethod
     def pmGetConfig(variable):
@@ -2440,12 +2185,12 @@ class pmContext(object):
     @staticmethod
     def get_current_tz(options=None, set_dst=-1):
         """ Get current timezone offset string using POSIX convention """
+        if options is None:
+            dst = time.localtime().tm_isdst
+        else:
+            dst = time.localtime(options.pmGetOptionOrigin()).tm_isdst
         if set_dst >= 0:
             dst = 1 if set_dst else 0
-        elif options:
-            dst = time.localtime(options.pmGetOptionOrigin()).tm_isdst
-        else:
-            dst = time.localtime().tm_isdst
         offset = time.altzone if dst else time.timezone
         timezone = time.tzname[dst]
         if offset:
@@ -2534,8 +2279,6 @@ LIBPCP.pmCreateFetchGroup.restype = c_int
 LIBPCP.pmCreateFetchGroup.argtypes = [POINTER(c_void_p), c_int, c_char_p]
 LIBPCP.pmGetFetchGroupContext.restype = c_int
 LIBPCP.pmGetFetchGroupContext.argtypes = [c_void_p]
-LIBPCP.pmClearFetchGroup.restype = c_int
-LIBPCP.pmClearFetchGroup.argtypes = [c_void_p]
 LIBPCP.pmDestroyFetchGroup.restype = c_int
 LIBPCP.pmDestroyFetchGroup.argtypes = [c_void_p]
 LIBPCP.pmExtendFetchGroup_item.restype = c_int
@@ -2729,9 +2472,10 @@ class fetchgroup(object):
         def __del__(self):
             """Override pmContext ctor to eschew pmDestroyContext."""
             self._ctx = c_api.PM_ERR_NOCONTEXT
-
+            
     def __init__(self, typed=c_api.PM_CONTEXT_HOST, target="local:"):
         """Create a fetchgroup from a pmContext."""
+
         self.pmfg = c_void_p()
         self.items = []
         if typed == c_api.PM_CONTEXT_LOCAL and target == None:
@@ -2741,9 +2485,10 @@ class fetchgroup(object):
             raise pmErr(sts)
         self.ctx = fetchgroup.pmContext_borrowed(LIBPCP.pmGetFetchGroupContext(self.pmfg),
                                                  typed, target)
-
+        
     def __del__(self):
         """Destroy the fetchgroup.  Drop references to fetchgroup_* items."""
+
         if LIBPCP != None and self.pmfg.value != None:
             sts = LIBPCP.pmDestroyFetchGroup(self.pmfg)
             if sts < 0:
@@ -2756,110 +2501,109 @@ class fetchgroup(object):
         WARNING: mutation of this context by other PMAPI functions
         may disrupt fetchgroup functionality.
         """
+        
         return self.ctx
-
+        
     def extend_item(self, metric=None, mtype=None, scale=None, instance=None):
         """Extend the fetchgroup with a single metric.  Infer type if
         necessary.  Convert scale/rate if appropriate/requested.
         Requires a specified instance if metric has an instance
         domain.
+
         """
+
         if metric is None:
             raise pmErr(-errno.EINVAL)
-
-        if mtype is None:
-            # a special service to dynamically-typed python
+        if mtype is None: # a special service to dynamically-typed python; not accepted at the C level
             pmids = self.ctx.pmLookupName(metric)
             descs = self.ctx.pmLookupDescs(pmids)
             mtype = descs[0].type
         v = fetchgroup.fetchgroup_item(mtype)
         sts = LIBPCP.pmExtendFetchGroup_item(self.pmfg,
-                      c_char_p(metric.encode('utf-8') if metric else None),
-                      c_char_p(instance.encode('utf-8') if instance else None),
-                      c_char_p(scale.encode('utf-8') if scale else None),
-                      pointer(v.value), c_int(mtype),
-                      pointer(v.sts))
+                                             c_char_p(metric.encode('utf-8') if metric else None),
+                                             c_char_p(instance.encode('utf-8') if instance else None),
+                                             c_char_p(scale.encode('utf-8') if scale else None),
+                                             pointer(v.value), c_int(mtype),
+                                             pointer(v.sts))
         if sts < 0:
             raise pmErr(sts)
-        self.items.append(v) # keep registered pmAtomValue/etc. alive
+        self.items.append(v) # remember to keep registered pmAtomValue/etc. alive
         return v
+
 
     def extend_indom(self, metric=None, mtype=None, scale=None, maxnum=100):
         """Extend the fetchgroup with up to @maxnum instances of a metric.
         (Metrics without instances are also accepted.)  Infer type if
         necessary.  Convert scale/rate if appropriate/requested.
+
         """
+
         if metric is None or maxnum < 0:
             raise pmErr(-errno.EINVAL)
-        if mtype is None:
-            # a special service to dynamically-typed python
+        if mtype is None: # a special service to dynamically-typed python; not accepted at the C level
             pmids = self.ctx.pmLookupName(metric)
             descs = self.ctx.pmLookupDescs(pmids)
             mtype = descs[0].type
         vv = fetchgroup.fetchgroup_indom(mtype, maxnum)
         sts = LIBPCP.pmExtendFetchGroup_indom(self.pmfg,
-                      c_char_p(metric.encode('utf-8') if metric else None),
-                      c_char_p(scale.encode('utf-8') if scale else None),
-                      cast(pointer(vv.icodes), POINTER(c_int)),
-                      cast(pointer(vv.inames), POINTER(c_char_p)),
-                      cast(pointer(vv.values), POINTER(pmAtomValue)),
-                      c_int(mtype),
-                      cast(pointer(vv.stss), POINTER(c_int)),
-                      c_uint(maxnum), pointer(vv.num), pointer(vv.sts))
+                                              c_char_p(metric.encode('utf-8') if metric else None),
+                                              c_char_p(scale.encode('utf-8') if scale else None),
+                                              cast(pointer(vv.icodes), POINTER(c_int)),
+                                              cast(pointer(vv.inames), POINTER(c_char_p)),
+                                              cast(pointer(vv.values), POINTER(pmAtomValue)),
+                                              c_int(mtype),
+                                              cast(pointer(vv.stss), POINTER(c_int)),
+                                              c_uint(maxnum), pointer(vv.num), pointer(vv.sts))
         if sts < 0:
             raise pmErr(sts)
-        self.items.append(vv) # keep registered pmAtomValue/etc. alive
+        self.items.append(vv) # remember to keep registered pmAtomValue/etc. alive
         return vv
+
 
     def extend_timestamp(self):
         """Extend the fetchgroup with a timestamp query. """
+
         v = fetchgroup.fetchgroup_timestamp(self.ctx)
         sts = LIBPCP.pmExtendFetchGroup_timestamp(self.pmfg,
                                                   pointer(v.value))
         if sts < 0:
             raise pmErr(sts)
-        self.items.append(v) # keep registered timeval alive
+        self.items.append(v) # remember to keep registered timeval alive
         return v
 
+
     def extend_event(self, metric=None, field=None, ftype=None, scale=None, instance=None, maxnum=100):
-        """Extend the fetchgroup with up to @maxnum instances of the given
-        field of the given event metric's records.  Infer type if necessary.
-        Convert scale if appropriate/requested.
+        """Extend the fetchgroup with up to @maxnum instances of the given field of
+        the given event metric's records.  Infer type if necessary.  Convert scale
+        if appropriate/requested.
         """
+
         if metric is None or maxnum < 0:
             raise pmErr(-errno.EINVAL)
-        if ftype is None:
-            # a special service to dynamically-typed python
+        if ftype is None: # a special service to dynamically-typed python; not accepted at the C level
             pmids = self.ctx.pmLookupName(field)
             descs = self.ctx.pmLookupDescs(pmids)
             ftype = descs[0].type
         vv = fetchgroup.fetchgroup_event(ftype, maxnum, self.ctx)
         sts = LIBPCP.pmExtendFetchGroup_event(self.pmfg,
-                      c_char_p(metric.encode('utf-8') if metric else None),
-                      c_char_p(instance.encode('utf-8') if instance else None),
-                      c_char_p(field.encode('utf-8') if field else None),
-                      c_char_p(scale.encode('utf-8') if scale else None),
-                      cast(pointer(vv.times), POINTER(timespec)),
-                      cast(pointer(vv.values), POINTER(pmAtomValue)),
-                      c_int(ftype),
-                      cast(pointer(vv.stss), POINTER(c_int)),
-                      c_uint(maxnum), pointer(vv.num), pointer(vv.sts))
+                                              c_char_p(metric.encode('utf-8') if metric else None),
+                                              c_char_p(instance.encode('utf-8') if instance else None),
+                                              c_char_p(field.encode('utf-8') if field else None),
+                                              c_char_p(scale.encode('utf-8') if scale else None),
+                                              cast(pointer(vv.times), POINTER(timespec)),
+                                              cast(pointer(vv.values), POINTER(pmAtomValue)),
+                                              c_int(ftype),
+                                              cast(pointer(vv.stss), POINTER(c_int)),
+                                              c_uint(maxnum), pointer(vv.num), pointer(vv.sts))
         if sts < 0:
             raise pmErr(sts)
-        self.items.append(vv) # keep registered pmAtomValue/etc. alive
+        self.items.append(vv) # remember to keep registered pmAtomValue/etc. alive
         return vv
+
 
     def fetch(self):
         """Fetch all the metrics in this fetchgroup and update all values."""
+
         sts = LIBPCP.pmFetchGroup(self.pmfg)
         if sts < 0:
             raise pmErr(sts)
-        return sts  # propogate any pmFetch(3) state flags to caller
-
-    def clear(self):
-        """Clear all the metrics in this fetchgroup ready to start again."""
-        sts = LIBPCP.pmClearFetchGroup(self.pmfg)
-        del self.items[:]
-        if sts < 0:
-            raise pmErr(sts)
-        self.items = []

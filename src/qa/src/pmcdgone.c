@@ -14,7 +14,7 @@
 
 #include <ctype.h>
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
 
 #include "localconfig.h"
 
@@ -243,7 +243,7 @@ main(int argc, char **argv)
     char	*binadm = pmGetConfig("PCP_BINADM_DIR");
     char	path[MAXPATHLEN];
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:")) != EOF) {
 	switch (c) {
@@ -251,7 +251,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -269,7 +269,7 @@ main(int argc, char **argv)
 \n\
 Options:\n\
   -D debugspec		set PCP debugging options\n",
-		pmGetProgname());
+		pmProgname);
 	exit(1);
     }
 

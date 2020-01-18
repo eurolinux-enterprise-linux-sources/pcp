@@ -20,10 +20,6 @@ perl -e "use XML::TokeParser" >/dev/null 2>&1
 [ $? -eq 0 ] || _notrun "perl XML::TokeParser module not installed"
 perl -e "use Spreadsheet::Read" >/dev/null 2>&1
 [ $? -eq 0 ] || _notrun "perl Spreadsheet::Read module not installed"
-[ -f ${PCP_LIB_DIR}/libpcp_import.${DSO_SUFFIX} ] || \
-	_notrun "No support for libpcp_import"
-perl -e "use PCP::LogImport" 2>/dev/null || \
-	_notrun "Perl PCP::LogImport module is not installed"
 
 _filter()
 {
@@ -188,7 +184,7 @@ sheet2pcp $tmp.simple.csv $tmp.mapfile $tmp 2>&1 \
 # don't expect an output archive as there are no rows of data
 # in the spreadsheet
 #
-[ -f $tmp.0 -o -f $tmp.index -o -f $tmp.meta ] && pmdumplog -dilmstz $tmp
+[ -f $tmp.0 -o -f $tmp.index -o -f $tmp.meta ] && pmdumplog -az $tmp
 
 # success, all done
 exit

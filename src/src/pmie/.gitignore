@@ -1,5 +1,3 @@
 crontab
 crontab.docker
 pmie.service
-pmie_check.service
-pmie_daily.service

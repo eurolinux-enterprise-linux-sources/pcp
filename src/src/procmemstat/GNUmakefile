@@ -19,6 +19,7 @@ CFILES	= procmemstat.c
 TARGETS	=
 LLDLIBS	= $(PCPLIB)
 LDIRT	= pmnsmap.h mylog.* runme.sh $(TARGETS) pmnsmap.i GNUmakefile.install.xxx
+LSRCFILES = README GNUmakefile.install pmnsmap.spec
 
 DEMODIR=$(PCP_DEMOS_DIR)/procmemstat
 
@@ -48,6 +49,3 @@ GNUmakefile.install.xxx:	GNUmakefile.install
 default_pcp : default
 
 install_pcp : install
-
-check::	$(CFILES)
-	$(CLINT) $^

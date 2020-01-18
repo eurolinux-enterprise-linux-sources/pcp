@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
 #include <pthread.h>
 
 #ifndef HAVE_PTHREAD_BARRIER_T
@@ -81,7 +81,6 @@ func1(void *arg)
 	perror("func1 fopen");
 	pthread_exit("botch");
     }
-    setlinebuf(f);
 
     j = pmUseContext(ctx1);
     if ( j < 0) {
@@ -99,7 +98,7 @@ func1(void *arg)
     }
 
     fclose(f);
-    return(NULL);	/* pthread done */
+    pthread_exit(NULL);
 }
 
 static void *
@@ -114,7 +113,6 @@ func2(void *arg)
 	perror("func2 fopen");
 	pthread_exit("botch");
     }
-    setlinebuf(f);
 
     j = pmUseContext(ctx2);
     if ( j < 0) {
@@ -132,7 +130,7 @@ func2(void *arg)
     }
 
     fclose(f);
-    return(NULL);	/* pthread done */
+    pthread_exit(NULL);
 }
 
 static void *
@@ -147,7 +145,6 @@ func3(void *arg)
 	perror("func3 fopen");
 	pthread_exit("botch");
     }
-    setlinebuf(f);
 
     j = pmUseContext(ctx3);
     if ( j < 0) {
@@ -166,24 +163,7 @@ func3(void *arg)
     }
 
     fclose(f);
-    return(NULL);	/* pthread done */
-}
-
-static void
-wait_for_thread(char *name, pthread_t tid)
-{
-    int		sts;
-    char	*msg;
-
-    sts = pthread_join(tid, (void *)&msg);
-    if (sts == 0) {
-	if (msg == PTHREAD_CANCELED)
-	    printf("thread %s: pthread_join: cancelled?\n", name);
-	else if (msg != NULL)
-	    printf("thread %s: pthread_join: %s\n", name, msg);
-    }
-    else
-	printf("thread %s: pthread_join: error: %s\n", name, strerror(sts));
+    pthread_exit(NULL);
 }
 
 int
@@ -193,11 +173,12 @@ main(int argc, char **argv)
     pthread_t	tid2;
     pthread_t	tid3;
     int		sts;
+    char	*msg;
     int		errflag = 0;
     int		c;
     int		i;
 
-    pmSetProgname(argv[0]);
+    __pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:")) != EOF) {
 	switch (c) {
@@ -206,7 +187,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -219,7 +200,7 @@ main(int argc, char **argv)
     }
 
     if (errflag || optind == argc || argc-optind > 3) {
-	fprintf(stderr, "Usage: %s [-D...] host1 [host2 [host3]]\n", pmGetProgname());
+	fprintf(stderr, "Usage: %s [-D...] host1 [host2 [host3]]\n", pmProgname);
 	exit(1);
     }
 
@@ -293,9 +274,12 @@ main(int argc, char **argv)
 	exit(1);
     }
 
-    wait_for_thread("tid1", tid1);
-    wait_for_thread("tid2", tid2);
-    wait_for_thread("tid3", tid3);
+    pthread_join(tid1, (void *)&msg);
+    if (msg != NULL) printf("tid1: %s\n", msg);
+    pthread_join(tid2, (void *)&msg); 
+    if (msg != NULL) printf("tid2: %s\n", msg);
+    pthread_join(tid3, (void *)&msg); 
+    if (msg != NULL) printf("tid3: %s\n", msg);
 
     exit(0);
 }

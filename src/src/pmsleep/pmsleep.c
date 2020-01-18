@@ -14,6 +14,7 @@
  */
 
 #include "pmapi.h"
+#include "impl.h"
 #include <signal.h>
 #ifdef HAVE_SYS_WAIT_H
 #include <sys/wait.h>
@@ -57,7 +58,7 @@ pmpause(void)
     sigemptyset(&sigact.sa_mask);
     sigact.sa_flags = SA_RESTART | SA_NOCLDSTOP;
     if (sigaction(SIGCHLD, &sigact, 0) == -1) {
-	perror("pmpause: 1st sigaction failed");
+	perror(pmProgname);
 	return 1;
     }
 
@@ -67,17 +68,13 @@ pmpause(void)
 	sigemptyset(&sigact.sa_mask);
 	sigact.sa_flags = SA_RESTART;
 	if (sigaction(finish[i], &sigact, 0) == -1) {
-	    perror("pmpause: 2nd sigaction failed");
+	    perror(pmProgname);
 	    return 1;
 	}
 	sigdelset(&sigset, finish[i]);
     }
 
-    if (sigprocmask(SIG_BLOCK, &sigset, NULL) < 0) {
-	/* most unlikely */
-	perror("pmpause: sigprocmask failed");
-	return 1;
-    }
+    sigprocmask(SIG_BLOCK, &sigset, NULL);
     while (!finished)
 	pause();
     return 0;
@@ -115,12 +112,12 @@ main(int argc, char **argv)
 {
     int sts = 1;
 
-    pmSetProgname(argv[0]);
-    if (strcmp(pmGetProgname(), "pmpause") == 0)
+    __pmSetProgname(argv[0]);
+    if (strcmp(pmProgname, "pmpause") == 0)
 	sts = pmpause();
     else if (argc == 2)
 	sts = pmsleep(argv[1]);
     else
-	fprintf(stderr, "Usage: %s interval\n", pmGetProgname());
+	fprintf(stderr, "Usage: %s interval\n", pmProgname);
     exit(sts);
 }

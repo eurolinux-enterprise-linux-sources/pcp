@@ -8,18 +8,25 @@
 #include <sys/sem.h>
 
 #include <pcp/pmapi.h>
-#include "libpcp.h"
+#include <pcp/impl.h>
+
+#define SEMAPHORES /* comment this to NOT test semaphores */
 
 #define IPC_N 4
 #define NSEMS 8
 
 int shm_list[IPC_N], shm_n=0, shmindom;
 int sem_list[IPC_N * NSEMS], sem_n=0, semindom;
+int semset_list[IPC_N], semset_n = 0, semsetindom;
 
 static char *metrics[] = {
     "ipc.shm.nattch",
     "ipc.shm.segsz",
+#ifdef SEMAPHORES
     "ipc.sem.nsems",
+    "ipc.sem.ncnt",
+    "ipc.sem.zcnt",
+#endif
 NULL };
 
 static int npmids;
@@ -86,8 +93,9 @@ main(int argc, char **argv)
     int		j;
     key_t	key;
     int		sts;
+    char	*p;
     int		errflag = 0;
-    char	*host = "local:";
+    char	*host = "localhost";
     char	*namespace = PM_NS_DEFAULT;
     int		iterations = 1;
     int		iter;
@@ -99,7 +107,12 @@ main(int argc, char **argv)
     extern char	*optarg;
     extern int	optind;
 
-    pmSetProgname(argv[0]);
+    /* trim command name of leading directory components */
+    pmProgname = argv[0];
+    for (p = pmProgname; *p; p++) {
+	if (*p == '/')
+	    pmProgname = p+1;
+    }
 
     while ((c = getopt(argc, argv, "D:h:l:n:i:")) != EOF) {
 	switch (c) {
@@ -108,7 +121,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmGetProgname(), optarg);
+		    pmProgname, optarg);
 		errflag++;
 	    }
 	    break;
@@ -134,19 +147,19 @@ main(int argc, char **argv)
 
     if (errflag) {
 USAGE:
-	fprintf(stderr, "Usage: %s %s\n", pmGetProgname(), usage);
+	fprintf(stderr, "Usage: %s %s\n", pmProgname, usage);
 	exit(1);
     }
 
     if (namespace != PM_NS_DEFAULT && (sts = pmLoadASCIINameSpace(namespace, 1)) < 0) {
-	printf("%s: Cannot load namespace from \"%s\": %s\n", pmGetProgname(), namespace, pmErrStr(sts));
+	printf("%s: Cannot load namespace from \"%s\": %s\n", pmProgname, namespace, pmErrStr(sts));
 	exit(1);
     }
 
     sts = pmNewContext(PM_CONTEXT_HOST, host);
 
     if (sts < 0) {
-	printf("%s: Cannot connect to PMCD on host \"%s\": %s\n", pmGetProgname(), host, pmErrStr(sts));
+	printf("%s: Cannot connect to PMCD on host \"%s\": %s\n", pmProgname, host, pmErrStr(sts));
 	exit(1);
     }
 
@@ -157,7 +170,7 @@ USAGE:
     memset(pmids, 0, sizeof(pmids));
     for (npmids=0; metrics[npmids]; npmids++) {
 	if ((sts = pmLookupName(1, &metrics[npmids], &pmids[npmids])) < 0) {
-	    fprintf(stderr, "%s: metric ``%s'' : %s\n", pmGetProgname(), metrics[npmids], pmErrStr(sts));
+	    fprintf(stderr, "%s: metric ``%s'' : %s\n", pmProgname, metrics[npmids], pmErrStr(sts));
 	    exit(1);
 	}
 	fprintf(stderr, "pmid=%s <%s>\n", pmIDStr(pmids[npmids]), metrics[npmids]);
@@ -169,14 +182,24 @@ USAGE:
     }
     shmindom = desc.indom;
 
+#ifdef SEMAPHORES
     if ((e = pmLookupDesc(pmids[2], &desc)) < 0) {
         printf("pmLookupDesc: %s\n", pmErrStr(e));
         exit(1);
     }
+    semsetindom = desc.indom;
+    if ((e = pmLookupDesc(pmids[3], &desc)) < 0) {
+        printf("pmLookupDesc: %s\n", pmErrStr(e));
+        exit(1);
+    }
     semindom = desc.indom;
+#endif
 
     fprintf(stderr, "shmindom=%s", pmInDomStr(shmindom));
-    fprintf(stderr, "semindom=%s", pmInDomStr(semindom));
+#ifdef SEMAPHORES
+    fprintf(stderr, " semsetindom=%s", pmInDomStr(semsetindom));
+    fprintf(stderr, " semindom=%s", pmInDomStr(semindom));
+#endif
     fputc('\n', stderr);
 
     key = (key_t)0xabcd0000;
@@ -190,7 +213,10 @@ USAGE:
 	    goto CLEANUP;
 	}
 
+#ifdef SEMAPHORES
 	if ((id = semget(key++, NSEMS, IPC_CREAT|IPC_EXCL|0777)) >= 0) {
+	    semset_list[semset_n++] = id;
+	    fprintf(stderr, "SEMSET_%d\n", id);
 	    for (j=0; j < NSEMS; j++) {
 		sem_list[sem_n++] = (id << 16) | j;
 		fprintf(stderr, "SEMID_%d.%d ", id, j);
@@ -201,19 +227,24 @@ USAGE:
 	    perror("semget");
 	    goto CLEANUP;
 	}
+#endif
     }
 
     pmDelProfile(shmindom, 0, NULL);
     pmAddProfile(shmindom, shm_n, shm_list);
 
+#ifdef SEMAPHORES
+    pmDelProfile(semsetindom, 0, NULL);
+    pmAddProfile(semsetindom, semset_n, semset_list);
     pmDelProfile(semindom, 0, NULL);
     pmAddProfile(semindom, sem_n, sem_list);
+#endif
 
     fprintf(stderr, "Single Metrics ...\n");
     for (j = 0; j < npmids; j++) {
 	sts = pmFetch(1, &pmids[j], &result);
 	if (sts < 0) {
-	    fprintf(stderr, "%s: metric %s : %s\n", pmGetProgname(), metrics[j], pmErrStr(sts));
+	    fprintf(stderr, "%s: metric %s : %s\n", pmProgname, metrics[j], pmErrStr(sts));
 	    exit(1);
 	}
 	__pmDumpResult(stderr, result);
@@ -227,7 +258,7 @@ USAGE:
 	    sts = pmFetch(j+1, pmids, &result);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: iteration %d cascade %d : %s\n",
-		    pmGetProgname(), iter, j, pmErrStr(sts));
+		    pmProgname, iter, j, pmErrStr(sts));
 		exit(1);
 	    }
 	    __pmDumpResult(stderr, result);
@@ -238,7 +269,11 @@ USAGE:
 
     /* now test the err conditions */
     _force_err(shmindom, shm_list[0], pmids[0]);
-    _force_err(semindom, sem_list[0], pmids[2]);
+
+#ifdef SEMAPHORES
+    _force_err(semsetindom, semset_list[0], pmids[2]);
+    _force_err(semindom, sem_list[0], pmids[3]);
+#endif
 
 CLEANUP:
     for (i=0; i < shm_n; i++) {
@@ -246,11 +281,13 @@ CLEANUP:
 	    if (shmctl(shm_list[i], IPC_RMID, 0) < 0)
 		perror("shmctl(IPC_RMID)");
     }
+#ifdef SEMAPHORES
     for (i=0; i < sem_n; i += NSEMS) {
 	if (sem_list[i] >= 0)
 	    if (semctl(sem_list[i] >> 16, 0, IPC_RMID) < 0)
 		perror("semctl(IPC_RMID)");
     }
+#endif
 
     exit(0);
 }

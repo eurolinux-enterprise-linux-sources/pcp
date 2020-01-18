@@ -54,6 +54,8 @@ Options:
   -U units    export observation values using the given units
   -V units    export counter values using the given units
 
+Installing the "trace" Performance Metrics Domain Agent (PMDA) ...
+
 Use the default installation [y]? 
 Trace period (in seconds) [60]? 
 Number of buckets [5]? 
@@ -112,6 +114,8 @@ Enter the scale for the Time dimension:
 Using the following units for trace.observe.value:
   Dimensions:  space=1 time=-1 count=0
   Scale:       space=0 time=3 count=0
+
+
 The dimension and scale for the trace.counter.value metrics may be expressed
 in terms of Space, Time and Count (i.e. events or messages).  The default
 dimension and scale is "None".  Do you wish to accept the default dimension
@@ -119,6 +123,8 @@ and scale [y]?
 Using the following units for trace.counter.value:
   Dimensions:  space=0 time=0 count=0
   Scale:       space=0 time=0 count=0
+
+
 Client host access - (A)llow/(D)isallow [Enter to complete install]? 
 Updating the Performance Metrics Name Space (PMNS) ...
 Terminate PMDA if already installed ...
@@ -131,6 +137,8 @@ Note: some warnings are expected until trace API calls are made - refer to
 trace.observe.value
     Data Type: double  InDom: 10.2 0x2800002
     Semantics: instant  Units: byte / sec
+Installing the "trace" Performance Metrics Domain Agent (PMDA) ...
+
 Use the default installation [y]? 
 Trace period (in seconds) [60]? 
 Number of buckets [5]? 
@@ -142,6 +150,8 @@ and scale [y]?
 Using the following units for trace.observe.value:
   Dimensions:  space=0 time=0 count=0
   Scale:       space=0 time=0 count=0
+
+
 The dimension and scale for the trace.counter.value metrics may be expressed
 in terms of Space, Time and Count (i.e. events or messages).  The default
 dimension and scale is "None".  Do you wish to accept the default dimension
@@ -169,6 +179,8 @@ Scale for the Count dimension is expressed:
 Using the following units for trace.counter.value:
   Dimensions:  space=1 time=-2 count=1
   Scale:       space=0 time=0 count=-4
+
+
 Client host access - (A)llow/(D)isallow [Enter to complete install]? 
 Updating the Performance Metrics Name Space (PMNS) ...
 Terminate PMDA if already installed ...
@@ -181,6 +193,8 @@ Note: some warnings are expected until trace API calls are made - refer to
 trace.counter.value
     Data Type: double  InDom: 10.3 0x2800003
     Semantics: counter  Units: byte count x 10^-4 / nanosec^2
+Installing the "trace" Performance Metrics Domain Agent (PMDA) ...
+
 Use the default installation [y]? 
 Trace period (in seconds) [60]? 
 Number of buckets [5]? 
@@ -192,6 +206,8 @@ and scale [y]?
 Using the following units for trace.observe.value:
   Dimensions:  space=0 time=0 count=0
   Scale:       space=0 time=0 count=0
+
+
 The dimension and scale for the trace.counter.value metrics may be expressed
 in terms of Space, Time and Count (i.e. events or messages).  The default
 dimension and scale is "None".  Do you wish to accept the default dimension
@@ -199,6 +215,8 @@ and scale [y]?
 Using the following units for trace.counter.value:
   Dimensions:  space=0 time=0 count=0
   Scale:       space=0 time=0 count=0
+
+
 Client host access - (A)llow/(D)isallow [Enter to complete install]? 
 Updating the Performance Metrics Name Space (PMNS) ...
 Terminate PMDA if already installed ...

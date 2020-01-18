@@ -25,10 +25,6 @@ fi
 trap "_cleanup; rm -f $tmp $tmp.*; exit" 0 1 2 3 15
 rm -f $seq.full
 
-# don't need to regenerate config.default with pmlogconf
-#
-export PMLOGGER_CHECK_SKIP_LOGCONF=yes
-
 _stop_auto_restart pmcd
 
 _cleanup()
@@ -92,14 +88,13 @@ cleanup()
 {
     if [ $_needclean ]
     then
-	$sudo $PCP_RC_DIR/pmcd stop 2>&1 | _filter_pcp_stop
-	$sudo $PCP_RC_DIR/pmlogger stop 2>&1 | _filter_pcp_stop
+	_service pcp stop | _filter_pcp_stop
 	_restore_config $PCP_PMCDCONF_PATH
 	pmafm $LOGGING_DIR/$LOCALHOST/Latest remove >$tmp.cmd 2>&1 \
 	    && $sudo sh $tmp.cmd
 	echo "Restarting pmcd"
 	echo "+++ restarting pmcd `date` +++" >>$seq.full
-	_service pcp restart 2>&1 | tee -a $seq.full | _filter_pcp_start
+	_service pcp restart | tee -a $seq.full | _filter_pcp_start
 	_restore_auto_restart pmcd
 	_wait_for_pmcd
 	_wait_for_pmlogger
@@ -118,7 +113,6 @@ _myfilter_config()
 	-e "/^$PCP_PLATFORM/s/.*/[platform PMDA]/" \
 	-e 's;$PCP_PMDAS_DIR/pmcd/;;' \
 	-e "s;\.$DSO_SUFFIX;.\$DSO_SUFFIX;g" \
-	-e '/Installed by PCP QA/s/ on .*/ on DATE/' \
     | _filter_pmcd_log
 }
 
@@ -129,9 +123,9 @@ trap "interrupt; cleanup; exit" 1 2 3 15
 trap "cleanup; exit" 0
 
 cat >$tmp  <<End-of-File
-# Need the pmcd PMDA so that "init" restart can start pmlogger
+# need the pmcd PMDA so that "init" restart can start pmlogger
 # the OS PMDA has to be there so that the default logging config works
-# Installed by PCP QA test $seq on `date`
+# created by QA 066
 #
 End-of-File
 
@@ -193,11 +187,7 @@ $sudo cp $tmp $PCP_PMCDCONF_PATH
 # try to dodge bind: Address already in use
 [ $PCP_PLATFORM = solaris ] && sleep 10
 echo "+++ starting pmcd `date` +++" >>$seq.full
-# cannot use _service here as we don't want systemctl in the picture
-# because pmcd will have trouble starting ...
-#
-$sudo $PCP_RC_DIR/pmcd start 2>&1 | tee -a $seq.full | _filter_pcp_start
-$sudo $PCP_RC_DIR/pmlogger start 2>&1 | tee -a $seq.full | _filter_pcp_start
+_service pcp start | tee -a $seq.full | _filter_pcp_start
 _wait_for_pmcd
 _wait_for_pmlogger
 echo "first config:"

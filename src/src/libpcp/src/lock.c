@@ -14,7 +14,7 @@
  */
 
 #include "pmapi.h"
-#include "libpcp.h"
+#include "impl.h"
 #include "internal.h"
 #ifdef HAVE_EXECINFO_H
 #include <execinfo.h>
@@ -24,9 +24,22 @@
 static pthread_mutex_t	lock_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t		__pmLock_extcall = PTHREAD_MUTEX_INITIALIZER;
 #else /* !PM_MULTI_THREAD - symbols exposed at the shlib ABI level */
-void *__pmLock_extcall;
+static void		*lock_lock;
+void			__pmLock_extcall;
 void *__pmLock_libpcp;
 void *__pmLock_extcall;
+void __pmInitLocks(void)
+{
+    static int		done = 0;
+    if (!done) {
+	SetupDebug();
+	done = 1;
+    }
+}
+int __pmMultiThreaded(int scope) { (void)scope; return 0; }
+int __pmLock(void *l, const char *f, int n) { (void)l, (void)f, (void)n; return 0; }
+int __pmIsLocked(void *l) { (void)l; return 0; }
+int __pmUnlock(void *l, const char *f, int n) { (void)l, (void)f, (void)n; return 0; }
 #endif /* PM_MULTI_THREAD */
 
 #ifdef PM_MULTI_THREAD
@@ -53,7 +66,11 @@ __pmIsLockLock(void *lock)
 #endif
 
 /* the big libpcp lock */
+#ifdef PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
+pthread_mutex_t	__pmLock_libpcp = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+#else
 pthread_mutex_t	__pmLock_libpcp = PTHREAD_MUTEX_INITIALIZER;
+#endif
 
 #ifndef HAVE___THREAD
 pthread_key_t 	__pmTPDKey = 0;
@@ -84,42 +101,14 @@ SetupDebug(void)
 	    fprintf(stderr, "Error: $PCP_DEBUG=%s is not valid, ignored\n", val);
     }
     PM_UNLOCK(__pmLock_extcall);
-    setlinebuf(stderr);
 }
 
-#ifdef PM_MULTI_THREAD
-static void
-mybacktrace(void)
-{
-#ifdef HAVE_BACKTRACE
-#define MAX_TRACE_DEPTH 32
-    void	*backaddr[MAX_TRACE_DEPTH];
-    int		sts;
-    sts = backtrace(backaddr, MAX_TRACE_DEPTH);
-    if (sts > 0) {
-	char	**symbols;
-	symbols = backtrace_symbols(backaddr, MAX_TRACE_DEPTH);
-	if (symbols != NULL) {
-	    int		i;
-	    fprintf(stderr, "backtrace:\n");
-	    for (i = 0; i < sts; i++)
-		fprintf(stderr, "  %s\n", symbols[i]);
-	    free(symbols);
-	}
-    }
-#endif /* HAVE_BACKTRACE */
-    return;
-}
-#endif /* PM_MULTI_THREAD */
-
-#ifdef PM_MULTI_THREAD
 #ifdef PM_MULTI_THREAD_DEBUG
 static char
 *lockname(void *lock)
 {
     static char locknamebuf[20];
     int		ctxid;
-    char	*ctxlist;
 
     if (__pmIsDeriveLock(lock))
 	return "derived_metric";
@@ -165,31 +154,17 @@ static char
 	pmsprintf(locknamebuf, sizeof(locknamebuf), "c_lock[slot %d]", ctxid);
 	return locknamebuf;
     }
-    else if ((ctxlist = __pmIsLogCtlLock(lock)) != NULL) {
-	pmsprintf(locknamebuf, sizeof(locknamebuf), "l_lock[handle(s) %s]", ctxlist);
-	free(ctxlist);
-	return locknamebuf;
-    }
     else {
 	pmsprintf(locknamebuf, sizeof(locknamebuf), PRINTF_P_PFX "%p", lock);
 	return locknamebuf;
     }
 }
-#endif /* PM_MULTI_THREAD_DEBUG */
-#endif /* PM_MULTI_THREAD */
 
-#define REPORT_STYLE0	1
-#define REPORT_STYLE1	2
-#define REPORT_STYLE2	3
-
-#ifdef PM_MULTI_THREAD
 void
 __pmDebugLock(int op, void *lock, const char *file, int line)
 {
     int			report = 0;
-#ifdef PM_MULTI_THREAD_DEBUG
     int			ctx;
-#endif
     static __pmHashCtl	hashctl = { 0, 0, NULL };
     __pmHashNode	*hp = NULL;
     lockdbg_t		*ldp;
@@ -199,19 +174,17 @@ __pmDebugLock(int op, void *lock, const char *file, int line)
     if (lock == (void *)&__pmLock_libpcp) {
 	if (pmDebugOptions.appl0 ||
 	    (!pmDebugOptions.appl0 && !pmDebugOptions.appl1 && !pmDebugOptions.appl2))
-	    report = REPORT_STYLE0;
+	    report = DBG_TRACE_APPL0;
     }
-#ifdef PM_MULTI_THREAD_DEBUG
     else if ((ctx = __pmIsContextLock(lock)) >= 0) {
 	if (pmDebugOptions.appl1 ||
 	    (!pmDebugOptions.appl0 && !pmDebugOptions.appl1 && !pmDebugOptions.appl2))
-	    report = REPORT_STYLE1;
+	    report = DBG_TRACE_APPL1;
     }
-#endif
     else {
 	if (pmDebugOptions.appl2 ||
 	    (!pmDebugOptions.appl0 && !pmDebugOptions.appl1 && !pmDebugOptions.appl2))
-	    report = REPORT_STYLE2;
+	    report = DBG_TRACE_APPL2;
     }
 
     if (report) {
@@ -242,20 +215,14 @@ again:
 	}
     }
 
-    if (report == REPORT_STYLE0) {
+    if (report == DBG_TRACE_APPL0) {
 	fprintf(stderr, "(global_libpcp)");
     }
-#ifdef PM_MULTI_THREAD_DEBUG
-    else if (report == REPORT_STYLE1) {
+    else if (report == DBG_TRACE_APPL1) {
 	fprintf(stderr, "(ctx %d)", ctx);
     }
-#endif
-    else if (report == REPORT_STYLE2) {
-#ifdef PM_MULTI_THREAD_DEBUG
+    else if (report == DBG_TRACE_APPL2) {
 	fprintf(stderr, "(%s)", lockname(lock));
-#else
-	fprintf(stderr, "(%p)", lock);
-#endif
     }
     if (report) {
 	if (hp != NULL) {
@@ -272,19 +239,35 @@ again:
 	    }
 	}
 	fputc('\n', stderr);
-	if (pmDebugOptions.desperate)
-	    mybacktrace();
+#ifdef HAVE_BACKTRACE
+#define MAX_TRACE_DEPTH 32
+	if (pmDebugOptions.desperate) {
+	    void	*backaddr[MAX_TRACE_DEPTH];
+	    sts = backtrace(backaddr, MAX_TRACE_DEPTH);
+	    if (sts > 0) {
+		char	**symbols;
+		symbols = backtrace_symbols(backaddr, MAX_TRACE_DEPTH);
+		if (symbols != NULL) {
+		    int		i;
+		    fprintf(stderr, "backtrace:\n");
+		    for (i = 0; i < sts; i++)
+			fprintf(stderr, "  %s\n", symbols[i]);
+		    free(symbols);
+		}
+	    }
+	}
+
+#endif
     }
 }
 #else
 #define __pmDebugLock(op, lock, file, line) do { } while (0)
-#endif /* PM_MULTI_THREAD */
+#endif
 
 /*
  * Initialize a single mutex to our preferred flavour ...
  * PTHREAD_MUTEX_ERRORCHECK today.
  */
-#ifdef PM_MULTI_THREAD
 void
 __pmInitMutex(pthread_mutex_t *lock)
 {
@@ -296,9 +279,9 @@ __pmInitMutex(pthread_mutex_t *lock)
 	pmErrStr_r(-sts, errmsg, sizeof(errmsg));
 	fprintf(stderr, "__pmInitMutex(");
 #ifdef PM_MULTI_THREAD_DEBUG
-	fprintf(stderr, "%s)", lockname(lock));
+	fprintf(stderr, "%s", lockname(lock));
 #else
-	fprintf(stderr, "%p)", lock);
+	fprintf(stderr, "%p", lock);
 #endif
 	fprintf(stderr, ": pthread_mutexattr_init failed: %s\n", errmsg);
 	exit(4);
@@ -307,9 +290,9 @@ __pmInitMutex(pthread_mutex_t *lock)
 	pmErrStr_r(-sts, errmsg, sizeof(errmsg));
 	fprintf(stderr, "__pmInitMutex(");
 #ifdef PM_MULTI_THREAD_DEBUG
-	fprintf(stderr, "%s)", lockname(lock));
+	fprintf(stderr, "%s", lockname(lock));
 #else
-	fprintf(stderr, "%p)", lock);
+	fprintf(stderr, "%p", lock);
 #endif
 	fprintf(stderr, ": pthread_mutexattr_settype failed: %s\n", errmsg);
 	exit(4);
@@ -318,54 +301,16 @@ __pmInitMutex(pthread_mutex_t *lock)
 	pmErrStr_r(-sts, errmsg, sizeof(errmsg));
 	fprintf(stderr, "__pmInitMutex(");
 #ifdef PM_MULTI_THREAD_DEBUG
-	fprintf(stderr, "%s)", lockname(lock));
+	fprintf(stderr, "%s", lockname(lock));
 #else
-	fprintf(stderr, "%p)", lock);
+	fprintf(stderr, "%p", lock);
 #endif
 	fprintf(stderr, ": pthread_mutex_init failed: %s\n", errmsg);
 	exit(4);
     }
     pthread_mutexattr_destroy(&attr);
-
-    if (pmDebugOptions.lock) {
-	fprintf(stderr, "__pmInitMutex(");
-#ifdef PM_MULTI_THREAD_DEBUG
-	fprintf(stderr, "%s", lockname(lock));
-#else
-	fprintf(stderr, "%p", lock);
-#endif
-	fprintf(stderr, ")\n");
-    }
 }
-#else
-#define __pmInitMutex(lock) do { } while (0)
-#endif /* PM_MULTI_THREAD */
 
-#ifdef PM_MULTI_THREAD
-void
-__pmDestroyMutex(pthread_mutex_t *lock)
-{
-    int			sts;
-    char		errmsg[PM_MAXERRMSGLEN];
-
-    if ((sts = pthread_mutex_destroy(lock)) != 0) {
-	pmErrStr_r(-sts, errmsg, sizeof(errmsg));
-	fprintf(stderr, "__pmDestroyMutex(");
-#ifdef PM_MULTI_THREAD_DEBUG
-	fprintf(stderr, "%s", lockname(lock));
-#else
-	fprintf(stderr, "%p", lock);
-#endif
-	fprintf(stderr, ": pthread_mutex_destroy failed: %s\n", errmsg);
-	exit(4);
-    }
-    return;
-}
-#else
-#define __pmDestroyMutex(lock) do { } while (0)
-#endif /* PM_MULTI_THREAD */
-
-#ifdef PM_MULTI_THREAD
 /*
  * Do one-trip mutex initializations ... PM_INIT_LOCKS() comes here
  */
@@ -383,6 +328,30 @@ __pmInitLocks(void)
     }
     if (!done) {
 	SetupDebug();
+#ifndef PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
+	/*
+	 * Unable to initialize at compile time, need to do it here in
+	 * a one trip for all threads run-time initialization.
+	 */
+	pthread_mutexattr_t	attr;
+
+	if ((psts = pthread_mutexattr_init(&attr)) != 0) {
+	    pmErrStr_r(-psts, errmsg, sizeof(errmsg));
+	    fprintf(stderr, "__pmInitLocks: pthread_mutexattr_init failed: %s", errmsg);
+	    exit(4);
+	}
+	if ((psts = pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE)) != 0) {
+	    pmErrStr_r(-psts, errmsg, sizeof(errmsg));
+	    fprintf(stderr, "__pmInitLocks: pthread_mutexattr_settype failed: %s", errmsg);
+	    exit(4);
+	}
+	if ((psts = pthread_mutex_init(&__pmLock_libpcp, &attr)) != 0) {
+	    pmErrStr_r(-psts, errmsg, sizeof(errmsg));
+	    fprintf(stderr, "__pmInitLocks: pthread_mutex_init failed: %s", errmsg);
+	    exit(4);
+	}
+	pthread_mutexattr_destroy(&attr);
+#endif
 #ifndef HAVE___THREAD
 	/* first thread here creates the thread private data key */
 	if ((psts = pthread_key_create(&__pmTPDKey, __pmTPD__destroy)) != 0) {
@@ -391,11 +360,6 @@ __pmInitLocks(void)
 	    exit(4);
 	}
 #endif
-	/*
-	 * Global locks
-	 */
-	__pmInitMutex(&__pmLock_libpcp);
-
 	/*
 	 * Now initialize the local mutexes.
 	 */
@@ -416,7 +380,7 @@ __pmInitLocks(void)
     if (pthread_getspecific(__pmTPDKey) == NULL) {
 	__pmTPD	*tpd = (__pmTPD *)malloc(sizeof(__pmTPD));
 	if (tpd == NULL) {
-	    pmNoMem("__pmInitLocks: __pmTPD", sizeof(__pmTPD), PM_FATAL_ERR);
+	    __pmNoMem("__pmInitLocks: __pmTPD", sizeof(__pmTPD), PM_FATAL_ERR);
 	    /*NOTREACHED*/
 	}
 	if ((psts = pthread_setspecific(__pmTPDKey, tpd)) != 0) {
@@ -429,18 +393,7 @@ __pmInitLocks(void)
     }
 #endif
 }
-#else
-void __pmInitLocks(void)
-{
-    static int		done = 0;
-    if (!done) {
-	SetupDebug();
-	done = 1;
-    }
-}
-#endif /* PM_MULTI_THREAD */
 
-#ifdef PM_MULTI_THREAD
 int
 __pmMultiThreaded(int scope)
 {
@@ -458,11 +411,7 @@ __pmMultiThreaded(int scope)
     PM_UNLOCK(lock_lock);
     return sts;
 }
-#else
-int __pmMultiThreaded(int scope) { (void)scope; return 0; }
-#endif /* PM_MULTI_THREAD */
 
-#ifdef PM_MULTI_THREAD
 int
 __pmLock(void *lock, const char *file, int line)
 {
@@ -470,14 +419,10 @@ __pmLock(void *lock, const char *file, int line)
 
     if ((sts = pthread_mutex_lock(lock)) != 0) {
 	sts = -sts;
-#ifdef PM_MULTI_THREAD_DEBUG
-	fprintf(stderr, "%s:%d: __pmLock(%s) failed: %s\n", file, line, lockname(lock), pmErrStr(sts));
-#else
-	fprintf(stderr, "%s:%d: __pmLock(%p) failed: %s\n", file, line, lock, pmErrStr(sts));
-#endif
+	if (pmDebugOptions.desperate)
+	    fprintf(stderr, "%s:%d: lock failed: %s\n", file, line, pmErrStr(sts));
 #ifdef BUILD_WITH_LOCK_ASSERTS
-	mybacktrace();
-	abort();
+	assert(sts == 0);
 #endif
     }
 
@@ -486,11 +431,7 @@ __pmLock(void *lock, const char *file, int line)
 
     return sts;
 }
-#else
-int __pmLock(void *l, const char *f, int n) { (void)l, (void)f, (void)n; return 0; }
-#endif /* PM_MULTI_THREAD */
 
-#ifdef PM_MULTI_THREAD
 int
 __pmIsLocked(void *lock)
 {
@@ -511,11 +452,7 @@ __pmIsLocked(void *lock)
     }
     return 0;
 }
-#else
-int __pmIsLocked(void *l) { (void)l; return 0; }
-#endif /* PM_MULTI_THREAD */
 
-#ifdef PM_MULTI_THREAD
 #ifdef BUILD_WITH_LOCK_ASSERTS
 /*
  * Assumes lock is a pthread mutex and not recursive.
@@ -529,11 +466,7 @@ __pmCheckIsUnlocked(void *lock, char *file, int line)
     if ((sts = pthread_mutex_trylock(lockp)) != 0) {
 	if (sts == EBUSY) {
 #ifdef __GLIBC__
-#ifdef PM_MULTI_THREAD_DEBUG
 	   fprintf(stderr, "__pmCheckIsUnlocked(%s): [%s:%d] __lock=%d __count=%d\n", lockname(lockp), file, line, lockp->__data.__lock, lockp->__data.__count);
-#else
-	   fprintf(stderr, "__pmCheckIsUnlocked(%p): [%s:%d] __lock=%d __count=%d\n", lockp, file, line, lockp->__data.__lock, lockp->__data.__count);
-#endif
 #else
 	   fprintf(stderr, "__pmCheckIsUnlocked(%s): [%s:%d] locked\n", lockname(lockp), file, line);
 #endif
@@ -550,9 +483,7 @@ __pmCheckIsUnlocked(void *lock, char *file, int line)
     return;
 }
 #endif /* BUILD_WITH_LOCK_ASSERTS */
-#endif /* PM_MULTI_THREAD */
 
-#ifdef PM_MULTI_THREAD
 int
 __pmUnlock(void *lock, const char *file, int line)
 {
@@ -563,19 +494,12 @@ __pmUnlock(void *lock, const char *file, int line)
 
     if ((sts = pthread_mutex_unlock(lock)) != 0) {
 	sts = -sts;
-#ifdef PM_MULTI_THREAD_DEBUG
-	fprintf(stderr, "%s:%d: __pmUnlock(%s) failed: %s\n", file, line, lockname(lock), pmErrStr(sts));
-#else
-	fprintf(stderr, "%s:%d: __pmUnlock(%p) failed: %s\n", file, line, lock, pmErrStr(sts));
-#endif
+	if (pmDebugOptions.desperate)
+	    fprintf(stderr, "%s:%d: unlock failed: %s\n", file, line, pmErrStr(sts));
 #ifdef BUILD_WITH_LOCK_ASSERTS
-	mybacktrace();
-	abort();
+	assert(sts == 0);
 #endif
     }
 
     return sts;
 }
-#else
-int __pmUnlock(void *l, const char *f, int n) { (void)l, (void)f, (void)n; return 0; }
-#endif /* PM_MULTI_THREAD */

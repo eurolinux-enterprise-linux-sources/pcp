@@ -1,0 +1,22 @@
+commit 25f7bab80fea8676fa24435e275934fc81f68bc7
+Author: Nathan Scott <nathans@redhat.com>
+Date:   Fri May 3 15:58:17 2019 +1000
+
+    qa: fix _fixmod function name typo in test 994
+    
+    Thanks to Michal Kolar from the Red Hat QE team for
+    reporting this one.
+
+diff --git a/qa/994 b/qa/994
+index cdf9485b6..01de9449b 100755
+--- a/qa/994
++++ b/qa/994
+@@ -151,7 +151,7 @@ p
+ 	then
+ 	    echo "$target: wrong mode: expected $mode (from $makefile), found $_mode"
+ 	    ls -ld $target
+-	    $fix && _fixmod "$mode" "$target"
++	    $fix && _fixmode "$mode" "$target"
+ 	fi
+ 	if [ "$_owner" != "$owner" ]
+ 	then

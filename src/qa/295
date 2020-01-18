@@ -1,0 +1,98 @@
+#! /bin/sh
+# PCP QA Test No. 295
+# verify pmproxy cleans up correctly when clients are terminated
+#
+# Copyright (c) 2005 Silicon Graphics, Inc.  All Rights Reserved.
+#
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+# get standard environment, filters and checks
+. ./common.product
+. ./common.filter
+. ./common.check
+
+which pmproxy >/dev/null 2>&1 || _notrun "No pmproxy binary installed"
+
+signal=$PCP_BINADM_DIR/pmsignal
+status=0	# success is the default!
+username=`id -u -n`
+$sudo rm -rf $tmp.* $seq.full
+trap "_cleanup; rm -rf $tmp.*; exit \$status" 0 1 2 3 15
+
+_cleanup()
+{
+    $sudo $signal -a pmproxy >/dev/null 2>&1
+    _service pmproxy restart >/dev/null 2>&1
+}
+
+_filter_pmproxy()
+{
+    sed \
+	-e '/^__pmSetSocketIPC: fd=/d' \
+	-e '/^__pmSetDataIPC:/d' \
+	-e '/^__pmDataIPC: /d' \
+	-e '/^IPC table fd/d' \
+    # end
+}
+
+_check()
+{
+    connects=`egrep 'AcceptNewClient|accept new client' $tmp.log | wc -l`
+    disconnects=`egrep 'DeleteClient|connection closed' $tmp.log | wc -l`
+    difference=`expr $connects - $disconnects`
+    echo "N connects"
+    echo "N-$difference disconnects"
+    echo "--- $tmp.log ---" >>$here/$seq.full
+    cat $tmp.log >>$here/$seq.full
+    echo "--- end $tmp.log ---" >>$here/$seq.full
+}
+
+_service pmproxy stop >/dev/null 2>&1
+$sudo $signal -a pmproxy >/dev/null 2>&1
+
+mkdir -p $tmp.rundir
+export PCP_RUN_DIR=$tmp.rundir
+proxyargs="-Dcontext -U $username"
+$PCP_BINADM_DIR/pmproxy $proxyargs -l $tmp.log 2>&1 | _filter_pmproxy
+
+# real QA test starts here
+export PMPROXY_HOST=localhost
+pidlist=`sh -c "pmval -h $PMPROXY_HOST hinv.ncpu >$tmp.1 2>&1 & echo \\\$!"`
+echo "pmval pid=$pidlist" >>$here/$seq.full
+pid=`sh -c "pmstat -h $PMPROXY_HOST >$tmp.2 2>&1 & echo \\\$!"`
+echo "pmstat pid=$pid" >>$here/$seq.full
+pidlist="$pidlist $pid"
+echo "kernel.all.load;" >$tmp.in
+pid=`sh -c "pmie -v -h $PMPROXY_HOST -c $tmp.in >$tmp.3 2>&1 & echo \\\$!"`
+echo "pmie pid=$pid" >>$here/$seq.full
+pidlist="$pidlist $pid"
+
+sleep 3
+
+echo all clients started
+echo "expect N connects and N-3 disconnect, thanks to pmie"
+_check
+
+for pid in $pidlist
+do
+    echo
+    echo "kill off a client ..."
+    echo "kill off client pid=$pid" >>$here/$seq.full
+    $signal -s KILL $pid >>$here/$seq.full 2>&1
+    sleep 1
+    _check
+done
+
+echo "pmval output ..." >>$here/$seq.full
+cat $tmp.1 >>$here/$seq.full
+echo >>$here/$seq.full
+echo "pmstat output ..." >>$here/$seq.full
+cat $tmp.2 >>$here/$seq.full
+echo >>$here/$seq.full
+echo "pmie output ..." >>$here/$seq.full
+cat $tmp.3 >>$here/$seq.full
+
+# success, all done
+exit

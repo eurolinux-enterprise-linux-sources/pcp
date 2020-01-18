@@ -1,0 +1,280 @@
+#
+# Common shell routines for testing pmdabcc
+#
+# Copyright (c) 2018 Andreas Gerstmayr.
+# Copyright (c) 2019 Red Hat.
+#
+
+# get standard environment, filters and checks
+. ./common.python
+
+_pmdabcc_check()
+{
+    $python -c "from pcp import pmda" >/dev/null 2>&1
+    [ $? -eq 0 ] || _notrun "python pcp pmda module not installed"
+
+    $python -c "import bcc" >/dev/null 2>&1
+    [ $? -eq 0 ] || _notrun "python bcc module not installed"
+
+    # python BCC module doesn't have a __version__ attribute,
+    # therefore check for the DEBUG_BPF_REGISTER_STATE attribute
+    # (added in version 0.5.0)
+    # TODO: update once __version__ attribute is available
+    $python -c "from bcc import DEBUG_BPF_REGISTER_STATE" >/dev/null 2>&1
+    [ $? -eq 0 ] || _notrun "python bcc module 0.5.0+ is required"
+
+    [ -f $PCP_PMDAS_DIR/bcc/pmdabcc.python ] || _notrun "bcc PMDA not installed"
+}
+
+_pmdabcc_require_kernel_version()
+{
+    uname -r | awk -F. -v major=$1 -v minor=$2 '$1 < major || ($1 == major && $2 < minor) {exit 1}' || \
+    _notrun "this test requires kernel $1.$2+"
+}
+
+_pmdabcc_install_filter()
+{
+    # ignore warnings because PMDA might not be ready yet
+    # and therefore it has no values
+    sed \
+    -e "s/.*pmdabcc.* Info/Info/g" \
+    -e "s/Tracing PID.*/Tracing PID./g" \
+    -e "s/[0-9]\+ warnings, //" \
+    -e "s/[0-9]\+ metrics and [0-9]\+ values/X metrics and X values/g" \
+    #end
+}
+
+_pmdabcc_install()
+{
+    cat > $tmp.config
+
+    # start from known starting points
+    cd $PCP_PMDAS_DIR/bcc
+    $sudo ./Remove >/dev/null 2>&1
+
+    echo "pmdabcc config:" >> $here/$seq.full
+    cat $tmp.config >> $here/$seq.full
+
+    [ -f $PCP_PMDAS_DIR/bcc/bcc.conf ] && \
+    $sudo cp $PCP_PMDAS_DIR/bcc/bcc.conf $PCP_PMDAS_DIR/bcc/bcc.conf.$seq
+    $sudo cp $tmp.config $PCP_PMDAS_DIR/bcc/bcc.conf
+
+    echo
+    echo "=== bcc agent installation ==="
+    $sudo ./Install </dev/null >$tmp.out 2>&1
+    cat $tmp.out | _filter_pmda_install | _pmdabcc_install_filter
+
+    echo
+}
+
+_pmdabcc_wait_for_metric()
+{
+    # Wait for the PMDA to compile the bcc modules and become ready, 60s max
+    _canwait=60
+    i=0
+    while [ $i -lt $_canwait ]
+    do
+	grep -q 'Ready to process requests' $PCP_LOG_DIR/pmcd/bcc.log && break
+	sleep 1
+	i=`expr $i + 1`
+    done
+    sed -n '/Error:/,$p' $PCP_LOG_DIR/pmcd/bcc.log
+    if [ $i -eq $_canwait ]; then
+        echo PMDA was not ready in $_canwait seconds, test failed
+        return 1
+    fi
+    echo "=== _pmdabcc_wait_for_metric: after $i secs, metrics should be available ===" >>$here/$seq.full
+    # "should" be available, but now wait up to 20 seconds for values
+    # to be seen ...
+    #
+    _canwait=20
+    i=1
+    while [ $i -le $_canwait ]
+    do
+	touch $tmp.ok
+	pmprobe bcc \
+	| while read metric numval foo
+	do
+	    if [ "$numval" -eq -12389 ]
+	    then
+		# PM_ERR_AGAIN ... this is expected (apparently)
+		#
+		:
+	    elif [ "$numval" -lt 0 ]
+	    then
+		rm -f $tmp.ok
+		if [ $i -eq $_canwait ]
+		then
+		    # still bad on last iteration ... report
+		    #
+		    echo "_pmdabcc_wait_for_metric: Botch: bcc PMDA ready but metric $metric returns numval $numval (`pmerr $numval`)"
+		fi
+	    fi
+	done
+	if [ -f $tmp.ok ]
+	then
+	    # goodness
+	    #
+	    echo "=== _pmdabcc_wait_for_metric: after another $i secs, values are available ===" >>$here/$seq.full
+	    pminfo -f bcc >>$here/$seq.full
+	    return 0
+	fi
+	sleep 1
+	i=`expr $i + 1`
+    done
+
+    # badness ...
+    #
+    pminfo -f bcc
+    echo "Here's the PMDA log ..."
+    cat $PCP_LOG_DIR/pmcd/bcc.log
+
+    return 0
+}
+
+_pmdabcc_wait_for_value()
+{
+    value_regex=${2:-'.*'}
+
+    sed -n '/Error:/,$p' $PCP_LOG_DIR/pmcd/bcc.log
+    for i in `seq 1 30`; do pminfo -f $1 | grep -q 'inst .* value '$value_regex && break; sleep 1; done
+    if [ $i -ge 30 ]; then
+        echo Could not get a single value, test failed
+        exit
+    fi
+}
+
+_pmdabcc_remove()
+{
+    cd $PCP_PMDAS_DIR/bcc
+
+    echo
+    echo "=== remove bcc agent ==="
+    $sudo ./Remove >$tmp.out 2>&1
+    _filter_pmda_remove <$tmp.out
+}
+
+_pmdabcc_cleanup()
+{
+    cat $PCP_LOG_DIR/pmcd/bcc.log >> $here/$seq.full
+    if [ -f $PCP_PMDAS_DIR/bcc/bcc.conf.$seq ]; then
+        $sudo cp $PCP_PMDAS_DIR/bcc/bcc.conf.$seq $PCP_PMDAS_DIR/bcc/bcc.conf
+        $sudo rm $PCP_PMDAS_DIR/bcc/bcc.conf.$seq
+    else
+        $sudo rm -f $PCP_PMDAS_DIR/bcc/bcc.conf
+    fi
+    # note: _restore_auto_restart pmcd done in _cleanup_pmda()
+    _cleanup_pmda bcc
+}
+
+_java_check()
+{
+    machine=`uname -m`
+    case "$machine"
+    in
+        x86_64)
+            java_machine=amd64
+            ;;
+        *)
+            java_machine="$machine"
+            ;;
+    esac
+
+    java_version=`java -version 2>&1 | awk '/version/ { print $3 }'`
+    java_version=`echo $java_version | tr -d '"' | sed -e 's,_.*,,'`
+    java_major=`echo $java_version   | sed -e 's,\..*,,g'`
+
+    jvm_path=""
+    for path in \
+	/etc/alternatives/jre/lib/server \
+	/etc/alternatives/jre/lib/$java_machine/server \
+	/usr/lib/jvm/java-${java_major}-openjdk-${java_machine}/lib/server \
+	/usr/lib/jvm/java-${java_version}-openjdk/jre/lib/${java_machine}/server \
+	/usr/lib/jvm/java-${java_major}-openjdk-${java_machine}/jre/lib/${java_machine}/server
+    do
+        [ -f "$path/libjvm.$DSO_SUFFIX" ] && jvm_path="$path/libjvm.$DSO_SUFFIX"
+    done
+
+    [ -z "$jvm_path" ] && _notrun "libjvm.$DSO_SUFFIX not found"
+
+    for tplistcmd in /usr/share/bcc/tools/tplist tplist-bpfcc tplist
+    do
+        which $tplistcmd >/dev/null 2>&1 && \
+            probes=$($tplistcmd -l $jvm_path 2>/dev/null | grep thread__start)
+        [ -n "$probes" ] && return 0
+    done
+    _notrun "No Java USDT probes available"
+}
+
+_python_probe_check()
+{
+    $python -c 'import time;time.sleep(5)' > /dev/null 2>&1 &
+    pypid=$!
+    probes=
+    for tplistcmd in /usr/share/bcc/tools/tplist tplist-bpfcc tplist
+    do
+        which $tplistcmd >/dev/null 2>&1 && \
+            probes=$($tplistcmd -p $pypid 2>/dev/null | grep function__entry)
+        [ -n "$probes" ] && return 0
+    done
+    _notrun "No Python USDT probes available"
+}
+
+_mount_filesystem()
+{
+    fs=$1
+    image=$tmp.loop.$fs.img
+    mountpoint=$tmp.mount.$fs
+
+    truncate -s 30M $image
+    echo y | mkfs.$fs $image > /dev/null 2>&1
+    mkdir -p $mountpoint
+    $sudo mount -t $fs $image $mountpoint
+    $sudo chown $(id -u):$(id -g) $mountpoint
+}
+
+_unmount_filesystem()
+{
+    fs=$1
+    mountpoint=$tmp.mount.$fs
+
+    $sudo umount $mountpoint
+    rm -r $mountpoint
+}
+
+_value_filter_any()
+{
+    awk '/value .+/ {print "OK"; exit}'
+}
+
+_value_filter_nonzero()
+{
+    awk '/value [1-9]\d*/ {print "OK"; exit}'
+}
+
+_value_filter_exact()
+{
+    grep "value $1" > /dev/null && echo OK
+}
+
+# openSUSE 15.0 bcc-0.5.0-lp150.9.2 is carrying a patch to backport bcc
+# upstream commit c0ca99a2 but not a subsequent fix made in upstream
+# commit d1a83c1b so bcc on openSUSE 15.0 is broken on this regard.
+_bcc_check_ArgString()
+{
+    if [ -f /etc/os-release ]
+    then
+	if grep 'openSUSE Leap' /etc/os-release >/dev/null
+	then
+	    case "`rpm -q libbcc0`"
+	    in
+		libbcc0-0.5.0-lp150.9.2*)
+		    # BAD
+		    return 1
+	    esac
+	fi
+    fi
+    
+    # OK
+    return 0
+}

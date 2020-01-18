@@ -1,0 +1,18 @@
+QA output created by 300
+Install should fail
+.NeedInstall present
+
+Install should succeed
+.NeedInstall missing
+
+Remove should fail
+.NeedRemove present
+
+Remove should succeed
+.NeedRemove missing
+
+Check pmpost messages ...
+TIME PMDA setup: automated Install FAILED (exit=1): bozo
+TIME PMDA setup: automated Install: bozo
+TIME PMDA setup: automated Remove FAILED (exit=1): bozo
+TIME PMDA setup: automated Remove: bozo

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016 Red Hat.
+ * Copyright (c) 2014-2018 Red Hat.
  *
  * This library is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as published
@@ -13,7 +13,7 @@
  */
 
 #include "pmapi.h"
-#include "impl.h"
+#include "libpcp.h"
 #include "internal.h"
 #include <math.h>
 #include <assert.h>
@@ -40,6 +40,7 @@
  */
 struct __pmFetchGroup {
     int	ctx;			/* our pcp context */
+    int wrap;			/* wrap-handling flag, set at fg-create-time */
     pmResult *prevResult;
     struct __pmFetchGroupItem *items;
     pmID *unique_pmids;
@@ -167,7 +168,9 @@ pmfg_add_pmid(pmFG pmfg, pmID pmid)
 /*
  * Populate given pmFGI item structure based on common lookup &
  * verification for pmfg inputs.  Adjust instance profile to
- * include requested instance.
+ * include requested instance.  If it's a derived metric, we 
+ * don't know what instance domain(s) it could involve, so we
+ * clear the instance profile entirely.
  */
 static int
 pmfg_lookup_item(const char *metric, const char *instance, pmFGI item)
@@ -183,15 +186,24 @@ pmfg_lookup_item(const char *metric, const char *instance, pmFGI item)
     sts = pmLookupDesc(item->u.item.metric_pmid, &item->u.item.metric_desc);
     if (sts < 0)
 	return sts;
+
     /* Validate domain instance */
     if ((item->u.item.metric_desc.indom == PM_INDOM_NULL && instance) ||
 	(item->u.item.metric_desc.indom != PM_INDOM_NULL && !instance))
 	return PM_ERR_INDOM;
+
+    /* Clear instance profile if this is an opaque derived metric. */
+    if (IS_DERIVED(item->u.item.metric_desc.pmid)) {
+        (void) pmAddProfile(PM_INDOM_NULL, 0, NULL);
+    }
+
+    /* Add given instance to profile. */
     if (item->u.item.metric_desc.indom != PM_INDOM_NULL) {
 	sts = pmLookupInDom(item->u.item.metric_desc.indom, instance);
 	if (sts < 0)
 	    return sts;
 	item->u.item.metric_inst = sts;
+        /* Moot & harmless if IS_DERIVED. */
 	sts = pmAddProfile(item->u.item.metric_desc.indom, 1,
 			   &item->u.item.metric_inst);
     }
@@ -214,6 +226,11 @@ pmfg_lookup_indom(const char *metric, pmFGI item)
     if (sts < 0)
 	return sts;
 
+    /* Clear instance profile if this is an opaque derived metric. */
+    if (IS_DERIVED(item->u.item.metric_desc.pmid)) {
+        (void) pmAddProfile(PM_INDOM_NULL, 0, NULL);
+    }
+
     /* As a convenience to users, we also accept non-indom'd metrics */
     if (item->u.indom.metric_desc.indom == PM_INDOM_NULL)
 	return 0;
@@ -221,6 +238,7 @@ pmfg_lookup_indom(const char *metric, pmFGI item)
     /*
      * Add all instances; this will override any other past or future
      * piecemeal instance requests from __pmExtendFetchGroup_lookup.
+     * Moot & harmless if IS_DERIVED.
      */
     return pmAddProfile(item->u.indom.metric_desc.indom, 0, NULL);
 }
@@ -682,6 +700,25 @@ pmfg_convert_double(const pmDesc *desc, const pmFGC conv, double *value)
 }
 
 static int
+pmfg_unwrap_counter(pmFG pmfg, int type, double *value)
+{
+    if (pmfg->wrap) {
+	switch (type) {
+	    case PM_TYPE_32:
+	    case PM_TYPE_U32:
+		*value += (double)UINT_MAX+1;
+		break;
+	    case PM_TYPE_64:
+	    case PM_TYPE_U64:
+		*value += (double)ULONGLONG_MAX+1;
+		break;
+	}
+	return 0;
+    }
+    return PM_ERR_VALUE;
+}
+
+static int
 pmfg_extract_convert_item(pmFG pmfg, pmID metric_pmid, int metric_inst,
 			  int first_vset, const pmDesc *desc, const pmFGC conv,
 			  pmValueSet **vsets, int numpmid,
@@ -720,7 +757,9 @@ pmfg_extract_convert_item(pmFG pmfg, pmID metric_pmid, int metric_inst,
 	    if (sts)
 		return sts;
 
-	    delta = (v.d - prev_v.d) / deltaT;
+	    delta = v.d - prev_v.d;
+	    if (delta < 0.0)
+		sts = pmfg_unwrap_counter(pmfg, desc->type, &delta);
 	    /*
 	     * NB: the units of this delta value are: "metric_units / second",
 	     * something we don't represent formally with another pmUnits
@@ -729,7 +768,10 @@ pmfg_extract_convert_item(pmFG pmfg, pmID metric_pmid, int metric_inst,
 	     * other, the pmfg_prep_conversion code will adjust the scalar
 	     * multiplier to map from /second to /hour etc.
 	     */
-	    sts = pmfg_convert_double(desc, conv, &delta);
+	    if (sts == 0) {
+		delta /= deltaT;
+		sts = pmfg_convert_double(desc, conv, &delta);
+	    }
 	    if (sts)
 		return sts;
 
@@ -1168,6 +1210,24 @@ out:
 	*item->u.event.output_sts = sts;
 }
 
+static int
+pmfg_clear_profile(pmFG pmfg)
+{
+    int sts;
+
+    sts = pmUseContext(pmfg->ctx);
+    if (sts != 0)
+	return sts;
+
+    /*
+     * Wipe clean all instances; we'll add them back incrementally as
+     * the fetchgroup is extended.  This cannot fail for the manner in
+     * which we call it - see pmDelProfile(3) man page discussion.
+     */
+    return pmDelProfile(PM_INDOM_NULL, 0, NULL);
+}
+
+
 /* ------------------------------------------------------------------------ */
 /* Public functions exported from libpcp and in pmapi.h */
 
@@ -1196,16 +1256,15 @@ pmCreateFetchGroup(pmFG *ptr, int type, const char *name)
     }
     pmfg->ctx = sts;
 
-    /*
-     * Wipe clean all instances; we'll add them back incrementally as
-     * the fetchgroup is extended.  This cannot fail for the manner in
-     * which we call it - see pmDelProfile(3) man page discussion.
-     */
-    pmDelProfile(PM_INDOM_NULL, 0, NULL);
+    /* PCP_COUNTER_WRAP in environment enables "counter wrap" logic */
+    PM_LOCK(__pmLock_extcall);
+    if (getenv("PCP_COUNTER_WRAP") != NULL)
+	pmfg->wrap = 1;
+    PM_UNLOCK(__pmLock_extcall);
 
-    /* Other fields may be left 0-initialized. */
+    pmfg_clear_profile(pmfg);
+
     *ptr = pmfg;
-
     return 0;
 }
 
@@ -1448,7 +1507,7 @@ pmExtendFetchGroup_event(pmFG pmfg,
 	    PM_UNLOCK(ctxp->c_lock);
 	    if (sts < 0)
 		goto out;
-	    sts = pmSetMode (PM_MODE_BACK, &archive_end, 0);
+	    sts = pmSetMode(PM_MODE_BACK, &archive_end, 0);
 	    if (sts < 0)
 		goto out;
 	    /* try again */
@@ -1558,10 +1617,8 @@ pmFetchGroup(pmFG pmfg)
     if (sts != 0)
 	return sts;
 
-    sts = pmFetch((int) pmfg->num_unique_pmids, pmfg->unique_pmids, &newResult);
+    sts = pmFetch(pmfg->num_unique_pmids, pmfg->unique_pmids, &newResult);
     if (sts < 0 || newResult == NULL) {
-	/* XXX: automatically pmReconnectContext on PM_ERR_IPC */
-
 	/*
 	 * Populate an empty fetch result, which will send out the
 	 * appropriate PM_ERR_VALUE etc. indications to the fetchgroup
@@ -1613,10 +1670,10 @@ pmFetchGroup(pmFG pmfg)
 }
 
 /*
- * Destroy the fetchgroup; release all items and related dynamic data.
+ * Clear the fetchgroup of all items, keeping the PMAPI context alive.
  */
 int
-pmDestroyFetchGroup(pmFG pmfg)
+pmClearFetchGroup(pmFG pmfg)
 {
     pmFGI item;
 
@@ -1639,7 +1696,7 @@ pmDestroyFetchGroup(pmFG pmfg)
 	    case pmfg_event:
 		pmfg_reinit_event(item);
 		break;
-	case pmfg_timestamp:
+	    case pmfg_timestamp:
 		/* no dynamically allocated content. */
 		break;
 	    default:
@@ -1648,12 +1705,30 @@ pmDestroyFetchGroup(pmFG pmfg)
 	free(item);
 	item = next_item;
     }
+    pmfg->items = NULL;
 
     if (pmfg->prevResult)
 	pmFreeResult(pmfg->prevResult);
+    pmfg->prevResult = NULL;
+    if (pmfg->unique_pmids)
+	free(pmfg->unique_pmids);
+    pmfg->unique_pmids = NULL;
+    pmfg->num_unique_pmids = 0;
 
-    pmDestroyContext(pmfg->ctx);
-    free(pmfg->unique_pmids);
+    return pmfg_clear_profile(pmfg);
+}
+
+/*
+ * Destroy the fetchgroup; release all items and related dynamic data.
+ */
+int
+pmDestroyFetchGroup(pmFG pmfg)
+{
+    int ctx = pmfg->ctx;
+
+    pmfg->ctx = -EINVAL;
+    pmDestroyContext(ctx);
+    pmClearFetchGroup(pmfg);
     free(pmfg);
     return 0;
 }

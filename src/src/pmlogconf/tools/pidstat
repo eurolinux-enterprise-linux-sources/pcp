@@ -1,6 +1,7 @@
 #pmlogconf-setup 2.0
 ident   metrics used by the pcp-pidstat(1) command
-probe	kernel.uname.sysname ~ Linux ? available : exclude
+probe   proc.psinfo.rss values ? available : exclude
+
 	proc.nprocs
 	proc.psinfo.pid
 	proc.psinfo.cmd
@@ -14,6 +15,7 @@ probe	kernel.uname.sysname ~ Linux ? available : exclude
 	proc.psinfo.maj_flt
 	proc.psinfo.vsize
 	proc.psinfo.rss
+	proc.psinfo.wchan_s
 	proc.memory.vmstack
 	proc.id.uid
 	proc.id.uid_nm

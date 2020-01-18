@@ -49,6 +49,7 @@ _cleanup()
 	else
 	    ( cd $PCP_PMDAS_DIR/kvm; $sudo ./Remove >/dev/null 2>&1 )
 	fi
+	_restore_auto_restart pmcd
 	done_clean=true
     fi
     $sudo rm -f $tmp.*
@@ -67,6 +68,8 @@ then
 fi
 cd $home/$iam
 unset ROOT MAKEFLAGS
+
+_stop_auto_restart pmcd
 
 # copy the pmcd config file to restore state later.
 cp $PCP_PMCDCONF_PATH $tmp.pmcd.conf
@@ -102,6 +105,12 @@ echo "from pmprobe ..." >>$here/$seq.full
 cat $tmp.probe >>$here/$seq.full
 for stat in `$sudo find $kvm_stats_path -mindepth 1`
 do
+    case $stat
+    in
+	$kvm_stats_path/[0-9]*)
+	    continue
+	    ;;
+    esac
     value=`$sudo cat $stat`
     echo $stat 1 $value | sed -e "s,$kvm_stats_path/,kvm.,g" >> $tmp.stats
 done
@@ -122,6 +131,7 @@ do
     case "$metric"
     in
 	kvm.max_mmu_page_hash_collisions)	;;
+	kvm.efer_reload)			;;
 	kvm.req_event)				;;
 	kvm.halt_successful_poll)		;;
 	kvm.halt_poll_invalid)			;;

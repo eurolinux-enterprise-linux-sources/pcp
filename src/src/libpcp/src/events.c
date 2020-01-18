@@ -24,7 +24,7 @@
  */
 #include <inttypes.h>
 #include "pmapi.h"
-#include "impl.h"
+#include "libpcp.h"
 #include "internal.h"
 #include "fault.h"
 
@@ -112,9 +112,12 @@ dump_parameter(FILE *f, pmEventParameter *epp)
 	case PM_TYPE_AGGREGATE_STATIC:
 	    fprintf(f, " = [%08x...]", ((__uint32_t *)vbuf)[0]);
 	    break;
+	case PM_TYPE_UNKNOWN:
+	    fprintf(f, " : unknown type");
+	    break;
 	default:
-	    fprintf(f, " : bad type %s",
-		    pmTypeStr_r(epp->ep_type, strbuf, sizeof(strbuf)));
+	    fprintf(f, " : bad type %u", epp->ep_type);
+	    break;
     }
     fputc('\n', f);
 }
@@ -356,7 +359,7 @@ __pmCheckEventRecords(pmValueSet *vsp, int idx)
     return check_event_records(vsp, idx, 0);
 }
 
-int
+static int
 __pmCheckHighResEventRecords(pmValueSet *vsp, int idx)
 {
     return check_event_records(vsp, idx, 1);
@@ -403,7 +406,7 @@ PM_FAULT_POINT("libpcp/" __FILE__ ":2", PM_FAULT_ALLOC);
 	    if ((sts = pmLookupName(1, &name, &pmid_flags)) < 0) {
 		fprintf(stderr, "%s: Warning: failed to get PMID for %s: %s\n",
 			caller, name, pmErrStr_r(sts, errmsg, sizeof(errmsg)));
-		__pmid_int(&pmid_flags)->item = 1;
+		pmid_flags = pmID_build(pmID_domain(pmid_flags), pmID_cluster(pmid_flags), 1);
 	    }
 	}
 	vset->pmid = pmid_flags;
@@ -423,7 +426,7 @@ PM_FAULT_POINT("libpcp/" __FILE__ ":2", PM_FAULT_ALLOC);
 	    if ((sts = pmLookupName(1, &name, &pmid_missed)) < 0) {
 		fprintf(stderr, "%s: Warning: failed to get PMID for %s: %s\n",
 			caller, name, pmErrStr_r(sts, errmsg, sizeof(errmsg)));
-		__pmid_int(&pmid_missed)->item = 1;
+		pmid_missed = pmID_build(pmID_domain(pmid_missed), pmID_cluster(pmid_missed), 1);
 	    }
 	}
 	vset->pmid = pmid_missed;
@@ -670,7 +673,7 @@ PM_FAULT_POINT("libpcp/" __FILE__ ":8", PM_FAULT_ALLOC);
 bail:
     while (r >= 0) {
 	if ((*rap)[r] != NULL)
-	    pmFreeHighResResult((*rap)[r]);
+	    __pmFreeHighResResult((*rap)[r]);
 	r--;
     }
     free(*rap);
@@ -698,6 +701,6 @@ pmFreeHighResEventResult(pmHighResResult **rset)
     if (rset == NULL)
 	return;
     for (r = 0; rset[r] != NULL; r++)
-	pmFreeHighResResult(rset[r]);
+	__pmFreeHighResResult(rset[r]);
     free(rset);
 }

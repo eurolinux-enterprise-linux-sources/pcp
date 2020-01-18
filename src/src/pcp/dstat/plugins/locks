@@ -1,0 +1,17 @@
+#
+# pcp-dstat(1) configuration file - see pcp-dstat(5)
+#
+
+[locks]
+label = file locks
+width = 3
+colorstep = 10
+printtype = f
+posix = vfs.locks.posix
+posix.label = pos
+flock = vfs.locks.flock
+flock.label = lck
+readlocks = vfs.locks.read
+readlocks.label = rea
+writelocks = vfs.locks.write
+writelocks.label = wri

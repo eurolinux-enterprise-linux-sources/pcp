@@ -209,6 +209,11 @@ rm -f VERSION.pcp
 git checkout -- VERSION.pcp
 # Look for errors/warnings in the build logs ...
 #
+# In the sed below are "warnings" that are
+# (a) out of out control (e.g. in flex/bison generated code), or
+# (b) apparently benign things we're no going to fix, or
+# (c) stuff we've triaged and made a "no change needed" call
+#
 for log in Logs/*
 do
     echo "--- $log ---" >>$HOME/daily.log
@@ -223,7 +228,11 @@ sed -e 's/^/ /' <Logs/pcp \
     -e 's/^ //' \
     -e '/yyunput.* defined but not used/d' \
     -e '/input.* defined but not used/d' \
-    -e '/jobserver unavailable: using -j1/d'
+    -e '/jobserver unavailable: using -j1/d'\
+    -e '/^warning: File listed twice: .*python/d' \
+    -e '/^dpkg-shlibdeps: warning: .*\/pmda_pmcd.so contains an unresolvable .* probably a plugin/d' \
+    -e '/^configure: WARNING: unrecognized options: --disable-dependency-tracking/d' \
+# end
 if [ -s $tmp.err ]
 then
     echo "Warning: `wc -l <$tmp.err | sed -e 's/ //g'` build warnings/errors" | tee -a $HOME/daily.log
@@ -283,7 +292,8 @@ s/ .*//p
 }'`
 	case "$apt_ver"
 	in
-	    0.*|1.0.*)
+	    #0.*|1.0.*)
+	    *)
 		# the old-school dpkg way
 		#
 		if yes Y | sudo dpkg -i --force-depends build/deb/*.deb >>$HOME/daily.log 2>&1
@@ -294,7 +304,10 @@ s/ .*//p
 		    exit 1
 		fi
 		;;
-	    *)
+	    #*)
+	    do-not-do-this-any-more)
+		# this does not work reliably ...
+		#
 		# the new-school apt-get way
 		#
 		here=`pwd`
@@ -336,12 +349,14 @@ in
 	    exit 1
 	fi
 	cd pcp-$buildversion/build/rpm
-	if sudo rpm -U --force `./cherrypick` >$tmp.out 2>&1
+	if sudo rpm -U --force `./cherrypick 2>$tmp.err` >$tmp.out 2>&1
 	then
 	    cat $tmp.out >>$HOME/daily.log
+	    cat $tmp.err >>$HOME/daily.log
 	    echo "Info: rpm install" | tee -a $HOME/daily.log
 	else
 	    cat $tmp.out >>$HOME/daily.log
+	    cat $tmp.err >>$HOME/daily.log
 	    grep -v 'is already installed' $tmp.out >$tmp.tmp
 	    if [ -s $tmp.tmp ]
 	    then
@@ -447,8 +462,13 @@ _script_qa()
     cat <<End-of-File
 rm -f *.out.bad
 ./changeversion >/dev/null 2>&1
-echo "Info: QA $check_what starting"
-./check -l $check_what >>\$HOME/daily.log 2>&1
+
+# Policy for QA Farm: exclude all tests tagged BAD
+#
+qa_restrict="$check_what -x BAD"
+
+echo "Info: QA \$qa_restrict starting"
+./check -l \$qa_restrict >>\$HOME/daily.log 2>&1
 sts=\$?
 # look for badness in daily.log and report here (so it goes into any
 # cron-based email)
@@ -470,9 +490,9 @@ END	{ print txt }' \
 want == 1		{ print }'
 if [ "\$sts" = 0 ]
 then
-    echo "Info: QA $check_what done" | tee -a \$HOME/daily.log
+    echo "Info: QA \$qa_restrict done" | tee -a \$HOME/daily.log
 else
-    echo "Error: QA $what failed!" | tee -a \$HOME/daily.log
+    echo "Error: QA \$qa_restrict failed!" | tee -a \$HOME/daily.log
 fi
 date >>\$HOME/daily.log
 End-of-File
@@ -525,7 +545,7 @@ sts=0
 trap "rm -f $tmp.*; exit \$sts" 0 1 2 3 15
 
 list_1="vm03 vm01 vm04 vm07 vm12 vm14 vm16 vm18 vm20 vm22 vm24 vm26 vm28 vm30 vm32 vm34"
-list_2="fuji vm02 vm00 vm05 vm11 vm15 vm19 vm21 vm23 vm25 vm27 vm29 vm31 vm33"
+list_2="vm02 vm00 vm05 vm11 vm15 vm19 vm21 vm23 vm25 vm27 vm29 vm31 vm33"
 
 args="$*"
 pcp_branch=master
@@ -682,8 +702,7 @@ in
     bozo)
 	echo "bozo" >>$tmp.domains
 	echo "bozo-vm" >>$tmp.domains
-	echo "bozo-laptop" >>$tmp.domains
-	echo "fuji" >>$tmp.domains
+	# echo "fuji" >>$tmp.domains
 	# and open up the X server
 	#
 	# Ubuntu up to 15.04
@@ -695,7 +714,11 @@ esac
 
 if which virsh >/dev/null 2>&1
 then
-    virsh list --all \
+    # sudo here is odd ... after Ubuntu 17.10 upgrade, virsh run
+    # from a cron-launched shell produces no output, sudo virsh does
+    # produce output again ... sigh.
+    #
+    sudo virsh list --all \
     | sed >>$tmp.domains \
         -e 1d \
         -e '/-----/d' \
@@ -723,7 +746,7 @@ do
 	echo "... using the first one."
     fi
     domain=`sed -e 1q $tmp.domain`
-    # used to be vmNN-osname&version, but now just vmMM ...
+    # used to be vmNN-osname&version, but now just vmNN ...
     # old sed now does nothing
     #
     host=`echo $domain | sed -e '/^vm/s/-.*//'`
@@ -731,7 +754,9 @@ do
 
     if which virsh >/dev/null 2>&1
     then
-	state=`virsh list --all | grep "$domain" | awk '{print $3}'`
+	# see note above re. sudo virsh
+	#
+	state=`sudo virsh list --all | grep "$domain" | awk '{print $3}'`
 	case "$state"
 	in
 	    shut)
@@ -831,11 +856,13 @@ do
 	[ X"$what" = Xall ] && check_what=''
 	case "$domain"
 	in
-	    vm06|vm10|vm09|vm33)
-		# Only -g sanity at this stage for NetBSD or OpenBSD
+	    vm06|vm10|vm09|vm13|vm33)
+		# Only -g sanity at this stage for NetBSD or OpenBSD or FreeBSD
+		# or OpenIndiana
 		#
 		[ X"$what" = Xall ] && check_what='-g sanity'
 		;;
+
 	    vm32)
 		# Only selected groups this stage for FreeBSD:
 		#	sanity trace
@@ -843,6 +870,7 @@ do
 		#
 		[ X"$what" = Xall ] && check_what='-g sanity -g trace -X 603'
 		;;
+
 	    vm07|vm11)
 		# Exclude -x valgrind at this stage for Debian stretch
 		# until
@@ -852,10 +880,17 @@ do
 		# tests (20 Jul 2016)
 		#
 		;;
+
 	    vm01)
 		# 739 segv's sometimes deep inside Python
 		[ X"$what" = Xall ] && check_what='-X 739'
 		;;
+
+	    vm15)
+		# 1123 loops forever lost in an X11 wasteland
+		[ X"$what" = Xall ] && check_what='-X 1123'
+		;;
+
 	    vm35)
 		# this is PCP 2.7.8, need to run as user pcpqa and just
 		# the sanity group and no -p or -m or -i flags
@@ -1002,8 +1037,8 @@ End-of-File
 	doit=false
 	case $host
 	in
-	    vm01|vm03|vm35)
-		# try to keep vm01, vm03 and vm35 running, unless -f
+	    vm01|vm03|vm15|vm35|vm36)
+		# try to keep these VMs running, unless -f
 		$fflag && doit=true
 		;;
 	    vm*)
@@ -1021,7 +1056,7 @@ End-of-File
 		    echo "Warning: Already shutdown"
 		fi
 	    else
-		ssh -t -q $user@$host "sync; sleep 2; sync; ( sudo poweroff || sudo halt )" -f </dev/null >/dev/null 2>&1 &
+		ssh -f -t -q $user@$host "sync; sleep 2; sync; export PATH=\$PATH:/sbin:/usr/sbin; ( sudo poweroff || sudo halt )" </dev/null &
 		sleep 60
 		sudo virsh shutdown $domain >/dev/null 2>&1
 		sleep 10

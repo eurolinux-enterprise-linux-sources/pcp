@@ -42,7 +42,6 @@ endif
 
 LCFLAGS = -DPMI_INTERNAL
 LLDLIBS = -lpcp
-LSRCFILES = $(VERSION_SCRIPT)
 LDIRT = $(SYMTARGET) domain.h $(LIBCONFIG)
 
 DOMAIN = PMI_DOMAIN
@@ -56,7 +55,7 @@ include $(BUILDRULES)
 install: default
 ifneq ($(LIBTARGET),)
 	$(INSTALL) -m 755 $(LIBTARGET) $(PCP_LIB_DIR)/$(LIBTARGET)
-	$(INSTALL) -m 444 $(LIBCONFIG) $(PCP_LIB_DIR)/pkgconfig/$(LIBCONFIG)
+	$(INSTALL) -m 644 $(LIBCONFIG) $(PCP_LIB_DIR)/pkgconfig/$(LIBCONFIG)
 endif
 ifneq ($(SYMTARGET),)
 	for tt in $(SYMTARGET); do \
@@ -87,3 +86,5 @@ endif
 
 domain.h: $(TOPDIR)/src/pmns/stdpmid
 	$(DOMAIN_MAKERULE)
+
+$(OBJECTS):	$(TOPDIR)/src/include/pcp/libpcp.h

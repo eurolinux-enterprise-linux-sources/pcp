@@ -19,12 +19,12 @@
 #include <sys/stat.h>
 #include "mmv_stats.h"
 #include "mmv_dev.h"
-#include "impl.h"
+#include "libpcp.h"
 
 static void
 mmv_stats_path(const char *fname, char *fullpath, size_t pathlen)
 {
-    int sep = __pmPathSeparator();
+    int sep = pmPathSeparator();
 
     pmsprintf(fullpath, pathlen, "%s%c" "mmv" "%c%s",
 		pmGetConfig("PCP_TMP_DIR"), sep, sep, fname);
@@ -102,7 +102,7 @@ mmv_generation(void)
     struct timeval now;
     __uint32_t gen1, gen2;
 
-    __pmtimevalNow(&now);
+    pmtimevalNow(&now);
     gen1 = now.tv_sec;
     gen2 = now.tv_usec;
     return (((__uint64_t)gen1 << 32) | (__uint64_t)gen2);
@@ -735,8 +735,13 @@ mmv_stats_stop(const char *fname, void *addr)
     struct stat sbuf;
 
     mmv_stats_path(fname, path, sizeof(path));
-    if (stat(path, &sbuf) < 0)
-	sbuf.st_size = (size_t)-1;
+    if (stat(path, &sbuf) < 0) {
+	/*
+	 * file has gone, just want to unmap the region that starts
+	 * at addr ... a length of 1 would seem to suffice
+	 */
+	sbuf.st_size = 1;
+    }
     else if (hdr->flags & MMV_FLAG_PROCESS)
 	unlink(path);
     __pmMemoryUnmap(addr, sbuf.st_size);
@@ -1024,7 +1029,7 @@ mmv_stats_interval_start(void *addr, pmAtomValue *value,
 	    value = mmv_lookup_value_desc(addr, metric, instance);
 	if (value) {
 	    struct timeval tv;
-	    __pmtimevalNow(&tv);
+	    pmtimevalNow(&tv);
 	    mmv_inc_value(addr, value, -(tv.tv_sec*1e6 + tv.tv_usec));
 	}
     }
@@ -1036,7 +1041,7 @@ mmv_stats_interval_end(void *addr, pmAtomValue *value)
 {
     if (value && addr) {
 	struct timeval tv;
-	__pmtimevalNow(&tv);
+	pmtimevalNow(&tv);
 	mmv_inc_value(addr, value, (tv.tv_sec*1e6 + tv.tv_usec));
     }
 }

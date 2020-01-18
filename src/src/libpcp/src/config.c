@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 Red Hat.
+ * Copyright (c) 2012-2018 Red Hat.
  * Copyright (c) 2008-2009 Aconex.  All Rights Reserved.
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
  * 
@@ -16,7 +16,8 @@
 
 #include <ctype.h>
 #include "pmapi.h"
-#include "impl.h"
+#include "libpcp.h"
+#include "internal.h"
 #include "pmda.h"
 #ifdef HAVE_STRINGS_H
 #include <strings.h>
@@ -115,6 +116,7 @@ static int posix_style(void)
 {
     char	*s;
     int		sts;
+
     PM_LOCK(__pmLock_extcall);
     s = getenv("SHELL");		/* THREADSAFE */
     sts = (s && strncmp(s, "/bin/", 5) == 0);
@@ -123,45 +125,46 @@ static int posix_style(void)
 }
 
 /*
- * Called with __pmLock_extcall held, so putenv() is thread-safe.
+ * Called with __pmLock_extcall held, so setenv() is thread-safe.
  */
 static void
 dos_formatter(char *var, char *prefix, char *val)
 {
-    char envbuf[MAXPATHLEN];
     int msys = posix_style();
 
     if (prefix && dos_rewrite_path(var, val, msys)) {
 	char *p = msys ? msys_native_path(prefix) : prefix;
-	pmsprintf(envbuf, sizeof(envbuf), "%s=%s%s", var, p, val);
+	char envbuf[MAXPATHLEN];
+
+	pmsprintf(envbuf, sizeof(envbuf), "%s%s", p, val);
+	setenv(var, envbuf, 1);	/* THREADSAFE */
     }
     else {
-	pmsprintf(envbuf, sizeof(envbuf), "%s=%s", var, val);
+	setenv(var, val, 1);	/* THREADSAFE */
     }
-    putenv(strdup(envbuf));		/* THREADSAFE */
 }
 
 PCP_DATA const __pmConfigCallback __pmNativeConfig = dos_formatter;
 char *__pmNativePath(char *path) { return dos_native_path(path); }
-int __pmPathSeparator() { return posix_style() ? '/' : '\\'; }
+int pmPathSeparator() { return posix_style() ? '/' : '\\'; }
 int __pmAbsolutePath(char *path) { return posix_style() ? path[0] == '/' : dos_absolute_path(path); }
 #else
 char *__pmNativePath(char *path) { return path; }
 int __pmAbsolutePath(char *path) { return path[0] == '/'; }
-int __pmPathSeparator() { return '/'; }
+int pmPathSeparator() { return '/'; }
 
 /*
- * Called with __pmLock_extcall held, so putenv() is thread-safe.
+ * Called with __pmLock_extcall held, so setenv() is thread-safe.
  */
 static void
 posix_formatter(char *var, char *prefix, char *val)
 {
-    /* +40 bytes for max PCP env variable name */
-    char	envbuf[MAXPATHLEN+40];
+    char	envbuf[MAXPATHLEN];
     char	*vp;
     char	*vend;
+    unsigned	length;
 
-    pmsprintf(envbuf, sizeof(envbuf), "%s=", var);
+    (void)prefix;
     vend = &val[strlen(val)-1];
     if (val[0] == *vend && (val[0] == '\'' || val[0] == '"')) {
 	/*
@@ -170,14 +173,13 @@ posix_formatter(char *var, char *prefix, char *val)
 	 */
 	vp = &val[1];
 	vend--;
-    }
-    else
+    } else {
 	vp = val;
-    strncat(envbuf, vp, vend-vp+1);
-    envbuf[strlen(var)+1+vend-vp+1+1] = '\0';
-
-    putenv(strdup(envbuf));		/* THREADSAFE */
-    (void)prefix;
+    }
+    if ((length = vend - vp + 1) > sizeof(envbuf))
+	length = sizeof(envbuf);
+    pmsprintf(envbuf, sizeof(envbuf), "%.*s", length, vp);
+    setenv(var, envbuf, 1);		/* THREADSAFE */
 }
 
 PCP_DATA const __pmConfigCallback __pmNativeConfig = posix_formatter;
@@ -326,7 +328,7 @@ pmGetOptionalConfig(const char *name)
 }
 
 int
-__pmGetUsername(char **username)
+pmGetUsername(char **username)
 {
     char *user = pmGetOptionalConfig("PCP_USER");
     if (user && user[0] != '\0') {
@@ -378,6 +380,8 @@ ipv6_enabled(void)
 #endif
 }
 
+extern const char *compress_suffix_list(void);
+
 #ifdef PM_MULTI_THREAD
 #define MULTI_THREAD_ENABLED	enabled
 #else
@@ -420,6 +424,16 @@ ipv6_enabled(void)
 #else
 #define LOCK_DEBUG_ENABLED	disabled
 #endif
+#if defined(HAVE_LZMA_DECOMPRESSION)
+#define LZMA_DECOMPRESS		enabled
+#else
+#define LZMA_DECOMPRESS		disabled
+#endif
+#if defined(HAVE_TRANSPARENT_DECOMPRESSION)
+#define TRANSPARENT_DECOMPRESS	enabled
+#else
+#define TRANSPARENT_DECOMPRESS	disabled
+#endif
 
 typedef const char *(*feature_detector)(void);
 static struct {
@@ -444,6 +458,9 @@ static struct {
 	{ "multi_archive_contexts", enabled },			/* from pcp-3.11.1 */
 	{ "lock_asserts",	LOCK_ASSERTS_ENABLED },		/* from pcp-3.11.10 */
 	{ "lock_debug",		LOCK_DEBUG_ENABLED },		/* from pcp-3.11.10 */
+	{ "lzma_decompress",	LZMA_DECOMPRESS },		/* from pcp-4.0.0 */
+	{ "transparent_decompress", TRANSPARENT_DECOMPRESS },	/* from pcp-4.0.0 */
+	{ "compress_suffixes",	compress_suffix_list },		/* from pcp-4.0.1 */
 };
 
 void
@@ -461,7 +478,7 @@ __pmAPIConfig(__pmAPIConfigCallback formatter)
 }
 
 const char *
-__pmGetAPIConfig(const char *name)
+pmGetAPIConfig(const char *name)
 {
     int i;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2017 Red Hat.
+ * Copyright (C) 2012-2018 Red Hat.
  * Copyright (C) 2009-2012 Michael T. Werner
  *
  * This file is part of the "pcp" module, the python interfaces for the
@@ -26,7 +26,8 @@
 
 #include <Python.h>
 #include <pcp/pmapi.h>
-#include <pcp/impl.h>
+#include <pcp/libpcp.h>
+#include <pcp/deprecated.h>
 
 #if PY_MAJOR_VERSION >= 3
 #define MOD_ERROR_VAL NULL
@@ -136,14 +137,14 @@ timevalToReal(PyObject *self, PyObject *args, PyObject *keywords)
     struct timeval ctv;
     long seconds, useconds;
     char *keyword_list[] = {"seconds", "useconds", NULL};
-    extern double __pmtimevalToReal(const struct timeval *);
+    extern double pmtimevalToReal(const struct timeval *);
 
     if (!PyArg_ParseTupleAndKeywords(args, keywords,
                         "ll:pmtimevalToReal", keyword_list, &seconds, &useconds))
         return NULL;
     ctv.tv_sec = seconds;
     ctv.tv_usec = useconds;
-    return Py_BuildValue("d", __pmtimevalToReal(&ctv));
+    return Py_BuildValue("d", pmtimevalToReal(&ctv));
 }
 
 static PyObject *
@@ -151,19 +152,19 @@ setIdentity(PyObject *self, PyObject *args, PyObject *keywords)
 {
     char *name;
     char *keyword_list[] = {"name", NULL};
-    extern int __pmSetProcessIdentity(const char *);
+    extern int pmSetProcessIdentity(const char *);
 
     if (!PyArg_ParseTupleAndKeywords(args, keywords,
                         "s:pmSetProcessIdentity", keyword_list, &name))
         return NULL;
-    return Py_BuildValue("i", __pmSetProcessIdentity(name));
+    return Py_BuildValue("i", pmSetProcessIdentity(name));
 }
 
 static PyObject *
 makeTime(PyObject *self, PyObject *args, PyObject *keywords)
 {
     struct tm tm;
-    int gmtoff = 0;
+    long gmtoff = 0;
     char *zone = NULL;
     char *keyword_list[] = {"tm_sec", "tm_min", "tm_hour",
 			    "tm_mday", "tm_mon", "tm_year",
@@ -286,7 +287,7 @@ addLongOptionObject(pmLongOptions *option)
 static PyObject *
 setLongOption(PyObject *self, PyObject *args, PyObject *keywords)
 {
-    char *short_opt = NULL;
+    char *short_opt = NULL, *message = NULL;
     pmLongOptions option = { 0 };
     char *keyword_list[] = {"long_opt", "has_arg", "short_opt",
 			    "argname", "message", NULL};
@@ -294,10 +295,12 @@ setLongOption(PyObject *self, PyObject *args, PyObject *keywords)
     if (!PyArg_ParseTupleAndKeywords(args, keywords,
 			"sisss:pmSetLongOption", keyword_list,
 			&option.long_opt, &option.has_arg, &short_opt,
-			&option.argname, &option.message))
+			&option.argname, &message))
 	return NULL;
     if (short_opt && (int)short_opt[0] != 0)
 	option.short_opt = (int)short_opt[0];
+    if (message && (int)message[0] != 0)
+	option.message = message;
     return addLongOptionObject(&option);
 }
 
@@ -446,6 +449,7 @@ resetAllOptions(PyObject *self, PyObject *args)
 {
     pmFreeOptions(&options);
     memset(&options, 0, sizeof(options));
+    longOptionsCount = 0;
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -653,13 +657,13 @@ setOptionSamples(PyObject *self, PyObject *args, PyObject *keywords)
 
     if (options.finish_optarg) {
 	pmprintf("%s: at most one of finish time and sample count allowed\n",
-		pmProgname);
+		pmGetProgname());
 	options.errors++;
     } else {
 	options.samples = (int)strtol(count, &endnum, 10);
 	if (*endnum != '\0' || options.samples < 0) {
 	    pmprintf("%s: sample count must be a positive numeric argument\n",
-		pmProgname);
+		pmGetProgname());
 	    options.errors++;
 	}
     }
@@ -679,7 +683,7 @@ setOptionInterval(PyObject *self, PyObject *args, PyObject *keywords)
 
     if (pmParseInterval(delta, &options.interval, &errmsg) < 0) {
 	pmprintf("%s: interval argument not in pmParseInterval(3) format:\n",
-		pmProgname);
+		pmGetProgname());
 	pmprintf("%s\n", errmsg);
 	options.errors++;
 	free(errmsg);
@@ -733,9 +737,14 @@ static void
 options_callback(int opt, pmOptions *opts)
 {
     PyObject *arglist, *result;
-    char argstring[2] = { (char)opt, '\0' };
+    const char *arg, argstring[2] = { (char)opt, '\0' };
 
-    arglist = Py_BuildValue("(ssi)", argstring, options.optarg, options.index);
+    if (opt == 0 && options.index < longOptionsCount)
+	arg = options.long_options[options.index].long_opt;
+    else
+	arg = argstring;
+
+    arglist = Py_BuildValue("(ssi)", arg, options.optarg, options.index);
     if (!arglist) {
 	PyErr_Print();
     } else {
@@ -811,9 +820,11 @@ getOptionsFromList(PyObject *self, PyObject *args, PyObject *keywords)
     PyObject *pyargv = NULL;
     char *keyword_list[] = {"argv", NULL};
 
-    // Note that PyArg_ParseTupleAndKeywords() returns a "borrowed"
-    // reference, so there is no need to decrement a reference to
-    // pyargv.
+    /*
+     * Note that PyArg_ParseTupleAndKeywords() returns a borrowed
+     * reference, so there is no need to decrement a reference to
+     * pyargv.
+     */
     if (!PyArg_ParseTupleAndKeywords(args, keywords,
 			"O:pmGetOptionsFromList", keyword_list, &pyargv))
 	return NULL;
@@ -843,7 +854,7 @@ getOptionsFromList(PyObject *self, PyObject *args, PyObject *keywords)
 #endif
 
 	/* All parameters may be referred back to later, e.g. via
-	 * pmProgname or getOperands (and others), so we need to
+	 * pmGetProgname() or getOperands (and others), so we must
 	 * allocate the memory to hold these strings permanently.
          */
 	if ((string = strdup(string)) == NULL) {
@@ -913,7 +924,7 @@ setContextOptions(PyObject *self, PyObject *args, PyObject *keywords)
 	    mode |= PM_XTB_SET(PM_TIME_MSEC);
 	}
 	if ((sts = pmSetMode(mode, &position, step)) < 0) {
-	    pmprintf("%s: pmSetMode: %s\n", pmProgname, pmErrStr(sts));
+	    pmprintf("%s: pmSetMode: %s\n", pmGetProgname(), pmErrStr(sts));
 	    options.flags |= PM_OPTFLAG_RUNTIME_ERR;
 	    options.errors++;
 	}
@@ -1060,6 +1071,11 @@ getOptionArchives(PyObject *self, PyObject *args)
     PyObject	*result;
     int		i;
 
+    /* default to localhost archives with unqualified -O/--origin option */
+    if (options.origin_optarg != NULL &&
+	options.narchives <= 0 && options.nhosts <= 0 && !options.Lflag)
+	__pmAddOptArchivePath(&options);
+
     if (options.narchives > 0) {
 	if ((result = PyList_New(options.narchives)) == NULL)
 	    return PyErr_NoMemory();
@@ -1074,6 +1090,7 @@ getOptionArchives(PyObject *self, PyObject *args)
 	Py_INCREF(result);
 	return result;
     }
+
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -1478,6 +1495,8 @@ MOD_INIT(cpmapi)
     dict_add(dict, "PM_SPACE_TBYTE", PM_SPACE_TBYTE);
     dict_add(dict, "PM_SPACE_PBYTE", PM_SPACE_PBYTE);
     dict_add(dict, "PM_SPACE_EBYTE", PM_SPACE_EBYTE);
+    dict_add(dict, "PM_SPACE_ZBYTE", PM_SPACE_ZBYTE);
+    dict_add(dict, "PM_SPACE_YBYTE", PM_SPACE_YBYTE);
 
     dict_add(dict, "PM_TIME_NSEC", PM_TIME_NSEC);
     dict_add(dict, "PM_TIME_USEC", PM_TIME_USEC);
@@ -1531,6 +1550,20 @@ MOD_INIT(cpmapi)
     dict_add(dict, "PMCD_ADD_AGENT", PMCD_ADD_AGENT);
     dict_add(dict, "PMCD_RESTART_AGENT", PMCD_RESTART_AGENT);
     dict_add(dict, "PMCD_DROP_AGENT", PMCD_DROP_AGENT);
+    dict_add(dict, "PMCD_AGENT_CHANGE", PMCD_AGENT_CHANGE);
+    dict_add(dict, "PMCD_LABEL_CHANGE", PMCD_LABEL_CHANGE);
+    dict_add(dict, "PMCD_NAMES_CHANGE", PMCD_NAMES_CHANGE);
+
+    dict_add(dict, "PM_MAXLABELS", PM_MAXLABELS);
+    dict_add(dict, "PM_MAXLABELJSONLEN", PM_MAXLABELJSONLEN);
+
+    dict_add(dict, "PM_LABEL_CONTEXT", PM_LABEL_CONTEXT);
+    dict_add(dict, "PM_LABEL_DOMAIN", PM_LABEL_DOMAIN);
+    dict_add(dict, "PM_LABEL_INDOM", PM_LABEL_INDOM);
+    dict_add(dict, "PM_LABEL_CLUSTER", PM_LABEL_CLUSTER);
+    dict_add(dict, "PM_LABEL_ITEM", PM_LABEL_ITEM);
+    dict_add(dict, "PM_LABEL_INSTANCES", PM_LABEL_INSTANCES);
+    dict_add(dict, "PM_LABEL_OPTIONAL", PM_LABEL_OPTIONAL);
 
     dict_add(dict, "PM_MAXERRMSGLEN", PM_MAXERRMSGLEN);
     dict_add(dict, "PM_TZ_MAXLEN",    PM_TZ_MAXLEN);
@@ -1643,7 +1676,9 @@ MOD_INIT(cpmapi)
     edict_add(dict, edict, "PM_ERR_LOGCHANGEINDOM", PM_ERR_LOGCHANGEINDOM);
     edict_add(dict, edict, "PM_ERR_LOGCHANGEUNITS", PM_ERR_LOGCHANGEUNITS);
     edict_add(dict, edict, "PM_ERR_NEEDCLIENTCERT", PM_ERR_NEEDCLIENTCERT);
+    edict_add(dict, edict, "PM_ERR_NOLABELS", PM_ERR_NOLABELS);
     edict_add(dict, edict, "PM_ERR_NYI", PM_ERR_NYI);
+    edict_add(dict, edict, "PM_ERR_NOLABELS", PM_ERR_NOLABELS);
 
     return MOD_SUCCESS_VAL(module);
 }

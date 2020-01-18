@@ -75,7 +75,7 @@ _usage()
 	echo >> $tmp/usage
 	( $PCP_ECHO_PROG $PCP_ECHO_N "Available Commands:     ""$PCP_ECHO_C" \
 		&& sort -u < $tmp/cmds ) | _fmt >> $tmp/usage
-	pmgetopt --progname=$progname --usage --config=$tmp/usage
+	$PCP_BINADM_DIR/pmgetopt --progname=$progname --usage --config=$tmp/usage
     fi
     sts=1
     exit
@@ -94,8 +94,37 @@ NR > 1	{ printf "           %s\n", $0; next }
 	{ print }'
 }
 
+# if there is no realpath(1) installed, this is a cheap knock-off
+# that does just what we need namely,
+# - replace leading ./ with cwd-of-./
+# - replace leading ../ with cwd-of-../
+# - leave alone if leading /
+# - prefix with cwd-of-./
+#
+_cheap_and_nasty_path()
+{
+    if [ "$#" -ne 1 -o -z "$1" ]
+    then
+	echo "_cheap_and_nasty_path: Error: expect 1 non-empty argument, got $#: $*"
+	sts=1
+	exit
+    fi
+
+    case "$1"
+    in
+    	./*)	echo "$1" | sed -e "s@^\.@`pwd`@"
+		;;
+	../*)	echo "$1" | sed -e "s@^\.\.@`cd ..; pwd`@"
+		;;
+	/*)	echo "$1"
+		;;
+	*)	echo "$1" | sed -e "s@^@`pwd`/@"
+		;;
+    esac
+}
+
 opts=""
-ARGS=`pmgetopt --progname=$progname --config=$tmp/usage -- "$@"`
+ARGS=`$PCP_BINADM_DIR/pmgetopt --progname=$progname --config=$tmp/usage -- "$@"`
 [ $? != 0 ] && exit 1
 
 eval set -- "$ARGS"
@@ -209,6 +238,14 @@ then
 elif [ -x "$PCP_BINADM_DIR/pcp-$command" ]
 then
     command="$PCP_BINADM_DIR/pcp-$command"
+elif [ -x "$command" ]
+then
+    if which realpath >/dev/null 2>&1
+    then
+	command=`realpath "$command"`
+    else
+	command=`_cheap_and_nasty_path "$command"`
+    fi
 else
     _usage "Cannot find a pcp-$command command to execute"
 fi

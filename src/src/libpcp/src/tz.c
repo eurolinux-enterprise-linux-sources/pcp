@@ -25,7 +25,7 @@
  */
 
 #include "pmapi.h"
-#include "impl.h"
+#include "libpcp.h"
 #include "internal.h"
 
 static char	*envtz;			/* buffer in env */
@@ -344,7 +344,8 @@ __pmTimezone(void)
 char *
 __pmTimezone_r(char *buf, int buflen)
 {
-    strcpy(buf, __pmTimezone());
+    strncpy(buf, __pmTimezone(), (size_t)buflen);
+    buf[buflen-1] = '\0';
     return buf;
 }
 
@@ -406,7 +407,7 @@ pmNewZone(const char *tz)
     zone = (char **)realloc(zone, nzone * sizeof(char *));
     if (zone == NULL) {
 	PM_UNLOCK(__pmLock_extcall);
-	__pmNoMem("pmNewZone", nzone * sizeof(char *), PM_FATAL_ERR);
+	pmNoMem("pmNewZone", nzone * sizeof(char *), PM_FATAL_ERR);
 	/* NOTREACHED */
     }
     zone[curzone] = strdup(envtz);

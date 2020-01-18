@@ -33,7 +33,7 @@ _filter()
     sed \
 	-e "s,$PCP_PMDAS_DIR,PCP_PMDAS_DIR,g" \
 	-e 's/value [0-9][0-9]*/value NUMBER/' \
-	-e 's/TOT_INS(5): [0-9][0-9]*/TOT_INS(5) NUMBER/' \
+	-e 's/TOT_INS([0-9]): [0-9][0-9]*/TOT_INS(N) NUMBER/' \
 	-e 's/TOT_INS(-1): [0-9][0-9]*/TOT_INS(-1) NUMBER/' \
 	-e 's/0x[0-9a-f]*/ADDR/g' \
 	-e 's/[0-2][0-9]:00:00.000/TIME/' \
@@ -58,6 +58,8 @@ _check_papi
 echo "=== Daemon PMDA papi auto_enable disabled test ==="
 $sudo TERM=ansi dbpmda -n $papirootpmns -ie <<EOF 2>&1 | _filter
 open pipe $pipepmda -d 126 -l $tmp.log
+# on some platforms this may take a while ...
+wait 2
 getdesc on
 attr 'username' 'root'
 attr 11 '0'
@@ -71,12 +73,15 @@ fetch papi.system.TOT_INS
 store papi.control.disable "TOT_INS"
 fetch papi.system.TOT_INS
 EOF
+cat $tmp.log >>$here/$seq.full
 
 # now that we know existing functionality is working, lets test
 # the timeout of auto_enable, lets set to 5 seconds and test
 echo "=== Daemon PMDA papi auto_enable test ==="
 $sudo TERM=ansi dbpmda -n $papirootpmns -ie <<EOF 2>&1 | _filter
 open pipe $pipepmda -d 126 -l $tmp.log
+# on some platforms this may take a while ...
+wait 2
 getdesc on
 attr "username" "root"
 attr 11 "0"
@@ -87,6 +92,7 @@ fetch papi.control.status
 wait 7
 fetch papi.control.status
 EOF
+cat $tmp.log >>$here/$seq.full
 
 # even with a timeout (for our case it will be a small one)
 # the existing control.{enable,disable} metrics will override the
@@ -95,6 +101,8 @@ EOF
 echo "=== Daemon PMDA papi auto_enable with papi.control.enable test ==="
 $sudo TERM=ansi dbpmda -n $papirootpmns -ie <<EOF 2>&1 | _filter
 open pipe $pipepmda -d 126 -l $tmp.log
+# on some platforms this may take a while ...
+wait 2
 getdesc on
 attr "username" "root"
 attr 11 "0"
@@ -108,6 +116,7 @@ fetch papi.control.status
 store papi.control.disable "TOT_INS"
 fetch papi.control.status
 EOF
+cat $tmp.log >>$here/$seq.full
 
 # add a test to check that the papi.control.status metric shows
 # evidence of altering the papi.control.multiplex metric
@@ -115,6 +124,8 @@ EOF
 echo "=== Daemon PMDA papi auto_enable with multiplexing disabled test ==="
 $sudo TERM=ansi dbpmda -n $papirootpmns -ie <<EOF 2>&1 | _filter
 open pipe $pipepmda -d 126 -l $tmp.log
+# on some platforms this may take a while ...
+wait 2
 getdesc on
 attr "username" "root"
 attr 11 "0"
@@ -127,3 +138,4 @@ fetch papi.control.status
 wait 7
 fetch papi.control.status
 EOF
+cat $tmp.log >>$here/$seq.full

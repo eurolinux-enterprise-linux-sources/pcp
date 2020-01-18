@@ -154,3 +154,28 @@ PCP_PMDA_3.6 {
     __pmdaRecvRootPDUStop;
     __pmdaDecodeRootPDUStop;
 } PCP_PMDA_3.5;
+
+PCP_PMDA_3.7 {
+  global:
+    pmdaLabel;
+    pmdaAddLabels;
+    pmdaAddLabelFlags;
+    pmdaSetLabelCallBack;
+    pmdaAddNotes;
+
+    pmdaExtDynamicPMNS;
+    pmdaExtSetFlags;
+} PCP_PMDA_3.6;
+
+PCP_PMDA_3.8 {
+  global:
+    pmdaSendError;
+} PCP_PMDA_3.7;
+
+PCP_PMDA_3.9 {
+  global:
+    pmdaSetCommFlags;
+    pmdaTreeCreate;
+    pmdaTreeInsert;
+    pmdaTreeRelease;
+} PCP_PMDA_3.8;

@@ -15,7 +15,7 @@
 
 #include <ctype.h>
 #include "pmapi.h"
-#include "impl.h"
+#include "libpcp.h"
 #include "logcheck.h"
 
 #define IS_UNKNOWN	0
@@ -128,6 +128,7 @@ pass0(char *fname)
     char	*p;
     __pmFILE	*f = NULL;
     int		label_ok = STS_OK;
+    char	logBase[MAXPATHLEN];
 
     if (vflag)
 	fprintf(stderr, "%s: start pass0\n", fname);
@@ -137,18 +138,18 @@ pass0(char *fname)
 	sts = STS_FATAL;
 	goto done;
     }
-    p = strrchr(fname, '.');
-    if (p != NULL) {
-	if (strcmp(p, ".index") == 0)
+    
+    strncpy(logBase, fname, sizeof(logBase));
+    logBase[sizeof(logBase)-1] = '\0';
+    if (__pmLogBaseName(logBase) != NULL) {
+	/* A valid archive suffix was found */
+	p = logBase + strlen(logBase) + 1;
+	if (strcmp(p, "index") == 0)
 	    is = IS_INDEX;
-	else if (strcmp(p, ".meta") == 0)
+	else if (strcmp(p, "meta") == 0)
 	    is = IS_META;
-	else if (isdigit((int)(*++p))) {
-	    p++;
-	    while (*p && isdigit((int)*p))
-		p++;
-	    if (*p == '\0')
-		is = IS_LOG;
+	else if (isdigit((int)(*p))) {
+	    is = IS_LOG;
 	}
     }
     if (is == IS_UNKNOWN) {
@@ -168,18 +169,18 @@ pass0(char *fname)
 	    check = __pmFgetc(f);
 	    if (check == EOF) {
 		if (nrec == 0)
-		    fprintf(stderr, "%s: unexpected EOF in label record body\n", fname);
+		    fprintf(stderr, "%s: unexpected EOF in label record body, wanted %d, got %d bytes\n", fname, len, i);
 		else
-		    fprintf(stderr, "%s[record %d]: unexpected EOF in record body\n", fname, nrec);
+		    fprintf(stderr, "%s[record %d]: unexpected EOF in record body, wanted %d, got %d bytes\n", fname, nrec, len, i);
 		sts = STS_FATAL;
 		goto done;
 	    }
 	}
 	if ((sts = __pmFread(&check, 1, sizeof(check), f)) != sizeof(check)) {
 	    if (nrec == 0)
-		fprintf(stderr, "%s: unexpected EOF in label record trailer\n", fname);
+		fprintf(stderr, "%s: unexpected EOF in label record trailer, wanted %d, got %d bytes\n", fname, (int)sizeof(check), sts);
 	    else
-		fprintf(stderr, "%s[record %d]: unexpected EOF in record trailer\n", fname, nrec);
+		fprintf(stderr, "%s[record %d]: unexpected EOF in record trailer, wanted %d, got %d bytes\n", fname, nrec, (int)sizeof(check), sts);
 	    sts = STS_FATAL;
 	    goto done;
 	}
@@ -210,7 +211,7 @@ pass0(char *fname)
 		nrec++;
 	    }
 	    if (sts != 0) {
-		fprintf(stderr, "%s[record %d]: unexpected EOF in index entry\n", fname, nrec);
+		fprintf(stderr, "%s[record %d]: unexpected EOF in index entry, wanted %d, got %d bytes\n", fname, nrec, (int)sizeof(tirec), sts);
 		index_state = STATE_BAD;
 		sts = STS_FATAL;
 		goto done;
@@ -219,7 +220,7 @@ pass0(char *fname)
 	}
     }
     if (sts != 0) {
-	fprintf(stderr, "%s[record %d]: unexpected EOF in record header\n", fname, nrec);
+	fprintf(stderr, "%s[record %d]: unexpected EOF in record header, wanted %d, got %d bytes\n", fname, nrec, (int)sizeof(len), sts);
 	sts = STS_FATAL;
     }
 empty_check:

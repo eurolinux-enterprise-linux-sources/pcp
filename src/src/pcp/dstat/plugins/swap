@@ -1,0 +1,7 @@
+#
+# pcp-dstat(1) configuration file - see pcp-dstat(5)
+#
+
+[swap]
+used = swap.used
+free = swap.free

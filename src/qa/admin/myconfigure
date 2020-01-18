@@ -89,6 +89,11 @@ then
 		configopts="--prefix=/usr --sysconfdir=/etc --localstatedir=/var"
 		;;
     esac
+elif [ $target = sunos ]
+then
+    # Need to take control of the Python versions, otherwise standard.
+    #
+    configopts="--prefix=/usr --sysconfdir=/etc --localstatedir=/var --with-python=no --with-python3=check"
 else
     # default case, we know no better
     #
@@ -108,7 +113,7 @@ in
 	    configopts="$configopts --libexecdir=/usr/lib"
 	fi
 	;;
-    sunos)
+    sunos|SunOS|solaris)
 	ARCH=`isainfo -k`
 	[ "$ARCH" = amd64 -o "$ARCH" = sparcv9 ] && configopts="$configopts --libdir=/usr/lib/64"
 	;;

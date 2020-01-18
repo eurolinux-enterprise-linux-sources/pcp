@@ -1,18 +1,18 @@
 dnl
-dnl Copyright (c) 2012-2017 Red Hat.
+dnl Copyright (c) 2012-2018 Red Hat.
 dnl Copyright (c) 2008 Aconex.  All Rights Reserved.
 dnl Copyright (c) 2000-2004,2008 Silicon Graphics, Inc.  All Rights Reserved.
-dnl 
+dnl
 dnl This program is free software; you can redistribute it and/or modify it
 dnl under the terms of the GNU General Public License as published by the
 dnl Free Software Foundation; either version 2 of the License, or (at your
 dnl option) any later version.
-dnl 
+dnl
 dnl This program is distributed in the hope that it will be useful, but
 dnl WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
 dnl or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
 dnl for more details.
-dnl 
+dnl
 
 dnl unpacking check - this file must exist
 AC_INIT(src/include/pcp/pmapi.h)
@@ -142,6 +142,12 @@ AC_ARG_WITH([perfevent],
     [do_perfevent=$withval; PACKAGE_CONFIGURE="$PACKAGE_CONFIGURE --with-perfevent=$withval"],
     [do_perfevent=check])
 
+AC_ARG_WITH([pmdabcc],
+    [AC_HELP_STRING([--with-pmdabcc],
+		   [enable BCC pmda (default is on)])],
+    [do_pmdabcc=$withval; PACKAGE_CONFIGURE="$PACKAGE_CONFIGURE --with-pmdabcc=$withval"],
+    [do_pmdabcc=check])
+
 AC_ARG_WITH([pmdajson],
     [AC_HELP_STRING([--with-pmdajson],
 		   [enable JSON pmda (default is on)])],
@@ -205,6 +211,14 @@ AC_ARG_WITH([zip],
     [ZIP=$withval; PACKAGE_CONFIGURE="$PACKAGE_CONFIGURE --with-zip=$withval"],
     [ZIP=''])
 
+AC_ARG_WITH(
+    [transparent-decompression],
+    [AC_HELP_STRING([--with-transparent-decompression],
+		    [enable support for transparent decompression of archives (default is on)])],
+    [do_decompression=$withval; PACKAGE_CONFIGURE="$PACKAGE_CONFIGURE --with-transparent-decompression=$withval"],
+    [do_decompression=check])
+
+
 dnl
 dnl Note: the following environment variables may be set to override defaults:
 dnl MAKE CC CPP LD LEX YACC INSTALL AWK SED ECHO
@@ -231,7 +245,7 @@ else
     build_os=`echo $build_os | sed '[s/^\([^-][^-]*\)-.*$/\1/]'`
 fi
 
-echo Building on $build for $target 
+echo Building on $build for $target
 echo "Build: os=$build_os cpu=$build_cpu"
 echo "Target: os=$target_os cpu=$target_cpu"
 
@@ -290,7 +304,7 @@ then
 elif test $target_os = solaris
 then
     AC_DEFINE(IS_SOLARIS, [1], [Platform is Solaris])
-    export CFLAGS_IF_GCC="-fPIC -fno-strict-aliasing"
+    export CFLAGS_IF_GCC="-fPIC -fno-strict-aliasing -D_XPG4_2 -D__EXTENSIONS__"
     export CFLAGS_IF_SUNCC="-fPIC -xalias_level=any -D_XPG4_2 -D__EXTENSIONS__"
     pcp_platform_paths='/usr/bin/X11:/usr/local/bin:/opt/sfw/bin:/opt/csw/bin'
     pcp_ps_all_flags=-ef
@@ -491,7 +505,8 @@ AC_LANG_POP([C++])
 dnl Prevent shared libraries from being built for libpcp and other core libraries
 AC_ARG_ENABLE([shared],
   [AS_HELP_STRING([--disable-shared], [disable core shared libary generation])],
-  [PACKAGE_CONFIGURE="$PACKAGE_CONFIGURE --disable-shared=$withval"])
+  [PACKAGE_CONFIGURE="$PACKAGE_CONFIGURE --disable-shared=$withval"],
+  [enable_shared=false])
 AC_SUBST(enable_shared)
 
 dnl check if user wants to use any of their own commands;
@@ -891,14 +906,16 @@ AC_DEFUN([PCP_CHECK_PYTHON_MODULE],
 	eval have_python_$1=false
     fi
   ])
+PCP_CHECK_PYTHON_MODULE(BPF, [from bcc import BPF])
+AC_SUBST(have_python_BPF)
 PCP_CHECK_PYTHON_MODULE(OrderedDict, [from collections import OrderedDict])
 AC_SUBST(have_python_OrderedDict)
 PCP_CHECK_PYTHON_MODULE(Elasticsearch, [from elasticsearch import Elasticsearch])
 AC_SUBST(have_python_Elasticsearch)
 PCP_CHECK_PYTHON_MODULE(jsonpointer)
 AC_SUBST(have_python_jsonpointer)
-PCP_CHECK_PYTHON_MODULE(xlsxwriter)
-AC_SUBST(have_python_xlsxwriter)
+PCP_CHECK_PYTHON_MODULE(openpyxl)
+AC_SUBST(have_python_openpyxl)
 PCP_CHECK_PYTHON_MODULE(setuptools)
 AC_SUBST(have_python_setuptools)
 PCP_CHECK_PYTHON_MODULE(requests)
@@ -918,6 +935,17 @@ AS_IF([test "x$do_pmdajson" = "xcheck"], [
 ])
 AC_SUBST(PMDA_JSON, $pmda_json)
 if $pmda_json; then AC_MSG_RESULT(yes); else AC_MSG_RESULT(no); fi
+
+AC_MSG_CHECKING([if the bcc PMDA should be included])
+pmda_bcc=false
+AS_IF([test "x$do_pmdabcc" = "xyes"], [pmda_bcc=true])
+AS_IF([test "x$do_pmdabcc" = "xcheck"], [
+    dnl BCC PMDA needs python3, and OrderedDict and BPF Python modules
+    $enable_python3 && $have_python_BPF && \
+	$have_python_OrderedDict && pmda_bcc=true
+])
+AC_SUBST(PMDA_BCC, $pmda_bcc)
+if $pmda_bcc; then AC_MSG_RESULT(yes); else AC_MSG_RESULT(no); fi
 
 dnl check if perl available for the build and runtime
 AC_CHECK_PROGS(PERL, perl)
@@ -1030,11 +1058,19 @@ AC_MSG_CHECKING([if the activemq PMDA should be included])
 pmda_activemq=false
 if test "$have_perl" = true
 then
-    dnl rpm build for activemq PMDA needs Perl LWP::UserAgent
-    if $pcp_perl_prog -e "use LWP::UserAgent" >/dev/null 2>&1
-    then
-	pmda_activemq=true
-    fi
+    dnl rpm build for activemq PMDA needs Perl modules LWP::UserAgent
+    dnl and JSON
+    pmda_activemq=true
+    for module in 'LWP::UserAgent' JSON
+    do
+	if $pcp_perl_prog -e "use $module" >/dev/null 2>&1
+	then
+	    :
+	else
+	    pmda_activemq=false
+	    break
+	fi
+    done
 fi
 AC_SUBST(PMDA_ACTIVEMQ, $pmda_activemq)
 if $pmda_activemq; then AC_MSG_RESULT(yes); else AC_MSG_RESULT(no); fi
@@ -1121,7 +1157,7 @@ qt_release=release
 qt_version=0
 AS_IF([test "x$do_qt" != "xno"], [
     enable_qt=true
-    
+
     if test -z "$QMAKE"
     then
 	dnl default to qmake from qtchooser whenever it is available
@@ -1134,19 +1170,34 @@ AS_IF([test "x$do_qt" != "xno"], [
 	enable_qt=false
     else
 	AC_MSG_CHECKING([Qt version])
-	eval `$qmake --version | awk '/Using Qt version/ { ver=4; print $ver }' | awk -F. '{ major=1; minor=2; point=3; printf "export QT_MAJOR=%d QT_MINOR=%d QT_POINT=%d\n",$major,$minor,$point }'`
+	if test ! -z "$QT_SELECT"; then
+	    # fallback to Qt v4 if given preference is not successful
+	    $qmake --version 2>&1 >/dev/null
+	    if test $? -eq 1; then
+		export QT_SELECT=4
+	    fi
+	fi
+	eval `$qmake --version 2>&1 | awk '/Using Qt version/ { ver=4; print $ver }' | awk -F. '{ major=1; minor=2; point=3; printf "export QT_MAJOR=%d QT_MINOR=%d QT_POINT=%d\n",$major,$minor,$point }'`
 	AC_MSG_RESULT([$QT_MAJOR.$QT_MINOR.$QT_POINT])
-	if test "$QT_MAJOR" -lt 4; then
+	if test -z "$QT_MAJOR" -o -z "$QT_MINOR"; then
+	    echo WARNING: cannot extract Qt version number from ...
+	    $qmake --version
+	    echo Cannot include the Qt components in the build.
+	    enable_qt=false
+	    qt_version=0
+	elif test "$QT_MAJOR" -lt 4; then
 	    echo WARNING: Qt version 4.4 or later does not seem to be installed.
 	    echo Cannot proceed with the Qt $QT_MAJOR installation found.
 	    enable_qt=false
-	fi
-	if test "$QT_MAJOR" -eq 4 -a "$QT_MINOR" -lt 4 ; then
+	    qt_version=0
+	elif test "$QT_MAJOR" -eq 4 -a "$QT_MINOR" -lt 4 ; then
 	    echo WARNING: Qt version 4.$QT_MINOR is too old.
 	    echo Qt version 4.4 or later is required for Qt builds.
 	    enable_qt=false
+	    qt_version=0
+	else
+	    qt_version=$QT_MAJOR
 	fi
-	qt_version=$QT_MAJOR
     fi
 
     if test "$do_qt" != "check" -a "$enable_qt" != "true"
@@ -1186,7 +1237,7 @@ dnl note: all makefiles in this package use the gmake syntax
 if test -z "$MAKE"
 then
     AC_PATH_PROG(MAKE, gmake)
-    if test -z "$MAKE" 
+    if test -z "$MAKE"
     then
 	# look elsewhere ...
 	AC_MSG_CHECKING([for GNU make elsewhere])
@@ -1215,7 +1266,7 @@ then
 	    fi
 	fi
 	AC_MSG_RESULT($MAKE)
-    fi 
+    fi
 fi
 make=$MAKE
 AC_SUBST(make)
@@ -1338,7 +1389,7 @@ then
 	    AC_MSG_WARN([PackageMaker not found, mac packages will not be made])
 	fi
     else
-	AC_MSG_RESULT([ no])	
+	AC_MSG_RESULT([ no])
     fi
 else
     package_maker="$PACKAGE_MAKER"
@@ -1455,12 +1506,6 @@ dnl check if a toolchain is available for the books
 test -z "$PUBLICAN" && AC_PATH_PROG(PUBLICAN, publican)
 publican=$PUBLICAN
 AC_SUBST(publican)
-test -z "$DBLATEX" && AC_PATH_PROG(DBLATEX, dblatex)
-dblatex=$DBLATEX
-AC_SUBST(dblatex)
-test -z "$XMLTO" && AC_PATH_PROG(XMLTO, xmlto)
-xmlto=$XMLTO
-AC_SUBST(xmlto)
 
 book_toolchain=""
 if test "$do_books" = "check" -o "$do_books" = "yes"
@@ -1468,15 +1513,9 @@ then
     if test "$BOOK_TOOLCHAIN" != ""
     then
         book_toolchain=$BOOK_TOOLCHAIN
-    elif test "$DBLATEX" != ""
-    then
-        book_toolchain=dblatex
     elif test "$PUBLICAN" != ""
     then
         book_toolchain=publican
-    elif test "$XMLTO" != ""
-    then
-        book_toolchain=xmlto
     elif test "$do_books" = "yes"
     then
 	AC_MSG_ERROR([cannot enable books build - no toolchain found])
@@ -1529,25 +1568,6 @@ then
 fi
 AC_SUBST(grep)
 
-dnl checks for /proc pseudo file system
-AC_MSG_CHECKING([for /proc ])
-if test "$cross_compiling" = "yes"; then
-    ans=$have_procfs
-    echo "cross-compile -> \"$ans\"" >&5
-elif test -d /proc
-then
-    have_procfs=true
-else
-    have_procfs=false
-fi
-if $have_procfs
-then
-    AC_MSG_RESULT(yes)
-    AC_DEFINE(HAVE_PROCFS, [1], [Support for /proc pseudo-filesystem])
-else
-    AC_MSG_RESULT(no)
-fi
-
 dnl Checks for C header files.
 AC_HEADER_DIRENT
 AC_HEADER_STDC
@@ -1562,7 +1582,7 @@ AC_CHECK_HEADERS(values.h stdint.h ieeefp.h math.h)
 AC_CHECK_HEADERS(pwd.h grp.h regex.h sys/wait.h)
 AC_CHECK_HEADERS(termio.h termios.h sys/termios.h)
 AC_CHECK_HEADERS(sys/ioctl.h sys/select.h sys/socket.h)
-AC_CHECK_HEADERS(netdb.h)
+AC_CHECK_HEADERS(netdb.h poll.h)
 if test $target_os = darwin -o $target_os = openbsd
 then
     AC_CHECK_HEADERS(net/if.h, [], [], [#include <sys/types.h>
@@ -1575,14 +1595,16 @@ AC_CHECK_HEADERS(windows.h winsock2.h ws2tcpip.h)
 AC_CHECK_HEADERS(execinfo.h bits/wordsize.h)
 AC_CHECK_HEADERS(iptypes.h, [], [], [#include <windows.h>])
 AC_CHECK_HEADERS(iphlpapi.h, [], [], [#include <winsock2.h>])
+AC_CHECK_HEADERS(netioapi.h, [], [], [#include <winsock2.h>])
 AC_CHECK_HEADERS(fts.h libzfs.h)
 AC_CHECK_HEADERS(sys/statvfs.h sys/statfs.h sys/mount.h)
+AC_CHECK_HEADERS(ncurses/curses.h)
 
 dnl Check if we have <sys/endian.h> ... standard way
 AC_MSG_CHECKING([for sys/endian.h ])
 AC_TRY_COMPILE(
-[  
-    #include <sys/endian.h> 
+[
+    #include <sys/endian.h>
 ],
 [
 ], AC_DEFINE(HAVE_SYS_ENDIAN_H, [1], [sys/endian.h]) AC_MSG_RESULT(yes), AC_MSG_RESULT(no))
@@ -1590,8 +1612,8 @@ AC_TRY_COMPILE(
 dnl Check if we have <machine/endian.h> ... MacOSX way
 AC_MSG_CHECKING([for machine/endian.h ])
 AC_TRY_COMPILE(
-[  
-    #include <machine/endian.h> 
+[
+    #include <machine/endian.h>
 ],
 [
 ], AC_DEFINE(HAVE_MACHINE_ENDIAN_H, [1], [machine/endian.h]) AC_MSG_RESULT(yes), AC_MSG_RESULT(no))
@@ -1599,9 +1621,9 @@ AC_TRY_COMPILE(
 dnl Check if we have <sys/endian.h> ... IRIX strangeness
 AC_MSG_CHECKING([for sys/endian.h (IRIX variant) ])
 AC_TRY_COMPILE(
-[  
+[
     #include <standards.h>
-    #include <sys/endian.h> 
+    #include <sys/endian.h>
 ],
 [
 ], AC_DEFINE(HAVE_SYS_ENDIAN_H, [1], [IRIX sys/endian.h]) AC_MSG_RESULT(yes), AC_MSG_RESULT(no))
@@ -1623,6 +1645,9 @@ then
     lib_for_regex="-lregex"
 fi
 AC_SUBST(lib_for_regex)
+
+PKG_CHECK_MODULES([libuv], [libuv], [have_libuv=true], [have_libuv=false])
+AC_SUBST(HAVE_LIBUV, [$have_libuv])
 
 PKG_CHECK_MODULES([ncurses], [ncurses], [have_ncurses=true], [have_ncurses=false])
 AC_SUBST(HAVE_NCURSES, [$have_ncurses])
@@ -1830,11 +1855,11 @@ fi
 AC_SUBST(PMDA_POSTFIX,$pmda_postfix)
 if $pmda_postfix; then AC_MSG_RESULT(yes); else AC_MSG_RESULT(no); fi
 
-dnl Do you have system microhttpd libraries for pmwebapi?
+dnl Do you have system microhttpd libraries for pmwebd?
 PKG_CHECK_MODULES([libmicrohttpd], [libmicrohttpd > 0.9.9], [have_libmicrohttpd=true], [have_libmicrohttpd=false])
 AC_SUBST(HAVE_LIBMICROHTTPD, [$have_libmicrohttpd])
 
-dnl Do you have graphics libraries for pmwebapi?
+dnl Do you have graphics libraries for pmwebd?
 PKG_CHECK_MODULES([cairo], [cairo >= 1.2, cairo-ft >= 1.2, cairo-png >= 1.2], [have_cairo=true], [have_cairo=false])
 AC_SUBST(HAVE_CAIRO, [$have_cairo])
 
@@ -1897,16 +1922,22 @@ AC_CHECK_PROGS(SEINFO, seinfo)
 AC_SUBST(SEINFO)
 AC_MSG_CHECKING([if selinux policy should be included])
 enable_selinux=false
-AS_IF([test "x$do_selinux" != "xno"], [
-for makefile in /usr/share/selinux/devel/Makefile
-do
-    if test -f "$makefile" -a "x$SEINFO" != "x"
-    then
-	enable_selinux=true
-	AC_MSG_RESULT(yes)
-    fi
-done
-])
+if test $target_os = mingw
+then
+    :
+else
+    AS_IF([test "x$do_selinux" != "xno"], [
+    for makefile in /usr/share/selinux/devel/Makefile
+    do
+	if test -f "$makefile" -a "x$SEINFO" != "x"
+	then
+	    enable_selinux=true
+	    AC_MSG_RESULT(yes)
+	fi
+    done
+
+    ])
+fi
 test "$enable_selinux" = "false" && AC_MSG_RESULT(no)
 AC_SUBST(enable_selinux)
 AC_SUBST(pcp_selinux_dir)
@@ -1921,6 +1952,12 @@ pcp_selinux_systemd_unit_file=false
 pcp_selinux_systemd_exec=false
 pcp_selinux_tracefs=false
 pcp_selinux_unreserved_port=false
+pcp_selinux_sock_file_getattr=false
+pcp_selinux_hostname_exec_map=false
+pcp_selinux_mock=false
+pcp_selinux_unconfined=false
+pcp_selinux_numad=false
+
 AS_IF([test "x$enable_selinux" != "xfalse"], [
 for policy_file in /etc/selinux/targeted/policy/policy.*
 do
@@ -1976,9 +2013,34 @@ do
 	then
 	    pcp_selinux_tracefs=true
 	fi
-
+	sock_file_getattr=`eval seinfo -x --class=sock_file -- $policy_file | grep getattr | awk '{ print $1 }'`
+	if test "x$sock_file_getattr" != "x"
+	then
+	    pcp_selinux_sock_file_getattr=true
+	fi
+	hostname_exec_map_a=`eval seinfo -x --class=file -- $policy_file | grep map | awk '{ print $1 }'`
+	hostname_exec_map_b=`eval seinfo -x --common file -- $policy_file 2>/dev/null | grep map | awk '{ print $1 }'`
+	if test "x$hostname_exec_map_a" != "x" -o "x$hostname_exec_map_b" != "x"
+	then
+	    pcp_selinux_hostname_exec_map=true
+	fi
+	mock_var_lib=`eval seinfo -t -- $policy_file | grep mock_var_lib_t | awk '{ print $1 }'`
+	if test "x$mock_var_lib" != "x"
+	then
+	    pcp_selinux_mock=true
+	fi
+       unconfined=`eval seinfo -t -- $policy_file | grep unconfined_service_t | awk '{ print $1 }'`
+       if test "x$unconfined" != "x"
+       then
+           pcp_selinux_unconfined=true
+       fi
+       numad=`eval seinfo -t -- $policy_file | grep numad_t | awk '{ print $1 }'`
+       if test "x$numad" != "x"
+       then
+           pcp_selinux_numad=true
+       fi
     fi
-done  
+done
 ])
 AC_SUBST(pcp_selinux_class_status)
 AC_SUBST(pcp_selinux_cap_userns_ptrace)
@@ -1990,25 +2052,30 @@ AC_SUBST(pcp_selinux_systemd_unit_file)
 AC_SUBST(pcp_selinux_systemd_exec)
 AC_SUBST(pcp_selinux_unreserved_port)
 AC_SUBST(pcp_selinux_tracefs)
+AC_SUBST(pcp_selinux_sock_file_getattr)
+AC_SUBST(pcp_selinux_hostname_exec_map)
+AC_SUBST(pcp_selinux_mock)
+AC_SUBST(pcp_selinux_unconfined)
+AC_SUBST(pcp_selinux_numad)
 
 dnl Checks for library functions.
 AC_TYPE_SIGNAL
 AC_FUNC_WAIT3
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS(mktime nanosleep usleep unsetenv)
-AC_CHECK_FUNCS(select socket gethostname getpeerucred getpeereid)
-AC_CHECK_FUNCS(uname syslog __clone pipe2 fcntl ioctl)
+AC_CHECK_FUNCS(select socket syslog sendmsg recvmsg setns)
+AC_CHECK_FUNCS(getuid getgid getpeerucred getpeereid)
+AC_CHECK_FUNCS(uname gethostname getdomainname getmachineid)
+AC_CHECK_FUNCS(__clone pipe2 fcntl ioctl)
 AC_CHECK_FUNCS(prctl setlinebuf waitpid atexit kill)
 AC_CHECK_FUNCS(chown fchmod getcwd scandir mkstemp)
 AC_CHECK_FUNCS(brk sbrk posix_memalign memalign valloc)
 AC_CHECK_FUNCS(signal sighold sigrelse tcgetattr)
 AC_CHECK_FUNCS(regex regcmp regexec regcomp)
 AC_CHECK_FUNCS(strtod strtol strtoll strtoull strndup strchrnul)
-AC_CHECK_FUNCS(getuid getgid)
 AC_CHECK_FUNCS(getgrent getgrent_r getgrnam getgrnam_r getgrgid getgrgid_r)
 AC_CHECK_FUNCS(getpwent getpwent_r getpwnam getpwnam_r getpwuid getpwuid_r)
 AC_CHECK_FUNCS(sysinfo trace_back_stack backtrace)
-AC_CHECK_FUNCS(sendmsg recvmsg setns)
 
 dnl only define readdir64 on non-linux platforms that support it
 if test $target_os != linux -a $target_os != freebsd -a $target_os != kfreebsd -a $target_os != netbsd; then
@@ -2034,9 +2101,9 @@ fi
 dnl check if we have a type for the pointer's size integer (__psint_t)
 AC_MSG_CHECKING([for __psint_t ])
 AC_TRY_COMPILE(
-[  
+[
     #include <sys/types.h>
-    #include <stdlib.h> 
+    #include <stdlib.h>
     #include <stddef.h>
 ], [ __psint_t psint; ],
 AC_DEFINE(HAVE___PSINT_T, [1], [__psint_t type]) AC_MSG_RESULT(yes), AC_MSG_RESULT(no))
@@ -2218,7 +2285,14 @@ _do_type()
     #   typedef long __pid_t;
     #   typedef __pid_t pid_t;
     #
-    _raw=`$CPP conftest.c \
+    if test $target_os = darwin
+    then
+	# Need to strip -arch foo args for gcc -E
+	_myflags=`echo "$CPPFLAGS" "$CFLAGS" | sed -e 's/-arch [[^ ]]*//g'`
+    else
+	_myflags="$CPPFLAGS $CFLAGS"
+    fi
+    _raw=`$CPP $_myflags conftest.c \
     | $SED \
 	-e 's/[[ 	]]__attribute__ ((.*));/;/' \
 	-e 's/__extension__[[ 	]][[ 	]]*//' \
@@ -2273,36 +2347,36 @@ $2 == "bozo"	{ t = $1
     case "$_raw"
     in
     int)
-    	_fmt='"d"'
+    	_fmt='d'
 	;;
     unsigned|'unsigned int')
-    	_fmt='"u"'
+    	_fmt='u'
 	;;
     long|'long int')
-	_fmt='"ld"'
+	_fmt='ld'
 	;;
     'long long'|'long long int')
         if test $target_os = mingw; then
-            _fmt='"I64d"'
+            _fmt='I64d'
         else
-	    _fmt='"lld"'
+	    _fmt='lld'
         fi
 	;;
     'unsigned long'|'unsigned long int'|'long unsigned int')
-	_fmt='"lu"'
+	_fmt='lu'
 	;;
     'unsigned long long'|'unsigned long long int')
         if test $target_os = mingw; then
-            _fmt='"I64u"'
+            _fmt='I64u'
         else
-	    _fmt='"llu"'
+	    _fmt='llu'
         fi
 	;;
     *\*)	# pointer to a something
-	_fmt='"p"'
+	_fmt='p'
 	;;
     struct\ *)	# not much can be done here ...
-	_fmt='"p"'
+	_fmt='p'
 	;;
     *)
 	echo
@@ -2320,7 +2394,7 @@ AC_MSG_CHECKING([printf type for pid_t])
 if test "$cross_compiling" = "yes"; then
     ans=$printf_fmt_pid
     echo "cross-compile -> \"$ans\"" >&5
-    fmt_pid="$ans"
+    fmt_pid=$ans
 else
     cat <<End-of-File >conftest.c
 #include <sys/types.h>
@@ -2328,7 +2402,7 @@ else
 pid_t bozo;
 End-of-File
     _do_type
-    fmt_pid="$_fmt"
+    fmt_pid=$_fmt
 fi
 AC_MSG_RESULT($fmt_pid)
 AC_SUBST(fmt_pid)
@@ -2346,7 +2420,15 @@ else
 #include <inttypes.h>
 int main()
 {
-    printf("\"%s\"\n", __PRI64_PREFIX "d");
+#if defined(__PRI64_PREFIX)
+    /* most of the civilized universe */
+    printf("%s\n", __PRI64_PREFIX "d");
+#elif defined(__PRI_64_LENGTH_MODIFIER__)
+    /* Darwin */
+    printf("%s\n", __PRI_64_LENGTH_MODIFIER__ "d");
+#else
+    bozo!	/* fall through to the hardway below */
+#endif
     return(0);
 }
 End-of-File
@@ -2369,16 +2451,22 @@ int main()
 #ifdef __WORDSIZE
 /* logic copied from <inttypes.h> */
 #if __WORDSIZE == 64
-    printf("\"ld\"\n");
+    printf("ld\n");
 #else
-    printf("\"lld\"\n");
+    printf("lld\n");
 #endif
 #else
 /* on NetBSD, for example, there is no __WORDSIZE */
     if (sizeof(int) == 8)
-	printf("\"ld\"\n");
-    else
-	printf("\"lld\"\n");
+	printf("d\n");
+    else if (sizeof(long) == 8)
+	printf("ld\n");
+    else if (sizeof(long long) == 8)
+	printf("lld\n");
+    else {
+	printf("no clue what printf format to use for __int64_t\n");
+	return(1);
+    }
 #endif
     return(0);
 }
@@ -2397,11 +2485,11 @@ then
     rm -rf conftest conftest.*
     exit 1
 fi
-fmt_int64="$ans"
-AC_MSG_RESULT("$fmt_int64")
+fmt_int64=$ans
+AC_MSG_RESULT($fmt_int64)
 AC_SUBST(fmt_int64)
 dnl and the unsigned version of this ...
-fmt_uint64=`echo $fmt_int64 | sed -e 's/d"/u"/'`
+fmt_uint64=`echo $fmt_int64 | sed -e 's/d$/u/'`
 AC_SUBST(fmt_uint64)
 rm -rf conftest.* conftest
 
@@ -2487,7 +2575,7 @@ then
     AC_MSG_CHECKING([where pthread_create() is defined])
     for cand in "" pthreads pthread ; do
 	savedLIBS=$LIBS
-	if test -n "$cand" 
+	if test -n "$cand"
 	then
 	    LIBS=`echo $LIBS -l$cand`
 	fi
@@ -2519,7 +2607,7 @@ then
 pthread_t bozo;
 End-of-File
 	_do_type
-	fmt_pthread="$_fmt"
+	fmt_pthread=$_fmt
 	AC_MSG_RESULT($fmt_pthread)
 	AC_SUBST(fmt_pthread)
 	rm -rf conftest.c conftest.debug
@@ -2885,7 +2973,7 @@ AC_TRY_LINK([#include <sys/wait.h>],
 ], AC_DEFINE(HAVE_WAIT_INCLUDES_SIGNAL, [1], [indirect signal.h]))
 
 dnl check for name and type of time fields in struct stat
-dnl IRIX example	timespec_t st_mtim;	
+dnl IRIX example	timespec_t st_mtim;
 dnl Linux example 	struct timespec st_mtim;
 dnl Darwin example 	struct timespec st_mtimespec;
 dnl Solaris example	timestruc_t st_mtim;
@@ -3189,6 +3277,9 @@ pcp_log_dir=`eval echo $pcp_log_dir`
 pcp_log_dir=`eval echo $pcp_log_dir`
 AC_SUBST(pcp_log_dir)
 
+pcp_sa_dir=$pcp_log_dir/sa
+AC_SUBST(pcp_sa_dir)
+
 AC_ARG_WITH(rundir,[AC_HELP_STRING([--with-rundir],[run directory [LOCALSTATEDIR/run/pcp]])],
                    [pcp_run_dir=$withval],
                    [pcp_run_dir=$localstatedir/run/pcp])
@@ -3222,7 +3313,7 @@ AC_ARG_WITH(demosdir,[AC_HELP_STRING([--with-demosdir],[run directory [DATADIR/p
                    [pcp_demos_dir=$pcp_share_dir/demos])
 AC_SUBST(pcp_demos_dir)
 
-if test -z "$XCONFIRM" 
+if test -z "$XCONFIRM"
 then
     AC_PATH_PROG(ac_xconfirm_prog, xconfirm, $pcp_bin_dir/pmconfirm)
 else
@@ -3261,6 +3352,28 @@ then
 	  (void) zpool_vdev_name(zh, zp, np, B_FALSE);
 	],
 	AC_DEFINE(HAVE_ZPOOL_VDEV_NAME_4ARG, [1], [4-arg zpool_vdev_name])
+	AC_MSG_RESULT(yes), AC_MSG_RESULT(no))
+fi
+
+dnl check for zfs_iter_snapshots API style from <libzfs.h>
+if test "$ac_cv_header_libzfs_h" = "yes"
+then
+    AC_MSG_CHECKING([for 4-argument style zfs_iter_snapshots])
+    AC_TRY_COMPILE([#include <libzfs.h>],
+	[ zfs_handle_t *zh;
+	  zfs_iter_f callback;
+	  (void)zfs_iter_snapshots(zh, B_FALSE, callback, NULL);
+	],
+	AC_DEFINE(HAVE_ZFS_ITER_SNAPSHOTS_4ARG, [1], [4-arg zfs_iter_snapshots])
+	AC_MSG_RESULT(yes), AC_MSG_RESULT(no))
+
+    AC_MSG_CHECKING([for 3-argument style zfs_iter_snapshots])
+    AC_TRY_COMPILE([#include <libzfs.h>],
+	[ zfs_handle_t *zh;
+	  zfs_iter_f callback;
+	  (void)zfs_iter_snapshots(zh, callback, NULL);
+	],
+	AC_DEFINE(HAVE_ZFS_ITER_SNAPSHOTS_3ARG, [1], [3-arg zfs_iter_snapshots])
 	AC_MSG_RESULT(yes), AC_MSG_RESULT(no))
 fi
 
@@ -3364,6 +3477,41 @@ dnl check for -latomic, needed for some -march=i386 builds with i686 c++ distro 
 AC_CHECK_LIB(atomic, __atomic_fetch_add_4, [lib_for_atomic="-latomic"])
 AC_SUBST(lib_for_atomic)
 
+dnl Check for decompression libraries
+enable_lzma=false
+enable_decompression=false
+AS_IF([test "x$do_decompression" != "xno"], [
+    # Check for -llzma
+    enable_lzma=true
+    PKG_CHECK_MODULES([lzma], [liblzma],
+        [AC_CHECK_LIB(lzma, lzma_index_stream_flags,
+		      [lib_for_lzma="-llzma"],
+		      [enable_lzma=false])
+        ],[enable_lzma=false])
+
+    AC_CHECK_HEADERS([lzma.h], [], [enable_lzma=false])
+
+    if test "$enable_lzma" = "true"
+    then
+        AC_SUBST(lib_for_lzma)
+	AC_SUBST(lzma_CFLAGS)
+	AC_DEFINE(HAVE_LZMA_DECOMPRESSION, [1], [lzma decompression])
+	enable_decompression=true
+    fi
+
+    if test "$do_decompression" != "check" -a "$enable_decompression" != "true"
+    then
+	AC_MSG_ERROR([cannot enable transparent decompression - no supported compression formats])
+    fi
+
+    if test "$enable_decompression" = "true"
+    then
+	AC_DEFINE(HAVE_TRANSPARENT_DECOMPRESSION, [1], [Transparent decompression])
+    fi
+])
+AC_SUBST(enable_decompression)
+AC_SUBST(enable_lzma)
+
 dnl check for array sessions
 if test -f /usr/include/sn/arsess.h
 then
@@ -3406,7 +3554,7 @@ AC_TRY_COMPILE([
 ], [ struct timespec foo; ],
 AC_DEFINE(HAVE_STRUCT_TIMESPEC, [1], [timespec type]) AC_MSG_RESULT(yes), AC_MSG_RESULT(no))
 
-dnl check if we have IRIX style altzone 
+dnl check if we have IRIX style altzone
 AC_MSG_CHECKING([for altzone in time.h])
 AC_TRY_COMPILE([
     #include <time.h>
@@ -3475,7 +3623,7 @@ AC_SUBST(HAVE_ZLIB, [$have_zlib])
 dnl Check if we have AI_ADDRCONFIG
 AC_MSG_CHECKING([for AI_ADDRCONFIG])
 AC_TRY_COMPILE(
-[  
+[
     #include <netdb.h>
     int test = AI_ADDRCONFIG;
 ],

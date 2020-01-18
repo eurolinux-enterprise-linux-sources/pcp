@@ -14,7 +14,7 @@
  * for more details.
  */
 #include "pmapi.h"
-#include "impl.h"
+#include "libpcp.h"
 #include "pmda.h"
 #include "clusters.h"
 #include "proc_pid.h"
@@ -28,7 +28,7 @@ typedef struct {
     char    *name;
 } dynproc_metric_t;
 
-static __pmnsTree *dynamic_proc_tree;
+static pmdaNameSpace *dynamic_proc_tree;
 
 enum {
     DYNPROC_GROUP_PSINFO = 0,
@@ -61,7 +61,8 @@ static int proc_hotproc_cluster_list[][2] = {
 	{ CLUSTER_PID_STATUS,	    CLUSTER_HOTPROC_PID_STATUS },
 	{ CLUSTER_PID_SCHEDSTAT,    CLUSTER_HOTPROC_PID_SCHEDSTAT },
 	{ CLUSTER_PID_IO,	    CLUSTER_HOTPROC_PID_IO },
-	{ CLUSTER_PID_FD,	    CLUSTER_HOTPROC_PID_FD }
+	{ CLUSTER_PID_FD,	    CLUSTER_HOTPROC_PID_FD },
+	{ CLUSTER_PID_OOM_SCORE,    CLUSTER_HOTPROC_PID_OOM_SCORE },
 };
 
 
@@ -134,13 +135,14 @@ static dynproc_metric_t psinfo_metrics[] = {
 	{ .name = "sigignore_s",    .cluster = CLUSTER_PID_STATUS,	.item=18 },
 	{ .name = "sigcatch_s",	    .cluster = CLUSTER_PID_STATUS,	.item=19 },
 	{ .name = "threads",	    .cluster = CLUSTER_PID_STATUS,	.item=28 },
-	{ .name = "cgroups",	    .cluster = CLUSTER_PID_CGROUP,	.item=0 },
-	{ .name = "labels",	    .cluster = CLUSTER_PID_LABEL,	.item=0 },
+	{ .name = "cgroups",	    .cluster = CLUSTER_PID_CGROUP,	.item = PROC_PID_CGROUP },
+	{ .name = "labels",	    .cluster = CLUSTER_PID_LABEL,	.item = PROC_PID_LABEL },
 	{ .name = "vctxsw",	    .cluster = CLUSTER_PID_STATUS,	.item=29 },
 	{ .name = "nvctxsw",	    .cluster = CLUSTER_PID_STATUS,	.item=30 },
 	{ .name = "cpusallowed",    .cluster = CLUSTER_PID_STATUS,	.item = PROC_PID_STATUS_CPUSALLOWED },
 	{ .name = "ngid",	    .cluster = CLUSTER_PID_STATUS,	.item = PROC_PID_STATUS_NGID },
         { .name = "tgid",	    .cluster = CLUSTER_PID_STATUS,	.item = PROC_PID_STATUS_TGID },
+	{ .name = "oom_score",	    .cluster = CLUSTER_PID_OOM_SCORE,	.item = PROC_PID_OOM_SCORE },
 };
 
 static dynproc_metric_t id_metrics[] = {
@@ -160,6 +162,7 @@ static dynproc_metric_t id_metrics[] = {
         { .name = "egid_nm",	.cluster = CLUSTER_PID_STATUS,  .item=13 },
         { .name = "sgid_nm",	.cluster = CLUSTER_PID_STATUS,  .item=14 },
         { .name = "fsgid_nm",   .cluster = CLUSTER_PID_STATUS,  .item=15 },
+        { .name = "container",  .cluster = CLUSTER_PID_CGROUP,  .item=1 },
 };
 
 static dynproc_metric_t memory_metrics[] = {
@@ -183,6 +186,8 @@ static dynproc_metric_t memory_metrics[] = {
 	{ .name = "vmpin",	.cluster = CLUSTER_PID_STATUS,	.item = PROC_PID_STATUS_VMPIN },
 	{ .name = "vmhwm",	.cluster = CLUSTER_PID_STATUS,	.item = PROC_PID_STATUS_VMHWM },
 	{ .name = "vmpte",	.cluster = CLUSTER_PID_STATUS,	.item = PROC_PID_STATUS_VMPTE },
+	{ .name = "vmreal",	.cluster = CLUSTER_PID_STATUS,	.item = PROC_PID_STATUS_VMREAL },
+	{ .name = "vmnonlib",	.cluster = CLUSTER_PID_STATUS,	.item = PROC_PID_STATUS_VMNONLIB },
 };
 
 static dynproc_metric_t namespace_metrics[] = {
@@ -305,8 +310,8 @@ build_dynamic_proc_tree(int domain)
 		if (tree == DYNPROC_HOTPROC)
 		    cluster = get_hot_cluster(cluster);
 
-		pmid = pmid_build(domain, cluster, item);
-		__pmAddPMNSNode(dynamic_proc_tree, pmid, entry);
+		pmid = pmID_build(domain, cluster, item);
+		pmdaTreeInsert(dynamic_proc_tree, pmid, entry);
 
 		num_hash_entries++;
 	    }
@@ -314,7 +319,7 @@ build_dynamic_proc_tree(int domain)
     }
 
     /* Must now call this in all cases when we update the tree */
-    pmdaTreeRebuildHash( dynamic_proc_tree, num_hash_entries);
+    pmdaTreeRebuildHash(dynamic_proc_tree, num_hash_entries);
 }
 
 /*
@@ -332,9 +337,9 @@ build_dynamic_proc_tree(int domain)
 static void
 refresh_metrictable(pmdaMetric *source, pmdaMetric *dest, int id)
 {
-    int domain = pmid_domain(source->m_desc.pmid);
-    int cluster = pmid_cluster(source->m_desc.pmid);
-    int item = pmid_item(source->m_desc.pmid);
+    int domain = pmID_domain(source->m_desc.pmid);
+    int cluster = pmID_cluster(source->m_desc.pmid);
+    int item = pmID_item(source->m_desc.pmid);
     int hotcluster = -1;
 
     memcpy(dest, source, sizeof(pmdaMetric));
@@ -342,7 +347,7 @@ refresh_metrictable(pmdaMetric *source, pmdaMetric *dest, int id)
     if (id == 1) {
 	hotcluster = get_hot_cluster(cluster);
 	if (hotcluster != -1) {
-	    dest->m_desc.pmid = pmid_build(domain, hotcluster, item);
+	    dest->m_desc.pmid = pmID_build(domain, hotcluster, item);
 	    if (source->m_desc.indom == PM_INDOM_NULL) {
 		dest->m_desc.indom = PM_INDOM_NULL;
 	    }
@@ -368,18 +373,18 @@ refresh_metrictable(pmdaMetric *source, pmdaMetric *dest, int id)
  *
  */
 static int
-refresh_dynamic_proc(pmdaExt *pmda, __pmnsTree **tree)
+refresh_dynamic_proc(pmdaExt *pmda, pmdaNameSpace **tree)
 {
     int sts, dom = pmda->e_domain;
 
     if (dynamic_proc_tree) {
         *tree = dynamic_proc_tree;
-    } else if ((sts = __pmNewPMNS(&dynamic_proc_tree)) < 0) {
-        __pmNotifyErr(LOG_ERR, "%s: failed to create dynamic_proc names: %s\n",
-                        pmProgname, pmErrStr(sts));
+    } else if ((sts = pmdaTreeCreate(&dynamic_proc_tree)) < 0) {
+        pmNotifyErr(LOG_ERR, "%s: failed to create dynamic_proc names: %s\n",
+                        pmGetProgname(), pmErrStr(sts));
         *tree = NULL;
     } else {
-	/* Call something that constructs the PMNS by multiple calls to __pmAddPMNSNode */
+	/* Construct the PMNS by multiple calls to pmdaTreeInsert */
 	build_dynamic_proc_tree(dom);
 	*tree = dynamic_proc_tree;
 	/* Only return 1 if we are building the pmns */
@@ -410,7 +415,7 @@ size_metrictable(int *total, int *trees)
     *trees = sizeof(dynproc_members)/sizeof(char*) -1; /* will be 1 (hotproc) */
 
     if (pmDebugOptions.libpmda)
-        fprintf(stderr, "interrupts size_metrictable: %d total x %d trees\n",
+        fprintf(stderr, "size_metrictable: %d total x %d trees\n",
                 *total, *trees);
 }
 
@@ -424,8 +429,8 @@ size_metrictable(int *total, int *trees)
 static int
 dynamic_proc_text(pmdaExt *pmda, pmID pmid, int type, char **buf)
 {
-    int item = pmid_item(pmid);
-    int cluster = pmid_cluster(pmid);
+    int item = pmID_item(pmid);
+    int cluster = pmID_cluster(pmid);
     char name[128];
 
     if (get_name(cluster, item, name, sizeof(name))) {
@@ -452,10 +457,10 @@ dynamic_proc_text(pmdaExt *pmda, pmID pmid, int type, char **buf)
 void
 proc_dynamic_init(pmdaMetric *metrics, int nmetrics)
 {
-    int clusters[1]; /* Not needed, but kept for interface compatibility */
+    int clusters[1] = {0}; /* Not needed, kept for interface compatibility */
     int nclusters = 0;
 
-    pmdaDynamicPMNS("NOTNEEDED",
+    pmdaDynamicPMNS("proc",
                     clusters, nclusters,
                     refresh_dynamic_proc, dynamic_proc_text,
                     refresh_metrictable, size_metrictable,

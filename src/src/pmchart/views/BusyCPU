@@ -25,13 +25,18 @@ _err()
     done
     echo >>$tmp/msg
     echo "Sorry, there is nothing to display." >>$tmp/msg
-    pmconfirm >/dev/null \
-	-header "pmchart view construction failure" \
-	-file $tmp/msg \
-	-icon error \
-	-B "OK"
+    if $dialog
+    then
+	pmconfirm >/dev/null \
+	    -header "pmchart view construction failure" \
+	    -file $tmp/msg \
+	    -icon error \
+	    -B "OK"
+    else
+	cat >&2 $tmp/msg
+    fi
     exit
-}
+    }
 
 # find top 10 consumers of user mode CPU cycles and generate a plot for each
 #
@@ -64,7 +69,7 @@ then
     #
     pmquery >/dev/null 2>&1 \
 	-timeout 5 \
-	-header "kmchart view construction" \
+	-header "pmchart view construction" \
 	-t "Finding top CPU burners, please wait 5 seconds ..." &
     query=$!
     echo "/\[0*$query /d" >>$tmp/sed
@@ -76,10 +81,10 @@ i=0
 fail=true
 for metric in proc.psinfo.utime proc.psusage.utime
 do
-    nval=`pmprobe -if $* $metric 2>&1 \
+    nval=`pmprobe -ifF $* $metric 2>&1 \
           | tee $tmp/err.$i \
-	  | $PCP_AWK_PROG '{print $2}'`
-    if [ "$nval" -gt 0 ]
+	  | $PCP_AWK_PROG '$1 == "'$metric'" && $2 > 0 {print $2}'`
+    if [ -n "$nval" ] && [ "$nval" -gt 0 ]
     then
 	fail=false
 	break
@@ -148,11 +153,16 @@ if [ ! -s $tmp/found ]
 then
     # no processes qualify
     #
-    pmconfirm >/dev/null \
-	-header "pmchart view construction failure" \
-	-t "No qualifying processes were found!" \
-	-icon warning \
-	-B "OK"
+    if $dialog
+    then
+	pmconfirm >/dev/null \
+	    -header "pmchart view construction failure" \
+	    -t "No qualifying processes were found!" \
+	    -icon warning \
+	    -B "OK"
+    else
+	echo "pmchart view construction failure: No qualifying processes were found!"
+    fi
     exit
 fi
 

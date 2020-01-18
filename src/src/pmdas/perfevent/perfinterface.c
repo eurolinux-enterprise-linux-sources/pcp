@@ -20,7 +20,7 @@
 #include "parse_events.h"
 #include <perfmon/pfmlib_perf_event.h>
 
-#include <pcp/pmapi.h>
+#include "pmapi.h"
 #include <limits.h>
 #include <dirent.h>
 
@@ -232,7 +232,7 @@ static int search_for_config(char *device_path, uint64_t config, char *event_fil
             break;
         }
         if (parsed_config == config) {
-            strncpy(event_file, entry->d_name, strlen(entry->d_name));
+            strncpy(event_file, entry->d_name, strlen(entry->d_name)+1);
             ret = 0;
             break;
         }

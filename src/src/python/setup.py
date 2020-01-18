@@ -1,6 +1,6 @@
 """ Build script for the PCP python package """
 #
-# Copyright (C) 2012-2017 Red Hat.
+# Copyright (C) 2012-2018 Red Hat.
 # Copyright (C) 2009-2012 Michael T. Werner
 #
 # This file is part of the "pcp" module, the python interfaces for the
@@ -29,13 +29,13 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name = 'pcp',
-    version = '1.2',
+    version = '4.1',
     description = 'Performance Co-Pilot collector, monitor and instrumentation APIs',
     long_description = long_description,
     license = 'GPLv2+',
     author = 'Performance Co-Pilot Development Team',
     author_email = 'pcp@groups.io',
-    url = 'http://pcp.io',
+    url = 'https://pcp.io',
     packages = find_packages(),
     ext_modules = [
         Extension('cpmapi', ['pmapi.c'], libraries = ['pcp']),

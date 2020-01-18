@@ -32,7 +32,7 @@ sample.colour PMID: 30.0.5
 sample.string.write_me: pmLookupDesc: No PMCD agent for domain of request
 qa.string.write_me: pmLookupDesc: No PMCD agent for domain of request
 +++ -K clear, +++
-pminfo: __pmSpecLocalPMDA failed: unexpected text after clear op in spec
+pminfo: pmSpecLocalPMDA failed: unexpected text after clear op in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -59,8 +59,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -70,7 +74,7 @@ Metrics options:
   -x, --events          unpack and report on any fetched event records
   -v, --verify          verify mode, be quiet and only report errors
 +++ -K clear,400 +++
-pminfo: __pmSpecLocalPMDA failed: unexpected text after clear op in spec
+pminfo: pmSpecLocalPMDA failed: unexpected text after clear op in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -97,8 +101,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -108,7 +116,7 @@ Metrics options:
   -x, --events          unpack and report on any fetched event records
   -v, --verify          verify mode, be quiet and only report errors
 +++ -K clear,400, +++
-pminfo: __pmSpecLocalPMDA failed: unexpected text after clear op in spec
+pminfo: pmSpecLocalPMDA failed: unexpected text after clear op in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -135,8 +143,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -146,7 +158,7 @@ Metrics options:
   -x, --events          unpack and report on any fetched event records
   -v, --verify          verify mode, be quiet and only report errors
 +++ -K clear,400,TMP.$DSO_SUFFIX +++
-pminfo: __pmSpecLocalPMDA failed: unexpected text after clear op in spec
+pminfo: pmSpecLocalPMDA failed: unexpected text after clear op in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -173,8 +185,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -184,7 +200,7 @@ Metrics options:
   -x, --events          unpack and report on any fetched event records
   -v, --verify          verify mode, be quiet and only report errors
 +++ -K clear,400,TMP.$DSO_SUFFIX, +++
-pminfo: __pmSpecLocalPMDA failed: unexpected text after clear op in spec
+pminfo: pmSpecLocalPMDA failed: unexpected text after clear op in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -211,8 +227,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -222,7 +242,7 @@ Metrics options:
   -x, --events          unpack and report on any fetched event records
   -v, --verify          verify mode, be quiet and only report errors
 +++ -K clear,400,TMP.$DSO_SUFFIX,sample_init +++
-pminfo: __pmSpecLocalPMDA failed: unexpected text after clear op in spec
+pminfo: pmSpecLocalPMDA failed: unexpected text after clear op in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -249,8 +269,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -260,7 +284,7 @@ Metrics options:
   -x, --events          unpack and report on any fetched event records
   -v, --verify          verify mode, be quiet and only report errors
 +++ -K clear,,TMP.$DSO_SUFFIX,sample_init +++
-pminfo: __pmSpecLocalPMDA failed: unexpected text after clear op in spec
+pminfo: pmSpecLocalPMDA failed: unexpected text after clear op in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -287,8 +311,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -298,7 +326,7 @@ Metrics options:
   -x, --events          unpack and report on any fetched event records
   -v, --verify          verify mode, be quiet and only report errors
 +++ -K clear,,,sample_init +++
-pminfo: __pmSpecLocalPMDA failed: unexpected text after clear op in spec
+pminfo: pmSpecLocalPMDA failed: unexpected text after clear op in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -325,8 +353,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -336,7 +368,7 @@ Metrics options:
   -x, --events          unpack and report on any fetched event records
   -v, --verify          verify mode, be quiet and only report errors
 +++ -K clear,,TMP.$DSO_SUFFIX,sample_init +++
-pminfo: __pmSpecLocalPMDA failed: unexpected text after clear op in spec
+pminfo: pmSpecLocalPMDA failed: unexpected text after clear op in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -363,8 +395,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -374,7 +410,7 @@ Metrics options:
   -x, --events          unpack and report on any fetched event records
   -v, --verify          verify mode, be quiet and only report errors
 +++ -K clear,400,,sample_init +++
-pminfo: __pmSpecLocalPMDA failed: unexpected text after clear op in spec
+pminfo: pmSpecLocalPMDA failed: unexpected text after clear op in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -401,8 +437,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -412,7 +452,7 @@ Metrics options:
   -x, --events          unpack and report on any fetched event records
   -v, --verify          verify mode, be quiet and only report errors
 +++ -K add +++
-pminfo: __pmSpecLocalPMDA failed: expected , after op in spec
+pminfo: pmSpecLocalPMDA failed: expected , after op in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -439,8 +479,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -450,7 +494,7 @@ Metrics options:
   -x, --events          unpack and report on any fetched event records
   -v, --verify          verify mode, be quiet and only report errors
 +++ -K add, +++
-pminfo: __pmSpecLocalPMDA failed: missing domain in spec
+pminfo: pmSpecLocalPMDA failed: missing domain in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -477,8 +521,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -488,7 +536,7 @@ Metrics options:
   -x, --events          unpack and report on any fetched event records
   -v, --verify          verify mode, be quiet and only report errors
 +++ -K add,400 +++
-pminfo: __pmSpecLocalPMDA failed: missing dso-path in spec
+pminfo: pmSpecLocalPMDA failed: missing dso-path in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -515,8 +563,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -526,7 +578,7 @@ Metrics options:
   -x, --events          unpack and report on any fetched event records
   -v, --verify          verify mode, be quiet and only report errors
 +++ -K add,400, +++
-pminfo: __pmSpecLocalPMDA failed: missing dso-path in spec
+pminfo: pmSpecLocalPMDA failed: missing dso-path in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -553,8 +605,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -564,7 +620,7 @@ Metrics options:
   -x, --events          unpack and report on any fetched event records
   -v, --verify          verify mode, be quiet and only report errors
 +++ -K add,400,TMP.$DSO_SUFFIX +++
-pminfo: __pmSpecLocalPMDA failed: missing init-routine in spec
+pminfo: pmSpecLocalPMDA failed: missing init-routine in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -591,8 +647,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -602,7 +662,7 @@ Metrics options:
   -x, --events          unpack and report on any fetched event records
   -v, --verify          verify mode, be quiet and only report errors
 +++ -K add,400,TMP.$DSO_SUFFIX, +++
-pminfo: __pmSpecLocalPMDA failed: missing init-routine in spec
+pminfo: pmSpecLocalPMDA failed: missing init-routine in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -629,8 +689,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -650,7 +714,7 @@ sample.string.write_me PMID: 30.0.29
 qa.string.write_me PMID: 400.0.29
     value 13
 +++ -K del +++
-pminfo: __pmSpecLocalPMDA failed: expected , after op in spec
+pminfo: pmSpecLocalPMDA failed: expected , after op in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -677,8 +741,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -688,7 +756,7 @@ Metrics options:
   -x, --events          unpack and report on any fetched event records
   -v, --verify          verify mode, be quiet and only report errors
 +++ -K del, +++
-pminfo: __pmSpecLocalPMDA failed: missing domain in spec
+pminfo: pmSpecLocalPMDA failed: missing domain in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -715,8 +783,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -736,7 +808,7 @@ qa.string.write_me: pmLookupDesc: No PMCD agent for domain of request
 +++ -K del,,sample/pmda_sample.$DSO_SUFFIX +++
 build_dsotab: parsing $PCP_PMCDCONF_PATH
 __pmLocalPMDA -> Unknown or illegal instance domain identifier
-pminfo: __pmSpecLocalPMDA failed: __pmLocalPMDA: Unknown or illegal instance domain identifier
+pminfo: pmSpecLocalPMDA failed: __pmLocalPMDA: Unknown or illegal instance domain identifier
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -763,8 +835,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -782,7 +858,7 @@ build_dsotab: parsing $PCP_PMCDCONF_PATH
 sample.string.write_me: pmLookupDesc: No PMCD agent for domain of request
 qa.string.write_me: pmLookupDesc: No PMCD agent for domain of request
 +++ -K del,, +++
-pminfo: __pmSpecLocalPMDA failed: missing domain and dso-path in spec
+pminfo: pmSpecLocalPMDA failed: missing domain and dso-path in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -809,8 +885,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -820,7 +900,7 @@ Metrics options:
   -x, --events          unpack and report on any fetched event records
   -v, --verify          verify mode, be quiet and only report errors
 +++ -K del,,, +++
-pminfo: __pmSpecLocalPMDA failed: missing domain and dso-path in spec
+pminfo: pmSpecLocalPMDA failed: missing domain and dso-path in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -847,8 +927,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 
@@ -858,7 +942,7 @@ Metrics options:
   -x, --events          unpack and report on any fetched event records
   -v, --verify          verify mode, be quiet and only report errors
 +++ -K del,,,sample_init +++
-pminfo: __pmSpecLocalPMDA failed: missing domain and dso-path in spec
+pminfo: pmSpecLocalPMDA failed: missing domain and dso-path in spec
 Usage: pminfo [options] [metricname | pmid | indom]...
 
 General options:
@@ -885,8 +969,12 @@ Protocol options:
   -d, --desc            get and print metric description
   -f, --fetch           fetch and print values for all instances
   -F, --fetchall        fetch and print values for non-enumerable indoms
+  -I, --fullindom       print InDom in verbose format
+  -l, --labels          print metric value labels (metadata)
   -m, --pmid            print PMID
   -M, --fullpmid        print PMID in verbose format
+  -s, --series          print metric series identifier
+  -S, --source          print metric source identifier
   -t, --oneline         get and display (terse) oneline text
   -T, --helptext        get and display (verbose) help text
 

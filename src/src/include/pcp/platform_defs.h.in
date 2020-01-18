@@ -31,8 +31,8 @@ extern "C" {
 #endif
 
 /* printf candy ... */
-#define FMT_PID @fmt_pid@
-#define FMT_PTHREAD @fmt_pthread@
+#define FMT_PID "@fmt_pid@"
+#define FMT_PTHREAD "@fmt_pthread@"
 
 #ifdef HAVE_BITS_WORDSIZE_H
 #include <bits/wordsize.h>
@@ -69,7 +69,7 @@ extern "C" {
 #include <ws2tcpip.h>
 #endif
 
-#if defined(HAVE_ENDIAN_H) 
+#if defined(HAVE_ENDIAN_H)
 #include <endian.h>
 #elif defined(HAVE_SYS_ENDIAN_H)
 #include <sys/endian.h>
@@ -203,6 +203,14 @@ bozo! need to find where MAXNAMELEN is defined for this platform
 #define MAXHOSTNAMELEN 4096
 #endif
 
+#ifndef MAXDOMAINNAMELEN
+#define MAXDOMAINNAMELEN 64
+#endif
+
+#ifndef MAXMACHINEIDLEN
+#define MAXMACHINEIDLEN 64
+#endif
+
 #ifndef HAVE_FLOG10
 #if !defined(flog10)
 #define flog10(x) (float)log10((double)x)
@@ -255,6 +263,11 @@ typedef void (*SIG_PF) (int);
 /* Determine if we are on Windows with MinGW compiler */
 #ifdef IS_MINGW
 
+#ifdef PCP_STATIC
+#define PCP_DATA
+#define PCP_CALL
+#else
+
 #ifdef PCP_INTERNAL
 #define PCP_DATA        __declspec(dllexport)
 #define PCP_CALL        __declspec(dllexport)
@@ -263,9 +276,13 @@ typedef void (*SIG_PF) (int);
 #define PCP_CALL        __declspec(dllimport)
 #endif
 
+#endif
+
 #ifdef PCP_VERSION		/* used to reduce namespace pollution */
 #define EHOSTDOWN	WSAEHOSTDOWN
+#ifndef ENODATA
 #define ENODATA		WSANO_DATA
+#endif
 extern const char *wsastrerror(int);
 
 #define HAVE_PIPE1
@@ -303,6 +320,7 @@ PCP_CALL extern void setlinebuf(FILE *);
 PCP_CALL extern char *index(const char *, int);
 PCP_CALL extern char *rindex(const char *, int);
 PCP_CALL extern char *strcasestr(const char *, const char *);
+PCP_CALL extern char *strsep(char **, const char *);
 PCP_CALL extern long int lrand48(void);
 PCP_CALL extern void srand48(long int);
 PCP_CALL extern long int random(void);
@@ -347,6 +365,9 @@ enum { LOG_EMERG, LOG_ALERT, LOG_CRIT, LOG_ERR,
 PCP_CALL extern int setenv(const char *, const char *, int);
 PCP_CALL extern int unsetenv(const char *);
 
+PCP_CALL extern int win32_inet_pton(int, const char *, void *);
+PCP_CALL extern const char *win32_inet_ntop(int, void *, char *, socklen_t);
+
 #else /*!MINGW*/
 #define PCP_DATA
 #define PCP_CALL
@@ -387,7 +408,14 @@ PCP_CALL extern char *strndup(const char *, size_t);
 PCP_CALL extern char *strchrnul(const char *, int);
 #endif
 #ifndef HAVE_STRCHRNUL
-PCP_CALL extern char *strchrnul(const char *, int c);
+PCP_CALL extern char *strchrnul(const char *, int);
+#endif
+
+#ifndef HAVE_GETDOMAINNAME
+PCP_CALL extern int getdomainname(char *, size_t);
+#endif
+#ifndef HAVE_GETMACHINEID
+PCP_CALL extern int getmachineid(char *, size_t);
 #endif
 
 #ifdef HAVE_CONST_DIRENT

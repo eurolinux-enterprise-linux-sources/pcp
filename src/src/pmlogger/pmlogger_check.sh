@@ -78,6 +78,7 @@ logfile=pmlogger.log
 SHOWME=false
 MV=mv
 CP=cp
+LN=ln
 KILL=pmsignal
 TERSE=false
 VERBOSE=false
@@ -102,6 +103,7 @@ EOF
 ARGS=`pmgetopt --progname=$prog --config=$tmp/usage -- "$@"`
 [ $? != 0 ] && exit 1
 
+daily_args=""
 eval set -- "$ARGS"
 while [ $# -gt 0 ]
 do
@@ -109,19 +111,23 @@ do
     in
 	-c)	CONTROL="$2"
 		CONTROLDIR="$2.d"
+		daily_args="${daily_args} -c $2"
 		shift
 		;;
 	-C)	CHECK_RUNLEVEL=true
 		;;
 	-l)	PROGLOG="$2"
 		USE_SYSLOG=false
+		daily_args="${daily_args} -l $2.from.check"
 		shift
 		;;
 	-N)	SHOWME=true
 		USE_SYSLOG=false
 		MV="echo + mv"
 		CP="echo + cp"
+		LN="echo + ln"
 		KILL="echo + kill"
+		daily_args="${daily_args} -N"
 		;;
 	-s)	START_PMLOGGER=false
 		STOP_PMLOGGER=true
@@ -134,6 +140,7 @@ do
 		else
 		    VERBOSE=true
 		fi
+		daily_args="${daily_args} -V"
 		;;
 	--)	shift
 		break
@@ -159,9 +166,40 @@ fi
 #
 PROGLOGDIR=`dirname "$PROGLOG"`
 [ -d "$PROGLOGDIR" ] || mkdir_and_chown "$PROGLOGDIR" 755 $PCP_USER:$PCP_GROUP 2>/dev/null
-[ -f "$PROGLOG" ] && mv "$PROGLOG" "$PROGLOG.prev"
-exec 1>"$PROGLOG"
-exec 2>&1
+if $SHOWME
+then
+    :
+else
+    # Salt away previous log, if any ...
+    #
+    _save_prev_file "$PROGLOG"
+    # After argument checking, everything must be logged to ensure no mail is
+    # accidentally sent from cron.  Close stdout and stderr, then open stdout
+    # as our logfile and redirect stderr there too.
+    #
+    # Exception is for -N where we want to see the output
+    #
+    exec 1>"$PROGLOG" 2>&1
+fi
+
+# if SaveLogs exists in the $PCP_LOG_DIR/pmlogger directory then save
+# $PROGLOG there as well with a unique name that contains the date and time
+# when we're run
+#
+if [ -d $PCP_LOG_DIR/pmlogger/SaveLogs ]
+then
+    now="`date '+%Y%m%d.%H.%M'`"
+    link=`echo $PROGLOG | sed -e "s/$prog/SaveLogs\/$prog.$now/"`
+    if [ ! -f "$link" ]
+    then
+	if $SHOWME
+	then
+	    echo "+ ln $PROGLOG $link"
+	else
+	    ln $PROGLOG $link
+	fi
+    fi
+fi
 
 QUIETLY=false
 if [ $CHECK_RUNLEVEL = true ]
@@ -239,6 +277,9 @@ _configure_pmlogger()
     tmpconfig="$1.tmp"
     configfile="$1"
     hostname="$2"
+
+    # clear any zero-length configuration file, that is never helpful.
+    [ -f "$configfile" -a ! -s "$configfile" ] && unlink "$configfile"
 
     if [ -f "$configfile" ]
     then
@@ -861,6 +902,18 @@ END				{ print m }'`
 		fi
 	    fi
 
+	    # if SaveLogs exists in the same directory that the archive
+	    # is being created, save pmlogger log file there as well
+	    #
+	    dirname=`dirname $LOGNAME`
+	    if [ -d $dirname/SaveLogs ]
+	    then
+		if [ ! -f $dirname/SaveLogs/$LOGNAME.log ]
+		then
+		    $LN $logfile $dirname/SaveLogs/$LOGNAME.log
+		fi
+	    fi
+
 	elif [ ! -z "$pid" -a $STOP_PMLOGGER = true ]
 	then
 	    # Send pmlogger a SIGTERM, which is noted as a pending shutdown.
@@ -892,7 +945,7 @@ then
     pmloggerlist=`cat $tmp/pmloggers`
     if $PCP_PS_PROG -p "$pmloggerlist" >/dev/null 2>&1
     then
-        $VERY_VERBOSE && ( echo; $PCP_ECHO_PROG $PCP_ECHO_N "+ $KILL -KILL `cat $tmp/pmies` ...""$PCP_ECHO_C" )
+        $VERY_VERBOSE && ( echo; $PCP_ECHO_PROG $PCP_ECHO_N "+ $KILL -KILL $pmloggerlist ...""$PCP_ECHO_C" )
         eval $KILL -s KILL $pmloggerlist >/dev/null 2>&1
         delay=30        # tenths of a second
         while $PCP_PS_PROG -f -p "$pmloggerlist" >$tmp/alive 2>&1
@@ -910,6 +963,11 @@ then
         done
     fi
 fi
+
+# and if $PCP_COMPRESSAFTER=0 in the control file(s), compress archives now ...
+#
+$PCP_BINADM_DIR/pmlogger_daily -K $daily_args
+
 
 [ -f $tmp/err ] && status=1
 exit

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2012-2017 Red Hat.
+# Copyright (c) 2012-2018 Red Hat.
 # Copyright (c) 2000,2004 Silicon Graphics, Inc.  All Rights Reserved.
 # 
 # This program is free software; you can redistribute it and/or modify it
@@ -66,6 +66,7 @@ pcp.spec: pcp.spec.in
 	    -e's|@package_release@|$(PACKAGE_BUILD)|g' \
 	    -e's|@package_configure@|$(PACKAGE_CONFIGURE)|g' \
 	    -e's|@package_distribution@|$(PACKAGE_DISTRIBUTION)|g' \
+	    -e's|@pmda_bcc@|$(PMDA_BCC)|g' \
 	    -e's|@pmda_rpm@|$(PMDA_RPM)|g' \
 	    -e's|@pmda_papi@|$(PMDA_PAPI)|g' \
 	    -e's|@pmda_systemd@|$(PMDA_SYSTEMD)|g' \
@@ -85,7 +86,7 @@ pcp.spec: pcp.spec.in
 	    -e's|@pmda_activemq@|$(PMDA_ACTIVEMQ)|g' \
 	    -e's|@pmda_bind2@|$(PMDA_BIND2)|g' \
 	    -e's|@pmda_nutcracker@|$(PMDA_NUTCRACKER)|g' \
-	    -e's|@pcp2xlsx@|$(HAVE_PYTHON_XLSXWRITER)|g' \
+	    -e's|@pcp2xlsx@|$(HAVE_PYTHON_OPENPYXL)|g' \
 	    -e's|@pcp2elasticsearch@|$(HAVE_PYTHON_ELASTICSEARCH)|g' \
 	    -e's|@enable_systemd@|$(ENABLE_SYSTEMD)|g' \
 	    -e's|@enable_secure@|$(ENABLE_SECURE)|g' \
@@ -98,6 +99,7 @@ pcp.spec: pcp.spec.in
 	    -e's|@enable_manager@|$(ENABLE_MANAGER)|g' \
 	    -e's|@enable_webapi@|$(ENABLE_WEBAPI)|g' \
 	    -e's|@enable_selinux@|$(ENABLE_SELINUX)|g' \
+	    -e's|@enable_lzma@|$(ENABLE_LZMA)|g' \
 	    -e's|@have_libmicrohttpd@|$(have_libmicrohttpd)|g' \
 	    -e's|@have_cairo@|$(have_cairo)|g' \
 	    -e's|@have_python@|$(HAVE_PYTHON)|g' \
@@ -109,7 +111,7 @@ pcp.spec: pcp.spec.in
 	    -e's|@pcp_log_dir@|$(PCP_LOG_DIR)|g' \
 	    -e's|@pcp_var_dir@|$(PCP_VAR_DIR)|g' \
 	    -e's|@pcp_etc_dir@|$(PCP_ETC_DIR)|g' \
-	    -e's|@pcp_selinux_dir@|$(PCP_SELINUX_DIR)|g' \
+	    -e's|@pcp_binadm_dir@|$(PCP_BINADM_DIR)|g' \
 	    -e's|@pcp_pmdas_dir@|$(PCP_PMDAS_DIR)|g' \
 	    -e's|@qt_version@|$(QT_VERSION)|g' \
 	    -e's|@rpm_version@|$(RPM_VERSION)|g' \

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013-2015 Red Hat.
+# Copyright (c) 2013-2017 Red Hat.
 # Copyright (c) 2009,2011 Aconex.  All Rights Reserved.
 # Copyright (c) 2000,2004 Silicon Graphics, Inc.  All Rights Reserved.
 # 
@@ -21,6 +21,7 @@ include $(TOPDIR)/src/include/builddefs
 CFILES	= callback.c open.c mainloop.c help.c cache.c tree.c context.c \
 	  events.c queues.c dynamic.c pduroot.c root.c lookup2.c
 HFILES	= libdefs.h queues.h
+XFILES	= lookup2.c
 LLDLIBS	= -lpcp
 LCFLAGS += -DPMDA_INTERNAL
 
@@ -47,15 +48,16 @@ LIBTARGET =
 SYMTARGET =
 endif
 
-LDIRT = $(LIBCONFIG) $(SYMTARGET) $(STATICLIBTARGET) $(LIBTARGET)
+LDIRT = $(XFILES) $(SYMTARGET) $(STATICLIBTARGET) $(LIBTARGET) $(LIBCONFIG)
 
-default: $(LIBCONFIG) $(SYMTARGET) $(STATICLIBTARGET) $(LIBTARGET)
+default: $(XFILES) $(SYMTARGET) $(STATICLIBTARGET) $(LIBTARGET) $(LIBCONFIG)
 
 ifneq ($(SYMTARGET),)
 $(SYMTARGET):
 	$(LN_S) -f $(LIBTARGET) $@
 endif
 
+cache.o : lookup2.c
 callback.o mainloop.o open.o : libdefs.h
 
 include $(BUILDRULES)
@@ -63,7 +65,7 @@ include $(BUILDRULES)
 install: default
 ifneq ($(LIBTARGET),)
 	$(INSTALL) -m 755 $(LIBTARGET) $(PCP_LIB_DIR)/$(LIBTARGET)
-	$(INSTALL) -m 444 $(LIBCONFIG) $(PCP_LIB_DIR)/pkgconfig/$(LIBCONFIG)
+	$(INSTALL) -m 644 $(LIBCONFIG) $(PCP_LIB_DIR)/pkgconfig/$(LIBCONFIG)
 endif
 ifneq ($(SYMTARGET),)
 	for tt in $(SYMTARGET); do \
@@ -73,6 +75,9 @@ endif
 ifneq ($(STATICLIBTARGET),)
 	$(INSTALL) -m 755 $(STATICLIBTARGET) $(PCP_LIB_DIR)/$(STATICLIBTARGET)
 endif
+
+$(XFILES):
+	$(LN_S) $(TOPDIR)/src/external/$@ .
 
 default_pcp:	default
 
@@ -86,3 +91,5 @@ $(LIBCONFIG): $(LIBCONFIG).in
 	     -e's|@INCDIR@|$(PCP_INC_DIR)|g' \
 	     -e's|@VERSION@|$(PCP_VERSION)|g' <$? >$@
 endif
+
+$(OBJECTS):	$(TOPDIR)/src/include/pcp/libpcp.h

@@ -34,7 +34,9 @@
 #define _WIN32_WINNT _WIN32_WINNT_WIN7
 
 #include "pmapi.h"
-#include "impl.h"
+#include "libpcp.h"
+#include "internal.h"
+#include "deprecated.h"
 #include <winbase.h>
 #include <psapi.h>
 
@@ -55,16 +57,17 @@ static struct {
 VOID CALLBACK
 SignalCallback(PVOID param, BOOLEAN timerorwait)
 {
-    int index = (int)param;
+    __psint_t index = (__psint_t)param;
 
     if (index >= 0 && index < MAX_SIGNALS)
 	signals[index].callback(signals[index].signal);
-    else
-	fprintf(stderr, "SignalCallback: bad signal index (%d)\n", index);
+    else {
+	fprintf(stderr, "SignalCallback: bad signal index (%" FMT_INT64 ")\n", (__int64_t)index);
+    }
 }
 
 static char *
-MapSignals(int sig, int *index)
+MapSignals(int sig, __psint_t *index)
 {
     static char name[8];
 
@@ -90,7 +93,8 @@ MapSignals(int sig, int *index)
 int
 __pmSetSignalHandler(int sig, __pmSignalHandler func)
 {
-    int sts, index = 0;
+    int sts;
+    __psint_t index = 0;
     char *signame, evname[64];
     HANDLE eventhdl, waithdl;
 
@@ -134,31 +138,42 @@ sigterm_callback(int sig)
 }
 
 int
-__pmSetProcessIdentity(const char *username)
+pmSetProcessIdentity(const char *username)
 {
     (void)username;
     return 0;	/* Not Yet Implemented */
 }
 
-int
-__pmSetProgname(const char *program)
+void
+pmSetProgname(const char *program)
 {
-    int	sts1, sts2;
-    char *p, *suffix = NULL;
-    WORD wVersionRequested = MAKEWORD(2, 2);
-    WSADATA wsaData;
+    char	*p, *suffix = NULL;
+    static int	setup;
+    WORD	wVersionRequested = MAKEWORD(2, 2);
+    WSADATA	wsaData;
 
-    /* Trim command name of leading directory components and ".exe" suffix */
-    if (program)
+    if (program == NULL) {
+	/* Restore the default application name */
+	pmProgname = "pcp";
+    } else {
+	/* Trim command name of leading directory components */
 	pmProgname = (char *)program;
-    for (p = pmProgname; pmProgname && *p; p++) {
-	if (*p == '\\' || *p == '/')
-	    pmProgname = p + 1;
-	if (*p == '.')
-	    suffix = p;
+	for (p = pmProgname; *p; p++) {
+	    if (*p == '\\' || *p == '/') {
+		pmProgname = p + 1;
+		suffix = NULL;
+	    }
+	    else if (*p == '.')
+		suffix = p;
+	}
+	/* Drop the .exe suffix from the name if we found it */
+	if (suffix && strcmp(suffix, ".exe") == 0)
+	    *suffix = '\0';
     }
-    if (suffix && strcmp(suffix, ".exe") == 0)
-	*suffix = '\0';
+
+    if (setup)
+	return;
+    setup = 1;
 
     /* Deal with all files in binary mode - no EOL futzing */
     _fmode = O_BINARY;
@@ -167,7 +182,7 @@ __pmSetProgname(const char *program)
      * If Windows networking is not setup, all networking calls fail;
      * this even includes gethostname(2), if you can believe that. :[
      */
-    sts1 = WSAStartup(wVersionRequested, &wsaData);
+    WSAStartup(wVersionRequested, &wsaData);
 
     /*
      * Here we are emulating POSIX signals using Event objects.
@@ -176,9 +191,7 @@ __pmSetProgname(const char *program)
      * get a look-in, IOW.  Other signals (HUP/USR1) are handled
      * in a similar way, but only by processes that need them.
      */
-    sts2 = __pmSetSignalHandler(SIGTERM, sigterm_callback);
-
-    return sts1 | sts2;
+    __pmSetSignalHandler(SIGTERM, sigterm_callback);
 }
 
 void
@@ -196,7 +209,7 @@ __pmServerStart(int argc, char **argv, int flags)
     for (i = 0; i < argc; i++)
 	total += strlen(argv[i]) + 1;
     if ((cmdline = malloc(total)) == NULL) {
-	__pmNotifyErr(LOG_ERR, "__pmServerStart: out-of-memory");
+	pmNotifyErr(LOG_ERR, "__pmServerStart: out-of-memory");
 	exit(1);
     }
     for (sz = i = 0; i < argc; i++)
@@ -216,7 +229,7 @@ __pmServerStart(int argc, char **argv, int flags)
 		NULL,		/* current directory */
 		&siStartInfo,	/* STARTUPINFO pointer */
 		&piProcInfo)) {	/* receives PROCESS_INFORMATION */
-	__pmNotifyErr(LOG_ERR, "__pmServerStart: CreateProcess");
+	pmNotifyErr(LOG_ERR, "__pmServerStart: CreateProcess");
 	/* but keep going */
     }
     else {
@@ -323,7 +336,7 @@ __pmProcessCreate(char **argv, int *infd, int *outfd)
 	int length = strlen(command);
 	/* add 1space or 1null */
 	if ((cmdline = realloc(cmdline, sz + length + 1)) == NULL) {
-	    __pmNoMem("__pmProcessCreate", sz + length + 1, PM_FATAL_ERR);
+	    pmNoMem("__pmProcessCreate", sz + length + 1, PM_FATAL_ERR);
 	    /* NOTREACHED */
 	}
 	strcpy(&cmdline[sz], command);
@@ -431,13 +444,7 @@ __pmProcessRunTimes(double *usr, double *sys)
 }
 
 void
-__pmDumpStack(FILE *f)
-{
-   /* TODO: StackWalk64 API */
-}
-
-void
-__pmtimevalNow(struct timeval *tv)
+pmtimevalNow(struct timeval *tv)
 {
     struct timespec ts;
     union {
@@ -565,6 +572,33 @@ strcasestr(const char *string, const char *substr)
 	continue;
     }
     return NULL;
+}
+
+char *
+strsep(char **stringp, const char *delim)
+{
+    char	*ss, *se;
+    const char	*dp;
+
+    if ((ss = *stringp) == NULL)
+	return NULL;
+
+    for (se = ss; *se; se++) {
+	for (dp = delim; *dp; dp++) {
+	    if (*se == *dp)
+		break;
+	}
+    }
+
+    if (*se != '\0') {
+	/* match: terminate and update stringp to point past match */
+	*se++ = '\0';
+	*stringp = se;
+    }
+    else
+	*stringp = NULL;
+
+    return ss;
 }
 
 void *
@@ -881,4 +915,16 @@ unsetenv(const char *name)
     sts = _putenv(ebuf);		/* THREADSAFE */
     free(ebuf);
     return sts;
+}
+
+int
+win32_inet_pton(int af, const char *src, void *dst)
+{
+    return InetPton(af, src, dst);
+}
+
+const char *
+win32_inet_ntop(int af, void *src, char *dst, socklen_t size)
+{
+    return InetNtop(af, src, dst, size);
 }

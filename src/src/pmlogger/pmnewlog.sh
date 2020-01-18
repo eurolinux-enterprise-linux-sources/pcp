@@ -1,6 +1,6 @@
 #! /bin/sh
 #
-# Copyright (c) 2014 Red Hat.
+# Copyright (c) 2014,2018 Red Hat.
 # Copyright (c) 1995-2001,2003 Silicon Graphics, Inc.  All Rights Reserved.
 # 
 # This program is free software; you can redistribute it and/or modify it
@@ -19,6 +19,8 @@
 # Get standard environment
 . $PCP_DIR/etc/pcp.env
 
+PMLOGGER="$PCP_BINADM_DIR/pmlogger"
+PMLOGGERENVS="$PCP_SYSCONFIG_DIR/pmlogger"
 
 # error messages should go to stderr, not the GUI notifiers
 #
@@ -604,11 +606,17 @@ fi
 dir=`dirname $archive`
 eval $RM -f $dir/Latest
 
-# clean up port-map, just in case
+# clean up port-map, just in case, and prepare primary pmlogger environment
 #
 PM_LOG_PORT_DIR="$PCP_TMP_DIR/pmlogger"
 eval $RM -f "$PM_LOG_PORT_DIR"/$pid
-$primary && eval $RM -f $PM_LOG_PORT_DIR/primary
+if $primary
+then
+    eval $RM -f "$PM_LOG_PORT_DIR/primary"
+    envs=`grep ^PMLOGGER "$PMLOGGERENVS" 2>/dev/null`
+else
+    envs=""
+fi
 
 # finally do it, ...
 #
@@ -646,21 +654,22 @@ do
 	    _abandon
 	fi
 	$VERBOSE && echo "Duplicate archive basename ... rename $archive.* files to $archive-$suff.*"
+	[ -f SaveLogs/$archive.log ] && eval $MV SaveLogs/$archive.log SaveLogs/$archive-$suff.log
     fi
     eval $MV -f $file `echo $file | sed -e "s/$archive/&-$suff/"`
 done
 
 $VERBOSE && echo "Launching new pmlogger in directory \"$dir\" as ..."
 [ -f $logfile ] && eval $MV -f $logfile $logfile.prior
-$VERBOSE && echo "${sock_me}pmlogger $args$archive"
+$VERBOSE && echo "${sock_me}$PMLOGGER $args$archive"
 
 if $SHOWME
 then
-    echo "+ ${sock_me}pmlogger $args$archive &"
+    echo "+ ${sock_me}$PMLOGGER $args$archive &"
     echo "+ ... assume pid is 12345"
     new_pid=12345
 else
-    ${sock_me}pmlogger $args$archive &
+    eval $envs '${sock_me}$PMLOGGER $args$archive &'
     new_pid=$!
 fi
 
@@ -714,6 +723,18 @@ then
     fi
 else
     _abandon
+fi
+
+# if SaveLogs exists in the same directory that the archive
+# is being created, save pmlogger log file there as well
+# (we've already cd'd into $dir)
+#
+if [ -d SaveLogs ]
+then
+    if [ ! -f SaveLogs/$LOGNAME.log ]
+    then
+	_do_cmd "ln $logfile SaveLogs/$archive.log"
+    fi
 fi
 
 exit

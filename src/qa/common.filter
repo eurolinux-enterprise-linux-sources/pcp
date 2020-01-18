@@ -176,7 +176,7 @@ _filter_pmdumplog()
 {
     sed \
 	-e 's/[A-Z][a-z][a-z] [A-Z][a-z][a-z]  *[0-9][0-9]* [0-9][0-9]:[0-9][0-9]:[0-9][0-9] [0-9][0-9][0-9][0-9]$/DATE/' \
-	-e 's/[A-Z][a-z][a-z] [A-Z][a-z][a-z]  *[0-9][0-9]* [0-9][0-9]:[0-9][0-9]:[0-9][0-9]\.[0-9][0-9][0-9] [0-9][0-9][0-9][0-9]$/DATE/' \
+	-e 's/[A-Z][a-z][a-z] [A-Z][a-z][a-z]  *[0-9][0-9]* [0-9][0-9]:[0-9][0-9]:[0-9][0-9]\.[0-9][0-9]*[0-9] [0-9][0-9][0-9][0-9]$/DATE/' \
 	-e '/[0-9][0-9]:[0-9][0-9]:[0-9][0-9]/s/[^ ]*/TIMESTAMP/' \
 	-e '/^\(Performance metrics from host\) [^ ][^ ]*/s//\1 HOST/' \
 	-e '/^archive:/s/\(  *\).*/\1ARCHIVE/' \
@@ -196,8 +196,8 @@ _filter_pmdumptext()
 _filter_dbg()
 {
     sed \
-	-e '/^__pmLogSetTime(/s/[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\.[0-9][0-9][0-9]/TIMESTAMP/g' \
-	-e '/^__pmLogRead:/s/[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\.[0-9][0-9][0-9]/TIMESTAMP/g'
+	-e '/^__pmLogSetTime(/s/[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\.[0-9][0-9]*[0-9]/TIMESTAMP/g' \
+	-e '/^__pmLogRead:/s/[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\.[0-9][0-9]*[0-9]/TIMESTAMP/g'
 }
 
 # cull the optional PMDA
@@ -211,6 +211,7 @@ _filter_optional_pmdas()
 	-e '/pmdaarray/d' \
 	-e '/pmdaash/d' \
 	-e '/pmdabash/d' \
+	-e '/pmdabcc/d' \
 	-e '/pmdabind2/d' \
 	-e '/pmdabonding/d' \
 	-e '/pmdabrocade/d' \
@@ -278,8 +279,10 @@ _filter_optional_pmdas()
 	-e '/pmdashping/d' \
 	-e '/pmda_simple/d' \
 	-e '/pmdasimple/d' \
+	-e '/pmdasmart/d' \
 	-e '/pmdasnia/d' \
 	-e '/pmdasnmp/d' \
+	-e '/pmdasmart/d' \
 	-e '/pmdassping/d' \
 	-e '/pmdasummary/d' \
 	-e '/pmdasystemd/d' \
@@ -310,6 +313,7 @@ _filter_top_pmns()
 	-e '/^    array /d' \
 	-e '/^    ash /d' \
 	-e '/^    bash /d' \
+	-e '/^    bcc /d' \
 	-e '/^    bind2 /d' \
 	-e '/^    bonding /d' \
 	-e '/^    brocade /d' \
@@ -376,6 +380,7 @@ _filter_top_pmns()
 	-e '/^    sendmail /d' \
 	-e '/^    shping /d' \
 	-e '/^    simple /d' \
+	-e '/^    smart /d' \
 	-e '/^    snmp /d' \
 	-e '/^    ssping /d' \
 	-e '/^    espping /d' \
@@ -387,7 +392,9 @@ _filter_top_pmns()
 	-e '/^    systemtap /d' \
 	-e '/^    trace /d' \
 	-e '/^    trivial /d' \
+	-e '/^    tty /d' \
 	-e '/^    txmon /d' \
+	-e '/^    vdo /d' \
 	-e '/^    vmware /d' \
 	-e '/^    web /d' \
 	-e '/^    webping /d' \
@@ -779,6 +786,7 @@ _filter_torture_api()
 	-e '/^    rsyslog /d' \
 	-e '/^    samba /d' \
 	-e '/^    sighups /d' \
+	-e '/^    smart /d' \
 	-e '/^    softtemp /d' \
 	-e '/^    stream /d' \
 	-e '/^    sysfs /d' \

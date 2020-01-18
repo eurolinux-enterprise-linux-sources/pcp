@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014 Red Hat.
+ * Copyright (c) 2013-2014,2018 Red Hat.
  * 
  * This library is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as published
@@ -12,10 +12,11 @@
  * License for more details.
  */
 #include "pmapi.h"
-#include "impl.h"
+#include "libpcp.h"
 #include "internal.h"
 #include "avahi.h"
-#include "probe.h"
+#include "shellprobe.h"
+#include "subnetprobe.h"
 
 /*
  * Advertise the given service using all available means. The implementation
@@ -29,12 +30,12 @@ __pmServerAdvertisePresence(const char *serviceSpec, int port)
 
     /* Allocate a server presence and copy the given data. */
     if ((s = malloc(sizeof(*s))) == NULL) {
-	__pmNoMem("__pmServerAdvertisePresence: can't allocate __pmServerPresence",
+	pmNoMem("__pmServerAdvertisePresence: can't allocate __pmServerPresence",
 		  sizeof(*s), PM_FATAL_ERR);
     }
     s->serviceSpec = strdup(serviceSpec);
     if (s->serviceSpec == NULL) {
-	__pmNoMem("__pmServerAdvertisePresence: can't allocate service spec",
+	pmNoMem("__pmServerAdvertisePresence: can't allocate service spec",
 		  strlen(serviceSpec) + 1, PM_FATAL_ERR);
     }
     s->port = port;
@@ -67,7 +68,7 @@ __pmServerUnadvertisePresence(__pmServerPresence *s)
  * Service discovery API entry points.
  */
 char *
-__pmServiceDiscoveryParseTimeout (const char *s, struct timeval *timeout)
+__pmServiceDiscoveryParseTimeout(const char *s, struct timeval *timeout)
 {
     double seconds;
     char *end;
@@ -78,12 +79,12 @@ __pmServiceDiscoveryParseTimeout (const char *s, struct timeval *timeout)
      */
     seconds = strtod(s, &end);
     if (*end != '\0' && *end != ',') {
-	__pmNotifyErr(LOG_ERR, "the timeout argument '%s' is not valid", s);
+	pmNotifyErr(LOG_ERR, "the timeout argument '%s' is not valid", s);
 	return strchrnul(s, ',');
     }
 
     /* Set the specified timeout. */
-    __pmtimevalFromReal(seconds, timeout);
+    pmtimevalFromReal(seconds, timeout);
 
     return end;
 }
@@ -100,7 +101,7 @@ parseOptions(const char *optionsString, __pmServiceDiscoveryOptions *options)
 	    options->resolve = 1;
 	else if (strncmp(optionsString, "timeout=", sizeof("timeout=") - 1) == 0) {
 #if ! PM_MULTI_THREAD
-	    __pmNotifyErr(LOG_ERR, "__pmDiscoverServicesWithOptions: Service discovery global timeout is not supported");
+	    pmNotifyErr(LOG_ERR, "__pmDiscoverServicesWithOptions: Service discovery global timeout is not supported");
 	    return -EOPNOTSUPP;
 #else
 	    optionsString += sizeof("timeout=") - 1;
@@ -109,7 +110,7 @@ parseOptions(const char *optionsString, __pmServiceDiscoveryOptions *options)
 #endif
 	}
 	else {
-	    __pmNotifyErr(LOG_ERR, "__pmDiscoverServicesWithOptions: unrecognized option at '%s'", optionsString);
+	    pmNotifyErr(LOG_ERR, "__pmDiscoverServicesWithOptions: unrecognized option at '%s'", optionsString);
 	    return -EINVAL;
 	}
 	/* Locate the start of the next option. */
@@ -203,6 +204,7 @@ __pmDiscoverServicesWithOptions(const char *service,
 		p = strerror_r(sts, errmsg, sizeof(errmsg));
 		if (p != errmsg)
 		    strncpy(errmsg, p, sizeof(errmsg));
+		errmsg[sizeof(errmsg)-1] = '\0';
 	    }
 #else
 	    /*
@@ -211,7 +213,7 @@ __pmDiscoverServicesWithOptions(const char *service,
 	     */
 	    strerror_r(sts, errmsg, sizeof(errmsg));
 #endif
-	    __pmNotifyErr(LOG_ERR, "Service discovery global timeout could not be set: %s",
+	    pmNotifyErr(LOG_ERR, "Service discovery global timeout could not be set: %s",
 			  errmsg);
 	    return -sts;
 	}
@@ -241,8 +243,17 @@ __pmDiscoverServicesWithOptions(const char *service,
 	}
 	numUrls += sts;
 	if (! flags || (*flags & PM_SERVICE_DISCOVERY_INTERRUPTED) == 0) {
-	    sts = __pmProbeDiscoverServices(service, mechanism, &options,
-					    numUrls, urls);
+	    sts = __pmSubnetProbeDiscoverServices(service, mechanism, &options,
+					numUrls, urls);
+	    if (sts < 0) {
+		numUrls = sts;
+		goto done;
+	    }
+	    numUrls += sts;
+	}
+	if (! flags || (*flags & PM_SERVICE_DISCOVERY_INTERRUPTED) == 0) {
+	    sts = __pmShellProbeDiscoverServices(service, mechanism, &options,
+					numUrls, urls);
 	    if (sts < 0) {
 		numUrls = sts;
 		goto done;
@@ -250,13 +261,17 @@ __pmDiscoverServicesWithOptions(const char *service,
 	    numUrls += sts;
 	}
     }
-    else if (strncmp(mechanism, "avahi", 5) == 0) {
+    else if (strncmp(mechanism, "avahi", sizeof("avahi")-1) == 0) {
 	numUrls = __pmAvahiDiscoverServices(service, mechanism, &options,
-					    numUrls, urls);
+					numUrls, urls);
     }
-    else if (strncmp(mechanism, "probe", 5) == 0) {
-	numUrls = __pmProbeDiscoverServices(service, mechanism, &options,
-					    numUrls, urls);
+    else if (strncmp(mechanism, "probe", sizeof("probe")-1) == 0) {
+	numUrls = __pmSubnetProbeDiscoverServices(service, mechanism, &options,
+					numUrls, urls);
+    }
+    else if (strncmp(mechanism, "shell", sizeof("shell")-1) == 0) {
+	numUrls = __pmShellProbeDiscoverServices(service, mechanism, &options,
+					numUrls, urls);
     }
     else
 	numUrls = -EOPNOTSUPP;
@@ -299,7 +314,7 @@ __pmAddDiscoveredService(__pmServiceInfo *info,
     if (host == NULL) {
 	host = __pmSockAddrToString(info->address);
 	if (host == NULL) {
-	    __pmNoMem("__pmAddDiscoveredService: can't allocate host buffer",
+	    pmNoMem("__pmAddDiscoveredService: can't allocate host buffer",
 		      0, PM_FATAL_ERR);
 	}
     }
@@ -316,7 +331,7 @@ __pmAddDiscoveredService(__pmServiceInfo *info,
 	size += 2;
     url = malloc(size);
     if (url == NULL) {
-	__pmNoMem("__pmAddDiscoveredService: can't allocate new entry",
+	pmNoMem("__pmAddDiscoveredService: can't allocate new entry",
 		  size, PM_FATAL_ERR);
     }
     if (isIPv6)

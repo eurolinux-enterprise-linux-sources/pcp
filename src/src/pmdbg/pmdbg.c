@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014,2016 Red Hat.
+ * Copyright (c) 2013-2014,2016-2017 Red Hat.
  * Copyright (c) 1995,2002-2003 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -19,7 +19,7 @@
 
 #include <ctype.h>
 #include "pmapi.h"
-#include "impl.h"
+#include "deprecated.h"
 #include "../libpcp/src/pmdbg.h"
 
 static char	*fmt_old = "DBG_TRACE_%-11.11s  %10d  %s\n";
@@ -61,7 +61,7 @@ main(int argc, char **argv)
 
 	case 'D':
 	    if ((i = __pmParseDebug(opts.optarg)) < 0) {
-		fprintf(stderr, "%s: unrecognized debug option specification (%s)\n", pmProgname, opts.optarg);
+		fprintf(stderr, "%s: unrecognized debug option specification (%s)\n", pmGetProgname(), opts.optarg);
 		exit(1);
 	    }
 	    else 

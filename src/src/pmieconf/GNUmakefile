@@ -29,7 +29,7 @@ PMLOGCONF_TOOLS = $(PCP_VAR_DIR)/config/pmlogconf/tools
 LLDLIBS = $(PCPLIB)
 LCFLAGS = -I$(TOPDIR)/src/pmie/src
 
-ifneq "$(TARGET_OS)" "mingw"
+ifneq "$(CROSS_COMPILING)" "yes"
 STATICTARGETS = pmieconf.static
 STATIC_LIBPCP = $(TOPDIR)/src/libpcp/src/libpcp.a
 STATIC_LDLIBS = $(PCPLIB_EXTRAS) $(LIBPCP_LDLIBS)
@@ -86,3 +86,4 @@ default_pcp: default
 
 install_pcp: install
 
+io.o rules.o:	$(TOPDIR)/src/include/pcp/libpcp.h

@@ -4,7 +4,7 @@
  * Copyright (c) 2000,2004,2007-2008 Silicon Graphics, Inc.  All Rights Reserved.
  * Portions Copyright (c) 2002 International Business Machines Corp.
  * Portions Copyright (c) 2007-2011 Aconex.  All Rights Reserved.
- * Portions Copyright (c) 2012-2016 Red Hat.
+ * Portions Copyright (c) 2012-2018 Red Hat.
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -18,7 +18,7 @@
  */
 
 #include "pmapi.h"
-#include "impl.h"
+#include "libpcp.h"
 #include "pmda.h"
 #include "domain.h"
 #include "contexts.h"
@@ -524,6 +524,18 @@ static pmdaMetric metrictab[] = {
     PM_TYPE_U32, PROC_INDOM, PM_SEM_INSTANT, 
     PMDA_PMUNITS(1,0,0,PM_SPACE_KBYTE,0,0)}},
 
+/* proc.memory.vmreal */
+  { NULL,
+    { PMDA_PMID(CLUSTER_PID_STATUS, PROC_PID_STATUS_VMREAL),
+    PM_TYPE_U64, PROC_INDOM, PM_SEM_INSTANT, 
+    PMDA_PMUNITS(1,0,0,PM_SPACE_KBYTE,0,0)}},
+
+/* proc.memory.vmnonlib */
+  { NULL,
+    { PMDA_PMID(CLUSTER_PID_STATUS, PROC_PID_STATUS_VMNONLIB),
+    PM_TYPE_U64, PROC_INDOM, PM_SEM_INSTANT, 
+    PMDA_PMUNITS(1,0,0,PM_SPACE_KBYTE,0,0)}},
+
 /* proc.psinfo.threads */
   { NULL,
     { PMDA_PMID(CLUSTER_PID_STATUS, PROC_PID_STATUS_THREADS),
@@ -590,18 +602,6 @@ static pmdaMetric metrictab[] = {
     PM_TYPE_U32, PROC_INDOM, PM_SEM_INSTANT, 
     PMDA_PMUNITS(1,0,0,PM_SPACE_KBYTE,0,0)}},
 
-/* proc.psinfo.cgroups */
-  { NULL,
-    { PMDA_PMID(CLUSTER_PID_CGROUP, PROC_PID_CGROUP),
-    PM_TYPE_STRING, PROC_INDOM, PM_SEM_INSTANT, 
-    PMDA_PMUNITS(0,0,0,0,0,0)}},
-
-/* proc.psinfo.labels */
-  { NULL,
-    { PMDA_PMID(CLUSTER_PID_LABEL, PROC_PID_LABEL),
-    PM_TYPE_STRING, PROC_INDOM, PM_SEM_INSTANT, 
-    PMDA_PMUNITS(0,0,0,0,0,0)}},
-
 /* proc.namespaces.tpid */
   { NULL,
     { PMDA_PMID(CLUSTER_PID_STATUS, PROC_PID_STATUS_NSTGID),
@@ -626,6 +626,29 @@ static pmdaMetric metrictab[] = {
     PM_TYPE_STRING, PROC_INDOM, PM_SEM_DISCRETE,
     PMDA_PMUNITS(0,0,0,0,0,0)}},
 
+/* proc.psinfo.cgroups */
+  { NULL,
+    { PMDA_PMID(CLUSTER_PID_CGROUP, PROC_PID_CGROUP),
+    PM_TYPE_STRING, PROC_INDOM, PM_SEM_INSTANT, 
+    PMDA_PMUNITS(0,0,0,0,0,0)}},
+
+/* proc.id.container */
+  { NULL,
+    { PMDA_PMID(CLUSTER_PID_CGROUP, PROC_PID_CONTAINER),
+    PM_TYPE_STRING, PROC_INDOM, PM_SEM_DISCRETE, 
+    PMDA_PMUNITS(0,0,0,0,0,0)}},
+
+/* proc.psinfo.labels */
+  { NULL,
+    { PMDA_PMID(CLUSTER_PID_LABEL, PROC_PID_LABEL),
+    PM_TYPE_STRING, PROC_INDOM, PM_SEM_INSTANT, 
+    PMDA_PMUNITS(0,0,0,0,0,0)}},
+
+/* proc.psinfo.oom_score */
+  { NULL,
+    { PMDA_PMID(CLUSTER_PID_OOM_SCORE, PROC_PID_OOM_SCORE),
+    PM_TYPE_U32, PROC_INDOM, PM_SEM_INSTANT, 
+    PMDA_PMUNITS(0,0,0,0,0,0)}},
 
 /*
  * proc/<pid>/statm cluster
@@ -802,6 +825,11 @@ static pmdaMetric metrictab[] = {
     { PMDA_PMID(CLUSTER_CPUSET_GROUPS, CG_CPUSET_MEMS), PM_TYPE_STRING,
     CGROUP_CPUSET_INDOM, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) } },
 
+/* cgroup.cpuset.id.container */
+  { NULL,
+    { PMDA_PMID(CLUSTER_CPUSET_GROUPS, CG_CPUSET_ID_CONTAINER), PM_TYPE_STRING,
+    CGROUP_CPUSET_INDOM, PM_SEM_DISCRETE, PMDA_PMUNITS(0,0,0,0,0,0)}},
+
 /* cgroup.cpuacct.stat.user */
   { NULL,
     { PMDA_PMID(CLUSTER_CPUACCT_GROUPS, CG_CPUACCT_USER), PM_TYPE_U64,
@@ -821,6 +849,11 @@ static pmdaMetric metrictab[] = {
   { NULL,
     { PMDA_PMID(CLUSTER_CPUACCT_GROUPS, CG_CPUACCT_PERCPU_USAGE), PM_TYPE_U64,
     CGROUP_PERCPUACCT_INDOM, PM_SEM_COUNTER, PMDA_PMUNITS(0,1,0,0,PM_TIME_NSEC,0) } },
+
+/* cgroup.cpuacct.id.container */
+  { NULL,
+    { PMDA_PMID(CLUSTER_CPUACCT_GROUPS, CG_CPUACCT_ID_CONTAINER), PM_TYPE_STRING,
+    CGROUP_CPUACCT_INDOM, PM_SEM_DISCRETE, PMDA_PMUNITS(0,0,0,0,0,0)}},
 
 /* cgroup.cpusched.shares */
   { NULL,
@@ -851,6 +884,11 @@ static pmdaMetric metrictab[] = {
   { NULL,
     { PMDA_PMID(CLUSTER_CPUSCHED_GROUPS, CG_CPUSCHED_CFS_QUOTA), PM_TYPE_64,
     CGROUP_CPUSCHED_INDOM, PM_SEM_INSTANT, PMDA_PMUNITS(0,1,0,0,PM_TIME_USEC,0) } },
+
+/* cgroup.cpusched.id.container */
+  { NULL,
+    { PMDA_PMID(CLUSTER_CPUSCHED_GROUPS, CG_CPUSCHED_ID_CONTAINER), PM_TYPE_STRING,
+    CGROUP_CPUSCHED_INDOM, PM_SEM_DISCRETE, PMDA_PMUNITS(0,0,0,0,0,0)}},
 
 /* cgroup.memory.stat.cache */
   { NULL,
@@ -1037,10 +1075,20 @@ static pmdaMetric metrictab[] = {
     { PMDA_PMID(CLUSTER_MEMORY_GROUPS, CG_MEMORY_FAILCNT), PM_TYPE_U64,
     CGROUP_MEMORY_INDOM, PM_SEM_COUNTER, PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
 
+/* cgroup.memory.id.container */
+  { NULL,
+    { PMDA_PMID(CLUSTER_MEMORY_GROUPS, CG_MEMORY_ID_CONTAINER), PM_TYPE_STRING,
+    CGROUP_MEMORY_INDOM, PM_SEM_DISCRETE, PMDA_PMUNITS(0,0,0,0,0,0)}},
+
 /* cgroup.netclass.classid */
   { NULL,
     { PMDA_PMID(CLUSTER_NETCLS_GROUPS, CG_NETCLS_CLASSID), PM_TYPE_U64,
     CGROUP_NETCLS_INDOM, PM_SEM_INSTANT, PMDA_PMUNITS(0,0,0,0,0,0) } },
+
+/* cgroup.netclass.id.container */
+  { NULL,
+    { PMDA_PMID(CLUSTER_NETCLS_GROUPS, CG_NETCLS_ID_CONTAINER), PM_TYPE_STRING,
+    CGROUP_NETCLS_INDOM, PM_SEM_DISCRETE, PMDA_PMUNITS(0,0,0,0,0,0)}},
 
 /* cgroup.blkio.dev.io_merged.read */
   { NULL,
@@ -1462,6 +1510,11 @@ static pmdaMetric metrictab[] = {
     { PMDA_PMID(CLUSTER_BLKIO_GROUPS, CG_BLKIO_THROTTLEIOSERVICED_TOTAL), PM_TYPE_U64,
     CGROUP_BLKIO_INDOM, PM_SEM_COUNTER, PMDA_PMUNITS(0,0,1,0,0,PM_COUNT_ONE) } },
 
+/* cgroup.blkio.id.container */
+  { NULL,
+    { PMDA_PMID(CLUSTER_BLKIO_GROUPS, CG_BLKIO_ID_CONTAINER), PM_TYPE_STRING,
+    CGROUP_BLKIO_INDOM, PM_SEM_DISCRETE, PMDA_PMUNITS(0,0,0,0,0,0)}},
+
 
 /*
  * proc/<pid>/fd cluster
@@ -1627,6 +1680,7 @@ proc_refresh(pmdaExt *pmda, int *need_refresh)
 	need_refresh[CLUSTER_PID_LABEL] ||
 	need_refresh[CLUSTER_PID_CGROUP] ||
 	need_refresh[CLUSTER_PID_SCHEDSTAT] ||
+	need_refresh[CLUSTER_PID_OOM_SCORE] ||
 	need_refresh[CLUSTER_PID_FD] ||
 	need_refresh[CLUSTER_PROC_RUNQ]) {
 	refresh_proc_pid(&proc_pid,
@@ -1643,6 +1697,7 @@ proc_refresh(pmdaExt *pmda, int *need_refresh)
         need_refresh[CLUSTER_HOTPROC_PID_LABEL] ||
         need_refresh[CLUSTER_HOTPROC_PID_CGROUP] ||
         need_refresh[CLUSTER_HOTPROC_PID_SCHEDSTAT] ||
+        need_refresh[CLUSTER_HOTPROC_PID_OOM_SCORE] ||
         need_refresh[CLUSTER_HOTPROC_PID_FD] ||
         need_refresh[CLUSTER_HOTPROC_GLOBAL] ||
         need_refresh[CLUSTER_HOTPROC_PRED]){
@@ -1654,14 +1709,14 @@ proc_refresh(pmdaExt *pmda, int *need_refresh)
 }
 
 static int
-proc_instance(pmInDom indom, int inst, char *name, __pmInResult **result, pmdaExt *pmda)
+proc_instance(pmInDom indom, int inst, char *name, pmInResult **result, pmdaExt *pmda)
 {
-    __pmInDom_int	*indomp = (__pmInDom_int *)&indom;
-    int			need_refresh[NUM_CLUSTERS] = { 0 };
+    unsigned int	serial = pmInDom_serial(indom);
+    int			need_refresh[MAX_CLUSTER] = { 0 };
     char		newname[16];		/* see Note below */
     int			sts;
 
-    switch (indomp->serial) {
+    switch (serial) {
     case PROC_INDOM:
     	need_refresh[CLUSTER_PID_STAT]++;
     	need_refresh[CLUSTER_PID_STATM]++;
@@ -1669,6 +1724,7 @@ proc_instance(pmInDom indom, int inst, char *name, __pmInResult **result, pmdaEx
         need_refresh[CLUSTER_PID_LABEL]++;
         need_refresh[CLUSTER_PID_CGROUP]++;
         need_refresh[CLUSTER_PID_SCHEDSTAT]++;
+        need_refresh[CLUSTER_PID_OOM_SCORE]++;
         need_refresh[CLUSTER_PID_IO]++;
         need_refresh[CLUSTER_PID_FD]++;
 	break;
@@ -1679,6 +1735,7 @@ proc_instance(pmInDom indom, int inst, char *name, __pmInResult **result, pmdaEx
         need_refresh[CLUSTER_HOTPROC_PID_LABEL]++;
         need_refresh[CLUSTER_HOTPROC_PID_CGROUP]++;
         need_refresh[CLUSTER_HOTPROC_PID_SCHEDSTAT]++;
+        need_refresh[CLUSTER_HOTPROC_PID_OOM_SCORE]++;
         need_refresh[CLUSTER_HOTPROC_PID_IO]++;
         need_refresh[CLUSTER_HOTPROC_PID_FD]++;
         need_refresh[CLUSTER_HOTPROC_GLOBAL]++;
@@ -1714,7 +1771,7 @@ proc_instance(pmInDom indom, int inst, char *name, __pmInResult **result, pmdaEx
     /* no default label : pmdaInstance will pick up errors */
     }
 
-    if ((indomp->serial == PROC_INDOM || indomp->serial == HOTPROC_INDOM) &&
+    if ((serial == PROC_INDOM || serial == HOTPROC_INDOM) &&
 	inst == PM_IN_NULL && name != NULL) {
     	/*
 	 * For the proc indoms if the name is a pid (as a string), and it
@@ -1744,7 +1801,7 @@ proc_instance(pmInDom indom, int inst, char *name, __pmInResult **result, pmdaEx
 	fprintf(stderr, "proc_instance: initial access have=%d all=%d proc_ctx_access=%d\n", have_access, all_access, proc_ctx_access(pmda->e_context));
 
     if (have_access ||
-	((indomp->serial != PROC_INDOM) && (indomp->serial != HOTPROC_INDOM))) {
+	((serial != PROC_INDOM) && (serial != HOTPROC_INDOM))) {
 	if ((sts = proc_refresh(pmda, need_refresh)) == 0)
 	    sts = pmdaInstance(indom, inst, name, result, pmda);
     }
@@ -1763,7 +1820,8 @@ proc_instance(pmInDom indom, int inst, char *name, __pmInResult **result, pmdaEx
 static int
 proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 {
-    __pmID_int		*idp = (__pmID_int *)&(mdesc->m_desc.pmid);
+    unsigned int	cluster = pmID_cluster(mdesc->m_desc.pmid);
+    unsigned int	item = pmID_item(mdesc->m_desc.pmid);
     pmInDom		indom;
     int			sts;
     int			have_totals;
@@ -1815,11 +1873,11 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	}
     }
     else
-    switch (idp->cluster) {
+    switch (cluster) {
     case CLUSTER_HOTPROC_GLOBAL:
 	have_totals = get_hot_totals(&ta, &ti, &tt, &tci);
 
-	switch (idp->item) {
+	switch (item) {
 	case ITEM_HOTPROC_G_REFRESH: /* hotproc.control.refresh */
 	    atom->ul = hotproc_update_interval.tv_sec;
 	    break;
@@ -1875,7 +1933,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	if (sts == 0)
 	    return PM_ERR_INST;
 
-	switch (idp->item) {
+	switch (item) {
 	    case ITEM_HOTPROC_P_SYSCALLS: /* No way to get this right now (maybe from systemtap?)*/
 		return PM_ERR_PMID;
 		break;
@@ -1909,7 +1967,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	active_proc_pid = &hotproc_pid;
 	/*FALLTHROUGH*/
     case CLUSTER_PID_STAT:
-	if (idp->item == 99) /* proc.nprocs */
+	if (item == 99) /* proc.nprocs */
 	    atom->ul = active_proc_pid->indom->it_numinst;
 	else {
 	    if (!have_access)
@@ -1918,19 +1976,17 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    if (entry == NULL)
 		return sts;
 
-	    switch (idp->item) {
+	    switch (item) {
 	    case PROC_PID_STAT_PID: /* proc.psinfo.pid */
 		atom->ul = entry->id;
 		break;
 
-	    case PROC_PID_STAT_TTYNAME: /* proc.psinfo.tty */
+	    case PROC_PID_STAT_TTYNAME: /* proc.psinfo.ttyname */
 		f = _pm_getfield(entry->stat_buf, PROC_PID_STAT_TTY);
-		if (f == NULL)
+		if (f == NULL || strcmp(f, "0") == 0)
 		    atom->cp = "?";
-		else {
-		    dev_t dev = get_encoded_dev(f);
-		    atom->cp = get_ttyname_info(inst, dev);
-		}
+		else
+		    atom->cp = get_ttyname_info(inst, f);
 		break;
 
 	    case PROC_PID_STAT_TTY_PGRP: /* proc.psinfo.tty_pgrp */
@@ -1946,7 +2002,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 		break;
 
 	    case PROC_PID_STAT_CMD: /* proc.psinfo.cmd */
-		f = _pm_getfield(entry->stat_buf, idp->item);
+		f = _pm_getfield(entry->stat_buf, item);
 		if (f == NULL)
 		    return 0;
 		atom->cp = f + 1;
@@ -1958,7 +2014,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 		break;
 
 	    case PROC_PID_STAT_STATE: /* string */ /* proc.psinfo.sname */
-		f = _pm_getfield(entry->stat_buf, idp->item);
+		f = _pm_getfield(entry->stat_buf, item);
 		if (f == NULL)
 		    return 0;
 	    	atom->cp = f;
@@ -1966,7 +2022,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 
 	    case PROC_PID_STAT_VSIZE: /* proc.psinfo.vsize */
 	    case PROC_PID_STAT_RSS_RLIM: /* bytes converted to kbytes */ /* proc.psinfo.rss_rlim */
-		f = _pm_getfield(entry->stat_buf, idp->item);
+		f = _pm_getfield(entry->stat_buf, item);
 		if (f == NULL)
 		    return 0;
 		atom->ull = strtoull(f, &tail, 0);
@@ -1974,7 +2030,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 		break;
 
 	    case PROC_PID_STAT_RSS: /* pages converted to kbytes */ /* proc.psinfo.rss */
-		f = _pm_getfield(entry->stat_buf, idp->item);
+		f = _pm_getfield(entry->stat_buf, item);
 		if (f == NULL)
 		    return 0;
 		atom->ull = strtoull(f, &tail, 0);
@@ -1986,7 +2042,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    case PROC_PID_STAT_CUTIME: /* proc.psinfo.cutime */
 	    case PROC_PID_STAT_CSTIME: /* proc.psinfo.cstime */
 		/* unsigned jiffies converted to unsigned msecs */
-		f = _pm_getfield(entry->stat_buf, idp->item);
+		f = _pm_getfield(entry->stat_buf, item);
 		if (f == NULL)
 		    return 0;
 		jiffies = (__int64_t)strtoul(f, &tail, 0);
@@ -1996,14 +2052,14 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    case PROC_PID_STAT_PRIORITY: /* proc.psinfo.priority */
 	    case PROC_PID_STAT_NICE: /* signed decimal int */ /* proc.psinfo.nice */
 		/* both are signed decimal integers in range [-20,20] */
-		f = _pm_getfield(entry->stat_buf, idp->item);
+		f = _pm_getfield(entry->stat_buf, item);
 		if (f == NULL)
 		    return 0;
 		atom->l = (__int32_t)strtol(f, &tail, 0);
 		break;
 
 	    case PROC_PID_STAT_WCHAN: /* proc.psinfo.wchan */
-		if ((f = _pm_getfield(entry->stat_buf, idp->item)) == NULL)
+		if ((f = _pm_getfield(entry->stat_buf, item)) == NULL)
 		    return 0;
 		_pm_assign_ulong(atom, (__pm_kernel_ulong_t)strtoull(f, &tail, 0));
 		break;
@@ -2042,7 +2098,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    /* The following 2 case groups need to be here since the #defines don't match the index into the buffer */
 	    case PROC_PID_STAT_RTPRIORITY: /* proc.psinfo.rt_priority */
 	    case PROC_PID_STAT_POLICY: /* proc.psinfo.policy */
-	    	if ((f = _pm_getfield(entry->stat_buf, idp->item - 3)) == NULL) /* Note the offset */
+	    	if ((f = _pm_getfield(entry->stat_buf, item - 3)) == NULL) /* Note the offset */
 		    	return 0;
 		    atom->ul = (__uint32_t)strtoul(f, &tail, 0);
 	    	break;
@@ -2053,7 +2109,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    	/*
 		 * unsigned jiffies converted to unsigned milliseconds
 		 */
-		if ((f = _pm_getfield(entry->stat_buf, idp->item - 3)) == NULL)  /* Note the offset */
+		if ((f = _pm_getfield(entry->stat_buf, item - 3)) == NULL)  /* Note the offset */
 		    return 0;
 
 		jiffies = (__uint64_t)strtoul(f, &tail, 0);
@@ -2063,7 +2119,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    	/*
 		 * unsigned jiffies converted to unsigned milliseconds
 		 */
-		if ((f = _pm_getfield(entry->stat_buf, idp->item)) == NULL)
+		if ((f = _pm_getfield(entry->stat_buf, item)) == NULL)
 		    return 0;
 
 		jiffies = (__uint64_t)strtoul(f, &tail, 0);
@@ -2074,8 +2130,8 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 		/*
 		 * unsigned decimal int
 		 */
-		if (idp->item < NR_PROC_PID_STAT) {
-		    if ((f = _pm_getfield(entry->stat_buf, idp->item)) == NULL)
+		if (item < NR_PROC_PID_STAT) {
+		    if ((f = _pm_getfield(entry->stat_buf, item)) == NULL)
 		    	return 0;
 		    atom->ul = (__uint32_t)strtoul(f, &tail, 0);
 		}
@@ -2092,7 +2148,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
     case CLUSTER_PID_STATM:
 	if (!have_access)
 	    return PM_ERR_PERMISSION;
-	if (idp->item == PROC_PID_STATM_MAPS) {	/* proc.memory.maps */
+	if (item == PROC_PID_STATM_MAPS) {	/* proc.memory.maps */
 	    if ((entry = fetch_proc_pid_maps(inst, active_proc_pid, &sts)) == NULL)
 		return sts;
 	    atom->cp = (entry->maps_buf ? entry->maps_buf : "");
@@ -2100,9 +2156,9 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    if ((entry = fetch_proc_pid_statm(inst, active_proc_pid, &sts)) == NULL)
 		return sts;
 
-	    if (idp->item <= PROC_PID_STATM_DIRTY) {
+	    if (item <= PROC_PID_STATM_DIRTY) {
 		/* unsigned int */
-		if ((f = _pm_getfield(entry->statm_buf, idp->item)) == NULL)
+		if ((f = _pm_getfield(entry->statm_buf, item)) == NULL)
 		    return 0;
 		atom->ul = (__uint32_t)strtoul(f, &tail, 0);
 		atom->ul *= _pm_system_pagesize / 1024;
@@ -2121,10 +2177,10 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	if ((entry = fetch_proc_pid_schedstat(inst, active_proc_pid, &sts)) == NULL)
 	    return sts;
 
-	if (idp->item < NR_PROC_PID_SCHED) {
-	    if ((f = _pm_getfield(entry->schedstat_buf, idp->item)) == NULL)
+	if (item < NR_PROC_PID_SCHED) {
+	    if ((f = _pm_getfield(entry->schedstat_buf, item)) == NULL)
 		return 0;
-	    if (idp->item == PROC_PID_SCHED_PCOUNT)
+	    if (item == PROC_PID_SCHED_PCOUNT)
 		_pm_assign_ulong(atom, (__pm_kernel_ulong_t)strtoul(f, &tail, 0));
 	    else
 		atom->ull  = (__uint64_t)strtoull(f, &tail, 0);
@@ -2142,7 +2198,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	if ((entry = fetch_proc_pid_io(inst, active_proc_pid, &sts)) == NULL)
 	    return sts;
 
-	switch (idp->item) {
+	switch (item) {
 
 	case PROC_PID_IO_RCHAR: /* proc.io.rchar */
 	    if ((f = _pm_getfield(entry->io_lines.rchar, 1)) == NULL)
@@ -2201,7 +2257,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	if ((entry = fetch_proc_pid_status(inst, active_proc_pid, &sts)) == NULL)
 		return sts;
 
-	switch (idp->item) {
+	switch (item) {
 
 	case PROC_PID_STATUS_UID: /* proc.id.uid */
 	case PROC_PID_STATUS_EUID: /* proc.id.euid */
@@ -2213,10 +2269,10 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	case PROC_PID_STATUS_FSUID_NM: { /* proc.id.fsuid_nm */
 	    struct passwd *pwe;
 
-	    if ((f = _pm_getfield(entry->status_lines.uid, (idp->item % 4) + 1)) == NULL)
+	    if ((f = _pm_getfield(entry->status_lines.uid, (item % 4) + 1)) == NULL)
 		return 0;
 	    atom->ul = (__uint32_t)strtoul(f, &tail, 0);
-	    if (idp->item > PROC_PID_STATUS_FSUID) {
+	    if (item > PROC_PID_STATUS_FSUID) {
 		if ((pwe = getpwuid((uid_t)atom->ul)) != NULL)
 		    atom->cp = pwe->pw_name;
 		else
@@ -2235,10 +2291,10 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	case PROC_PID_STATUS_FSGID_NM: { /* proc.id.fsgid_nm */
 	    struct group *gre;
 
-	    if ((f = _pm_getfield(entry->status_lines.gid, (idp->item % 4) + 1)) == NULL)
+	    if ((f = _pm_getfield(entry->status_lines.gid, (item % 4) + 1)) == NULL)
 		return 0;
 	    atom->ul = (__uint32_t)strtoul(f, &tail, 0);
-	    if (idp->item > PROC_PID_STATUS_FSGID) {
+	    if (item > PROC_PID_STATUS_FSGID) {
 		if ((gre = getgrgid((gid_t)atom->ul)) != NULL) {
 		    atom->cp = gre->gr_name;
 		} else {
@@ -2352,6 +2408,26 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    atom->ul = (__uint32_t)strtoul(f, &tail, 0);
 	break;
 
+	case PROC_PID_STATUS_VMREAL: /* proc.memory.vmreal and */
+	case PROC_PID_STATUS_VMNONLIB: /* proc.memory.vmnonlib */
+	if ((f = _pm_getfield(entry->status_lines.vmrss, 1)) == NULL) {
+	    atom->ull = 0;
+	    break;
+	}
+	atom->ull = (__uint64_t)strtoull(f, &tail, 0);
+	if ((f = _pm_getfield(entry->status_lines.vmswap, 1)) == NULL) {
+	    atom->ull = 0;
+	    break;
+	}
+	atom->ull += (__uint64_t)strtoull(f, &tail, 0);
+	if (item == PROC_PID_STATUS_VMREAL)
+	    break;
+	if ((f = _pm_getfield(entry->status_lines.vmlib, 1)) == NULL)
+	    atom->ull = 0;
+	else
+	    atom->ull -= (__uint64_t)strtoull(f, &tail, 0);
+	break;
+
 	case PROC_PID_STATUS_THREADS: /* proc.psinfo.threads */
 	if ((f = _pm_getfield(entry->status_lines.threads, 1)) == NULL)
 	    atom->ul = 0;
@@ -2428,7 +2504,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	subsys_t *ssp;
 
 	indom = INDOM(CGROUP_SUBSYS_INDOM);
-	if (idp->item == 1) { /* cgroup.subsys.count */
+	if (item == 1) { /* cgroup.subsys.count */
 	    atom->ul = pmdaCacheOp(indom, PMDA_CACHE_SIZE_ACTIVE);
 	    break;
 	}
@@ -2436,7 +2512,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    return sts;
 	if (sts != PMDA_CACHE_ACTIVE)
 	    return 0;
-	switch (idp->item) {
+	switch (item) {
 	case CG_SUBSYS_HIERARCHY: /* cgroup.subsys.hierarchy */
 	    atom->ul = ssp->hierarchy;
 	    break;
@@ -2456,7 +2532,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	filesys_t *fsp;
 
 	indom = INDOM(CGROUP_MOUNTS_INDOM);
-	switch (idp->item) {
+	switch (item) {
 	case CG_MOUNTS_SUBSYS: /* cgroup.mounts.subsys */
 	    if ((sts = pmdaCacheLookup(indom, inst, NULL, (void **)&fsp)) < 0)
 		return sts;
@@ -2481,12 +2557,15 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    return sts;
 	if (sts != PMDA_CACHE_ACTIVE)
 	   return 0;
-	switch (idp->item) {
+	switch (item) {
 	case CG_CPUSET_CPUS: /* cgroup.cpuset.cpus */
 	    atom->cp = proc_strings_lookup(cpuset->cpus);
 	    break;
 	case CG_CPUSET_MEMS: /* cgroup.cpuset.mems */
 	    atom->cp = proc_strings_lookup(cpuset->mems);
+	    break;
+	case CG_CPUSET_ID_CONTAINER: /* cgroup.cpuset.id.container */
+	    atom->cp = proc_strings_lookup(cpuset->container);
 	    break;
 	default:
 	    return PM_ERR_PMID;
@@ -2498,7 +2577,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	cgroup_percpuacct_t *percpuacct;
 	cgroup_cpuacct_t *cpuacct;
 
-	if (idp->item == CG_CPUACCT_PERCPU_USAGE) {
+	if (item == CG_CPUACCT_PERCPU_USAGE) {
 	    indom = INDOM(CGROUP_PERCPUACCT_INDOM);
 	    sts = pmdaCacheLookup(indom, inst, NULL, (void **)&percpuacct);
 	} else {
@@ -2509,7 +2588,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    return sts;
 	if (sts != PMDA_CACHE_ACTIVE)
 	   return 0;
-	switch (idp->item) {
+	switch (item) {
 	case CG_CPUACCT_USER: /* cgroup.cpuacct.stat.user */
 	    atom->ull = cpuacct->user;
 	    break;
@@ -2521,6 +2600,9 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    break;
 	case CG_CPUACCT_PERCPU_USAGE: /* cgroup.cpuacct.usage_percpu */
 	    atom->ull = percpuacct->usage;
+	    break;
+	case CG_CPUACCT_ID_CONTAINER: /* cgroup.cpuacct.id.container */
+	    atom->cp = proc_strings_lookup(cpuacct->container);
 	    break;
 	default:
 	    return PM_ERR_PMID;
@@ -2536,7 +2618,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    return sts;
 	if (sts != PMDA_CACHE_ACTIVE)
 	   return 0;
-	switch (idp->item) {
+	switch (item) {
 	case CG_CPUSCHED_SHARES: /* cgroup.cpusched.shares */
 	    atom->ull = cpusched->shares;
 	    break;
@@ -2555,6 +2637,9 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	case CG_CPUSCHED_CFS_QUOTA: /* cgroup.cpusched.cfs_quota */
 	    atom->ll = cpusched->cfs_quota;
 	    break;
+	case CG_CPUSCHED_ID_CONTAINER: /* cgroup.cpusched.id.container */
+	    atom->cp = proc_strings_lookup(cpusched->container);
+	    break;
 	default:
 	    return PM_ERR_PMID;
 	}
@@ -2569,7 +2654,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    return sts;
 	if (sts != PMDA_CACHE_ACTIVE)
 	   return 0;
-	switch (idp->item) {
+	switch (item) {
 	case CG_MEMORY_STAT_CACHE: /* cgroup.memory.stat.cache */
 	    atom->ull = memory->stat.cache;
 	    break;
@@ -2681,6 +2766,9 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	case CG_MEMORY_FAILCNT: /* cgroup.memory.failcnt */
 	    atom->ull = memory->failcnt;
 	    break;
+	case CG_MEMORY_ID_CONTAINER: /* cgroup.memory.id.container */
+	    atom->cp = proc_strings_lookup(memory->container);
+	    break;
 	default:
 	    return PM_ERR_PMID;
 	}
@@ -2695,9 +2783,12 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    return sts;
 	if (sts != PMDA_CACHE_ACTIVE)
 	   return 0;
-	switch (idp->item) {
+	switch (item) {
 	case CG_NETCLS_CLASSID: /* cgroup.netclass.classid */
 	    atom->ull = netcls->classid;
+	    break;
+	case CG_NETCLS_ID_CONTAINER: /* cgroup.netclass.id.container */
+	    atom->cp = proc_strings_lookup(netcls->container);
 	    break;
 	default:
 	    return PM_ERR_PMID;
@@ -2720,7 +2811,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	    return sts;
 	if (sts != PMDA_CACHE_ACTIVE)
 	   return 0;
-	switch (idp->item) {
+	switch (item) {
 	case CG_PERDEVBLKIO_IOMERGED_READ: /* cgroup.blkio.dev.io_merged.read */
 	    atom->ull = blkdev->stats.io_merged.read;
 	    break;
@@ -2978,6 +3069,9 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 	case CG_BLKIO_THROTTLEIOSERVICED_TOTAL: /* cgroup.blkio.all.throttle.io_serviced.total */
 	    atom->ull = blkio->total.throttle_io_serviced.total;
 	    break;
+	case CG_BLKIO_ID_CONTAINER: /* cgroup.blkio.id.container */
+	    atom->cp = proc_strings_lookup(blkio->container);
+	    break;
 
 	default:
 	    return PM_ERR_PMID;
@@ -2991,7 +3085,7 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
     case CLUSTER_PID_FD:
 	if (!have_access)
 	    return PM_ERR_PERMISSION;
-	if (idp->item > PROC_PID_FD_COUNT)
+	if (item > PROC_PID_FD_COUNT)
 	    return PM_ERR_PMID;
 	if ((entry = fetch_proc_pid_fd(inst, active_proc_pid, &sts)) == NULL) /* proc.fd.count */
 	    return sts;
@@ -3004,11 +3098,18 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
     case CLUSTER_PID_CGROUP:
 	if (!have_access)
 	    return PM_ERR_PERMISSION;
-	if (idp->item > PROC_PID_CGROUP)
-	    return PM_ERR_PMID;
-	if ((entry = fetch_proc_pid_cgroup(inst, active_proc_pid, &sts)) == NULL) /* proc.psinfo.cgroups */
+	if ((entry = fetch_proc_pid_cgroup(inst, active_proc_pid, &sts)) == NULL)
 	    return sts;
-	atom->cp = proc_strings_lookup(entry->cgroup_id);
+	switch (item) {
+	case PROC_PID_CGROUP: /* proc.psinfo.cgroups */
+	    atom->cp = proc_strings_lookup(entry->cgroup_id);
+	    break;
+	case PROC_PID_CONTAINER: /* proc.id.container */
+	    atom->cp = proc_strings_lookup(entry->container_id);
+	    break;
+	default:
+	    return PM_ERR_PMID;
+	}
 	break;
 
     case CLUSTER_HOTPROC_PID_LABEL:
@@ -3017,15 +3118,28 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
     case CLUSTER_PID_LABEL:
 	if (!have_access)
 	    return PM_ERR_PERMISSION;
-	if (idp->item > PROC_PID_LABEL)
+	if (item > PROC_PID_LABEL)
 	    return PM_ERR_PMID;
 	if ((entry = fetch_proc_pid_label(inst, active_proc_pid, &sts)) == NULL) /* proc.psinfo.labels */
 	    return sts;
 	atom->cp = proc_strings_lookup(entry->label_id);
 	break;
 
+    case CLUSTER_HOTPROC_PID_OOM_SCORE:
+	active_proc_pid = &hotproc_pid;
+	/*FALLTHROUGH*/
+    case CLUSTER_PID_OOM_SCORE:
+	if (!have_access)
+	    return PM_ERR_PERMISSION;
+	if (item > PROC_PID_OOM_SCORE)
+	    return PM_ERR_PMID;
+	if ((entry = fetch_proc_pid_oom_score(inst, active_proc_pid, &sts)) == NULL) /* proc.psinfo.oom_score */
+	    return sts;
+	atom->ul = entry->oom_score;
+	break;
+
     case CLUSTER_CONTROL:
-	switch (idp->item) {
+	switch (item) {
 	/* case 1: not reached -- proc.control.all.threads is direct */
 	case 2:	/* proc.control.perclient.threads */
 	    atom->ul = proc_ctx_threads(pmdaGetContext(), threads);
@@ -3049,14 +3163,12 @@ proc_fetchCallBack(pmdaMetric *mdesc, unsigned int inst, pmAtomValue *atom)
 static int
 proc_fetch(int numpmid, pmID pmidlist[], pmResult **resp, pmdaExt *pmda)
 {
-    __pmID_int	*idp;
-    int		i, sts, cluster;
-    int		need_refresh[NUM_CLUSTERS] = { 0 };
+    int		i, sts;
+    int		need_refresh[MAX_CLUSTER] = { 0 };
 
     for (i = 0; i < numpmid; i++) {
-	idp = (__pmID_int *)&(pmidlist[i]);
-	cluster = idp->cluster;
-	if (cluster >= MIN_CLUSTER && cluster < NUM_CLUSTERS)
+	unsigned int	cluster = pmID_cluster(pmidlist[i]);
+	if (cluster >= MIN_CLUSTER && cluster < MAX_CLUSTER)
 	    need_refresh[cluster]++;
     }
 
@@ -3084,14 +3196,13 @@ proc_store(pmResult *result, pmdaExt *pmda)
 
     for (i = 0; i < result->numpmid; i++) {
 	pmValueSet *vsp = result->vset[i];
-	__pmID_int *idp = (__pmID_int *)&(vsp->pmid);
 	pmAtomValue av;
 
-	switch (idp->cluster) {
+	switch (pmID_cluster(vsp->pmid)) {
 	case CLUSTER_CONTROL:
 	    if (vsp->numval != 1)
 		sts = PM_ERR_INST;
-	    else switch (idp->item) {
+	    else switch (pmID_item(vsp->pmid)) {
 	    case 1: /* proc.control.all.threads */
 		if (!have_access)
 		    sts = PM_ERR_PERMISSION;
@@ -3125,7 +3236,7 @@ proc_store(pmResult *result, pmdaExt *pmda)
 	case CLUSTER_HOTPROC_GLOBAL:
 	    if (!isroot)
 		sts = PM_ERR_PERMISSION;
-	    else switch (idp->item) {
+	    else switch (pmID_item(vsp->pmid)) {
 	    case ITEM_HOTPROC_G_REFRESH: /* hotproc.control.refresh */
 		if ((sts = pmExtractValue(vsp->valfmt, &vsp->vlist[0],
 				PM_TYPE_U32, &av, PM_TYPE_U32)) >= 0) {
@@ -3245,6 +3356,84 @@ proc_children(const char *name, int flag, char ***kids, int **sts, pmdaExt *pmda
     return pmdaTreeChildren(tree, name, flag, kids, sts);
 }
 
+static int
+proc_labelCallBack(pmInDom indom, unsigned int inst, pmLabelSet **lp)
+{
+    char	*name, *device;
+    int		sts;
+
+    switch (pmInDom_serial(indom)) {
+    case PROC_INDOM:
+    case HOTPROC_INDOM:
+	return pmdaAddLabels(lp, "{\"pid\":%u}", inst);
+
+    case CGROUP_PERDEVBLKIO_INDOM:
+	sts = pmdaCacheLookup(indom, inst, &name, NULL);
+	if (sts < 0 || sts == PMDA_CACHE_INACTIVE)
+	    return 0;
+	device = strrchr(name, ':');
+	return pmdaAddLabels(lp, "{\"cgroup\":\"%.*s\",\"device_name\":\"%s\"}",
+				(int)(device - name) - 1, name, device + 1);
+
+    case CGROUP_PERCPUACCT_INDOM:
+	sts = pmdaCacheLookup(indom, inst, &name, NULL);
+	if (sts < 0 || sts == PMDA_CACHE_INACTIVE)
+	    return 0;
+	device = strrchr(name, ':');
+	return pmdaAddLabels(lp, "{\"cgroup\":\"%.*s\",\"cpu\":\"%s\"}",
+				(int)(device - name) - 1, name, device + 4);
+
+    case CGROUP_CPUSET_INDOM:
+    case CGROUP_CPUACCT_INDOM:
+    case CGROUP_CPUSCHED_INDOM:
+    case CGROUP_MEMORY_INDOM:
+    case CGROUP_NETCLS_INDOM:
+    case CGROUP_BLKIO_INDOM:
+	sts = pmdaCacheLookup(indom, inst, &name, NULL);
+	if (sts < 0 || sts == PMDA_CACHE_INACTIVE)
+	    return 0;
+	return pmdaAddLabels(lp, "{\"cgroup\":\"%s\"}", name);
+
+    default:
+	break;
+    }
+    return 0;
+}
+
+static int
+proc_label_indom(pmInDom indom, pmLabelSet **lp, pmdaExt *pmda)
+{
+    switch (pmInDom_serial(indom)) {
+    case CGROUP_CPUSET_INDOM:
+    case CGROUP_CPUACCT_INDOM:
+    case CGROUP_CPUSCHED_INDOM:
+    case CGROUP_PERCPUACCT_INDOM:
+	return pmdaAddLabels(lp, "{\"device_type\":\"cpu\"}");
+    case CGROUP_MEMORY_INDOM:
+	return pmdaAddLabels(lp, "{\"device_type\":\"memory\"}");
+    case CGROUP_NETCLS_INDOM:
+	return pmdaAddLabels(lp, "{\"device_type\":\"interface\"}");
+    case CGROUP_BLKIO_INDOM:
+    case CGROUP_PERDEVBLKIO_INDOM:
+	return pmdaAddLabels(lp, "{\"device_type\":\"block\"}");
+    default:
+	break;
+    }
+    return 0;
+}
+
+static int
+proc_label(int ident, int type, pmLabelSet **lp, pmdaExt *pmda)
+{
+    int		sts;
+
+    if ((type & PM_LABEL_INDOM) &&
+	(sts = proc_label_indom(ident, lp, pmda)) < 0)
+	return sts;
+
+    return pmdaLabel(ident, type, lp, pmda);
+}
+
 /*
  * Helper routines for accessing a generic static string dictionary
  */
@@ -3252,8 +3441,8 @@ proc_children(const char *name, int flag, char ***kids, int **sts, pmdaExt *pmda
 char *
 proc_strings_lookup(int index)
 {
-    char *value;
-    pmInDom dict = INDOM(STRINGS_INDOM);
+    char	*value;
+    pmInDom	dict = INDOM(STRINGS_INDOM);
 
     if (pmdaCacheLookup(dict, index, &value, NULL) == PMDA_CACHE_ACTIVE)
 	return value;
@@ -3297,24 +3486,26 @@ proc_init(pmdaInterface *dp)
 
     if (_isDSO) {
 	char helppath[MAXPATHLEN];
-	int sep = __pmPathSeparator();
+	int sep = pmPathSeparator();
 	pmsprintf(helppath, sizeof(helppath), "%s%c" "proc" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-	pmdaDSO(dp, PMDA_INTERFACE_6, "proc DSO", helppath);
+	pmdaDSO(dp, PMDA_INTERFACE_7, "proc DSO", helppath);
     }
 
     if (dp->status != 0)
 	return;
-    dp->comm.flags |= (PDU_FLAG_AUTH|PDU_FLAG_CONTAINER);
+    pmdaSetCommFlags(dp, PMDA_FLAG_AUTHORIZE | PMDA_FLAG_CONTAINER);
 
-    dp->version.six.instance = proc_instance;
-    dp->version.six.store = proc_store;
-    dp->version.six.fetch = proc_fetch;
-    dp->version.six.text = proc_text;
-    dp->version.six.pmid = proc_pmid;
-    dp->version.six.name = proc_name;
-    dp->version.six.children = proc_children;
-    dp->version.six.attribute = proc_ctx_attrs;
+    dp->version.seven.instance = proc_instance;
+    dp->version.seven.store = proc_store;
+    dp->version.seven.fetch = proc_fetch;
+    dp->version.seven.text = proc_text;
+    dp->version.seven.pmid = proc_pmid;
+    dp->version.seven.name = proc_name;
+    dp->version.seven.children = proc_children;
+    dp->version.seven.attribute = proc_ctx_attrs;
+    dp->version.seven.label = proc_label;
+    pmdaSetLabelCallBack(dp, proc_labelCallBack);
     pmdaSetEndContextCallBack(dp, proc_ctx_end);
     pmdaSetFetchCallBack(dp, proc_fetchCallBack);
 
@@ -3395,16 +3586,16 @@ pmdaOptions	opts = {
 int
 main(int argc, char **argv)
 {
-    int			c, sep = __pmPathSeparator();
+    int			c, sep = pmPathSeparator();
     pmdaInterface	dispatch;
     char		helppath[MAXPATHLEN];
     char		*username = "root";
 
     _isDSO = 0;
-    __pmSetProgname(argv[0]);
+    pmSetProgname(argv[0]);
     pmsprintf(helppath, sizeof(helppath), "%s%c" "proc" "%c" "help",
 		pmGetConfig("PCP_PMDAS_DIR"), sep, sep);
-    pmdaDaemon(&dispatch, PMDA_INTERFACE_6, pmProgname, PROC, "proc.log", helppath);
+    pmdaDaemon(&dispatch, PMDA_INTERFACE_7, pmGetProgname(), PROC, "proc.log", helppath);
 
     while ((c = pmdaGetOptions(argc, argv, &opts, &dispatch)) != EOF) {
 	switch (c) {
@@ -3428,7 +3619,7 @@ main(int argc, char **argv)
 	username = opts.username;
 
     pmdaOpenLog(&dispatch);
-    __pmSetProcessIdentity(username);
+    pmSetProcessIdentity(username);
 
     proc_init(&dispatch);
     pmdaConnect(&dispatch);

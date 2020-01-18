@@ -1,6 +1,6 @@
 #!gmake
 #
-# Copyright (c) 2015-2017 Red Hat.
+# Copyright (c) 2015-2018 Red Hat.
 # Copyright (c) 1997-2002 Silicon Graphics, Inc.  All Rights Reserved.
 #
 # NB: this GNUmakefile is only for use from within the PCP build tree.  It governs
@@ -16,14 +16,13 @@ TESTS	= $(shell sed -n -e '/^[0-9]/s/:retired//' -e '/^[0-9][0-9]*:reserved/d' -
 
 SUBDIRS = src pmdas cisco gluster pconf sadist collectl nfsclient named \
 	  archives badarchives views qt linux unbound cifs gpfs lustre ganglia \
-	  postfix perl json slurm tmparch sheet
+	  java mmv postfix perl json slurm tmparch sheet smart
 ifeq "$(PMDA_PERFEVENT)" "true"
 SUBDIRS += perfevent
 endif
 ifeq "$(HAVE_PYTHON)" "true"
 SUBDIRS += secure mic haproxy lio prometheus
 endif
-LCONFIG = localconfig
 
 # No implicit rules here, thank you
 #
@@ -33,11 +32,14 @@ LCONFIG = localconfig
 #
 %.out: %
 
-default_pcp default: new remake check qa_outfiles $(OTHERS) $(SUBDIRS) $(LCONFIG)
+default_pcp default: new remake check qa_outfiles localconfig $(OTHERS) $(SUBDIRS)
 	$(SUBDIRS_MAKERULE)
 
-setup: $(SUBDIRS) $(LCONFIG) qa_hosts
+setup: $(SUBDIRS) localconfig qa_hosts
 	$(SUBDIRS_MAKERULE)
+
+# override ${MANDIRT} from buildefs, we want to keep e.g. *.[1-9].xz
+MANDIRT =
 
 LDIRT += 051.work 134.full.* \
 	 *.bak *.bad *.core *.full *.notrun *.raw *.o core a.out core.* \
@@ -51,7 +53,7 @@ LDIRT += $(shell [ -f .gitignore ] && grep '\.out$$' .gitignore)
 SCRIPTS = mk.localconfig mk.pcpversion mk.qa_hosts mk.variant getpmcdhosts \
 	  new check recheck remake findmetric group-stats changeversion \
 	  check-gitignore check-group chk.setup show-me disk-work \
-	  xlate_2_new_pmns common setup.051
+	  xlate_2_new_pmns common setup.051 mk.logfarm
 
 COMMON_SCRIPTS = common.install.cisco common.pcpweb
 COMMON = common.check common.config common.filter \
@@ -59,7 +61,7 @@ COMMON = common.check common.config common.filter \
 	 common.secure common.gfs2 common.rpm \
 	 common.qt common.avahi common.docker \
 	 common.discovery common.compress common.webapi \
-	 common.python 
+	 common.python common.prometheus common.bcc
 
 OTHERS = group qa_hosts.master README sanity.coverage \
 	 $(shell echo valgrind-suppress* helgrind-suppress*)

@@ -9,7 +9,7 @@
  */
 
 #include <pcp/pmapi.h>
-#include <pcp/impl.h>
+#include "libpcp.h"
 #include <pcp/trace.h>
 #include <pcp/trace_dev.h>
 #include <math.h>
@@ -115,19 +115,22 @@ _z(void)
     int			attr;
     int			rate;
     int			state;
+    int			nsets;
     int			num;
     pmID		*pmidp;
-    __pmInResult	inres;
-    __pmInResult	*inresp;
+    pmInResult	inres;
+    pmInResult	*inresp;
+    pmLabelSet		*labels;
+    pmLabelSet		*rlabels;
     pmInDom		indom;
     int			inst;
     pmDesc		result_desc;
     pmDesc		*descp = &result_desc;
     int			ctxnum;
-    __pmTimeval		now;
-    __pmProfile		curprof;
-    __pmInDomProfile	idp[2];
-    __pmProfile		*profp;
+    pmTimeval		now;
+    pmProfile		curprof;
+    pmInDomProfile	idp[2];
+    pmProfile		*profp;
     pmResult		*resp;
     int			code;
     int			nv;
@@ -486,7 +489,7 @@ _z(void)
     n = sizeof(pmidlist) / sizeof(pmidlist[0]);
     if (pass != 0)
 	n = 1 + (foorand() % n);
-    if ((e = __pmSendFetch(fd[1], mypid, 43, (__pmTimeval *)0, n, pmidlist)) < 0) {
+    if ((e = __pmSendFetch(fd[1], mypid, 43, (pmTimeval *)0, n, pmidlist)) < 0) {
 	fprintf(stderr, "Error: SendFetch: %s\n", pmErrStr(e));
 	fatal = 1;
 	goto cleanup;
@@ -638,7 +641,7 @@ _z(void)
     now.tv_sec = 60 * 60 * 60;		/* 60 hrs after the epoch */
     now.tv_usec = 654321;		/* plus a gnat */
     for (i = 0; i < n; i++) {
-	__pmTimeval	tmp;
+	pmTimeval	tmp;
 	if ((e = __pmSendInstanceReq(fd[1], mypid, &now, 0xface, indomlist[i].inst, indomlist[i].name)) < 0) {
 	    fprintf(stderr, "Error: SendInstanceReq: %s\n", pmErrStr(e));
 	    fatal = 1;
@@ -765,6 +768,118 @@ _z(void)
 	    __pmFreeInResult(inresp);
     }
 
+/* PDU_LABEL_REQ */
+    if ((e = __pmSendLabelReq(fd[1], mypid, 0x1234abcd, PM_LABEL_INDOM)) < 0) {
+	fprintf(stderr, "Error: SendLabelReq: %s\n", pmErrStr(e));
+	fatal = 1;
+	goto cleanup;
+    }
+    else {
+	if ((e = __pmGetPDU(fd[0], ANY_SIZE, timeout, &pb)) < 0) {
+	    fprintf(stderr, "Error: RecvLabelReq: %s\n", pmErrStr(e));
+	    fatal = 1;
+	    goto cleanup;
+	}
+	else if (e == 0) {
+	    fprintf(stderr, "Error: RecvLabelReq: end-of-file!\n");
+	    fatal = 1;
+	    goto cleanup;
+	}
+	else if (e != PDU_LABEL_REQ) {
+	    fprintf(stderr, "Error: RecvLabelReq: %s wrong type PDU!\n", __pmPDUTypeStr(e));
+	    fatal = 1;
+	    goto cleanup;
+	}
+	else {
+	    if ((e = __pmDecodeLabelReq(pb, &ident, &type)) < 0) {
+		fprintf(stderr, "Error: DecodeLabelReq: %s\n", pmErrStr(e));
+		fatal = 1;
+		goto cleanup;
+	    }
+	    else {
+		if (ident != 0x1234abcd)
+		    fprintf(stderr, "Botch: LabelReq: ident: got: 0x%x expect: 0x%x\n",
+			ident, 0x1234abcd);
+		if (type != PM_LABEL_INDOM)
+		    fprintf(stderr, "Botch: LabelReq: type: got: 0x%x expect: 0x%x\n",
+			type, PM_LABEL_INDOM);
+	    }
+	}
+    }
+
+/* PDU_LABEL */
+#define TEMP "{\"temperature\":\"celcius\"}"
+    if ((e = __pmParseLabelSet(TEMP, strlen(TEMP), PM_LABEL_ITEM, &labels)) < 0) {
+	fprintf(stderr, "Error: __pmParseLabelSet: %s\n", pmErrStr(e));
+	fatal = 1;
+	goto cleanup;
+    }
+    if ((e = __pmSendLabel(fd[1], mypid, 0x7bcd1234, PM_LABEL_ITEM, labels, 1)) < 0) {
+	fprintf(stderr, "Error: SendLabel: %s\n", pmErrStr(e));
+	fatal = 1;
+	goto cleanup;
+    }
+    else {
+	if ((e = __pmGetPDU(fd[0], ANY_SIZE, timeout, &pb)) < 0) {
+	    fprintf(stderr, "Error: RecvLabel: %s\n", pmErrStr(e));
+	    fatal = 1;
+	    goto cleanup;
+	}
+	else if (e == 0) {
+	    fprintf(stderr, "Error: RecvLabel: end-of-file!\n");
+	    fatal = 1;
+	    goto cleanup;
+	}
+	else if (e != PDU_LABEL) {
+	    fprintf(stderr, "Error: RecvLabel: %s wrong type PDU!\n", __pmPDUTypeStr(e));
+	    fatal = 1;
+	    goto cleanup;
+	}
+	else {
+	    rlabels = NULL;
+	    if ((e = __pmDecodeLabel(pb, &ident, &type, &rlabels, &nsets)) < 0) {
+		fprintf(stderr, "Error: DecodeLabels: %s\n", pmErrStr(e));
+		fatal = 1;
+		goto cleanup;
+	    }
+	    else {
+		if (ident != 0x7bcd1234)
+		    fprintf(stderr, "Botch: Label: ident: got: 0x%x expect: 0x%x\n",
+			ident, 0x7bcd1234);
+		if (type != PM_LABEL_ITEM)
+		    fprintf(stderr, "Botch: Label: type: got: 0x%x expect: 0x%x\n",
+			type, PM_LABEL_ITEM);
+		if (nsets != 1)
+		    fprintf(stderr, "Botch: Label: nset: got: %d expect: %d\n",
+			    nsets, 1);
+		if (rlabels->inst != labels->inst)
+		    fprintf(stderr, "Botch: Labels: inst: got: %d expect: %d\n",
+			    rlabels->inst, labels->inst);
+		if (rlabels->nlabels != labels->nlabels)
+		    fprintf(stderr, "Botch: Label: nlabels: got: %d expect: %d\n",
+			    rlabels->nlabels, labels->nlabels);
+		else {
+		    for (i = 0; i < labels->nlabels; i++) {
+			if (rlabels->labels[i].name != labels->labels[i].name)
+			    fprintf(stderr, "Botch: Label[%d] name got: %d expect: %d\n",
+				    i, rlabels->labels[i].name, labels->labels[i].name);
+			if (rlabels->labels[i].namelen != labels->labels[i].namelen)
+			    fprintf(stderr, "Botch: Label[%d] namelen got: %d expect: %d\n",
+				    i, rlabels->labels[i].namelen, labels->labels[i].namelen);
+			if (rlabels->labels[i].value != labels->labels[i].value)
+			    fprintf(stderr, "Botch: Label[%d] value got: %d expect: %d\n",
+				    i, rlabels->labels[i].value, labels->labels[i].value);
+			if (rlabels->labels[i].valuelen != labels->labels[i].valuelen)
+			    fprintf(stderr, "Botch: Label[%d] valuelen got: %d expect: %d\n",
+				    i, rlabels->labels[i].valuelen, labels->labels[i].valuelen);
+		    }
+		}
+		pmFreeLabelSets(rlabels, nsets);
+	    }
+	}
+	pmFreeLabelSets(labels, 1);
+    }
+
 /* PDU_TEXT_REQ */
     if ((e = __pmSendTextReq(fd[1], mypid, 0x12341234, PM_TEXT_PMID|PM_TEXT_ONELINE)) < 0) {
 	fprintf(stderr, "Error: SendTextReq: %s\n", pmErrStr(e));
@@ -850,7 +965,6 @@ _z(void)
 	}
     }
 
-#if PCP_VER >= 3800
 /* PDU_AUTH */
 #define USERNAME "pcpqa"
     if (remote_version == -1 || remote_version >= 3800) {
@@ -900,7 +1014,6 @@ _z(void)
 	    }
 	}
     }
-#endif
 
 /* PDU_CREDS */
     sender = 0;
@@ -1521,9 +1634,8 @@ main(int argc, char **argv)
     int		errflag = 0;
     int		port = 4323;	/* default port for remote connection */
     char	*endnum;
-    __pmID_int	*pmidp;
 
-    __pmSetProgname(argv[0]);
+    pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:i:Np:v:?")) != EOF) {
 	switch (c) {
@@ -1531,7 +1643,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmProgname, optarg);
+		    pmGetProgname(), optarg);
 		errflag++;
 	    }
 	    break;
@@ -1539,7 +1651,7 @@ main(int argc, char **argv)
 	case 'i':	/* iterations */
 	    iter = (int)strtol(optarg, &endnum, 10);
 	    if (*endnum != '\0') {
-		fprintf(stderr, "%s: -i requires numeric argument\n", pmProgname);
+		fprintf(stderr, "%s: -i requires numeric argument\n", pmGetProgname());
 		errflag++;
 	    }
 	    break;
@@ -1552,7 +1664,7 @@ main(int argc, char **argv)
 	case 'p':	/* port */
 	    port = (int)strtol(optarg, &endnum, 10);
 	    if (*endnum != '\0') {
-		fprintf(stderr, "%s: -p requires numeric argument\n", pmProgname);
+		fprintf(stderr, "%s: -p requires numeric argument\n", pmGetProgname());
 		errflag++;
 	    }
 	    break;
@@ -1579,7 +1691,7 @@ main(int argc, char **argv)
     }
 
     if (errflag || optind < argc-1) {
-	fprintf(stderr, "Usage: %s [-N] [-D debugspec] [-i iter] [-p port] [-v remote_version] [host]\n", pmProgname);
+	fprintf(stderr, "Usage: %s [-N] [-D debugspec] [-i iter] [-p port] [-v remote_version] [host]\n", pmGetProgname());
 	exit(1);
     }
 
@@ -1612,21 +1724,11 @@ main(int argc, char **argv)
 	exit(1);
     }
 
-    pmidlist[0] = (pmID)0;
-    pmidlist[1] = (pmID)0;
-    pmidp = (__pmID_int *)&pmidlist[1];
-    pmidp->domain = 123;
-    pmidp->cluster = 456;
-    pmidp->item = 789;
-    pmidlist[2] = (pmID)0;
-    pmidp = (__pmID_int *)&pmidlist[2];
-    pmidp->domain = 255;
-    pmidlist[3] = (pmID)0;
-    pmidp = (__pmID_int *)&pmidlist[3];
-    pmidp->cluster = 4095;
-    pmidlist[4] = (pmID)0;
-    pmidp = (__pmID_int *)&pmidlist[4];
-    pmidp->item = 1023;
+    pmidlist[0] = pmID_build(0, 0, 0);
+    pmidlist[1] = pmID_build(123, 456, 789);
+    pmidlist[2] = pmID_build(255, 0, 0);
+    pmidlist[3] = pmID_build(0, 4095, 0);
+    pmidlist[4] = pmID_build(0, 0, 1023);
     pmidlist[5] = PM_ID_NULL;
 
     for (pass = 0; pass < iter; pass++) {

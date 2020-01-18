@@ -20,6 +20,7 @@
 # Get standard environment
 . $PCP_DIR/etc/pcp.env
 . $PCP_SHARE_DIR/lib/rc-proc.sh
+. $PCP_SHARE_DIR/lib/utilproc.sh
 
 PMIE="$PCP_BIN_DIR/pmie"
 PMIECONF="$PCP_BIN_DIR/pmieconf"
@@ -171,9 +172,22 @@ fi
 #
 PROGLOGDIR=`dirname "$PROGLOG"`
 [ -d "$PROGLOGDIR" ] || mkdir_and_chown "$PROGLOGDIR" 755 $PCP_USER:$PCP_GROUP 2>/dev/null
-[ -f "$PROGLOG" ] && mv "$PROGLOG" "$PROGLOG.prev"
-exec 1>"$PROGLOG"
-exec 2>&1
+
+if $SHOWME
+then
+    :
+else
+    # Salt away previous log, if any ...
+    #
+    _save_prev_file "$PROGLOG"
+    # After argument checking, everything must be logged to ensure no mail is
+    # accidentally sent from cron.  Close stdout and stderr, then open stdout
+    # as our logfile and redirect stderr there too.
+    #
+    # Exception is for -N where we want to see the output
+    #
+    exec 1>"$PROGLOG" 2>&1
+fi
 
 _error()
 {
@@ -234,8 +248,10 @@ _lock()
 	    echo "$prog: `cat $tmp/out`"
 	fi
 	_warning "failed to acquire exclusive lock ($logfile.lock) ..."
-	continue
+	return 1
     fi
+
+    return 0
 }
 
 _unlock()
@@ -627,7 +643,7 @@ s/^\\$//
 	#
 	[ -f "$logfile" ] && chown $PCP_USER:$PCP_GROUP "$logfile" >/dev/null 2>&1
 
-	if cd "$dir"
+	if cd "$dir" >/dev/null 2>&1
 	then
 	    :
 	else
@@ -642,7 +658,7 @@ s/^\\$//
 	    _warning "no write access in $dir, skip lock file processing"
 	    ls -ld "$dir"
 	else
-	    _lock
+	    _lock || continue
 	fi
 
 	# match $logfile from control file to running pmies

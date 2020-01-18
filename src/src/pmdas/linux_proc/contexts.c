@@ -13,7 +13,6 @@
  */
 
 #include "pmapi.h"
-#include "impl.h"
 #include "pmda.h"
 #include "contexts.h"
 
@@ -56,7 +55,7 @@ proc_ctx_growtab(int ctx)
     need = (ctx + 1) * sizeof(ctxtab[0]);
     ctxtab = (proc_perctx_t *)realloc(ctxtab, need);
     if (ctxtab == NULL)
-        __pmNoMem("proc ctx table", need, PM_FATAL_ERR);
+        pmNoMem("proc ctx table", need, PM_FATAL_ERR);
     while (num_ctx <= ctx)
 	proc_ctx_clear(num_ctx++);
 }
@@ -107,13 +106,13 @@ proc_ctx_attrs(int ctx, int attr, const char *value, int length, pmdaExt *pmda)
 	return sts;
 
     switch (attr) {
-    case PCP_ATTR_USERID:
+    case PMDA_ATTR_USERID:
 	proc_ctx_set_userid(ctx, value);
 	break;
-    case PCP_ATTR_GROUPID:
+    case PMDA_ATTR_GROUPID:
 	proc_ctx_set_groupid(ctx, value);
 	break;
-    case PCP_ATTR_CONTAINER:
+    case PMDA_ATTR_CONTAINER:
 	proc_ctx_set_container(ctx, value, length);
 	break;
     default:
@@ -161,7 +160,7 @@ proc_ctx_access(int ctx)
 	accessible++;
 	if (basegid != pp->gid) {
 	    if (setresgid(pp->gid,pp->gid,-1) < 0) {
-		__pmNotifyErr(LOG_ERR, "set*gid(%d) access failed: %s\n",
+		pmNotifyErr(LOG_ERR, "set*gid(%d) access failed: %s\n",
 			      pp->gid, osstrerror());
 		accessible--;
 	    }
@@ -171,7 +170,7 @@ proc_ctx_access(int ctx)
 	accessible++;
 	if (baseuid != pp->uid) {
 	    if (setresuid(pp->uid,pp->uid,-1) < 0) {
-		__pmNotifyErr(LOG_ERR, "set*uid(%d) access failed: %s\n",
+		pmNotifyErr(LOG_ERR, "set*uid(%d) access failed: %s\n",
 			      pp->uid, osstrerror());
 		accessible--;
 	    }
@@ -193,12 +192,12 @@ proc_ctx_revert(int ctx)
 
     if ((pp->state & CTX_USERID) && baseuid != pp->uid) {
 	if (setresuid(baseuid,baseuid,-1) < 0)
-	    __pmNotifyErr(LOG_ERR, "set*uid(%d) revert failed: %s\n",
+	    pmNotifyErr(LOG_ERR, "set*uid(%d) revert failed: %s\n",
 			  baseuid, osstrerror());
     }
     if ((pp->state & CTX_GROUPID) && basegid != pp->gid) {
 	if (setresgid(basegid,basegid,-1) < 0)
-	    __pmNotifyErr(LOG_ERR, "set*gid(%d) revert failed: %s\n",
+	    pmNotifyErr(LOG_ERR, "set*gid(%d) revert failed: %s\n",
 			  basegid, osstrerror());
     }
     return 0;

@@ -1,7 +1,7 @@
 '\"macro stdmacro
 .\"
 .\" Copyright (c) 2000 Silicon Graphics, Inc.  All Rights Reserved.
-.\" Copyright (c) 2014-2016 Red Hat.
+.\" Copyright (c) 2014-2018 Red Hat.
 .\" 
 .\" This program is free software; you can redistribute it and/or modify it
 .\" under the terms of the GNU General Public License as published by the
@@ -136,7 +136,8 @@ and is affected by the files
 .IR $PCP_SYSCONF_DIR/pmlogger/control ,
 .IR $PCP_SYSCONF_DIR/pmlogger/control .d
 (use
-.BR chkconfig (8)
+.BR chkconfig (8),
+.BR systemctl (1)
 or similar platform-specific commands to activate or disable the primary
 .B pmlogger 
 instance),
@@ -184,7 +185,7 @@ option may be used to control the DSO PMDAs that should be
 made accessible.  The
 .I spec
 argument conforms to the syntax described in
-.BR __pmSpecLocalPMDA (3).
+.BR pmSpecLocalPMDA (3).
 More than one
 .B \-K
 option may be used.
@@ -245,16 +246,19 @@ so this limit may be slightly surpassed).
 Other viable file size units include:
 .BR K ,
 .BR Kb ,
+.BR KiB ,
 .BR Kbyte ,
 .BR Kilobyte
 for kilobytes and
 .BR M ,
 .BR Mb ,
+.BR MiB ,
 .BR Mbyte ,
 .BR Megabyte
 for megabytes and
 .BR G ,
 .BR Gb ,
+.BR GiB ,
 .BR Gbyte ,
 .BR Gigabyte
 for gigabytes.
@@ -292,10 +296,9 @@ The
 option causes the size of the physical record(s) for each
 group of metrics and the expected contribution of
 the group to the size of the PCP archive for one full day
-of collection to be reported in the log file.  This
-information is reported
-the first time each group is successfully written
-to the archive.
+of collection to be reported in the log file.
+This information is reported the first time each group is
+successfully written to the archive.
 .PP
 The
 .B \-U
@@ -589,6 +592,35 @@ is applied to all instances of the associated metric.
 .IP 8. 5n
 There may be an arbitrary number of logging specifications.
 .IP 9. 5n
+As of PCP version 4.0 and later, any metric name specification
+that does not resolve to a leaf node in the PMNS is added to an
+internal list of possible
+.IR "dynamic subtree roots" .
+PMDAs can dynamically create new metrics below a dynamic root node
+in their PMNS, and send a notification to clients that the PMNS
+has changed, see 
+.BR pmdaExtSetFlags (3)
+and in particular the
+.B "METRIC CHANGES"
+section for API details.
+This mechanism is currently supported by
+.BR pmdaprometheus (1)
+and
+.BR pmdammv (1) .
+When a fetch issued by
+.B pmlogger
+returns with the
+.B PMDA_EXT_NAMES_CHANGE
+flag set,
+.B pmlogger
+will traverse the internal list of possible dynamic subtree nodes
+and dynamically discover any new metrics.
+In effect,
+as of PCP version 4.0 and later,
+.B pmlogger
+can be configured to dynamically log new metrics that appear in the future,
+after the configuration file is initially parsed.
+.IP 10. 5n
 Following all of the logging specifications, there may be an optional
 access control section, introduced by the literal token
 .BR [access] .
@@ -832,9 +864,11 @@ as described in
 .BR pmdumplog (1),
 .BR pmlc (1),
 .BR pmlogger_check (1),
-.BR __pmSpecLocalPMDA (3),
+.BR systemctl (1),
+.BR pmSpecLocalPMDA (3),
 .BR pcp.conf (5),
 .BR pcp.env (5),
+.BR pmlogger (5),
 .BR pmns (5)
 and
 .BR chkconfig (8).
@@ -844,9 +878,9 @@ The archive logs are sufficiently precious that
 will not truncate an existing physical file.  A message of the form
 .br
 .in +0.5v
-__pmLogNewFile: "foo.index" already exists, not over-written
+\&...: "foo.index" already exists, not over-written
 .br
-__pmLogCreate: File exists
+\&...: File exists
 .in
 indicates this situation has arisen.  You must explicitly remove
 the files and launch

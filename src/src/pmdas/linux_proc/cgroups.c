@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 Red Hat.
+ * Copyright (c) 2012-2018 Red Hat.
  * Copyright (c) 2010 Aconex.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -14,7 +14,7 @@
  */
 
 #include "pmapi.h"
-#include "impl.h"
+#include "libpcp.h"
 #include "pmda.h"
 #include "indom.h"
 #include "cgroups.h"
@@ -94,7 +94,7 @@ refresh_cgroup_devices(void)
 	if (pmdaCacheLookupName(diskindom, namebuf, &inst, (void **)&dev) < 0 ||
 	    dev == NULL) {
 	    if (!(dev = (device_t *)malloc(sizeof(device_t)))) {
-		__pmNoMem("device", sizeof(device_t), PM_RECOV_ERR);
+		pmNoMem("device", sizeof(device_t), PM_RECOV_ERR);
 		continue;
 	    }
 	    dev->major = major;
@@ -208,7 +208,7 @@ refresh_cgroup_filesys(void)
 static char *
 scan_filesys_options(const char *options, const char *option)
 {
-    static char buffer[128];
+    static char buffer[MAXMNTOPTSLEN];
     char *s;
 
     strncpy(buffer, options, sizeof(buffer));
@@ -278,6 +278,58 @@ cgroup_mounts_subsys(const char *system, char *buffer, int length)
 	return strlen(buffer);
     }
     return 0;
+}
+
+/*
+ * From a cgroup name attempt to extract a container ID
+ *    /system.slice/docker-0ea0c4[...]3bc0.scope (e.g. RHEL/Fedora)
+ *    /docker/0ea0c4[...]3bc0  (e.g. Debian/Ubuntu/SUSE)
+ * However, we need to be wary of strings like "docker-containerd".
+ * Also, docker may be started with the --parent-cgroup= argument,
+ * further complicating our life - /system.slice is just a default.
+ */
+char *
+cgroup_container_search(const char *cgroup, char *cid, int cidlen)
+{
+    const char *endp = strchr(cgroup, '\n');
+    const char *p;
+    char *end;
+    int len;
+
+    if (endp == NULL)
+	endp = cgroup + strlen(cgroup) + 1;
+    while (*(endp-1) == '\n')
+	endp--;
+    for (p = endp; p != cgroup; p--)
+	if (*p == '/') break;
+    if (p == cgroup)
+	return NULL;
+
+    if (strncmp(p, "/docker-", sizeof("/docker-")-1) == 0) {
+	p += sizeof("/docker-")-1;
+	if ((end = strchr(p, '.')) != NULL &&
+	    ((len = end - p) < cidlen) && len == DOCKERCIDLEN) {
+	    strncpy(cid, p, len);
+	    cid[len] = '\0';
+	    return cid;
+	}
+    } else if ((len = (endp - p) - 2) == DOCKERCIDLEN) {
+	strncpy(cid, p + 1, len);
+	cid[len] = '\0';
+	return cid;
+    }
+    return NULL;
+}
+
+static void
+cgroup_container(const char *cgroup, char *buf, int buflen, int *key)
+{
+    char	*cid;
+
+    if ((cid = cgroup_container_search(cgroup, buf, buflen)) == NULL)
+	*key = -1;
+    else
+	*key = proc_strings_insert(cid);
 }
 
 static const char *
@@ -448,6 +500,7 @@ refresh_cpuset(const char *path, const char *name)
     pmInDom indom = INDOM(CGROUP_CPUSET_INDOM);
     cgroup_cpuset_t *cpuset;
     char file[MAXPATHLEN];
+    char id[MAXCIDLEN];
     int sts;
 
     sts = pmdaCacheLookupName(indom, name, NULL, (void **)&cpuset);
@@ -462,6 +515,7 @@ refresh_cpuset(const char *path, const char *name)
     cpuset->cpus = read_oneline_string(file);
     pmsprintf(file, sizeof(file), "%s/cpuset.mems", path);
     cpuset->mems = read_oneline_string(file);
+    cgroup_container(name, id, sizeof(id), &cpuset->container);
     pmdaCacheStore(indom, PMDA_CACHE_ADD, name, cpuset);
 }
 
@@ -555,6 +609,7 @@ refresh_cpuacct(const char *path, const char *name)
     pmInDom indom = INDOM(CGROUP_CPUACCT_INDOM);
     cgroup_cpuacct_t *cpuacct;
     char file[MAXPATHLEN];
+    char id[MAXCIDLEN];
     int sts;
 
     sts = pmdaCacheLookupName(indom, name, NULL, (void **)&cpuacct);
@@ -571,6 +626,7 @@ refresh_cpuacct(const char *path, const char *name)
     read_oneline_ull(file, &cpuacct->usage);
     pmsprintf(file, sizeof(file), "%s/cpuacct.usage_percpu", path);
     read_percpuacct_usage(file, name);
+    cgroup_container(name, id, sizeof(id), &cpuacct->container);
     pmdaCacheStore(indom, PMDA_CACHE_ADD, name, cpuacct);
 }
 
@@ -623,6 +679,7 @@ refresh_cpusched(const char *path, const char *name)
     pmInDom indom = INDOM(CGROUP_CPUSCHED_INDOM);
     cgroup_cpusched_t *cpusched;
     char file[MAXPATHLEN];
+    char id[MAXCIDLEN];
     int sts;
 
     sts = pmdaCacheLookupName(indom, name, NULL, (void **)&cpusched);
@@ -641,6 +698,7 @@ refresh_cpusched(const char *path, const char *name)
     read_oneline_ull(file, &cpusched->cfs_period);
     pmsprintf(file, sizeof(file), "%s/cpu.cfs_quota_us", path);
     read_oneline_ll(file, &cpusched->cfs_quota);
+    cgroup_container(name, id, sizeof(id), &cpusched->container);
 
     pmdaCacheStore(indom, PMDA_CACHE_ADD, name, cpusched);
 }
@@ -726,6 +784,7 @@ refresh_memory(const char *path, const char *name)
     pmInDom indom = INDOM(CGROUP_MEMORY_INDOM);
     cgroup_memory_t *memory;
     char file[MAXPATHLEN];
+    char id[MAXCIDLEN];
     int sts;
 
     sts = pmdaCacheLookupName(indom, name, NULL, (void **)&memory);
@@ -744,6 +803,7 @@ refresh_memory(const char *path, const char *name)
     read_oneline_ull(file, &memory->usage);
     pmsprintf(file, sizeof(file), "%s/memory.failcnt", path);
     read_oneline_ull(file, &memory->failcnt);
+    cgroup_container(name, id, sizeof(id), &memory->container);
 
     pmdaCacheStore(indom, PMDA_CACHE_ADD, name, memory);
 }
@@ -760,6 +820,7 @@ refresh_netcls(const char *path, const char *name)
     pmInDom indom = INDOM(CGROUP_NETCLS_INDOM);
     cgroup_netcls_t *netcls;
     char file[MAXPATHLEN];
+    char id[MAXCIDLEN];
     int sts;
 
     sts = pmdaCacheLookupName(indom, name, NULL, (void **)&netcls);
@@ -772,6 +833,7 @@ refresh_netcls(const char *path, const char *name)
     }
     pmsprintf(file, sizeof(file), "%s/net_cls.classid", path);
     read_oneline_ull(file, &netcls->classid);
+    cgroup_container(name, id, sizeof(id), &netcls->container);
     pmdaCacheStore(indom, PMDA_CACHE_ADD, name, netcls);
 }
 
@@ -971,6 +1033,7 @@ refresh_blkio(const char *path, const char *name)
     pmInDom indom = INDOM(CGROUP_BLKIO_INDOM);
     cgroup_blkio_t *blkio;
     char file[MAXPATHLEN];
+    char id[MAXCIDLEN];
     int sts;
 
     sts = pmdaCacheLookupName(indom, name, NULL, (void **)&blkio);
@@ -1011,6 +1074,7 @@ refresh_blkio(const char *path, const char *name)
     pmsprintf(file, sizeof(file), "%s/blkio.throttle.io_serviced", path);
     read_blkio_devices_stats(file, name,
 		CG_BLKIO_THROTTLEIOSERVICED_TOTAL, &blkio->total.throttle_io_serviced);
+    cgroup_container(name, id, sizeof(id), &blkio->container);
 
     pmdaCacheStore(indom, PMDA_CACHE_ADD, name, blkio);
 }

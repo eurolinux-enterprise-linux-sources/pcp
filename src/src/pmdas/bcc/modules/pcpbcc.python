@@ -1,0 +1,242 @@
+#
+# Copyright (C) 2017-2018 Marko Myllynen <myllynen@redhat.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+""" PCP BCC PMDA module base class """
+
+import ctypes as ct
+from os import kill
+from collections import OrderedDict
+from bcc.table import log2_index_max
+
+# pylint: disable=too-many-instance-attributes
+class PCPBCCBase(object):
+    """ PCP BCC Base Class """
+    def __init__(self, module, config, log, err):
+        """ Constructor """
+        self._who = module
+        self._log = log
+        self._err = err
+
+        self.bpf = None
+        self.insts = {}
+        self.items = []
+
+        self.pmdaIndom = None # pylint: disable=invalid-name
+        self.config = config
+        self.debug = False
+
+        for opt in self.config.options(self._who):
+            if opt == 'debug':
+                self.debug = self.config.getboolean(self._who, opt)
+
+        if self.debug:
+            self.log("Debug logging enabled.")
+
+    def log(self, msg):
+        """ Log a message """
+        self._log(self._who + ": " + msg)
+
+    def err(self, msg):
+        """ Log an error """
+        self._err(self._who + ": " + msg)
+
+    def metrics(self):
+        """ Get metric definitions """
+        raise NotImplementedError
+
+    def helpers(self, pmdaIndom): # pylint: disable=invalid-name
+        """ Register helper function references """
+        self.pmdaIndom = pmdaIndom
+
+    def compile(self):
+        """ Compile BPF """
+        raise NotImplementedError
+
+    def refresh(self):
+        """ Refresh BPF data """
+        raise NotImplementedError
+
+    def bpfdata(self, item, inst):
+        """ Return BPF data as PCP metric value """
+        raise NotImplementedError
+
+    def label_cluster(self): # pylint: disable=no-self-use
+        """ Cluster labels """
+        return '{}'
+
+    def label_instance(self, inst): # pylint: disable=no-self-use,unused-argument
+        """ Instance labels """
+        return '{}'
+
+    def cleanup(self):
+        """ Clean up at exit """
+        if self.bpf is not None:
+            self.bpf.cleanup()
+        self.bpf = None
+        self.log("BPF detached.")
+
+    #
+    # Helpers for modules
+    #
+
+    @classmethod
+    def read_log2_histogram_section(cls, hist_data, cache):
+        """
+        Read log2 histogram section
+
+        Adapted from https://github.com/iovisor/bcc/blob/master/src/python/bcc/table.py
+
+        Cache is filled until the top end (zero value buckets).
+        Always populate the cache with the first element, even if the value is
+        zero (to have at least a single instance instead of no values at all).
+        """
+        idx_max = -1
+        val_max = 0
+
+        for i, v in enumerate(hist_data): # pylint: disable=invalid-name
+            if v > 0:
+                idx_max = i
+            if v > val_max:
+                val_max = v
+
+        for i in range(1, max(idx_max, 1) + 1):
+            low = (1 << i) >> 1
+            high = (1 << i) - 1
+            if low == high:
+                low -= 1
+
+            key = str(low) + "-" + str(high)
+            if key not in cache:
+                cache[key] = 0
+            cache[key] += hist_data[i]
+
+    # pylint: disable=protected-access
+    @classmethod
+    def read_log2_histograms(cls, table, cache):
+        """
+        Read multiple log2 histograms
+
+        Adapted from https://github.com/iovisor/bcc/blob/master/src/python/bcc/table.py
+        """
+
+        if not isinstance(table.Key(), ct.Structure):
+            raise Exception("Histogram does not contain multiple sections")
+
+        hist_sections = {}
+        hist_key_field1 = table.Key._fields_[0][0]
+        hist_key_field2 = table.Key._fields_[1][0]
+
+        # Note: table contains sections with changed values only
+        for k, v in table.items(): # pylint: disable=invalid-name
+            section = getattr(k, hist_key_field1).decode("UTF-8")
+            if section not in hist_sections:
+                hist_sections[section] = [0] * log2_index_max
+            slot = getattr(k, hist_key_field2)
+            hist_sections[section][slot] = v.value
+
+        for section, hist_data in hist_sections.items():
+            if section not in cache:
+                cache[section] = {}
+            cls.read_log2_histogram_section(hist_data, cache[section])
+
+        all_cache_keys = set()
+        for section_cache in cache.values():
+            all_cache_keys.update(section_cache.keys())
+        sorted_cache_keys = sorted(all_cache_keys, key=lambda k: int(k.split('-')[0]))
+        return OrderedDict([(key, ct.c_int(1)) for key in sorted_cache_keys])
+
+    @classmethod
+    def read_log2_histogram(cls, table, cache):
+        """ Read single log2 histogram """
+        if isinstance(table.Key(), ct.Structure):
+            raise Exception("Histogram contains multiple sections")
+
+        hist_data = [0] * log2_index_max
+        for k, v in table.items(): # pylint: disable=invalid-name
+            hist_data[k.value] = v.value
+        cls.read_log2_histogram_section(hist_data, cache)
+        sorted_cache_keys = sorted(cache.keys(), key=lambda k: int(k.split('-')[0]))
+        return OrderedDict([(key, ct.c_int(1)) for key in sorted_cache_keys])
+
+    @staticmethod
+    def read_probe_conf(conf):
+        """ Read tracepoint/uprobe/USDT probes from a file """
+        if ":" in conf:
+            return conf.split(",")
+        if not conf.startswith("/"):
+            from os import path
+            conf = path.dirname(__file__) + "/../" + conf
+        return [l.strip() for l in open(conf).readlines() if l.strip() != "" and '#' not in l]
+
+    @staticmethod
+    def get_proc_info(process):
+        """ Get process info for given PIDs or process name """
+
+        def get_pids(procname):
+            """ Get PIDs for a process """
+            from os import listdir
+            import re
+            pids = []
+            comp = re.compile(r'\A' + procname + r'\Z')
+            for dirname in listdir("/proc"):
+                try:
+                    with open("/proc/%s/cmdline" % dirname, "rb") as fcmd:
+                        cmdline = fcmd.read().decode().split("\x00")
+                    with open("/proc/%s/comm" % dirname) as fcomm:
+                        comm = fcomm.read().strip()
+                    if procname == comm or re.match(comp, " ".join(cmdline[:-1])):
+                        pids.append(int(dirname))
+                except Exception: # pylint: disable=broad-except
+                    continue
+            return pids
+
+        def get_proc_details(pids):
+            """ Get process info for PIDs """
+            procinfo = []
+            for pid in pids:
+                try:
+                    with open("/proc/%s/cmdline" % str(pid), "rb") as fcmd:
+                        cmdline = fcmd.read().decode().split("\x00")
+                    procinfo.append([pid, cmdline[0], " ".join(cmdline[1:-1])])
+                except Exception: # pylint: disable=broad-except
+                    continue
+            return procinfo
+
+        try:
+            pids = [int(i) for i in process.split(",")]
+        except ValueError:
+            pids = [pid for proc in process.split(",") for pid in get_pids(proc)]
+
+        return get_proc_details(pids)
+
+    @staticmethod
+    def apply_pid_filter(bpf_text, pids, need_pid_def=True):
+        """ Apply PID filtering for BPF text """
+        if need_pid_def:
+            pid_filter = "u32 pid = bpf_get_current_pid_tgid() >> 32; if (PID_CHECK) return 0;"
+        else:
+            pid_filter = "if (PID_CHECK) return 0;"
+        if not pids:
+            return bpf_text.replace("//FILTER_PID", "FILTER_PID").replace("FILTER_PID", "")
+        bpf_text = bpf_text.replace("//FILTER_PID", "FILTER_PID").replace("FILTER_PID", pid_filter)
+        check_pid = " && ".join(["pid != %d" % pid for pid in pids])
+        return bpf_text.replace("PID_CHECK", check_pid)
+
+    @staticmethod
+    def pid_alive(pid):
+        """ Test liveliness of PID """
+        try:
+            kill(int(pid), 0)
+            return True
+        except Exception: # pylint: disable=broad-except
+            return False

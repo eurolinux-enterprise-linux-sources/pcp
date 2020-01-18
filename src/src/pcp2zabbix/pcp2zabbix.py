@@ -1,6 +1,7 @@
 #!/usr/bin/env pmpython
 #
-# Copyright (C) 2015-2017 Marko Myllynen <myllynen@redhat.com>
+# Copyright (C) 2015-2018 Marko Myllynen <myllynen@redhat.com>
+# Copyright (C) 2018 Red Hat.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
@@ -43,7 +44,7 @@
 # pylint: disable=too-many-boolean-expressions, too-many-statements
 # pylint: disable=too-many-instance-attributes, too-many-locals
 # pylint: disable=too-many-branches, too-many-nested-blocks
-# pylint: disable=bare-except, broad-except
+# pylint: disable=broad-except
 
 """ PCP to Zabbix Bridge """
 
@@ -54,16 +55,13 @@ import time
 import sys
 
 # Our imports
-try:
-    import json
-except:
-    import simplejson as json
+import json
 import socket
 import struct
 
 # PCP Python PMAPI
 from pcp import pmapi, pmconfig
-from cpmapi import PM_CONTEXT_ARCHIVE, PM_ERR_EOL, PM_IN_NULL, PM_DEBUG_APPL0, PM_DEBUG_APPL1
+from cpmapi import PM_CONTEXT_ARCHIVE, PM_ERR_EOL, PM_DEBUG_APPL0, PM_DEBUG_APPL1
 from cpmapi import PM_TIME_SEC
 
 if sys.version_info[0] >= 3:
@@ -101,8 +99,12 @@ class PCP2Zabbix(object):
         # Configuration directives
         self.keys = ('source', 'output', 'derived', 'header', 'globals',
                      'samples', 'interval', 'type', 'precision', 'daemonize',
-                     'zabbix_server', 'zabbix_port', 'zabbix_host', 'zabbix_interval', 'zabbix_prefix',
+                     'zabbix_server', 'zabbix_port', 'zabbix_host',
+                     'zabbix_interval', 'zabbix_prefix', 'zabbix_lld',
                      'count_scale', 'space_scale', 'time_scale', 'version',
+                     'count_scale_force', 'space_scale_force', 'time_scale_force',
+                     'type_prefer', 'precision_force', 'limit_filter', 'limit_filter_force',
+                     'live_filter', 'rank', 'invert_filter', 'predicate',
                      'speclocal', 'instances', 'ignore_incompat', 'omit_flat')
 
         # The order of preference for options (as present):
@@ -122,21 +124,36 @@ class PCP2Zabbix(object):
         self.opts.pmSetOptionInterval(str(60)) # 60 sec
         self.delay = 0
         self.type = 0
+        self.type_prefer = self.type
         self.ignore_incompat = 0
         self.instances = []
+        self.live_filter = 0
+        self.rank = 0
+        self.limit_filter = 0
+        self.limit_filter_force = 0
+        self.invert_filter = 0
+        self.predicate = None
         self.omit_flat = 0
         self.precision = 3 # .3f
+        self.precision_force = None
         self.timefmt = "%H:%M:%S" # For compat only
         self.interpol = 0
         self.count_scale = None
+        self.count_scale_force = None
         self.space_scale = None
+        self.space_scale_force = None
         self.time_scale = None
+        self.time_scale_force = None
 
         self.zabbix_server = ZBXSERVER
         self.zabbix_port = ZBXPORT
         self.zabbix_host = None
         self.zabbix_interval = None
         self.zabbix_prefix = ZBXPREFIX
+
+        self.zabbix_lld = 0
+        # Dictionary storing metric:[instance, instance ...] objects
+        self.lld_history = {}
 
         # Internal
         self.runtime = -1
@@ -146,7 +163,8 @@ class PCP2Zabbix(object):
 
         # Performance metrics store
         # key - metric name
-        # values - 0:label, 1:instance(s), 2:unit/scale, 3:type, 4:width, 5:pmfg item
+        # values - 0:txt label, 1:instance(s), 2:unit/scale, 3:type,
+        #          4:width, 5:pmfg item, 6:precision, 7:limit
         self.metrics = OrderedDict()
         self.pmfg = None
         self.pmfg_ts = None
@@ -156,13 +174,14 @@ class PCP2Zabbix(object):
         self.pmconfig.read_options()
         self.pmconfig.read_cmd_line()
         self.pmconfig.prepare_metrics()
+        self.pmconfig.set_signal_handler()
 
     def options(self):
         """ Setup default command line argument option handling """
         opts = pmapi.pmOptions()
         opts.pmSetOptionCallback(self.option)
         opts.pmSetOverrideCallback(self.option_override)
-        opts.pmSetShortOptions("a:h:LK:c:Ce:D:V?HGA:S:T:O:s:t:rIi:vP:q:b:y:g:p:X:E:x:")
+        opts.pmSetShortOptions("a:h:LK:c:Ce:D:V?HGA:S:T:O:s:t:rRIi:jJ:8:9:nN:vP:0:q:b:y:Q:B:Y:g:p:X:E:x:l")
         opts.pmSetShortUsage("[option...] metricspec [...]")
 
         opts.pmSetLongOptionHeader("General options")
@@ -175,7 +194,7 @@ class PCP2Zabbix(object):
         opts.pmSetLongOption("config", 1, "c", "FILE", "config file path")
         opts.pmSetLongOption("check", 0, "C", "", "check config and metrics and exit")
         opts.pmSetLongOption("derived", 1, "e", "FILE|DFNT", "derived metrics definitions")
-        self.daemonize = opts.pmSetLongOption("daemonize", 0, "", "", "daemonize on startup") # > 1
+        opts.pmSetLongOption("daemonize", 0, "", "", "daemonize on startup")
         opts.pmSetLongOptionDebug()        # -D/--debug
         opts.pmSetLongOptionVersion()      # -V/--version
         opts.pmSetLongOptionHelp()         # -?/--help
@@ -190,68 +209,100 @@ class PCP2Zabbix(object):
         opts.pmSetLongOptionSamples()      # -s/--samples
         opts.pmSetLongOptionInterval()     # -t/--interval
         opts.pmSetLongOption("raw", 0, "r", "", "output raw counter values (no rate conversion)")
+        opts.pmSetLongOption("raw-prefer", 0, "R", "", "prefer output raw counter values (no rate conversion)")
         opts.pmSetLongOption("ignore-incompat", 0, "I", "", "ignore incompatible instances (default: abort)")
         opts.pmSetLongOption("instances", 1, "i", "STR", "instances to report (default: all current)")
-        opts.pmSetLongOption("omit-flat", 0, "v", "", "omit single-valued metrics with -i (default: include)")
-        opts.pmSetLongOption("precision", 1, "P", "N", "N digits after the decimal separator (default: 3)")
+        opts.pmSetLongOption("live-filter", 0, "j", "", "perform instance live filtering")
+        opts.pmSetLongOption("rank", 1, "J", "COUNT", "limit results to COUNT highest/lowest valued instances")
+        opts.pmSetLongOption("limit-filter", 1, "8", "LIMIT", "default limit for value filtering")
+        opts.pmSetLongOption("limit-filter-force", 1, "9", "LIMIT", "forced limit for value filtering")
+        opts.pmSetLongOption("invert-filter", 0, "n", "", "perform ranking before live filtering")
+        opts.pmSetLongOption("predicate", 1, "N", "METRIC", "set predicate filter reference metric")
+        opts.pmSetLongOption("omit-flat", 0, "v", "", "omit single-valued metrics")
+        opts.pmSetLongOption("precision", 1, "P", "N", "prefer N digits after decimal separator (default: 3)")
+        opts.pmSetLongOption("precision-force", 1, "0", "N", "force N digits after decimal separator")
         opts.pmSetLongOption("count-scale", 1, "q", "SCALE", "default count unit")
+        opts.pmSetLongOption("count-scale-force", 1, "Q", "SCALE", "forced count unit")
         opts.pmSetLongOption("space-scale", 1, "b", "SCALE", "default space unit")
+        opts.pmSetLongOption("space-scale-force", 1, "B", "SCALE", "forced space unit")
         opts.pmSetLongOption("time-scale", 1, "y", "SCALE", "default time unit")
+        opts.pmSetLongOption("time-scale-force", 1, "Y", "SCALE", "forced time unit")
 
         opts.pmSetLongOption("zabbix-server", 1, "g", "SERVER", "zabbix server (default: " + ZBXSERVER + ")")
         opts.pmSetLongOption("zabbix-port", 1, "p", "PORT", "zabbix port (default: " + str(ZBXPORT) + ")")
         opts.pmSetLongOption("zabbix-host", 1, "X", "HOSTID", "zabbix host-id for measurements")
         opts.pmSetLongOption("zabbix-interval", 1, "E", "INTERVAL", "interval to send collected metrics")
         opts.pmSetLongOption("zabbix-prefix", 1, "x", "PREFIX", "prefix for metric names (default: " + ZBXPREFIX + ")")
+        opts.pmSetLongOption("zabbix-lld", 0, "l", "", "emit low level discovery keys for each metric")
 
         return opts
 
     def option_override(self, opt):
         """ Override standard PCP options """
-        if opt == 'H' or opt == 'K' or opt == 'g':
+        if opt in ('g', 'H', 'K', 'n', 'N', 'p'):
             return 1
         return 0
 
     def option(self, opt, optarg, index):
         """ Perform setup for an individual command line option """
-        if index == self.daemonize and opt == '':
+        if opt == 'daemonize':
             self.daemonize = 1
-            return
-        if opt == 'K':
-            if not self.speclocal or not self.speclocal.startswith("K:"):
-                self.speclocal = "K:" + optarg
+        elif opt == 'K':
+            if not self.speclocal or not self.speclocal.startswith(";"):
+                self.speclocal = ";" + optarg
             else:
-                self.speclocal = self.speclocal + "|" + optarg
+                self.speclocal = self.speclocal + ";" + optarg
         elif opt == 'c':
             self.config = optarg
         elif opt == 'C':
             self.check = 1
         elif opt == 'e':
-            self.derived = optarg
+            if not self.derived or not self.derived.startswith(";"):
+                self.derived = ";" + optarg
+            else:
+                self.derived = self.derived + ";" + optarg
         elif opt == 'H':
             self.header = 0
         elif opt == 'G':
             self.globals = 0
         elif opt == 'r':
             self.type = 1
+        elif opt == 'R':
+            self.type_prefer = 1
         elif opt == 'I':
             self.ignore_incompat = 1
         elif opt == 'i':
             self.instances = self.instances + self.pmconfig.parse_instances(optarg)
+        elif opt == 'j':
+            self.live_filter = 1
+        elif opt == 'J':
+            self.rank = optarg
+        elif opt == '8':
+            self.limit_filter = optarg
+        elif opt == '9':
+            self.limit_filter_force = optarg
+        elif opt == 'n':
+            self.invert_filter = 1
+        elif opt == 'N':
+            self.predicate = optarg
         elif opt == 'v':
             self.omit_flat = 1
         elif opt == 'P':
-            try:
-                self.precision = int(optarg)
-            except:
-                sys.stderr.write("Error while parsing options: Integer expected.\n")
-                sys.exit(1)
+            self.precision = optarg
+        elif opt == '0':
+            self.precision_force = optarg
         elif opt == 'q':
             self.count_scale = optarg
+        elif opt == 'Q':
+            self.count_scale_force = optarg
         elif opt == 'b':
             self.space_scale = optarg
+        elif opt == 'B':
+            self.space_scale_force = optarg
         elif opt == 'y':
             self.time_scale = optarg
+        elif opt == 'Y':
+            self.time_scale_force = optarg
         elif opt == 'g':
             self.zabbix_server = optarg
         elif opt == 'p':
@@ -262,6 +313,8 @@ class PCP2Zabbix(object):
             self.zabbix_interval = optarg
         elif opt == 'x':
             self.zabbix_prefix = optarg
+        elif opt == 'l':
+            self.zabbix_lld = 1
         else:
             raise pmapi.pmUsageErr()
 
@@ -276,17 +329,18 @@ class PCP2Zabbix(object):
         if pmapi.c_api.pmSetContextOptions(self.context.ctx, self.opts.mode, self.opts.delta):
             raise pmapi.pmUsageErr()
 
-        self.pmconfig.validate_metrics()
-
     def validate_config(self):
         """ Validate configuration options """
         if self.version != CONFVER:
             sys.stderr.write("Incompatible configuration file version (read v%s, need v%d).\n" % (self.version, CONFVER))
             sys.exit(1)
 
+        self.pmconfig.validate_common_options()
+
         if self.zabbix_host is None:
             self.zabbix_host = self.context.pmGetContextHostName()
 
+        self.pmconfig.validate_metrics(curr_insts=not self.live_filter)
         self.pmconfig.finalize_options()
 
         # Adjust interval
@@ -350,7 +404,7 @@ class PCP2Zabbix(object):
             if self.samples and self.samples > 0:
                 self.samples -= 1
             if self.delay and self.interpol and self.samples != 0:
-                self.context.pmtimevalSleep(self.interval)
+                self.pmconfig.pause()
 
         # Allow to flush buffered values / say goodbye
         self.report(None)
@@ -400,7 +454,10 @@ class PCP2Zabbix(object):
                                  '\t\t\t"host":%s,\n'
                                  '\t\t\t"key":%s,\n'
                                  '\t\t\t"value":%s,\n'
-                                 '\t\t\t"clock":%d}') % (j(m.host), j(m.key), j(m.value), clock))
+                                 '\t\t\t"clock":%d}') % (j(m.host),
+                                                         j(m.key),
+                                                         j(m.value),
+                                                         clock))
         json_data = ('{\n'
                      '\t"request":"sender data",\n'
                      '\t"data":[\n%s]\n'
@@ -429,7 +486,7 @@ class PCP2Zabbix(object):
             if self.context.pmDebug(PM_DEBUG_APPL0):
                 print('Got response from Zabbix: %s' % resp)
             if resp.get('response') != 'success':
-                sys.stderr.write('Error response from Zabbix: %s', resp)
+                sys.stderr.write('Error response from Zabbix: %s' % resp)
                 sys.stderr.flush()
                 return False
             return True
@@ -454,25 +511,48 @@ class PCP2Zabbix(object):
         if self.zabbix_prevsend is None:
             self.zabbix_prevsend = ts
 
-        # Collect the results
-        for metric in self.metrics:
-            try:
-                for inst, name, val in self.metrics[metric][5](): # pylint: disable=unused-variable
-                    key = self.zabbix_prefix + metric
-                    if name:
-                        key += "[" + name + "]"
-                    if inst != PM_IN_NULL and not name:
-                        continue
-                    try:
-                        value = val()
-                        fmt = "." + str(self.precision) + "f"
-                        value = format(value, fmt) if isinstance(value, float) else str(value)
-                        self.zabbix_metrics.append(ZabbixMetric(self.zabbix_host, key, value, ts))
-                    except:
-                        pass
-            except:
-                pass
+        results = self.pmconfig.get_sorted_results()
 
+        # Collect the results
+        for metric in results:
+            fmt = "." + str(self.metrics[metric][6]) + "f"
+
+            if self.zabbix_lld:
+                send_lld = False
+                if metric in self.lld_history:
+                    metric_lld = self.lld_history[metric]
+                    send_lld = False
+                else:
+                    metric_lld = self.lld_history[metric] = set()
+                    send_lld = True
+
+            for _, name, value in results[metric]:
+                key = self.zabbix_prefix + metric
+                if name:
+                    if self.zabbix_lld and name not in metric_lld:
+                        metric_lld.add(name)
+                        send_lld = True
+                    key += "[" + name + "]"
+                value = format(value, fmt) if isinstance(value, float) else str(value)
+                self.zabbix_metrics.append(ZabbixMetric(self.zabbix_host, key, value, ts))
+                
+            # Construct extra LLD pseudo-metric if needed
+            if self.zabbix_lld and send_lld:
+                # https://www.zabbix.com/documentation/3.4/manual/discovery/low_level_discovery
+                # The key name goes into the zabbix discovery rule:
+                key = self.zabbix_prefix + "discovery[" + self.zabbix_prefix + metric + "]"
+                # The value is a string with JSON content;
+                # it will be quoted inside the outer JSON message.
+                value = "{ \"data\": ["
+                values = []
+                for instance in sorted(metric_lld): # For QA reproducability
+                    macro_name = "\"{#" + (self.zabbix_prefix+metric).upper() + "}\""
+                    macro_value = json.dumps(instance)
+                    values.append("{ " + macro_name + ":" + macro_value + "}")
+                value += ",".join(values)
+                value += "] }"
+                self.zabbix_metrics.append(ZabbixMetric(self.zabbix_host, key, value, ts))
+                
         # Send when needed
         if self.context.type == PM_CONTEXT_ARCHIVE:
             if len(self.zabbix_metrics) >= self.zabbix_interval:

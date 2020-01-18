@@ -1,7 +1,7 @@
 /*
  * Linux /proc/<pid>/... Clusters
  *
- * Copyright (c) 2013-2015 Red Hat.
+ * Copyright (c) 2013-2015,2018 Red Hat.
  * Copyright (c) 2000,2004 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -123,6 +123,8 @@ enum {
     PROC_PID_STATUS_NSSID,
     PROC_PID_STATUS_TGID,
     PROC_PID_STATUS_ENVID,	/* OpenVZ kernel, not in mainline */
+    PROC_PID_STATUS_VMREAL,
+    PROC_PID_STATUS_VMNONLIB,
 
     /* number of metrics from /proc/<pid>/status */
     NR_PROC_PID_STATUS
@@ -167,12 +169,12 @@ enum {
  */
 #define PROC_PID_FD_COUNT		0
 
-
 /*
  * metrics in /proc/<pid>/cgroup
  */
 enum {
     PROC_PID_CGROUP = 0,
+    PROC_PID_CONTAINER,
 };
 
 /*
@@ -180,6 +182,13 @@ enum {
  */
 enum {
     PROC_PID_LABEL = 0,
+};
+
+/*
+ * metrics in /proc/<pid>/oom_score
+ */
+enum {
+    PROC_PID_OOM_SCORE = 0,
 };
 
 typedef struct {	/* /proc/<pid>/status */
@@ -237,6 +246,7 @@ enum {
     PROC_PID_FLAG_CGROUP_FETCHED	= 1<<9,
     PROC_PID_FLAG_LABEL_FETCHED		= 1<<10,
     PROC_PID_FLAG_ENVIRON_FETCHED	= 1<<11,
+    PROC_PID_FLAG_OOM_SCORE_FETCHED	= 1<<12,
 };
 
 typedef struct {
@@ -283,9 +293,13 @@ typedef struct {
 
     /* /proc/<pid>/cgroup cluster */
     int			cgroup_id;
+    int			container_id;
 
     /* /proc/<pid>/attr/current cluster */
     int			label_id;
+
+    /* /proc/<pid>/oom_score cluster */
+    uint32_t		oom_score;
 } proc_pid_entry_t;
 
 typedef struct {
@@ -347,6 +361,9 @@ extern proc_pid_entry_t *fetch_proc_pid_cgroup(int, proc_pid_t *, int *);
 
 /* fetch a proc/<pid>/attr/current entry for pid */
 extern proc_pid_entry_t *fetch_proc_pid_label(int, proc_pid_t *, int *);
+
+/* fetch a proc/<pid>/oom_score entry for pid */
+extern proc_pid_entry_t *fetch_proc_pid_oom_score(int, proc_pid_t *, int *);
 
 /* extract the ith space separated field from a buffer */
 extern char *_pm_getfield(char *, int);

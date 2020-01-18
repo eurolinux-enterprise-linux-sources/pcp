@@ -6,9 +6,164 @@
  */
 
 #include <pcp/pmapi.h>
-#include <pcp/impl.h>
+#include "libpcp.h"
 #include <pcp/trace.h>
 #include <pcp/trace_dev.h>
+
+static void
+decode_label_req(const char *name)
+{
+    int			ident, type, sts;
+    struct label_req {
+	__pmPDUHdr	hdr;
+	int		val[1];
+    } *label_req;
+
+    label_req = (struct label_req *)malloc(sizeof(*label_req));
+
+    fprintf(stderr, "[%s] checking all-zeroes structure\n", name);
+    memset(label_req, 0, sizeof(*label_req));
+    sts = __pmDecodeLabelReq((__pmPDU *)label_req, &ident, &type);
+    fprintf(stderr, "  __pmDecodeLabelReq: sts = %d (%s)\n", sts, pmErrStr(sts));
+
+    fprintf(stderr, "[%s] checking access beyond buffer\n", name);
+    memset(label_req, 0, sizeof(*label_req));
+    label_req->hdr.len = sizeof(*label_req);
+    label_req->hdr.type = PDU_LABEL_REQ;
+    sts = __pmDecodeLabelReq((__pmPDU *)label_req, &ident, &type);
+    fprintf(stderr, "  __pmDecodeLabelReq: sts = %d (%s)\n", sts, pmErrStr(sts));
+
+    free(label_req);
+}
+
+static void
+decode_label(const char *name)
+{
+    int			ident, type, nsets, sts;
+    pmLabelSet		*sets;
+    struct labelset {
+	int		inst;
+	int		nlabels;
+	int		json;
+	int		jsonlen;
+    };
+    struct label {
+	__pmPDUHdr	hdr;
+	int		ident;
+	int		type;
+	int		padding;
+	int		nsets;
+	struct labelset	sets[1];
+    } *labels, *xlabels;
+
+    labels = (struct label *)malloc(sizeof(*labels));
+    xlabels = (struct label *)malloc(sizeof(*xlabels)+16);
+
+    fprintf(stderr, "[%s] checking all-zeroes structure\n", name);
+    memset(labels, 0, sizeof(*labels));
+    sts = __pmDecodeLabel((__pmPDU *)labels, &ident, &type, &sets, &nsets);
+    fprintf(stderr, "  __pmDecodeLabel: sts = %d (%s)\n", sts, pmErrStr(sts));
+    if (sts >= 0) { pmFreeLabelSets(sets, nsets); }
+
+    fprintf(stderr, "[%s] checking large nsets field\n", name);
+    memset(labels, 0, sizeof(*labels));
+    labels->hdr.len = sizeof(*labels);
+    labels->hdr.type = PDU_LABEL;
+    labels->nsets = htonl(INT_MAX - 1);
+    sts = __pmDecodeLabel((__pmPDU *)labels, &ident, &type, &sets, &nsets);
+    fprintf(stderr, "  __pmDecodeLabel: sts = %d (%s)\n", sts, pmErrStr(sts));
+    if (sts >= 0) { pmFreeLabelSets(sets, nsets); }
+
+    fprintf(stderr, "[%s] checking large nlabels field\n", name);
+    memset(labels, 0, sizeof(*labels));
+    labels->hdr.len = sizeof(*labels);
+    labels->hdr.type = PDU_LABEL;
+    labels->nsets = htonl(1);
+    labels->sets[0].nlabels = htonl(INT_MAX - 1);
+    sts = __pmDecodeLabel((__pmPDU *)labels, &ident, &type, &sets, &nsets);
+    fprintf(stderr, "  __pmDecodeLabel: sts = %d (%s)\n", sts, pmErrStr(sts));
+    if (sts >= 0) { pmFreeLabelSets(sets, nsets); }
+
+    fprintf(stderr, "[%s] checking large json offset field\n", name);
+    memset(labels, 0, sizeof(*labels));
+    labels->hdr.len = sizeof(*labels);
+    labels->hdr.type = PDU_LABEL;
+    labels->nsets = htonl(1);
+    labels->sets[0].nlabels = htonl(1);
+    labels->sets[0].jsonlen = htonl(1);
+    labels->sets[0].json = htonl(INT_MAX - 1);
+    sts = __pmDecodeLabel((__pmPDU *)labels, &ident, &type, &sets, &nsets);
+    fprintf(stderr, "  __pmDecodeLabel: sts = %d (%s)\n", sts, pmErrStr(sts));
+    if (sts >= 0) { pmFreeLabelSets(sets, nsets); }
+
+    fprintf(stderr, "[%s] checking large jsonlen field\n", name);
+    memset(labels, 0, sizeof(*labels));
+    labels->hdr.len = sizeof(*labels);
+    labels->hdr.type = PDU_LABEL;
+    labels->nsets = htonl(1);
+    labels->sets[0].nlabels = htonl(1);
+    labels->sets[0].jsonlen = htonl(INT_MAX - 1);
+    sts = __pmDecodeLabel((__pmPDU *)labels, &ident, &type, &sets, &nsets);
+    fprintf(stderr, "  __pmDecodeLabel: sts = %d (%s)\n", sts, pmErrStr(sts));
+    if (sts >= 0) { pmFreeLabelSets(sets, nsets); }
+
+    fprintf(stderr, "[%s] checking negative json offset field\n", name);
+    memset(labels, 0, sizeof(*labels));
+    labels->hdr.len = sizeof(*labels);
+    labels->hdr.type = PDU_LABEL;
+    labels->nsets = htonl(1);
+    labels->sets[0].nlabels = htonl(1);
+    labels->sets[0].json = htonl(-2);
+    sts = __pmDecodeLabel((__pmPDU *)labels, &ident, &type, &sets, &nsets);
+    fprintf(stderr, "  __pmDecodeLabel: sts = %d (%s)\n", sts, pmErrStr(sts));
+    if (sts >= 0) { pmFreeLabelSets(sets, nsets); }
+
+    fprintf(stderr, "[%s] checking negative jsonlen field\n", name);
+    memset(labels, 0, sizeof(*labels));
+    labels->hdr.len = sizeof(*labels);
+    labels->hdr.type = PDU_LABEL;
+    labels->nsets = htonl(1);
+    labels->sets[0].nlabels = htonl(1);
+    labels->sets[0].jsonlen = htonl(-2);
+    sts = __pmDecodeLabel((__pmPDU *)labels, &ident, &type, &sets, &nsets);
+    fprintf(stderr, "  __pmDecodeLabel: sts = %d (%s)\n", sts, pmErrStr(sts));
+    if (sts >= 0) { pmFreeLabelSets(sets, nsets); }
+
+    fprintf(stderr, "[%s] checking access beyond basic buffer\n", name);
+    memset(labels, 0, sizeof(*labels));
+    labels->hdr.len = sizeof(*labels);
+    labels->hdr.type = PDU_LABEL;
+    labels->nsets = htonl(2);
+    sts = __pmDecodeLabel((__pmPDU *)labels, &ident, &type, &sets, &nsets);
+    fprintf(stderr, "  __pmDecodeLabel: sts = %d (%s)\n", sts, pmErrStr(sts));
+    if (sts >= 0) { pmFreeLabelSets(sets, nsets); }
+
+    fprintf(stderr, "[%s] checking jsonlen access beyond extended buffer\n", name);
+    memset(xlabels, 0, sizeof(*xlabels) + 16);
+    xlabels->hdr.len = sizeof(*xlabels) + 16;
+    xlabels->hdr.type = PDU_LABEL;
+    xlabels->nsets = htonl(1);
+    xlabels->sets[0].nlabels = htonl(1);
+    xlabels->sets[0].json = htonl(sizeof(struct label));
+    xlabels->sets[0].jsonlen = htonl(32);
+    sts = __pmDecodeLabel((__pmPDU *)xlabels, &ident, &type, &sets, &nsets);
+    fprintf(stderr, "  __pmDecodeLabel: sts = %d (%s)\n", sts, pmErrStr(sts));
+    if (sts >= 0) { pmFreeLabelSets(sets, nsets); }
+
+    fprintf(stderr, "[%s] checking json access beyond extended buffer\n", name);
+    memset(xlabels, 0, sizeof(*xlabels) + 16);
+    xlabels->hdr.len = sizeof(*xlabels) + 16;
+    xlabels->hdr.type = PDU_LABEL;
+    xlabels->nsets = htonl(1);
+    xlabels->sets[0].nlabels = htonl(1);
+    xlabels->sets[0].json = htonl(sizeof(struct label) + 32);
+    sts = __pmDecodeLabel((__pmPDU *)xlabels, &ident, &type, &sets, &nsets);
+    fprintf(stderr, "  __pmDecodeLabel: sts = %d (%s)\n", sts, pmErrStr(sts));
+    if (sts >= 0) { pmFreeLabelSets(sets, nsets); }
+
+    free(xlabels);
+    free(labels);
+}
 
 static void
 decode_attr(const char *name)
@@ -150,7 +305,7 @@ decode_error(const char *name)
 static void
 decode_profile(const char *name)
 {
-    __pmProfile		*outprofs;
+    pmProfile		*outprofs;
     int			sts, ctxnum;
     struct profile {
 	__pmPDUHdr	hdr;
@@ -239,13 +394,13 @@ decode_profile(const char *name)
 static void
 decode_fetch(const char *name)
 {
-    __pmTimeval		when;
+    pmTimeval		when;
     pmID		*pmidlist;
     int			sts, ctx, count;
     struct fetch {
 	__pmPDUHdr	hdr;
 	int		ctxnum;
-	__pmTimeval	when;
+	pmTimeval	when;
 	int		numpmid;
 	pmID		pmidlist[0];
     } *fetch;
@@ -343,14 +498,14 @@ decode_desc(const char *name)
 static void
 decode_instance_req(const char *name)
 {
-    __pmTimeval		when;
+    pmTimeval		when;
     pmInDom		indom;
     int			inst, sts;
     char		*resname;
     struct instance_req {
 	__pmPDUHdr	hdr;
 	pmInDom		indom;
-	__pmTimeval	when;
+	pmTimeval	when;
 	int		inst;
 	int		namelen;
 	char		name[0];
@@ -408,7 +563,7 @@ decode_instance_req(const char *name)
 static void
 decode_instance(const char *name)
 {
-    __pmInResult	*inresult;
+    pmInResult	*inresult;
     int			sts;
     struct instance {
 	__pmPDUHdr	hdr;
@@ -900,7 +1055,7 @@ decode_result(const char *name)
     pmResult		*resp;
     struct result {
 	__pmPDUHdr	hdr;
-	__pmTimeval	stamp;
+	pmTimeval	stamp;
 	int		numpmid;
 	__pmPDU		data[0];
     } *result;
@@ -1225,6 +1380,8 @@ struct pdu {
     { "trace_ack",	decode_trace_ack },
     { "trace_data",	decode_trace_data },
     { "attr",		decode_attr },
+    { "label_req",	decode_label_req },
+    { "label", 		decode_label },
 };
 
 int
@@ -1233,7 +1390,7 @@ main(int argc, char **argv)
     int		c, d;
     int		sts, errflag = 0;
 
-    __pmSetProgname(argv[0]);
+    pmSetProgname(argv[0]);
 
     while ((c = getopt(argc, argv, "D:?")) != EOF) {
 	switch (c) {
@@ -1241,7 +1398,7 @@ main(int argc, char **argv)
 	    sts = pmSetDebug(optarg);
 	    if (sts < 0) {
 		fprintf(stderr, "%s: unrecognized debug options specification (%s)\n",
-		    pmProgname, optarg);
+		    pmGetProgname(), optarg);
 		errflag++;
 	    }
 	    break;
@@ -1254,7 +1411,7 @@ main(int argc, char **argv)
     }
 
     if (errflag || optind < argc-1) {
-	fprintf(stderr, "Usage: %s [-D debugspec]\n", pmProgname);
+	fprintf(stderr, "Usage: %s [-D debugspec]\n", pmGetProgname());
 	exit(1);
     }
 

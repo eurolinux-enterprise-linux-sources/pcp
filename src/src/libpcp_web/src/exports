@@ -2,6 +2,9 @@ PCP_WEB_1.0 {
   global:
     pmjsonInitIndom;
     pmjsonInit;
+
+  local:
+    *;
 };
 
 PCP_WEB_1.1 {
@@ -18,3 +21,62 @@ PCP_WEB_1.2 {
   global:
     pmjsonGet;
 } PCP_WEB_1.1;
+
+PCP_WEB_1.3 {
+  global:
+    pmSeriesQuery;
+    pmSeriesLoad;
+    pmjsonPrint;
+} PCP_WEB_1.2;
+
+PCP_WEB_1.4 {
+  global:
+    sdsnewlen;
+    sdsnew;
+    sdsempty;
+    sdsdup;
+    sdsfree;
+    sdsgrowzero;
+    sdscatlen;
+    sdscat;
+    sdscatsds;
+    sdscpylen;
+    sdscpy;
+    sdscatvprintf;
+    sdscatprintf;
+    sdscatfmt;
+    sdstrim;
+    sdsrange;
+    sdsupdatelen;
+    sdsclear;
+    sdscmp;
+    sdssplitlen;
+    sdsfreesplitres;
+    sdstolower;
+    sdstoupper;
+    sdsfromlonglong;
+    sdscatrepr;
+    sdssplitargs;
+    sdsmapchars;
+    sdsjoin;
+    sdsjoinsds;
+} PCP_WEB_1.3;
+
+PCP_WEB_1.5 {
+  global:
+    pmSeriesDescs;
+    pmSeriesLabels;
+    pmSeriesMetrics;
+    pmSeriesSources;
+    pmSeriesInstances;
+
+    pmLogLevelIsTTY;
+    pmLogLevelPrint;
+    pmLogLevelStr;
+} PCP_WEB_1.4;
+
+PCP_WEB_1.6 {
+  global:
+    pmDiscoverRegister;
+    pmDiscoverUnregister;
+} PCP_WEB_1.5;

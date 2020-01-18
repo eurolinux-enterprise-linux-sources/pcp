@@ -1,7 +1,7 @@
 /*
  * Linux proc/<pid>/{stat,statm,status,...} Clusters
  *
- * Copyright (c) 2013-2016 Red Hat.
+ * Copyright (c) 2013-2018 Red Hat.
  * Copyright (c) 2000,2004,2006 Silicon Graphics, Inc.  All Rights Reserved.
  * Copyright (c) 2010 Aconex.  All Rights Reserved.
  * 
@@ -17,7 +17,7 @@
  */
 
 #include "pmapi.h"
-#include "impl.h"
+#include "libpcp.h"
 #include "pmda.h"
 #include <ctype.h>
 #include <dirent.h>
@@ -478,7 +478,7 @@ hotproc_eval_procs(void)
 	    continue;
 	}
 
-	__pmtimevalNow(&p_timestamp);
+	pmtimevalNow(&p_timestamp);
 
 	/* Collect all the stat/status/statm info */
 	statentry = fetch_proc_pid_stat(pid, hotproc_poss_pid, &sts);
@@ -737,7 +737,7 @@ hotproc_eval_procs(void)
 
     hot_numprocs[current] = np;
 
-    __pmtimevalNow(&ts);
+    pmtimevalNow(&ts);
     refresh_time[current] = ts.tv_sec + ts.tv_usec / 1000000;
 
     double hptime = (ts.tv_sec - p_timestamp.tv_sec) + (ts.tv_usec - p_timestamp.tv_usec)/1000000.0;
@@ -800,7 +800,7 @@ reset_hotproc_timer(void)
     __pmAFunregister(hotproc_timer_id);
     sts = __pmAFregister(&hotproc_update_interval, NULL, hotproc_timer);
     if (sts < 0) {
-	__pmNotifyErr(LOG_ERR, "error registering hotproc timer: %s",
+	pmNotifyErr(LOG_ERR, "error registering hotproc timer: %s",
 			pmErrStr(sts));
 	exit(1);
     }
@@ -865,6 +865,8 @@ refresh_proc_pidlist(proc_pid_t *proc_pid, proc_pid_list_t *pids)
 		int numlen = pmsprintf(buf, sizeof(buf), "%06d ", pids->pids[i]);
 		if ((k = read(fd, buf+numlen, sizeof(buf)-numlen)) > 0) {
 		    p = buf + k + numlen;
+		    if (p - buf >= sizeof(buf))
+			p--;
 		    *p-- = '\0';
 		    /* Skip trailing nils, i.e. don't replace them */
 		    while (buf+numlen < p) {
@@ -1170,7 +1172,6 @@ maperr(void)
 
     if (sts == -EACCES || sts == -EINVAL) sts = 0;
     else if (sts == -ENOENT) sts = PM_ERR_APPVERSION;
-    
     return sts;
 }
 
@@ -1180,97 +1181,60 @@ maperr(void)
 proc_pid_entry_t *
 fetch_proc_pid_stat(int id, proc_pid_t *proc_pid, int *sts)
 {
-    int fd;
-    int n;
-    __pmHashNode *node = __pmHashSearch(id, &proc_pid->pidhash);
-    if( node == NULL ){
-	fprintf(stderr, "Hash Search in fetch_proc_pid_stat failed\n");
-    }
-    else{
-	//fprintf(stderr, "Hash Search in fetch_proc_pid_stat success\n");
-    }
-    proc_pid_entry_t *ep;
-    char buf[1024];
-    char *p;
-    ssize_t nread;
-
+    __pmHashNode	*node = __pmHashSearch(id, &proc_pid->pidhash);
+    proc_pid_entry_t	*ep = node ? (proc_pid_entry_t *)node->data : NULL;
+    char		buf[1024];
+    char		*p;
+    int			fd, n;
+    ssize_t		nread;
 
     *sts = 0;
-    if (node == NULL) {
-	if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-	    char ibuf[1024];
-	    fprintf(stderr, "fetch_proc_pid_stat: __pmHashSearch(%d, hash[%s]) -> NULL\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)));
-	}
-    	return NULL;
-    }
-    ep = (proc_pid_entry_t *)node->data;
+    if (!ep)
+	return NULL;
 
     if (!(ep->flags & PROC_PID_FLAG_STAT_FETCHED)) {
 	if (ep->stat_buflen > 0)
 	    ep->stat_buf[0] = '\0';
 	if ((fd = proc_open("stat", ep)) < 0)
 	    *sts = maperr();
-	else if ((n = read(fd, buf, sizeof(buf))) < 0) {
+	else if ((n = read(fd, buf, sizeof(buf))) < 0)
 	    *sts = maperr();
-	    if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-		char ibuf[1024];
-		char ebuf[1024];
-		fprintf(stderr, "fetch_proc_pid_stat: read failed: id=%d, indom=%s, sts=%s\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)), pmErrStr_r(-oserror(), ebuf, sizeof(ebuf)));
-	    }
-	}
+	else if (n == 0)
+	    *sts = -ENODATA;
 	else {
-	    if (n == 0) {
-		/* eh? */
-		*sts = -ENODATA;
-		if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-		    char ibuf[1024];
-		    fprintf(stderr, "fetch_proc_pid_stat: read EOF?: id=%d, indom=%s\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)));
-		}
+	    if (ep->stat_buflen <= n) {
+		ep->stat_buflen = n;
+		ep->stat_buf = (char *)realloc(ep->stat_buf, n);
 	    }
-	    else {
-		if (ep->stat_buflen <= n) {
-		    ep->stat_buflen = n;
-		    ep->stat_buf = (char *)realloc(ep->stat_buf, n);
-		}
-		memcpy(ep->stat_buf, buf, n);
-		ep->stat_buf[n-1] = '\0';
-	    }
+	    memcpy(ep->stat_buf, buf, n);
+	    ep->stat_buf[n-1] = '\0';
 	}
 	if (fd >= 0)
-		close(fd);
+	    close(fd);
 	ep->flags |= PROC_PID_FLAG_STAT_FETCHED;
     }
 
     if (!(ep->flags & PROC_PID_FLAG_WCHAN_FETCHED)) {
 	if (ep->wchan_buflen > 0)
 	    ep->wchan_buf[0] = '\0';
-	if ((fd = proc_open("wchan", ep)) < 0) {
-	    /* ignore failure here, backwards compat */
+	if ((fd = proc_open("wchan", ep)) < 0)
+	    ; /* ignore failure here, backwards compat */
+	else if ((n = read(fd, buf, sizeof(buf)-1)) < 0)
+	    *sts = maperr();
+	else if (n == 0)
+	    /* wchan is empty, nothing to add here */
 	    ;
-	}
 	else {
-	    if ((n = read(fd, buf, sizeof(buf)-1)) < 0) {
-		*sts = maperr();
-		if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-		    char ibuf[1024];
-		    char ebuf[1024];
-		    fprintf(stderr, "fetch_proc_pid_stat: read \"wchan\" failed: id=%d, indom=%s, sts=%s\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)), pmErrStr_r(*sts, ebuf, sizeof(ebuf)));
-		}
+	    n++;	/* no terminating null (from kernel) */
+	    if (ep->wchan_buflen <= n) {
+		ep->wchan_buflen = n;
+		ep->wchan_buf = (char *)realloc(ep->wchan_buf, n);
 	    }
-	    else {
-		if (n == 0) {
-		    /* wchan is empty, nothing to add here */
-		    ;
-		}
-		else {
-		    n++;	/* no terminating null (from kernel) */
-		    if (ep->wchan_buflen <= n) {
-			ep->wchan_buflen = n;
-			ep->wchan_buf = (char *)realloc(ep->wchan_buf, n);
-		    }
-		    memcpy(ep->wchan_buf, buf, n-1);
-		    ep->wchan_buf[n-1] = '\0';
-		}
+	    if (ep->wchan_buf) {
+		memcpy(ep->wchan_buf, buf, n-1);
+		ep->wchan_buf[n-1] = '\0';
+	    } else {
+		ep->wchan_buflen = 0;
 	    }
 	}
 	if (fd >= 0)
@@ -1283,34 +1247,27 @@ fetch_proc_pid_stat(int id, proc_pid_t *proc_pid, int *sts)
 	    ep->environ_buf[0] = '\0';
 	if ((fd = proc_open("environ", ep)) >= 0) {
 	    nread = 0;
-	    while ( (n = read(fd, buf, sizeof(buf))) > 0) {
-
-		if ( ( nread + n ) >= ep->environ_buflen ) {
+	    while ((n = read(fd, buf, sizeof(buf))) > 0) {
+		if ((nread + n) >= ep->environ_buflen) {
 		    ep->environ_buflen = nread + n + 1;
 		    ep->environ_buf = realloc(ep->environ_buf, ep->environ_buflen);
 		}
 
 		/* Replace nulls with spaces */
-		for(p = memchr(buf, '\0', n); p; p = memchr(p, '\0', buf + n - p) ) {
+		for (p = memchr(buf, '\0', n); p; p = memchr(p, '\0', buf+n-p))
 		    *p = ' ';
-		}
 
-		memcpy( &ep->environ_buf[nread], buf, n);
+		memcpy(&ep->environ_buf[nread], buf, n);
 		nread += n;
 	    }
-	    if (ep->environ_buf) {
+	    if (ep->environ_buf)
 		ep->environ_buf[nread] = '\0';
-	    }
+	    else
+		ep->environ_buflen = 0;
 	    close(fd);
-	}
-    else {
-        if (pmDebugOptions.appl0 ) {
-		    fprintf(stderr, "fetch_proc_pid_stat: error opening environ for pid %d (error is %s)\n", ep->id, strerror(errno) );
-        }
 	}
 	ep->flags |= PROC_PID_FLAG_ENVIRON_FETCHED;
     }
-
 
     if (*sts < 0)
     	return NULL;
@@ -1347,18 +1304,12 @@ commasep(char **buf)
 proc_pid_entry_t *
 fetch_proc_pid_status(int id, proc_pid_t *proc_pid, int *sts)
 {
-    __pmHashNode *node = __pmHashSearch(id, &proc_pid->pidhash);
-    proc_pid_entry_t *ep;
+    __pmHashNode	*node = __pmHashSearch(id, &proc_pid->pidhash);
+    proc_pid_entry_t	*ep = node ? (proc_pid_entry_t *)node->data : NULL;
 
     *sts = 0;
-    if (node == NULL) {
-	if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-	    char ibuf[1024];
-	    fprintf(stderr, "fetch_proc_pid_status: __pmHashSearch(%d, hash[%s]) -> NULL\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)));
-	}
+    if (!ep)
 	return NULL;
-    }
-    ep = (proc_pid_entry_t *)node->data;
 
     if (!(ep->flags & PROC_PID_FLAG_STATUS_FETCHED)) {
 	int	fd;
@@ -1370,39 +1321,21 @@ fetch_proc_pid_status(int id, proc_pid_t *proc_pid, int *sts)
 	    ep->status_buf[0] = '\0';
 	if ((fd = proc_open("status", ep)) < 0)
 	    *sts = maperr();
-	else if ((n = read(fd, buf, sizeof(buf))) < 0) {
+	else if ((n = read(fd, buf, sizeof(buf))) < 0)
 	    *sts = maperr();
-	    if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-		char ibuf[1024];
-		char ebuf[1024];
-		fprintf(stderr, "fetch_proc_pid_status: read failed: id=%d, indom=%s, sts=%s\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)), pmErrStr_r(-oserror(), ebuf, sizeof(ebuf)));
-	    }
-	}
+	else if (n == 0)
+	    *sts = -ENODATA;
 	else {
-	    if (n == 0) {
-		*sts = -ENODATA;
-		if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-		    char ibuf[1024];
-		    fprintf(stderr, "fetch_proc_pid_status: read EOF?: id=%d, indom=%s\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)));
-		}
+	    if (ep->status_buflen < n) {
+		ep->status_buflen = n;
+		ep->status_buf = (char *)realloc(ep->status_buf, n);
 	    }
-	    else {
-		if (ep->status_buflen < n) {
-		    ep->status_buflen = n;
-		    ep->status_buf = (char *)realloc(ep->status_buf, n);
-		}
-
-		if (ep->status_buf == NULL) {
-		    *sts = -ENODATA;
-		    if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-			char ibuf[1024];
-			fprintf(stderr, "fetch_proc_pid_status: read EOF?: id=%d, indom=%s\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)));
-		    }
-		}
-		else {
-		    memcpy(ep->status_buf, buf, n);
-		    ep->status_buf[n-1] = '\0';
-		}
+	    if (ep->status_buf == NULL) {
+		ep->status_buflen = 0;
+		*sts = -ENODATA;
+	    } else {
+		memcpy(ep->status_buf, buf, n);
+		ep->status_buf[n-1] = '\0';
 	    }
 	}
 
@@ -1583,18 +1516,12 @@ nomatch:
 proc_pid_entry_t *
 fetch_proc_pid_statm(int id, proc_pid_t *proc_pid, int *sts)
 {
-    __pmHashNode *node = __pmHashSearch(id, &proc_pid->pidhash);
-    proc_pid_entry_t *ep;
+    __pmHashNode	*node = __pmHashSearch(id, &proc_pid->pidhash);
+    proc_pid_entry_t	*ep = node ? (proc_pid_entry_t *)node->data : NULL;
 
     *sts = 0;
-    if (node == NULL) {
-	if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-	    char ibuf[1024];
-	    fprintf(stderr, "fetch_proc_pid_statm: __pmHashSearch(%d, hash[%s]) -> NULL\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)));
-	}
+    if (!ep)
     	return NULL;
-    }
-    ep = (proc_pid_entry_t *)node->data;
 
     if (!(ep->flags & PROC_PID_FLAG_STATM_FETCHED)) {
 	char buf[1024];
@@ -1604,30 +1531,20 @@ fetch_proc_pid_statm(int id, proc_pid_t *proc_pid, int *sts)
 	    ep->statm_buf[0] = '\0';
 	if ((fd = proc_open("statm", ep)) < 0)
 	    *sts = maperr();
-	else if ((n = read(fd, buf, sizeof(buf))) < 0) {
+	else if ((n = read(fd, buf, sizeof(buf))) < 0)
 	    *sts = maperr();
-	    if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-		char ibuf[1024];
-		char ebuf[1024];
-		fprintf(stderr, "fetch_proc_pid_statm: read failed: id=%d, indom=%s, sts=%s\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)), pmErrStr_r(-oserror(), ebuf, sizeof(ebuf)));
-	    }
-	}
+	else if (n == 0)
+	    *sts = -ENODATA;
 	else {
-	    if (n == 0) {
-		/* eh? */
-		*sts = -ENODATA;
-		if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-		    char ibuf[1024];
-		    fprintf(stderr, "fetch_proc_pid_statm: read EOF?: id=%d, indom=%s\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)));
-		}
+	    if (ep->statm_buflen <= n) {
+		ep->statm_buflen = n;
+		ep->statm_buf = (char *)realloc(ep->statm_buf, n);
 	    }
-	    else {
-		if (ep->statm_buflen <= n) {
-		    ep->statm_buflen = n;
-		    ep->statm_buf = (char *)realloc(ep->statm_buf, n);
-		}
+	    if (ep->statm_buf) {
 		memcpy(ep->statm_buf, buf, n);
 		ep->statm_buf[n-1] = '\0';
+	    } else {
+		ep->statm_buflen = 0;
 	    }
 	}
 
@@ -1648,23 +1565,16 @@ fetch_proc_pid_statm(int id, proc_pid_t *proc_pid, int *sts)
 proc_pid_entry_t *
 fetch_proc_pid_maps(int id, proc_pid_t *proc_pid, int *sts)
 {
-    __pmHashNode *node = __pmHashSearch(id, &proc_pid->pidhash);
-    proc_pid_entry_t *ep;
-    char *maps_bufptr = NULL;
+    __pmHashNode	*node = __pmHashSearch(id, &proc_pid->pidhash);
+    proc_pid_entry_t	*ep = node ? (proc_pid_entry_t *)node->data : NULL;
+    char		*maps_bufptr = NULL;
+    int			fd;
 
     *sts = 0;
-    if (node == NULL) {
-	if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-	    char ibuf[1024];
-	    fprintf(stderr, "fetch_proc_pid_maps: __pmHashSearch(%d, hash[%s]) -> NULL\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)));
-	}
+    if (!ep)
 	return NULL;
-    }
-    ep = (proc_pid_entry_t *)node->data;
 
     if (!(ep->flags & PROC_PID_FLAG_MAPS_FETCHED)) {
-	int fd;
-
 	if (ep->maps_buflen > 0)
 	    ep->maps_buf[0] = '\0';
 	if ((fd = proc_open("maps", ep)) < 0)
@@ -1682,15 +1592,20 @@ fetch_proc_pid_maps(int id, proc_pid_t *proc_pid, int *sts)
 		maps_bufptr = ep->maps_buf + len - n;
 		memcpy(maps_bufptr, buf, n);
 	    }
-	    ep->flags |= PROC_PID_FLAG_MAPS_FETCHED;
-	    /* If there are no maps, make maps_buf point to a zero length string. */
+	    /* If there are no maps, make maps_buf a zero length string. */
 	    if (ep->maps_buflen == 0) {
-		ep->maps_buf = (char *)malloc(1);
 		ep->maps_buflen = 1;
+		ep->maps_buf = (char *)malloc(1);
 	    }
-	    ep->maps_buf[ep->maps_buflen - 1] = '\0';
-	    close(fd);
+	    if (ep->maps_buf)
+		ep->maps_buf[ep->maps_buflen - 1] = '\0';
+	    else
+		ep->maps_buflen = 0;
 	}
+
+	if (fd >= 0)
+	    close(fd);
+	ep->flags |= PROC_PID_FLAG_MAPS_FETCHED;
     }
 
     return (*sts < 0) ? NULL : ep;
@@ -1702,57 +1617,40 @@ fetch_proc_pid_maps(int id, proc_pid_t *proc_pid, int *sts)
 proc_pid_entry_t *
 fetch_proc_pid_schedstat(int id, proc_pid_t *proc_pid, int *sts)
 {
-    __pmHashNode *node = __pmHashSearch(id, &proc_pid->pidhash);
-    proc_pid_entry_t *ep;
+    __pmHashNode	*node = __pmHashSearch(id, &proc_pid->pidhash);
+    proc_pid_entry_t	*ep = node ? (proc_pid_entry_t *)node->data : NULL;
 
     *sts = 0;
-    if (node == NULL) {
-	if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-	    char ibuf[1024];
-	    fprintf(stderr, "fetch_proc_pid_schedstat: __pmHashSearch(%d, hash[%s]) -> NULL\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)));
-	}
-    	return NULL;
-    }
-    ep = (proc_pid_entry_t *)node->data;
+    if (!ep)
+	return NULL;
 
     if (!(ep->flags & PROC_PID_FLAG_SCHEDSTAT_FETCHED)) {
-	int fd, n;
-	char buf[1024];
+	int		fd, n;
+	char		buf[1024];
 
 	if (ep->schedstat_buflen > 0)
 	    ep->schedstat_buf[0] = '\0';
 	if ((fd = proc_open("schedstat", ep)) < 0)
 	    *sts = maperr();
-	else if ((n = read(fd, buf, sizeof(buf))) < 0) {
+	else if ((n = read(fd, buf, sizeof(buf))) < 0)
 	    *sts = maperr();
-	    if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-		char ibuf[1024];
-		char ebuf[1024];
-		fprintf(stderr, "fetch_proc_pid_schedstat: read failed: id=%d, indom=%s, sts=%s\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)), pmErrStr_r(-oserror(), ebuf, sizeof(ebuf)));
-	    }
-	}
+	else if (n == 0)
+	    *sts = -ENODATA;
 	else {
-	    if (n == 0) {
-		/* eh? */
-		*sts = -ENODATA;
-		if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-		    char ibuf[1024];
-		    fprintf(stderr, "fetch_proc_pid_schedstat: read EOF?: id=%d, indom=%s\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)));
-		}
+	    if (ep->schedstat_buflen <= n) {
+		ep->schedstat_buflen = n;
+		ep->schedstat_buf = (char *)realloc(ep->schedstat_buf, n);
 	    }
-	    else {
-		if (ep->schedstat_buflen <= n) {
-		    ep->schedstat_buflen = n;
-		    ep->schedstat_buf = (char *)realloc(ep->schedstat_buf, n);
-		}
+	    if (ep->schedstat_buf) {
 		memcpy(ep->schedstat_buf, buf, n);
 		ep->schedstat_buf[n-1] = '\0';
+	    } else {
+		ep->schedstat_buflen = 0;
 	    }
 	}
 
-	if (fd >= 0) {
+	if (fd >= 0)
 	    close(fd);
-	}
 	ep->flags |= PROC_PID_FLAG_SCHEDSTAT_FETCHED;
     }
 
@@ -1771,18 +1669,12 @@ fetch_proc_pid_schedstat(int id, proc_pid_t *proc_pid, int *sts)
 proc_pid_entry_t *
 fetch_proc_pid_io(int id, proc_pid_t *proc_pid, int *sts)
 {
-    __pmHashNode *node = __pmHashSearch(id, &proc_pid->pidhash);
-    proc_pid_entry_t *ep;
+    __pmHashNode	*node = __pmHashSearch(id, &proc_pid->pidhash);
+    proc_pid_entry_t	*ep = node ? (proc_pid_entry_t *)node->data : NULL;
 
     *sts = 0;
-    if (node == NULL) {
-	if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-	    char ibuf[1024];
-	    fprintf(stderr, "fetch_proc_pid_io: __pmHashSearch(%d, hash[%s]) -> NULL\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)));
-	}
+    if (!ep)
 	return NULL;
-    }
-    ep = (proc_pid_entry_t *)node->data;
 
     if (!(ep->flags & PROC_PID_FLAG_IO_FETCHED)) {
 	int	fd, n;
@@ -1793,39 +1685,21 @@ fetch_proc_pid_io(int id, proc_pid_t *proc_pid, int *sts)
 	    ep->io_buf[0] = '\0';
 	if ((fd = proc_open("io", ep)) < 0)
 	    *sts = maperr();
-	else if ((n = read(fd, buf, sizeof(buf))) < 0) {
+	else if ((n = read(fd, buf, sizeof(buf))) < 0)
 	    *sts = maperr();
-	    if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-		char ibuf[1024];
-		char ebuf[1024];
-		fprintf(stderr, "fetch_proc_pid_io: read failed: id=%d, indom=%s, sts=%s\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)), pmErrStr_r(-oserror(), ebuf, sizeof(ebuf)));
-	    }
-	}
+	else if (n == 0)
+	    *sts = -ENODATA;
 	else {
-	    if (n == 0) {
+	    if (ep->io_buflen < n) {
+		ep->io_buflen = n;
+		ep->io_buf = (char *)realloc(ep->io_buf, n);
+	    }
+	    if (ep->io_buf) {
+		memcpy(ep->io_buf, buf, n);
+		ep->io_buf[n-1] = '\0';
+	    } else {
+		ep->io_buflen = 0;
 		*sts = -ENODATA;
-		if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-		    char ibuf[1024];
-		    fprintf(stderr, "fetch_proc_pid_io: read EOF?: id=%d, indom=%s\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)));
-		}
-	    }
-	    else {
-		if (ep->io_buflen < n) {
-		    ep->io_buflen = n;
-		    ep->io_buf = (char *)realloc(ep->io_buf, n);
-		}
-
-		if (ep->io_buf == NULL) {
-		    *sts = -ENODATA;
-		    if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-			char ibuf[1024];
-			fprintf(stderr, "fetch_proc_pid_io: read EOF?: id=%d, indom=%s\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)));
-		    }
-	    }
-		else {
-		    memcpy(ep->io_buf, buf, n);
-		    ep->io_buf[n-1] = '\0';
-		}
 	    }
 	}
 
@@ -1884,17 +1758,12 @@ fetch_proc_pid_io(int id, proc_pid_t *proc_pid, int *sts)
 proc_pid_entry_t *
 fetch_proc_pid_fd(int id, proc_pid_t *proc_pid, int *sts)
 {
-    __pmHashNode *node = __pmHashSearch(id, &proc_pid->pidhash);
-    proc_pid_entry_t *ep;
+    __pmHashNode	*node = __pmHashSearch(id, &proc_pid->pidhash);
+    proc_pid_entry_t	*ep = node ? (proc_pid_entry_t *)node->data : NULL;
 
-    if (node == NULL) {
-	if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-	    char ibuf[1024];
-	    fprintf(stderr, "fetch_proc_pid_fd: __pmHashSearch(%d, hash[%s]) -> NULL\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)));
-	}
+    *sts = 0;
+    if (!ep)
 	return NULL;
-    }
-    ep = (proc_pid_entry_t *)node->data;
 
     if (!(ep->flags & PROC_PID_FLAG_FD_FETCHED)) {
 	uint32_t de_count = 0;
@@ -1904,15 +1773,26 @@ fetch_proc_pid_fd(int id, proc_pid_t *proc_pid, int *sts)
 	    *sts = maperr();
 	    return NULL;
 	}
-	while (readdir(dir) != NULL) {
+	while (readdir(dir) != NULL)
 	    de_count++;
-	}
 	closedir(dir);
 	ep->fd_count = de_count - 2; /* subtract cwd and parent entries */
 	ep->flags |= PROC_PID_FLAG_FD_FETCHED;
     }
 
     return ep;
+}
+
+/*
+ * From a kernel proc cgroups file entry attempt to extract a
+ * container ID using the cgroup_container_search routine.
+ */
+static char *
+proc_container_search(const char *buf, int buflen, char *cid, int cidlen)
+{
+    if (strncmp(buf, "cpuset:", 7) != 0)
+	return NULL;
+    return cgroup_container_search(buf + 7, cid, cidlen);
 }
 
 /*
@@ -1924,24 +1804,32 @@ fetch_proc_pid_fd(int id, proc_pid_t *proc_pid, int *sts)
  *     "cpu:/;cpuset:/"
  */
 static void
-proc_cgroup_reformat(char *buf, int len, char *fmt)
+proc_cgroup_reformat(char *buf, int buflen, char *fmt, int fmtlen, char *cid, int cidlen)
 {
-    char *target = fmt, *p, *s = NULL;
+    char	*target = fmt, *p, *s = NULL, *c = NULL;
+    int		off, len;
 
-    *target = '\0';
-    for (p = buf; p - buf < len; p++) {
+    *target = *cid = '\0';
+    for (p = buf; p - buf < buflen; p++) {
 	if (*p == '\0')
 	    break;
-        if (*p == ':' && !s)	/* position "s" at start */
-            s = p + 1;
-        if (*p != '\n' || !s)	/* find end of this line */
-            continue;
-        if (target != fmt)      /* not the first cgroup? */
-            strncat(target, ";", 2);
+	if (*p == ':' && !s)	/* position "s" at start */
+	    s = p + 1;
+	if (*p != '\n' || !s)	/* find end of this line */
+	    continue;
+	if (target != fmt)      /* not the first cgroup? */
+	    strncat(target, ";", 2);
 	/* have a complete cgroup line now, copy it over */
-        strncat(target, s, (p - s));
-        target += (p - s);
-        s = NULL;		/* reset it for new line */
+	/* (but first try out container name heuristics) */
+	off = target - fmt;
+	len = p - s;
+	if (off + len >= fmtlen)
+	    break;
+	if (!c)
+	    c = proc_container_search(s, len, cid, cidlen);
+	strncat(target, s, len);
+	target += len;
+	s = NULL;		/* reset it for new line */
     }
 }
 
@@ -1951,47 +1839,31 @@ proc_cgroup_reformat(char *buf, int len, char *fmt)
 proc_pid_entry_t *
 fetch_proc_pid_cgroup(int id, proc_pid_t *proc_pid, int *sts)
 {
-    __pmHashNode *node = __pmHashSearch(id, &proc_pid->pidhash);
-    proc_pid_entry_t *ep;
+    __pmHashNode	*node = __pmHashSearch(id, &proc_pid->pidhash);
+    proc_pid_entry_t	*ep = node ? (proc_pid_entry_t *)node->data : NULL;
 
     *sts = 0;
-    if (node == NULL) {
-	if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-	    char ibuf[1024];
-	    fprintf(stderr, "fetch_proc_pid_cgroup: __pmHashSearch(%d, hash[%s]) -> NULL\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)));
-	}
+    if (!ep)
 	return NULL;
-    }
-    ep = (proc_pid_entry_t *)node->data;
 
     if (!(ep->flags & PROC_PID_FLAG_CGROUP_FETCHED)) {
 	char	buf[1024];
 	char	fmt[1024];
+	char	cid[72];
 	int	n, fd;
 
 	if ((fd = proc_open("cgroup", ep)) < 0)
 	    *sts = maperr();
-	else if ((n = read(fd, buf, sizeof(buf))) < 0) {
+	else if ((n = read(fd, buf, sizeof(buf))) < 0)
 	    *sts = maperr();
-	    if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-		char ibuf[1024];
-		char ebuf[1024];
-		fprintf(stderr, "fetch_proc_pid_cgroup: read failed: id=%d, indom=%s, sts=%s\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)), pmErrStr_r(-oserror(), ebuf, sizeof(ebuf)));
-	    }
-	}
+	else if (n == 0)
+	    *sts = -ENODATA;
 	else {
-	    if (n == 0) {
-		*sts = -ENODATA;
-		if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-		    char ibuf[1024];
-		    fprintf(stderr, "fetch_proc_pid_cgroup: read EOF?: id=%d, indom=%s\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)));
-		}
-	    }
-	    else {
-		/* reformat the buffer to match "ps" output format, then hash */
-		proc_cgroup_reformat(&buf[0], n, &fmt[0]);
-		ep->cgroup_id = proc_strings_insert(fmt);
-	    }
+	    /* reformat the buffer to match "ps" output format and */
+	    /* try any container name heuristics, then hash (both) */
+	    proc_cgroup_reformat(buf, n, fmt, sizeof(fmt), cid, sizeof(cid));
+	    ep->container_id = proc_strings_insert(cid);
+	    ep->cgroup_id = proc_strings_insert(fmt);
 	}
 	if (fd >= 0)
 	    close(fd);
@@ -2007,18 +1879,12 @@ fetch_proc_pid_cgroup(int id, proc_pid_t *proc_pid, int *sts)
 proc_pid_entry_t *
 fetch_proc_pid_label(int id, proc_pid_t *proc_pid, int *sts)
 {
-    __pmHashNode *node = __pmHashSearch(id, &proc_pid->pidhash);
-    proc_pid_entry_t *ep;
+    __pmHashNode	*node = __pmHashSearch(id, &proc_pid->pidhash);
+    proc_pid_entry_t	*ep = node ? (proc_pid_entry_t *)node->data : NULL;
 
     *sts = 0;
-    if (node == NULL) {
-	if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-	    char ibuf[1024];
-	    fprintf(stderr, "fetch_proc_pid_label: __pmHashSearch(%d, hash[%s]) -> NULL\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)));
-	}
+    if (!ep)
 	return NULL;
-    }
-    ep = (proc_pid_entry_t *)node->data;
 
     if (!(ep->flags & PROC_PID_FLAG_LABEL_FETCHED)) {
 	char	buf[1024];
@@ -2026,30 +1892,53 @@ fetch_proc_pid_label(int id, proc_pid_t *proc_pid, int *sts)
 
 	if ((fd = proc_open("attr/current", ep)) < 0)
 	    *sts = maperr();
-	else if ((n = read(fd, buf, sizeof(buf))) < 0) {
+	else if ((n = read(fd, buf, sizeof(buf))) < 0)
 	    *sts = maperr();
-	    if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-		char ibuf[1024];
-		char ebuf[1024];
-		fprintf(stderr, "fetch_proc_pid_label: read failed: id=%d, indom=%s, sts=%s\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)), pmErrStr_r(-oserror(), ebuf, sizeof(ebuf)));
-	    }
-	}
+	else if (n == 0)
+	    *sts = -ENODATA;
 	else {
-	    if (n == 0) {
-		*sts = -ENODATA;
-		if (pmDebugOptions.libpmda && pmDebugOptions.desperate) {
-		    char ibuf[1024];
-		    fprintf(stderr, "fetch_proc_pid_label: read EOF?: id=%d, indom=%s\n", id, pmInDomStr_r(proc_pid->indom->it_indom, ibuf, sizeof(ibuf)));
-		}
-	    } else {
-		/* buffer matches "ps" output format, direct hash */
-		buf[sizeof(buf)-1] = '\0';
-		ep->label_id = proc_strings_insert(buf);
-	    }
+	    /* buffer matches "ps" output format, direct hash */
+	    buf[n-1] = '\0';
+	    ep->label_id = proc_strings_insert(buf);
 	}
 	if (fd >= 0)
 	    close(fd);
 	ep->flags |= PROC_PID_FLAG_LABEL_FETCHED;
+    }
+
+    return (*sts < 0) ? NULL : ep;
+}
+
+/*
+ * fetch the proc/<pid>/oom_score value for pid
+ */
+proc_pid_entry_t *
+fetch_proc_pid_oom_score(int id, proc_pid_t *proc_pid, int *sts)
+{
+    __pmHashNode	*node = __pmHashSearch(id, &proc_pid->pidhash);
+    proc_pid_entry_t	*ep = node ? (proc_pid_entry_t *)node->data : NULL;
+
+    *sts = 0;
+    if (!ep)
+	return NULL;
+
+    if (!(ep->flags & PROC_PID_FLAG_OOM_SCORE_FETCHED)) {
+	char	buf[64];
+	int	n, fd;
+
+	if ((fd = proc_open("oom_score", ep)) < 0)
+	    *sts = maperr();
+	else if ((n = read(fd, buf, sizeof(buf))) < 0)
+	    *sts = maperr();
+	else if (n == 0)
+	    *sts = -ENODATA;
+	else {
+	    buf[n-1] = '\0';
+	    ep->oom_score = (__uint32_t)strtoul(buf, NULL, 0);
+	}
+	if (fd >= 0)
+	    close(fd);
+	ep->flags |= PROC_PID_FLAG_OOM_SCORE_FETCHED;
     }
 
     return (*sts < 0) ? NULL : ep;
@@ -2065,15 +1954,15 @@ fetch_proc_pid_label(int id, proc_pid_t *proc_pid, int *sts)
 char *
 _pm_getfield(char *buf, int field)
 {
-    static int retbuflen = 0;
-    static char *retbuf = NULL;
-    char *p;
-    int i;
+    static int	retbuflen = 0;
+    static char	*retbuf = NULL;
+    char	*p;
+    int		i;
 
     if (buf == NULL)
 	return NULL;
 
-    for (p=buf, i=0; i < field; i++) {
+    for (p = buf, i=0; i < field; i++) {
 	/* if brace-enclosed, skip to the closing brace */
 	if (*p == '(')
 	    for (; *p && *p != ')'; p++) {;}

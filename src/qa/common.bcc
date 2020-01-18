@@ -1,0 +1,152 @@
+#
+# Common shell routines for testing pmdabcc
+#
+# Copyright (c) 2018 Andreas Gerstmayr.
+#
+
+# get standard environment, filters and checks
+. ./common.python
+
+_pmdabcc_check()
+{
+    $python -c "from pcp import pmda" >/dev/null 2>&1
+    [ $? -eq 0 ] || _notrun "python pcp pmda module not installed"
+
+    $python -c "import bcc" >/dev/null 2>&1
+    [ $? -eq 0 ] || _notrun "python bcc module not installed"
+
+    # python BCC module doesn't have a __version__ attribute,
+    # therefore check for the DEBUG_BPF_REGISTER_STATE attribute
+    # (added in version 0.5.0)
+    # TODO: update once __version__ attribute is available
+    $python -c "from bcc import DEBUG_BPF_REGISTER_STATE" >/dev/null 2>&1
+    [ $? -eq 0 ] || _notrun "python bcc module 0.5.0+ is required"
+
+    [ -f $PCP_PMDAS_DIR/bcc/pmdabcc.python ] || _notrun "bcc PMDA not installed"
+}
+
+_pmdabcc_require_kernel_version()
+{
+    uname -r | awk -F. -v major=$1 -v minor=$2 '$1 < major || ($1 == major && $2 < minor) {exit 1}' || \
+    _notrun "this test requires kernel $1.$2+"
+}
+
+_pmdabcc_install_filter()
+{
+    # ignore warnings because PMDA might not be ready yet
+    # and therefore it has no values
+    sed \
+    -e "s/.*pmdabcc.* Info/Info/g" \
+    -e "s/[0-9]\+ warnings, //" \
+    -e "s/[0-9]\+ metrics and [0-9]\+ values/X metrics and X values/g" \
+    #end
+}
+
+_pmdabcc_install()
+{
+    cat > $tmp.config
+
+    # start from known starting points
+    cd $PCP_PMDAS_DIR/bcc
+    $sudo ./Remove >/dev/null 2>&1
+
+    echo "pmdabcc config:" >> $here/$seq.full
+    cat $tmp.config >> $here/$seq.full
+
+    [ -f $PCP_PMDAS_DIR/bcc/bcc.conf ] && \
+    $sudo cp $PCP_PMDAS_DIR/bcc/bcc.conf $tmp.backup
+    $sudo cp $tmp.config $PCP_PMDAS_DIR/bcc/bcc.conf
+
+    echo
+    echo "=== bcc agent installation ==="
+    $sudo ./Install </dev/null >$tmp.out 2>&1
+    cat $tmp.out | _filter_pmda_install | _pmdabcc_install_filter
+
+    echo
+}
+
+_pmdabcc_wait_for_metric()
+{
+    # Wait for the PMDA to compile the bcc modules and become ready, 30s max
+    for i in `seq 1 30`; do grep -q 'Ready to process requests' $PCP_LOG_DIR/pmcd/bcc.log && break; sleep 1; done
+    grep 'Error:' $PCP_LOG_DIR/pmcd/bcc.log
+    if [ $i -gt 30 ]; then
+        echo PMDA was not ready in 30 seconds, test failed
+        exit
+    fi
+}
+
+_pmdabcc_remove()
+{
+    cd $PCP_PMDAS_DIR/bcc
+
+    echo
+    echo "=== remove bcc agent ==="
+    $sudo ./Remove >$tmp.out 2>&1
+    _filter_pmda_remove <$tmp.out
+}
+
+_pmdabcc_cleanup()
+{
+    if [ -f $tmp.backup ]; then
+        $sudo cp $tmp.backup $PCP_PMDAS_DIR/bcc/bcc.conf
+        $sudo rm $tmp.backup
+    else
+        $sudo rm -f $PCP_PMDAS_DIR/bcc/bcc.conf
+    fi
+    # note: _restore_auto_restart pmcd done in _cleanup_pmda()
+    _cleanup_pmda bcc
+}
+
+_java_check()
+{
+    machine=`uname -m`
+    case "$machine"
+    in
+        x86_64)
+            java_machine=amd64
+            ;;
+        *)
+            java_machine="$machine"
+            ;;
+    esac
+
+    eval java_version=`java -version 2>&1 | grep version | awk '{ print $3 }'`
+    java_version=`echo "$java_version" | sed -e 's,_.*,,'`
+    java_major=`echo "$java_version" | sed -e 's,1.,,' -e 's,\..*,,'`
+
+    jvm_path=""
+    for path in \
+	/etc/alternatives/jre/lib/server \
+	/etc/alternatives/jre/lib/$java_machine/server \
+	/usr/lib/jvm/java-${java_version}-openjdk/jre/lib/${java_machine}/server \
+	/usr/lib/jvm/java-${java_major}-openjdk-${java_machine}/jre/lib/${java_machine}/server
+    do
+        # echo "$path/libjvm.$DSO_SUFFIX"
+        [ -f "$path/libjvm.$DSO_SUFFIX" ] && jvm_path="$path/libjvm.$DSO_SUFFIX"
+    done
+
+    [ -z "$jvm_path" ] && _notrun "libjvm.$DSO_SUFFIX not found"
+}
+
+_mount_filesystem()
+{
+    fs=$1
+    image=$tmp.loop.$fs.img
+    mountpoint=$tmp.mount.$fs
+
+    truncate -s 30M $image
+    mkfs.$fs $image > /dev/null 2>&1
+    mkdir -p $mountpoint
+    $sudo mount $image $mountpoint
+    $sudo chown $(id -u):$(id -g) $mountpoint
+}
+
+_unmount_filesystem()
+{
+    fs=$1
+    mountpoint=$tmp.mount.$fs
+
+    $sudo umount $mountpoint
+    rm -r $mountpoint
+}

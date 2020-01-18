@@ -13,27 +13,35 @@ _pcp_complete()
     # Register arguments
     case $cmd in
     pcp2elasticsearch)
-        all_args="ahLKcCeVHGASTOstrIivPqbygXx"
-        arg_regex="-[ahKceASTOstZiPqbygXx]"
+        all_args="ahLKcCeVHGASTOstRrIijJ89nNvP0qQbByYgXx"
+        arg_regex="-[ahKceASTOstZiJ89NP0qQbByYgXx]"
+    ;;
+    pcp2graphite)
+        all_args="ahLKcCeVHGASTOstRrIijJ89nNvP0qQbByYgpXEx"
+        arg_regex="-[ahKceASTOstZiJ89NP0qQbByYgpXEx]"
+    ;;
+    pcp2influxdb)
+        all_args="ahLKcCeVHGASTOstRrIijJ89nNvP0qQbByYgxUEX"
+        arg_regex="-[ahKceASTOstZiJ89NP0qQbByYgxUEX]"
     ;;
     pcp2json)
-        all_args="ahLKcCeVHGASTOstZzrIivPqbyFfXx"
-        arg_regex="-[ahKceASTOstZiPqbygFf]"
+        all_args="ahLKcCeVHGASTOstRrZzrIijJ89nNvP0qQbByYFfxXE"
+        arg_regex="-[ahKceASTOstZiJ89NP0qQbByYgFf]"
     ;;
     pcp2xlsx)
-        all_args="ahLKcCeVHGASTOstZzrIivPqbyFf"
-        arg_regex="-[ahKceASTOstZiPqbygFf]"
+        all_args="ahLKcCeVHGASTOstRrZzrIivP0qQbByYFf"
+        arg_regex="-[ahKceASTOstZiP0qQbByYgFf]"
     ;;
     pcp2xml)
-        all_args="ahLKcCeVHGASTOstZzrIivPqbyFfXx"
-        arg_regex="-[ahKceASTOstZiPqbygFf]"
+        all_args="ahLKcCeVHGASTOstRrZzrIijJ89nNvP0qQbByYFfXx"
+        arg_regex="-[ahKceASTOstZiJ89NP0qQbByYgFf]"
     ;;
     pcp2zabbix)
-        all_args="ahLKcCeVHGASTOstrIivPqbygpXEx"
-        arg_regex="-[ahKceASTOstZiPqbygpXEx]"
+        all_args="ahLKcCeVHGASTOstRrIijJ89nNvP0qQbByYgpXExl"
+        arg_regex="-[ahKceASTOstZiJ89NP0qQbByYgpXEx]"
     ;;
     pmdumplog)
-        all_args="adiLlmnrSsTtVvxZz"
+        all_args="adehiLlmnrSsTtVvxZz"
         arg_regex="-[nSTvZ]"
     ;;
     pmdumptext)
@@ -45,23 +53,31 @@ _pcp_complete()
         arg_regex="-[AafhiKnOpSsTtUwxZ]"
     ;;
     pminfo)
-        all_args="abcdFfhKLMmNnOTtVvxZz"
+        all_args="abcdFfhIKLlMmNnOSsTtVvxZz"
         arg_regex="-[abchKNnOZ]"
+    ;;
+    pmlogcheck)
+        all_args="lnSTvwZz"
+        arg_regex="-[nSTZ]"
+    ;;
+    pmlogextract)
+        all_args="cdfmSsTvwZz"
+        arg_regex="-[cSsTvZ]"
     ;;
     pmlogsummary)
         all_args="aBbFfHIilMmNnpSTVvxZz"
         arg_regex="-[BnpSTZ]"
     ;;
     pmprobe)
-        all_args="adfFhIiKLnOVvZz"
-        arg_regex="-[ahKnOZ]"
+        all_args="abdfFhIiKLnOVvZz"
+        arg_regex="-[abhKnOZ]"
     ;;
     pmrep)
-        all_args="AabCcdEeFfGHhIiKkLlOoPpqrSsTtUuVvwXxyZz"
-        arg_regex="-[AabcEeFfhiKlOoPqSsTtwXyZ]"
+        all_args="012389AaBbCcdEeFfGgHhIiJjKkLlNnOoPpQqRrSsTtUuVvWwXxYyZz"
+        arg_regex="-[089ABabcEeFfhiJKlNOoPQqSsTtWwXYyZ]"
     ;;
     pmstore)
-        all_args="fhiKLnV"
+        all_args="FfhiKLnV"
         arg_regex="-[hiKn]"
     ;;
     pmval)
@@ -72,7 +88,7 @@ _pcp_complete()
 
     # Complete
     pytool=0
-    [[ "pcp2elasticsearch pcp2json pcp2xlsx pcp2xml pcp2zabbix pmrep" =~ $cmd ]] && pytool=1
+    [[ "pcp2elasticsearch pcp2graphite pcp2influxdb pcp2json pcp2xlsx pcp2xml pcp2zabbix pmrep" =~ $cmd ]] && pytool=1
     if [[ "$cur" == -* ]]; then
         # Arguments
         local comp=( $(echo $all_args | sed -e 's,.\{1\},-& ,g') )
@@ -110,4 +126,4 @@ _pcp_complete()
         fi
     fi
 }
-complete -F _pcp_complete -o default pcp2elasticsearch pcp2json pcp2xlsx pcp2xml pcp2zabbix pmdumplog pmdumptext pmevent pminfo pmlogsummary pmprobe pmrep pmstore pmval
+complete -F _pcp_complete -o default pcp2elasticsearch pcp2graphite pcp2influxdb pcp2json pcp2xlsx pcp2xml pcp2zabbix pmdumplog pmdumptext pmevent pminfo pmlogcheck pmlogextract pmlogsummary pmprobe pmrep pmstore pmval

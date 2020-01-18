@@ -34,7 +34,7 @@
 
 #include <ctype.h>
 #include "pmapi.h"
-#include "impl.h"
+#include "libpcp.h"
 #include "internal.h"
 
 /*
@@ -50,7 +50,7 @@ typedef struct {
 
 typedef struct {
     __pmPDUHdr		hdr;
-    __pmTimeval		timestamp;	/* when returned */
+    pmTimeval		timestamp;	/* when returned */
     int			numpmid;	/* no. of PMIDs to follow */
     __pmPDU		data[1];	/* zero or more */
 } result_t;
@@ -156,7 +156,7 @@ int
 __pmSendResult_ctx(__pmContext *ctxp, int fd, int from, const pmResult *result)
 {
     int		sts;
-    __pmPDU	*pdubuf;
+    __pmPDU	*pdubuf = NULL;
     result_t	*pp;
 
     if (ctxp != NULL)
@@ -338,7 +338,7 @@ __pmDecodeResult_ctx(__pmContext *ctxp, __pmPDU *pdubuf, pmResult **result)
 		    }
 		    if (pduvbp->vlen > (size_t)(pduend - (char *)pduvbp)) {
 			if (pmDebugOptions.pdu && pmDebugOptions.desperate) {
-			    fprintf(stderr, "__pmDecodeResult: Bad: pmid[%d] value[%d] third pduvp past end of PDU buffer\n", i, j);
+			    fprintf(stderr, "__pmDecodeResult: Bad: pmid[%d] value[%d] pduvp past end of PDU buffer\n", i, j);
 			}
 			goto corrupt;
 		    }
@@ -563,7 +563,7 @@ __pmDecodeResult_ctx(__pmContext *ctxp, __pmPDU *pdubuf, pmResult **result)
 		    }
 		    if (pduvbp->vlen > (size_t)(pduend - (char *)pduvbp)) {
 			if (pmDebugOptions.pdu && pmDebugOptions.desperate) {
-			    fprintf(stderr, "__pmDecodeResult: Bad: pmid[%d] value[%d] third pduvp past end of PDU buffer\n", i, j);
+			    fprintf(stderr, "__pmDecodeResult: Bad: pmid[%d] value[%d] pduvp past end of PDU buffer\n", i, j);
 			}
 			goto corrupt;
 		    }

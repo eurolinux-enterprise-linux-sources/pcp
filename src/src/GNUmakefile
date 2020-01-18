@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2012-2016 Red Hat.
+# Copyright (c) 2012-2018 Red Hat.
 # Copyright (c) 2000,2004,2012 Silicon Graphics, Inc.  All Rights Reserved.
 # 
 # This program is free software; you can redistribute it and/or modify it
@@ -69,6 +69,7 @@ OTHER_SUBDIRS = \
 	pmie \
 	pmieconf \
 	pmiestatus \
+	pmjson \
 	pmlc \
 	pmlock \
 	pmlogextract \
@@ -77,6 +78,7 @@ OTHER_SUBDIRS = \
 	pmlogconf \
 	pmloglabel \
 	pmlogrewrite \
+	pmlogsize \
 	pmlogsummary \
 	pmlogcheck \
 	pmmgr \
@@ -84,6 +86,7 @@ OTHER_SUBDIRS = \
 	pmproxy \
 	pmquery \
 	pmrep \
+	pmseries \
 	pmstat \
 	pmstore \
 	pmsocks \
@@ -94,7 +97,7 @@ OTHER_SUBDIRS = \
 	pmtime \
 	pmval \
 	pmview \
-	pmwebapi \
+	pmwebd \
 	perl \
 	python \
 	procmemstat \
@@ -106,9 +109,11 @@ OTHER_SUBDIRS = \
 	sar2pcp \
 	sheet2pcp \
 	ganglia2pcp \
+	webapps \
 	win32ctl \
 	zabbix-agent \
 	pmpython \
+	discover \
 	derived \
 	selinux \
 	zeroconf \

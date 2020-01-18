@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Red Hat.
+ * Copyright (c) 2013,2018 Red Hat.
  * Copyright (c) 2004 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -105,6 +105,53 @@ typedef struct metricspec {
 extern metricspec_t	*metric_root;
 
 /*
+ * Rewrite specifications for a help text record
+ */
+typedef struct textspec {
+    struct textspec	*t_next;
+    int			flags;		/* TEXT_* flags */
+    int			old_type;
+    int			new_type;
+    int			old_id;
+    int			new_id;
+    char		*old_text;
+    char		*new_text;
+    indomspec_t		*ip;		/* for instance id changes */
+} textspec_t;
+
+/* values for textspec_t flags[] */
+#define TEXT_ACTIVE             1
+#define TEXT_CHANGE_ID		2
+#define TEXT_CHANGE_TYPE	4
+#define TEXT_CHANGE_TEXT	8
+#define TEXT_DELETE		16
+
+extern textspec_t	*text_root;
+
+/*
+ * Rewrite specifications for a label record
+ */
+typedef struct labelspec {
+    struct labelspec	*l_next;
+    int			flags;		/* LABEL_* flags */
+    int			old_type;
+    int			new_type;
+    int			old_id;
+    int			new_id;
+    char		*old_label;
+    char		*new_label;
+    indomspec_t		*ip;		/* for instance id changes */
+} labelspec_t;
+
+/* values for labelspec_t flags[] */
+#define LABEL_CHANGE_ID		1
+#define LABEL_CHANGE_TYPE	2
+#define LABEL_CHANGE_LABEL	4
+#define LABEL_DELETE		8
+
+extern labelspec_t	*label_root;
+
+/*
  *  Input archive control
  */
 typedef struct {
@@ -125,7 +172,8 @@ extern inarch_t		inarch;		/* input archive */
  */
 typedef struct {
     char	*name;		/* base name of output archive */
-    __pmLogCtl	logctl;		/* libpcp control */
+    __pmArchCtl	archctl;	/* libpcp archive control */
+    __pmLogCtl	logctl;		/* libpcp log control */
 } outarch_t;
 
 extern outarch_t	outarch;	/* output archive */
@@ -152,7 +200,7 @@ extern int	yyparse(void);
 #define W_NEXT	2
 #define W_NONE	3
 
-extern int	_pmLogGet(__pmLogCtl *, int, __pmPDU **);
+extern int	_pmLogGet(__pmArchCtl *, int, __pmPDU **);
 extern int	_pmLogPut(FILE *, __pmPDU *);
 extern int	_pmLogRename(const char *, const char *);
 extern int	_pmLogRemove(const char *);
@@ -162,6 +210,8 @@ extern pmUnits	ntoh_pmUnits(pmUnits);
 
 extern metricspec_t	*start_metric(pmID);
 extern indomspec_t	*start_indom(pmInDom);
+extern textspec_t	*start_text(int, int);
+extern labelspec_t	*start_label(int, int);
 extern int		change_inst_by_inst(pmInDom, int, int);
 extern int		change_inst_by_name(pmInDom, char *, char *);
 extern int		inst_name_eq(const char *, const char *);
@@ -171,6 +221,8 @@ extern void	newvolume(int);
 
 extern void	do_desc(void);
 extern void	do_indom(void);
+extern void	do_labelset(void);
+extern void	do_text(void);
 extern void	do_result(void);
 
 extern void	abandon(void);

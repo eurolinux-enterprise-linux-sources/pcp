@@ -1,0 +1,49 @@
+QA output created by 563
+
+== No global labels
+
+pmcd.labels
+    value ""
+    labels {"agent":"pmcd","domainname":"DOMAIN","groupid":GID,"hostname":"HOSTNAME","machineid":"MACHINE","userid":UID}
+
+== Bad global label
+
+pmcd.labels
+    value ""
+    labels {"agent":"pmcd","hostname":"HOSTNAME"}
+
+== Empty global label
+
+pmcd.labels
+    value ""
+    labels {"agent":"pmcd","domainname":"DOMAIN","groupid":GID,"hostname":"HOSTNAME","machineid":"MACHINE","userid":UID}
+
+== Simple global label
+
+pmcd.labels
+    value "{"one":"two"}"
+    labels {"agent":"pmcd","domainname":"DOMAIN","groupid":GID,"hostname":"HOSTNAME","machineid":"MACHINE","one":"two","userid":UID}
+
+== Empty string global label value
+
+pmcd.labels
+    value "{"one":""}"
+    labels {"agent":"pmcd","domainname":"DOMAIN","groupid":GID,"hostname":"HOSTNAME","machineid":"MACHINE","one":"","userid":UID}
+
+== Array global label
+
+pmcd.labels
+    value "{"a1":[1,2,3,4],"a2":[]}"
+    labels {"a1":[1,2,3,4],"a2":[],"agent":"pmcd","domainname":"DOMAIN","groupid":GID,"hostname":"HOSTNAME","machineid":"MACHINE","userid":UID}
+
+== Map global label
+
+pmcd.labels
+    value "{"map1":{"a":1,"b":2},"map2":{}}"
+    labels {"agent":"pmcd","domainname":"DOMAIN","groupid":GID,"hostname":"HOSTNAME","machineid":"MACHINE","map1":{"a":1,"b":2},"map2":{},"userid":UID}
+
+== Multiple global labels
+
+pmcd.labels
+    value "{"a1":[1,2,3,4],"a2":[],"map1":{"a":1,"b":2},"map2":{},"one":"two"}"
+    labels {"a1":[1,2,3,4],"a2":[],"agent":"pmcd","domainname":"DOMAIN","groupid":GID,"hostname":"HOSTNAME","machineid":"MACHINE","map1":{"a":1,"b":2},"map2":{},"one":"two","userid":UID}

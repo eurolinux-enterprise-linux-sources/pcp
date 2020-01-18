@@ -377,6 +377,9 @@ fi
 
 [ -f check.time ] || touch check.time
 
+# Remove automated PMDA install/remove that will interfere with tests
+$sudo rm -f $PCP_PMDAS_DIR/*/.NeedInstall $PCP_PMDAS_DIR/*/.NeedRemove
+
 [ "`_get_config pmcd`" != on ] && _change_config pmcd on
 
 if $showme
@@ -493,6 +496,7 @@ do
 	    err=true
 	fi
 
+	$sudo rm -f $seq.out.bad
 	if [ -f $seq.notrun ]
 	then
 	    [ $color = true ] && tput bold && tput setaf 4 # blue
@@ -500,7 +504,6 @@ do
 	    [ $color = true ] && tput sgr0 # reset
 	    notrun="$notrun $seq"
 	else
-	    $sudo rm -f $seq.out.bad
 	    if [ $sts -ne 0 ]
 	    then
 		$PCP_ECHO_PROG $PCP_ECHO_N " [failed, exit status $sts]""$PCP_ECHO_C"

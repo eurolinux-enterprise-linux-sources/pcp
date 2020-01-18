@@ -14,10 +14,10 @@
  */
 
 #include "pmapi.h"
-#include "impl.h"
+#include "libpcp.h"
 #include "pmda.h"
 
-#define NONLEAF(node)	((node)->pmid == PM_ID_NULL)
+#define NONLEAF(node)	((node)->pmid == PM_ID_NULL || IS_DYNAMIC_ROOT((node)->pmid))
 
 /*
  * Fixup the parent pointers of the tree.
@@ -59,7 +59,7 @@ pmdaTreeRebuildHash(__pmnsTree *tree, int numpmid)
 	if (tree->htab) {
 	    __pmdaTreeReindexHash(tree, tree->root);
 	} else {
-	    __pmNoMem("pmdaTreeRebuildHash",
+	    pmNoMem("pmdaTreeRebuildHash",
 			htabsize * sizeof(__pmnsNode *), PM_RECOV_ERR);
 	    tree->htabsize = 0;
 	}
@@ -310,4 +310,26 @@ pmdaTreeChildren(__pmnsTree *pmns, const char *name, int traverse, char ***offsp
     else
 	sts = __pmdaNodeAbsoluteChildren(node, offspring, status);
     return sts;
+}
+
+/*
+ * Direct wrappers for PMDAs working with namespaces,
+ * so that they do not need to peek inside <libpcp.h>
+ */
+int
+pmdaTreeCreate(__pmnsTree **pmns)
+{
+    return __pmNewPMNS(pmns);
+}
+
+int
+pmdaTreeInsert(__pmnsTree *tree, pmID pmid, const char *name)
+{
+    return __pmAddPMNSNode(tree, pmid, name);
+}
+
+void
+pmdaTreeRelease(__pmnsTree *tree)
+{
+    __pmFreePMNS(tree);
 }

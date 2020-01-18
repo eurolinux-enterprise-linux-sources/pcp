@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2014-2015 Red Hat.
+# Copyright (c) 2014-2015,2018 Red Hat.
 # 
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
@@ -19,7 +19,7 @@ IAM	= json
 PYSCRIPT = pmda$(IAM).python
 LCFILES = acme_json.c
 LTARGET = acme_json$(EXECSUFFIX)
-LSRCFILES = Install Remove $(PYSCRIPT) $(LCFILES) README.demos Makefile.demos
+SCRIPTS = Install Remove generate_ceph_metadata
 
 DOMAIN	= JSON
 PMDADIR	= $(PCP_PMDAS_DIR)/$(IAM)
@@ -39,10 +39,11 @@ default_pcp default:	build-me
 include $(BUILDRULES)
 
 ifeq "$(PMDA_JSON)" "true"
-build-me:	check_domain
+build-me:	check_domain config.json
 install_pcp install:	default 
 	$(INSTALL) -m 755 -d $(PMDADIR)
-	$(INSTALL) -m 755 Install Remove $(PYSCRIPT) generate_ceph_metadata $(PMDADIR)
+	$(INSTALL) -o $(PCP_USER) -g $(PCP_GROUP) -m 775 -d $(PCP_TMP_DIR)/$(IAM)
+	$(INSTALL) -m 755 $(SCRIPTS) $(PYSCRIPT) $(PMDADIR)
 	$(INSTALL) -m 644 config.json README $(PMDADIR)
 	$(INSTALL) -m 755 -d $(DEMODIR)
 	$(INSTALL) -m 644 Makefile.demos $(DEMODIR)/Makefile
@@ -57,6 +58,11 @@ endif
 
 check_domain:	../../pmns/stdpmid
 	$(DOMAIN_PYTHONRULE)
+
+config.json:	config.json.in
+	$(SED) <$< >$@ \
+	    -e 's;@PCP_TMP_DIR@;'$(PCP_TMP_DIR)';' \
+	# END
 
 # check-build only, binary not installed (but source is)
 $(LTARGET):	acme_json.c

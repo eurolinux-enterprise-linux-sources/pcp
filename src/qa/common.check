@@ -171,20 +171,22 @@ _restore_auto_restart()
 # one has to do the $sudo and the journal dredging and handle "pcp" as
 # the special non-service case ...
 #
-# Usage: _service <service> [on|off|restart|...]
+# Usage: _service [-v] <service> [on|off|restart|...]
 #
 _service()
 {
-    if [ $# -ne 2 ]
+    if [ -n "$1" -a "$1" = "-v" ]
     then
-	echo "_service: expect 2 arguments, not $# ($*)"
-	exit
+	_verbose=true
+	shift
+    else
+	_verbose=false
     fi
     _do_systemctl=false
     if [ "$PCPQA_SYSTEMD" = no ]
     then
 	# don't ever use systemctl
-	:
+	$_verbose && echo "_service: no systemctl, PCPQA_SYSTEMD=$PCPQA_SYSTEMD"
     else
 	which systemctl >/dev/null 2>&1 && _do_systemctl=true
 	if $_do_systemctl
@@ -196,6 +198,7 @@ _service()
 		    then
 			:
 		    else
+			$_verbose && echo "_service: no systemctl, need pmcd service, pmlogger servce and pcp rc script"
 			_do_systemctl=false
 		    fi
 		    ;;
@@ -204,10 +207,13 @@ _service()
 		    then
 			:
 		    else
+			$_verbose && echo "_service: no systemctl, need $1 service"
 			_do_systemctl=false
 		    fi
 		    ;;
 	    esac
+	else
+	    $_verbose && echo "_service: no systemct executable"
 	fi
     fi
 
@@ -238,6 +244,7 @@ _service()
 		    | egrep " (pmcd)|(pmlogger)\\[" \
 		    | sed -e 's/\.\.done$//' >$tmp.journal.pre
 		fi
+		$_verbose && echo "_service: using $PCP_RC_DIR/pcp $2"
 		$sudo $PCP_RC_DIR/pcp $2
 		sleep 2
 		if `which journalctl >/dev/null 2>&1`
@@ -264,6 +271,7 @@ _service()
 		    | egrep " $1\\[" \
 		    | sed -e 's/\.\.done$//' >$tmp.journal.pre
 		fi
+		$_verbose && echo "_service: using systemctl $2 $1.service"
 		$sudo systemctl $2 $1.service
 		sleep 2
 		if `which journalctl >/dev/null 2>&1`
@@ -314,6 +322,7 @@ skip == 0	{ print }' \
 	# end
     elif [ -f $PCP_RC_DIR/$1 ]
     then
+	$_verbose && echo "_service: using $PCP_RC_DIR/$1 $2"
 	$sudo $PCP_RC_DIR/$1 $2
     else
 	echo "_service: $1 is not a systemctl service nor a $PCP_RC_DIR script!"
@@ -436,7 +445,12 @@ _make_helptext()
     if [ -f $PCP_PMDAS_DIR/$__pmda/help.dir ]
     then
 	# ./Install already run, or QA stumbled past to run newhelp
-	return 0
+	if [ -f $PCP_PMDAS_DIR/$__pmda/help -a $PCP_PMDAS_DIR/$__pmda/help -nt $PCP_PMDAS_DIR/$__pmda/help.dir ]
+	then
+	    :
+	else
+	    return 0
+	fi
     fi
 
     cd $PCP_PMDAS_DIR/$__pmda
@@ -458,14 +472,29 @@ _make_helptext()
 #
 _host_to_ipv6addrs()
 {
-    ADDRESS=`pminfo -f -h "$1" network.interface.ipv6_addr | \
-    sed -e '/^$/d' -e '/^network/d' -e '/"lo"/d' -e 's/\/[0-9][0-9]*//g'`
-    LOCAL_LINK=`echo $ADDRESS | awk -F\" '{ printf "%s\n", $4 }' | grep -i "^fe80::"`
-    if [ ! -z "$LOCAL_LINK" ]; then
-        echo $ADDRESS | awk -F\" '{ printf "%s%%%s\n", $4, $2 }'
-    else
-        echo $ADDRESS | awk -F\" '{ printf "%s\n", $4 }'
-    fi
+    # extract string from lines like:
+    # inst [2 or "br0"] value "fe80::d217:c2ff:fea7:4ae9/64"
+    #
+    pminfo -f -h "$1" network.interface.ipv6_addr \
+    | sed \
+	-e '/^$/d' \
+	-e '/^network/d' \
+	-e '/"lo"/d' \
+	-e 's/.* or "//' \
+	-e 's/"] value "/ /' \
+	-e 's/\/[0-9][0-9]*"//g' \
+    | while read iface addr
+    do
+	case "$addr"
+	in
+	    fe80::*)
+		echo "$addr%$iface"
+		;;
+	    *)
+		echo $addr
+		;;
+	esac
+    done
 }
 
 _host_to_ipaddr()
@@ -531,6 +560,11 @@ _ipv6_localhost()
     done
     echo >&2 "Arrgh ... cannot determine IPv6 localhost name from /etc/hosts"
     return
+}
+
+_machine_id()
+{
+    cat /etc/machine-id 2> /dev/null || echo localmachine
 }
 
 _check_metric()
@@ -694,8 +728,8 @@ _wait_for_pmlogger()
     rm -f $tmp._wait_for_pmlogger.pmlc
     while [ $_i -lt $_maxdelay ]
     do
-	#debug# ps -ef | grep "[^0-9]$_pid[^0-9]"
-	echo "pmlc $_pid" >> $tmp._wait_for_pmlogger.pmlc
+	ps $PCP_PS_ALL_FLAGS | egrep "([p]mlogger|[P]ID)" >>$tmp._wait_for_pmlogger.pmlc
+	echo "pmlc $_pid" >>$tmp._wait_for_pmlogger.pmlc
 	if pmlc $_pid </dev/null 2>&1 \
 		| tee -a $tmp._wait_for_pmlogger.pmlc \
 		| egrep "Connection refused|Transport endpoint is not connected" >/dev/null
@@ -784,7 +818,7 @@ _wait_for_pmlogger()
 	done
 	echo
 	echo "Likely looking processes ..."
-	ps $PCP_PS_ALL_FLAGS | egrep '[p]m|[P]ID'
+	ps $PCP_PS_ALL_FLAGS | egrep '([p]m)|([P]ID)'
 	status=2
 	exit $status
     fi
@@ -1014,11 +1048,9 @@ EOF
 
 _run_purify()
 {
-    args=$* 
-
     _here=`pwd`
     cd $_purify_dir
-    $_purify_dir/$_pure_prog $args > $tmp._purify.out 2>&1
+    $_purify_dir/$_pure_prog "$@" > $tmp._purify.out 2>&1
     cat $tmp._purify.out >>$_here/$seq.full
     if grep -i expired $tmp._purify.out >/dev/null; then
 	cat $tmp._purify.out
@@ -1123,11 +1155,14 @@ EOF
 _check_papi_native()
 {
     $sudo dbpmda -n $PCP_PMDAS_DIR/papi/root -ie <<EOF >$tmp.papi.check
-open pipe $PCP_PMDAS_DIR/papi/pmdapapi -d 126
+open pipe $PCP_PMDAS_DIR/papi/pmdapapi -d 126 -l $tmp.papi.log
 attr "username" "root"
 attr 11 "0"
 traverse papi.system.perf
 EOF
+    echo "papi.log ..." >>$here/$seq.full
+    cat $tmp.papi.log >>$here/$seq.full
+    $sudo rm $tmp.papi.log
     echo "_check_papi_native ..." >>$here/$seq.full
     cat $tmp.papi.check >>$here/$seq.full
     if grep "Error PDU: Unknown metric name" <$tmp.papi.check >/dev/null
@@ -1192,6 +1227,7 @@ _filter_valgrind()
 	-e '/Ignoring non-Dwarf2\/3\/4 block in .debug_info/d' \
 	-e '/Last block truncated in .debug_info; ignoring/d' \
 	-e '/parse_CU_Header: is neither DWARF2 nor DWARF3 nor DWARF4/d' \
+	-e '/^parse DIE/,/confused by the above DIE/d' \
     # end
 }
 
@@ -1213,6 +1249,13 @@ _filter_helgrind()
 
 _run_valgrind()
 {
+    if [ x"$1" = "x--sudo" ]
+    then
+	_valgrind_prefix=$sudo
+	shift
+    else
+	_valgrind_prefix=''
+    fi
     __version=`valgrind --version | sed -e 's/valgrind-//'`
     if [ -f $here/valgrind-suppress-$__version ]
     then
@@ -1222,19 +1265,19 @@ _run_valgrind()
 	__extra=''
 	echo "Warning: no extra suppressions found for valgrind version $__version" >>$here/$seq.full
     fi
-    valgrind \
+    $_valgrind_prefix valgrind \
 	--leak-check=full --read-var-info=yes --gen-suppressions=all \
 	--suppressions=$here/valgrind-suppress $__extra \
 	--log-file=$tmp._valgrind \
-	    $* 2>$tmp._valgrind.err >$tmp._valgrind.out
+	    "$@" 2>$tmp._valgrind.err >$tmp._valgrind.out
     echo "=== std out ==="
-    cat $tmp._valgrind.out
+    $sudo cat $tmp._valgrind.out
     echo "=== std err ==="
-    cat $tmp._valgrind.err
+    $sudo cat $tmp._valgrind.err
     echo "=== valgrind report ===" >>$here/$seq.full
-    cat $tmp._valgrind >>$here/$seq.full
+    $sudo cat $tmp._valgrind >>$here/$seq.full
     echo "=== filtered valgrind report ==="
-    _filter_valgrind <$tmp._valgrind
+    $sudo cat $tmp._valgrind | _filter_valgrind
 }
 
 # Alternate invocation, using valgrind-silence as an assertion.
@@ -1275,7 +1318,7 @@ if which valgrind >/dev/null 2>&1; then
 	    __extra="$__extra --show-reachable=no"
 	fi
     fi
-    rm -f $tmp.valgrind.help
+    $sudo rm -f $tmp.valgrind.help
     _valgrind_clean_assert="valgrind -q \
 	     --leak-check=full --read-var-info=yes --gen-suppressions=all \
 	     --suppressions=$here/valgrind-suppress $__extra \
@@ -1307,11 +1350,11 @@ _run_helgrind()
 	--tool=helgrind --gen-suppressions=all \
 	--suppressions=$here/helgrind-suppress $__extra \
 	--log-file=$tmp.valgrind.log \
-	    $* 2>$tmp.valgrind.err >$tmp.valgrind.out
+	    "$@" 2>$tmp.valgrind.err >$tmp.valgrind.out
     echo "=== valgrind report ===" >>$here/$seq.full
-    cat $tmp.valgrind.log >>$here/$seq.full
+    $sudo cat $tmp.valgrind.log >>$here/$seq.full
     echo "=== filtered valgrind report ==="
-    _filter_helgrind <$tmp.valgrind.log
+    $sudo cat $tmp.valgrind.log | _filter_helgrind
 }
 
 #
@@ -1477,7 +1520,7 @@ _restore_cron()
 		echo "               Unexpected differences ..."
 		diff -u $rc_backup rc_cron_check
 	    fi
-	    $rc_sudo rm -f rc_cron_check rc_cron_diff
+	    $rc_sudo rm -f rc_cron_check rc_cron_check.clean rc_cron_diff
 	else
 	    echo "_restore_cron: Warning: could not restore crontab to original state"
 	    echo "               crontab(1) failed ..."
@@ -1543,7 +1586,7 @@ _get_port()
     __port=$2
     while [ $__port -le "$3" ]
     do
-	if fuser $__port/$__proto >/dev/null 2>&1
+	if $sudo fuser $__port/$__proto >/dev/null 2>&1
 	then
 	    :
 	else
@@ -2363,7 +2406,7 @@ if conn != None:
 exit(0)
 End-of-File
 	    _libvirt_ver=`$PCP_PYTHON_PROG $tmp.py 2>/dev/null`
-	    echo "Ubuntu and libvert version $_libvirt_ver" >>$here/$seq.full
+	    echo "Ubuntu and libvirt version $_libvirt_ver" >>$here/$seq.full
 	    case "$_libvirt_ver"
 	    in
 		2005000)
@@ -2373,4 +2416,47 @@ End-of-File
 	fi
     fi
     return 0
+}
+
+# send pmcd SIGHUP and reliably check that it received (at least) one
+#
+_sighup_pmcd()
+{
+    _signal_delay=0.05
+    _sighups_before=-1
+
+    eval `pmprobe -v pmcd.sighups 2>/dev/null \
+	  | $PCP_AWK_PROG '{ printf "_sighups_before=%d\n", $3 }'`
+    if [ $_sighups_before -lt 0 ]
+    then
+	echo _sighup_pmcd called but pmcd not running
+	exit 1
+    fi
+
+    $sudo $PCP_BINADM_DIR/pmsignal -a -s HUP pmcd >/dev/null 2>&1
+
+    # first make sure pmcd has received SIGHUP
+    #
+    _sts=1
+    for _delay in 0.01 0.05 0.1 0.15 0.25 0.5 1 2
+    do
+	$PCP_BINADM_DIR/pmsleep $_delay
+	_sighups=-1
+	eval `pmprobe -v pmcd.sighups 2>/dev/null | \
+	    $PCP_AWK_PROG '{ printf "_sighups=%d\n", $3 }'`
+	if [ $_sighups -gt $_sighups_before ]
+	then
+	    _sts=0
+	    break
+	fi
+    done
+    if [ $_sts -ne 0 ]
+    then
+	echo _sighup_pmcd caused no change in pmcd sighup count
+	exit 1
+    fi
+
+    # delay for $_signal_delay while pmcd actually does post-SIGHUP work
+    #
+    $PCP_BINADM_DIR/pmsleep $_signal_delay
 }
